@@ -8,7 +8,7 @@ English version: [CHANGELOG.md](CHANGELOG.md)
   - **`shell-team` へのリブランドと、最初の安定・公開準備リリース。** プラグイン・namespace・フラッグシップコマンドを改名——`claude-dev-team` → `shell-team`／`team-run` → `run`（`/shell-team:run` で起動）——し、リポジトリごとの footprint ディレクトリを `.team-run/` → `.shell-team/` へ移動。他のコマンド名（`team-init`・`goal`・`review`・`loop-triage`・`review-response`）は不変。
   - **単一の配布線。** v0.2 / v0.3 の並行配布を廃止: `shell-team` を `main` 上の単一リリース線として配布し、pin・切り替え・backport の対象となる別系統はない。
   - **1.0 は API 安定をコミット。** namespace とコマンド面が公開形に確定したため、本リリースでそれらを semantic versioning 下の安定した公開面として採用する（以後の破壊的変更は major を上げる）。
-  - **挙動変更なし。** 純粋な識別子／ブランドの改名＋配布の単純化であり、チームループ・エージェント・チェック・contract は v0.3.0 と機能的に同一。
+  - **v0.3.0以降も、クローズド開発で相当な改修を継続。** 最終的な公開準備中は、重要な変更が続いていてもバージョン番号を意図的に進めなかった。v0.3.0はクローズド開発上の節目であり、公開版の前身やv1.0.0の変更量を測る完全な基準ではない。
 - **v0.3.0**
   - **Oversight モデル進化が GA に到達。** 完了ゲートの中核契約を「特定人間が生成コードを読み続ける」から「機械強制された接地ナレッジ＋独立 AI evaluator」へ移設し、人間は out-of-distribution（OOD）例外の回路遮断器として残す。
   - **全 5 段階、すべてこのラインで出荷**: この転換が守るべき新しい失敗モード（チームが機械速度で自分自身に同意してしまう）を命名する oversight doctrine。タスクの Goal・受入条件・入力空間・非ゴールを hash-pin し後の drift を fail-closed で検知可能にする凍結 intent 機構。非自明な実装判断に対する（決定・理由・接地引用）三つ組の決定 provenance 記録。何かが接地できないときだけ人間へエスカレーションする構造化 verdict を返す独立した drift/alignment evaluator（cross-provider・playbook 注入除外）。そして「人間よ答えよ」から retro を書くエージェントが直接エビデンスを読み自ら attest する形へ移した retro プロセス。
