@@ -1,0 +1,12 @@
+# T-107-step: codex
+codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
+"Read docs/specs/<slug>.md's frozen intent-block yourself (the region strictly between \
+<!-- BEGIN intent-block: T-XXX --> and <!-- END intent-block: T-XXX -->), read \
+tasks/provenance/T-XXX.md's decision/reason/grounding triples (or its zero-decision sentinel) \
+yourself, and read the diff between <base> and HEAD yourself with git diff / nl -ba — do not \
+expect any of these pasted into this prompt. Judge whether the delivered diff's semantics still \
+align with the frozen intent's meaning, and whether every non-trivial provenance decision carries \
+a real grounding citation (a decision whose grounding value literally reads 'none (ungrounded)' \
+is a candidate for ungrounded-decision, not an automatic pass). Return your verdict as exactly one \
+of: aligned, drift-detected, ungrounded-decision, OOD-novelty, plus your reasoning and which files \
+you actually read." > "<RAW_JSONL>" 2>&1

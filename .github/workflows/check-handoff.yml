@@ -1,0 +1,143 @@
+name: check-handoff
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: check-handoff lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install shellcheck (pinned — must match local dev version)
+        env:
+          SHELLCHECK_VERSION: "0.11.0"
+        run: |
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" -o /tmp/shellcheck.tar.xz
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+
+      - name: shellcheck
+        run: shellcheck bin/check-handoff.sh tests/check-handoff/run.sh bin/check-contract.sh tests/check-contract/run.sh bin/loop-guard.sh tests/loop-guard/run.sh bin/log-run.sh tests/log-run/run.sh bin/check-run.sh tests/check-run/run.sh bin/team-init.sh tests/team-init/run.sh bin/discover-work.sh tests/discover-work/run.sh tests/discover-work/fixtures/gh bin/check-acs.sh tests/check-acs/run.sh bin/check-retro.sh tests/check-retro/run.sh bin/check-readme-version.sh tests/check-readme-version/run.sh bin/rollup-runs.sh tests/rollup-runs/run.sh bin/rollup-track.sh tests/rollup-track/run.sh bin/team-paths.sh tests/team-paths/run.sh bin/check-design-note.sh tests/check-design-note/run.sh bin/goal-state.sh tests/goal-state/run.sh bin/consolidate-proposals.sh tests/consolidate-proposals/run.sh bin/review-gate.sh tests/review-gate/run.sh bin/close-out.sh bin/gen-project-status.sh tests/close-out/run.sh bin/check-prompt-sync.sh tests/check-prompt-sync/run.sh bin/cluster-failures.sh tests/cluster-failures/run.sh bin/check-playbook.sh tests/check-playbook/run.sh bin/gen-playbook-blocks.sh tests/gen-playbook-blocks/run.sh bin/playbook-promote.sh tests/playbook-promote/run.sh bin/install tests/install/run.sh bin/rework-digest.sh tests/rework-digest/run.sh bin/check-intent.sh tests/check-intent/run.sh bin/check-provenance.sh tests/check-provenance/run.sh bin/check-board-headings.sh tests/check-board-headings/run.sh tests/errexit-safe/run.sh bin/codex-capture.sh tests/codex-skeleton-hygiene/run.sh
+
+      - name: Lint the shipped board template (hand-off linter)
+        run: bash bin/check-handoff.sh templates/todo-template.md
+
+      - name: Run check-handoff fixture suite
+        run: bash tests/check-handoff/run.sh
+
+      - name: Lint the shipped shell-team loop contract
+        run: bash bin/check-contract.sh templates/shell-team.contract.yaml
+
+      - name: Lint the shipped generic loop-contract template
+        run: bash bin/check-contract.sh templates/loop-contract-template.yaml
+
+      - name: Lint the shipped goal loop contract
+        run: bash bin/check-contract.sh templates/goal.contract.yaml
+
+      - name: Run check-contract fixture suite
+        run: bash tests/check-contract/run.sh
+
+      - name: Run loop-guard fixture suite
+        run: bash tests/loop-guard/run.sh
+
+      - name: Run check-run fixture suite
+        run: bash tests/check-run/run.sh
+
+      - name: Run log-run resolution suite
+        run: bash tests/log-run/run.sh
+
+      - name: Run team-init fixture suite
+        run: bash tests/team-init/run.sh
+
+      - name: Run discover-work fixture suite
+        run: bash tests/discover-work/run.sh
+
+      - name: Run check-acs fixture suite
+        run: bash tests/check-acs/run.sh
+
+      - name: Run check-design-note fixture suite
+        run: bash tests/check-design-note/run.sh
+
+      - name: Run goal-state fixture suite
+        run: bash tests/goal-state/run.sh
+
+      - name: Run rework-digest fixture suite
+        run: bash tests/rework-digest/run.sh
+
+      - name: Run check-retro fixture suite
+        run: bash tests/check-retro/run.sh
+
+      - name: Run check-readme-version fixture suite
+        run: bash tests/check-readme-version/run.sh
+
+      - name: Dogfood check-readme-version on the repo's READMEs
+        run: bash bin/check-readme-version.sh README.md README.ja.md
+
+      - name: Run rollup-runs fixture suite
+        run: bash tests/rollup-runs/run.sh
+
+      - name: Run rollup-track fixture suite
+        run: bash tests/rollup-track/run.sh
+
+      - name: Run consolidate-proposals fixture suite
+        run: bash tests/consolidate-proposals/run.sh
+
+      - name: Run cluster-failures fixture suite
+        run: bash tests/cluster-failures/run.sh
+
+      - name: Run review-gate fixture suite
+        run: bash tests/review-gate/run.sh
+
+      - name: Run close-out fixture suite
+        run: bash tests/close-out/run.sh
+
+      - name: Run check-prompt-sync fixture suite
+        run: bash tests/check-prompt-sync/run.sh
+
+      - name: Dogfood check-prompt-sync — this repo's prompt blocks must be in sync
+        run: bash bin/check-prompt-sync.sh
+
+      - name: Run check-playbook fixture suite
+        run: bash tests/check-playbook/run.sh
+
+      - name: Run gen-playbook-blocks fixture suite
+        run: bash tests/gen-playbook-blocks/run.sh
+
+      - name: Run playbook-promote fixture suite
+        run: bash tests/playbook-promote/run.sh
+
+      - name: Run team-paths fixture suite
+        run: bash tests/team-paths/run.sh
+
+      - name: Dogfood team-paths — a repo with no legacy markers resolves to the default layout
+        run: |
+          test "$(bash bin/team-paths.sh --get base)"  = ".shell-team"
+          test "$(bash bin/team-paths.sh --get todo)"  = ".shell-team/todo.md"
+          test "$(bash bin/team-paths.sh --get specs)" = ".shell-team/specs"
+
+      - name: Run install fixture suite
+        run: bash tests/install/run.sh
+
+      - name: Run check-intent fixture suite
+        run: bash tests/check-intent/run.sh
+
+      - name: Run check-provenance fixture suite
+        run: bash tests/check-provenance/run.sh
+
+      - name: Run check-board-headings fixture suite
+        run: bash tests/check-board-headings/run.sh
+
+      - name: Run errexit-safe regression suite
+        run: bash tests/errexit-safe/run.sh
+
+      - name: Run codex-skeleton-hygiene suite
+        run: bash tests/codex-skeleton-hygiene/run.sh

@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# tests/codex-skeleton-hygiene/mock/codex — mock `codex` CLI for the
+# bin/codex-capture.sh suite (T-097). Never invokes the real Codex CLI or
+# network; parses argv only for the `-o <path>` slot codex-capture.sh
+# substitutes @CODEX_OUT@ into, and behaves per $MOCK_CODEX_MODE:
+#
+#   happy      writes a canned final message to the -o path, and a
+#              {"type":"item.completed",...} JSONL line to stdout; exit 0.
+#   empty      writes NOTHING to the -o path (stays empty, from mktemp); a
+#              JSONL line to stdout regardless; exit 0.
+#   structure  writes a final message to the -o path, but a NON-JSON line
+#              (no leading `{`) to stdout; exit 0.
+#   malformed  (T-098, DP-A counterfactual) writes a non-empty final message
+#              to the -o path, but a `{`-leading-but-invalid line (no closing
+#              brace / no event key) to stdout; exit 0.
+#   fail       writes nothing; a diagnostic line to stdout; exit 7 (non-zero).
+#
+# Unset/unknown mode => usage error (exit 2), so a missing env var is never
+# silently mistaken for "happy".
+
+set -euo pipefail
+
+mode="${MOCK_CODEX_MODE:?mock codex: MOCK_CODEX_MODE must be set (happy|empty|structure|malformed|fail)}"
+
+out_path=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "-o" ]; then
+    out_path="$arg"
+  fi
+  prev="$arg"
+done
+
+case "$mode" in
+  happy)
+    if [ -n "$out_path" ]; then
+      printf 'mock codex final message: OK\n' > "$out_path"
+    fi
+    printf '{"type":"item.completed","item":{"type":"agent_message","text":"mock codex final message: OK"}}\n'
+    exit 0
+    ;;
+  empty)
+    # -o path is left empty (mktemp already created it empty; write nothing).
+    printf '{"type":"item.completed","item":{"type":"agent_message","text":""}}\n'
+    exit 0
+    ;;
+  structure)
+    if [ -n "$out_path" ]; then
+      printf 'mock codex final message: OK\n' > "$out_path"
+    fi
+    printf 'not-a-json-event-stream-line\n'
+    exit 0
+    ;;
+  malformed)
+    if [ -n "$out_path" ]; then
+      printf 'mock codex final message: OK\n' > "$out_path"
+    fi
+    printf '{broken-jsonl\n'
+    exit 0
+    ;;
+  fail)
+    printf 'mock codex: simulated non-zero exit\n'
+    exit 7
+    ;;
+  *)
+    printf 'mock codex: unknown MOCK_CODEX_MODE=%s (want happy|empty|structure|malformed|fail)\n' "$mode" >&2
+    exit 2
+    ;;
+esac

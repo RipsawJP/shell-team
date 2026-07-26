@@ -1,0 +1,249 @@
+---
+description: Run a /goal self-verification loop — repeatedly implement+verify a single task until a layered completion gate (check-acs → check-intent, only when the spec carries a frozen intent block → check-provenance → qa-verifier → codex-reviewer) is fully green, bounded by loop-guard.sh (iteration / wall-clock / no-progress). Use when you want the team to drive a task to "done" on its own cadence rather than one manual pass.
+---
+
+You are driving the **`/goal` runtime self-verification loop** for the single
+target task named in the request. Unlike `/shell-team:run` (one pass), `/goal` keeps
+running one implement→verify attempt per tick until the task's acceptance
+criteria are fully green **or** the loop's contract says stop. The loop is
+**bounded by `bin/loop-guard.sh`** (iteration, wall-clock, no-progress) so it
+cannot run away. You do **not** merge or push — those stay human gates.
+
+**Step 0 — resolve paths & contract.** Run `team-paths.sh --print` once (on PATH
+when the plugin is loaded; else `bin/team-paths.sh`) to read `TEAM_TODO`,
+`TEAM_LOOPS_DIR`, `TEAM_RUNS_DIR`, `TEAM_SPECS_DIR`. The loop contract is
+`<TEAM_LOOPS_DIR>/goal.contract.yaml`. The cross-tick **state file** is
+`<TEAM_RUNS_DIR>/goal-<task-id>.state` (the runs dir is gitignored — state is
+volatile, not committed).
+
+⚠️ **Env vars do NOT persist across separate Bash tool calls.** Do not `export`
+a path or counter in one call and read it in another. Cross-tick state lives in
+the state file (managed by `goal-state.sh`); resolve any path *in the same Bash
+call* with `$(team-paths.sh --get KEY)`.
+
+**Language — mirror the user.** Prepend one line to each sub-agent prompt
+(`engineer` / `qa-verifier` / `codex-reviewer`, as `/shell-team:run` does) telling it to
+**respond in the same language the user is conversing in** (mirror it; default to
+English if unclear). Zero-config — no language config file and no env var; pass the
+conversation language you observe. **Keep machine-parsed tokens verbatim in
+English**: status flags (`READY_FOR_*` / `BLOCKED` / `REWORK`), verdict labels
+(`PASS` / `FAIL` / `APPROVE` / `REQUEST_CHANGES`), and each agent's fixed hand-off
+headings/keys — `goal-state.sh signature` greps the verdict labels, so translating
+them breaks no-progress detection. Prose follows the conversation language; the
+contract tokens do not.
+
+## First tick — initialize state
+
+On the **first** tick for this task, create the state file (records the loop
+start time + iteration 0):
+
+```
+goal-state.sh init "$(team-paths.sh --get runs)/goal-<task-id>.state"
+```
+
+(on PATH when the plugin is loaded; else `bin/goal-state.sh`.) Skip this on
+later ticks — the state file already exists.
+
+## Each tick
+
+1. **Implement/verify attempt** — invoke `engineer` for one implement+test pass
+   over the target task's spec (prepend the Operating-paths line to its prompt,
+   as `/shell-team:run` does). It updates the board to `READY_FOR_QA`.
+   - **Preserve the implementation across the seam (T-073)**: the engineer commits its implementation and tests before it sets `READY_FOR_QA`; as a second-layer guard, confirm there is no uncommitted implementation diff before invoking `qa-verifier` in the completion gate (`git status --short` shows nothing to commit).
+
+2. **Completion gate (layered, each verifier independent)** — run in order, and
+   **do not carry one verifier's conclusion into the next** (a QA false-positive
+   PASS must not anchor Codex):
+   - `check-acs.sh <spec>` — deterministic: are the scriptable ACs all PASS?
+   - if the spec carries a frozen `<!-- BEGIN/END intent-block: T-NNN -->`
+     (T-072), also run `check-intent.sh <spec> <board>` alongside `check-acs.sh`
+     as a second deterministic layer — the gate is not green unless it reports
+     `aligned` (exit 0); when the spec has no intent block, skip this check
+     (backward compatible).
+   - also run `check-provenance.sh tasks/provenance/<task-id>.md` alongside
+     `check-acs.sh` as a third deterministic layer — the gate is not green
+     unless it reports `conformant` (exit 0). The engineer's T-074 producer
+     discipline records this file (decision/reason/grounding triples or the
+     zero-decision sentinel) every implement pass, so — unlike the opt-in
+     intent-block check — this layer is unconditional: a missing file (usage
+     exit 2) or a non-conformant file (schema exit 1 / structural exit 2) is
+     itself a non-green outcome that routes back to `engineer`, never a skip
+     (fail-closed by design — the mechanical enforcement point of the
+     provenance discipline; provenance is mandatory per task, not opt-in per
+     spec). A non-conformant provenance layer feeds this tick's SIG (step 3,
+     translated below) and is therefore bounded by `loop-guard.sh` just like
+     check-acs / check-intent — no separate retry cap is needed on the goal
+     side (unlike the shell-team seam gate, which fails closed and escalates
+     to the human immediately rather than bounding retries).
+   - if so, invoke `qa-verifier` — judges the non-scriptable ACs (PASS/FAIL).
+   - if QA PASS, invoke `codex-reviewer` — cross-provider verdict
+     (APPROVE / REQUEST_CHANGES).
+   - **Detection lens** (same distinction as `/shell-team:run`'s step 5/6):
+     `qa-verifier` verifies empirically/by execution (does it actually run,
+     actually produce the claimed output); `codex-reviewer` verifies
+     formulaically/statically (boundary conditions, arithmetic, structural
+     edge cases) — an orthogonal detection surface, not a duplicate of QA's.
+   The gate is **green** only when all applicable layers pass — five when an
+   intent block exists, otherwise four — check-acs PASS + check-intent.sh
+   aligned (when the spec carries an intent block) +
+   check-provenance.sh conformant + QA PASS + Codex APPROVE.
+   - **Per-tick failure-class tracking (T-058)**: on every non-green tick,
+     classify each gate finding by root-cause class slug — check-acs /
+     `check-intent.sh` (a non-`aligned` result) /
+     `check-provenance.sh (a non-conformant result)` / `qa-verifier` findings
+     all as phase `validate`, `codex-reviewer` findings as phase `review` — and keep
+     the per-tick list (round = the iteration number
+     this tick gets from `goal-state.sh bump` in step 3) in your working
+     context across ticks (a ScheduleWakeup re-entry stays in the same
+     conversation; the state file stores no classes — reuse, don't modify).
+     These records are the input for the STOP escalation digest in step 4.
+
+3. **Bound gate** — compute the loop-guard inputs *in one Bash call each*, then
+   ask the guard whether to continue:
+   ```
+   STATE="$(team-paths.sh --get runs)/goal-<task-id>.state"
+   ITER="$(goal-state.sh bump "$STATE")"
+   ELAPSED="$(goal-state.sh elapsed-min "$STATE")"
+   SIG="$(printf '%s' "<combined check-acs (normalized: check-acs: PASS or check-acs: FAIL <ids>) + check-intent (translated) + check-provenance (translated) + QA/Codex verdict labels only — never the raw check-acs stdout or free-form prose>" | goal-state.sh signature)"
+   PREV="$(goal-state.sh prev-sig "$STATE")"
+   loop-guard.sh "$(team-paths.sh --get loops)/goal.contract.yaml" \
+     --iteration "$ITER" --elapsed-min "$ELAPSED" \
+     --verdict-hash "$SIG" --prev-verdict-hash "$PREV"
+   goal-state.sh set-sig "$STATE" "$SIG"
+   ```
+   - **`check-acs.sh`'s contribution to the combined text must be a normalized
+     summary, never its raw stdout**: concatenate `check-acs: PASS` when every
+     scriptable AC passed, or `check-acs: FAIL <space-separated failing AC
+     ids>` otherwise. Never paste the raw `check-acs.sh` stdout — its per-AC
+     `running: <check command text>` diagnostic lines are literal
+     reproductions of each AC's `check:` command, and this very spec's own
+     AC5/AC16 check commands contain the literal tokens `FAIL AC900003` /
+     `AC900004`; concatenating the raw stdout would inject those tokens into
+     every tick's signature regardless of the actual check-provenance
+     outcome, making the signature non-injective — a false `STOP:no_progress`
+     that Codex round1 (Blocker 1) reproduced byte-for-byte in this repo.
+     **Derive this deterministically — no orchestrator discretion left in how
+     to extract it (Codex round2 M2)**: decide PASS/FAIL from
+     `check-acs.sh <spec>`'s **exit code** — exit 0 means `check-acs: PASS`.
+     On exit 1, parse the trailing `check-acs: FAILED: AC3 AC7 …` summary
+     line (equivalently, the `n` in each `ACn: FAIL (exit …)` line) and pull
+     out only the **bare `ACn` ids** to build `check-acs: FAIL AC3 AC7` —
+     **never take the `ACn: running: <check command>` diagnostic lines**,
+     which reproduce each AC's check command verbatim and are exactly the B1
+     poisoning source. The same rule applies to QA/Codex: contribute their
+     **verdict label only** (`PASS`/`FAIL`/`APPROVE`/`REQUEST_CHANGES`),
+     never their free-form prose — a stray verdict-label word inside a
+     finding's write-up would otherwise corrupt the signature in the
+     opposite direction.
+   - **`check-acs.sh`'s exit 2 (usage) must never poison the signature (T-077
+     req 3)**: on a `check-acs.sh <spec>` exit 2 (usage — an unreadable/missing
+     spec, bad args, or an unrecognized AC label line), check-acs exit 2 never
+     poisons the signature: treat it as a `guard_error`-class condition and
+     escalate to the human immediately — never translate it into a sentinel,
+     and never fold check-acs's raw error text into the combined signature
+     text. The goal loop is bounded by `loop-guard.sh`, but a spec you cannot
+     read is a broken setup, not a convergence failure.
+   - The `verdict-hash` is a **normalized failure signature** (verdict labels + AC
+     ids only — `goal-state.sh signature` strips volatile prose), so a tick that
+     repeats the same failure shape trips `STOP:no_progress`.
+   - **`check-intent.sh` must be translated into existing signature vocabulary
+     before you concatenate it into the combined text** — `goal-state.sh`'s
+     normalization regex only recognizes `PASS`/`FAIL`/`APPROVE`/
+     `REQUEST_CHANGES`/`AC[0-9]+`, and it is a primitive ("Reuse, don't modify"
+     below), so a raw literal `aligned`/`structural`/`drift-detected` token
+     would be silently dropped by the regex and two ticks with genuinely
+     different check-intent outcomes would collapse onto the same signature
+     (false `STOP:no_progress`, or a real repeated failure going undetected).
+     When the spec carries an intent block, append one of these to the
+     combined text instead of the raw exit-code word:
+     - `aligned` (exit 0) → `check-intent: PASS`.
+     - `structural` (exit 2, hash not yet recorded) → `check-intent: FAIL
+       AC900001` — `AC900001` is a **reserved sentinel** AC id (never a real
+       spec AC number — this repo's specs never reach anywhere near 900) used
+       only so this failure mode's signature differs from `drift-detected`'s.
+     - `drift-detected` (exit 1, recorded hash mismatches the current intent
+       block) → `check-intent: FAIL AC900002` — a second, distinct sentinel.
+     This keeps `goal-state.sh` itself untouched while still making
+     `structural` and `drift-detected` (and `aligned`) each produce a distinct
+     signature — verified: `printf '%s' "AC1: PASS\ncheck-intent: FAIL
+     AC900001" | goal-state.sh signature` → `AC1;AC900001;FAIL;PASS`, versus
+     `...AC900002` → `AC1;AC900002;FAIL;PASS` (different), versus the aligned
+     case `...check-intent: PASS` → `AC1;PASS` (different from both).
+   - **`check-provenance.sh` must also be translated into the signature
+     vocabulary before you concatenate it** — same reason as `check-intent.sh`
+     (`goal-state.sh`'s regex only recognizes `PASS`/`FAIL`/`APPROVE`/
+     `REQUEST_CHANGES`/`AC[0-9]+`, so a raw `conformant`/`schema`/`usage` word
+     would be silently dropped and two ticks with different provenance outcomes
+     would collapse onto one signature — a false `STOP:no_progress` or a missed
+     repeated failure, the exact T-072 SIG-follow-through miss). When the
+     provenance gate ran this tick, append one of these to the combined text:
+     - `conformant` (exit 0) → `check-provenance: PASS`.
+     - `schema` (exit 1, a malformed/incomplete triple or an
+       ungrounded-without-declaration decision) → `check-provenance: FAIL
+       AC900003` — a **reserved sentinel** AC id (never a real spec AC; distinct
+       from check-intent's AC900001/AC900002).
+     - `usage` / `structural` (exit 2, a missing/unreadable provenance file or
+       broken markers) → `check-provenance: FAIL AC900004` — a second reserved
+       sentinel.
+     This keeps `goal-state.sh` itself untouched while making conformant /
+     schema / usage-structural each produce a distinct signature — verified:
+     `printf '%s' "check-provenance: FAIL AC900003" | goal-state.sh signature`
+     → `AC900003;FAIL`, versus `...AC900004` → `AC900004;FAIL` (different),
+     versus `check-provenance: PASS` → `PASS` (different from both, and from
+     check-intent's sentinels).
+   - **`--elapsed-min` is required**: `loop-guard.sh` defaults `ELAPSED_MIN=0` and
+     the contract's `max_wallclock_min` is inert without it. `goal-state.sh
+     elapsed-min` derives it from the persisted start time — always pass it.
+
+4. **Decide**:
+   - Gate **green** → the loop **succeeds**; report done (board at
+     `READY_FOR_MERGE`, review recorded) and **stop**. Do not merge/push (human
+     gate).
+   - **Fast-follow disposition recording (T-068)**: before reporting done at `READY_FOR_MERGE`, act on `codex-reviewer`'s `#### Fast-follow disposition` declaration — the reviewer states intent only (file-an-issue or won't-fix) and never opens issues or edits the board, so **you (the orchestrator) are the actor**: for a file-an-issue intent, open the issue (via this repo's normal issue-creation flow, user-approval gate where it applies) and capture its number; for a won't-fix intent, capture the reason. Transcribe the result onto the task's board entry as a sub-bullet anchored `- fast-follow disposition (YYYY-MM-DD): …`, using the same closed disposition set as `/shell-team:run`'s Review step — `filed as issue #N`, `waived: <reason>`, or a time-bound `pending: <reason> — <deadline>` that must resolve to `filed as issue #N` or `waived: <reason>` before close-out (`pending` must never survive close-out — `bin/close-out.sh` fails closed if one remains). If the reviewer declared `no fast-follow deferrals`, no line is required. The reviewer is read-only on the board (no `gh`/API access) — filing and recording are the orchestrator's job, so a surfaced deferral never silently vanishes (the T-066 record gap).
+   - loop-guard prints **`STOP:<reason>`** (`max_iterations_reached` /
+     `budget_exhausted` / `no_progress` / `guard_error`) → **stop** and report the
+     reason verbatim to the user.
+     - **Rework-history digest (T-058)**: when escalating a `STOP:`, run `rework-digest.sh` with the per-round root-cause classes you have been tracking across rounds — one `--round <n> --phase <validate|review> --class <slug>` triple per classified rework finding — plus `--stop-reason <reason>` (on PATH when the plugin is loaded; else `bin/rework-digest.sh`), and paste its stdout into the escalation message. It prints the per-round failure-class list and the same-class-repetition vs new-classes judgment the human needs for the extend/stop decision. Do not re-describe the digest format by hand — the script is its single source of truth.
+     - **Re-routing branch (T-063)**: when the digest's judgment is `same-class-repetition`, its `recommended-action` block is present in the pasted stdout — surface those choices to the human as-is and lead with reconsider the design premise (routing back to pm-spec/ui-designer) as the first choice, not a hand-copied restatement; the script's output is the single source of truth for the choice text.
+   - **Early escalation branch (T-100, distinct from the STOP escalation above)**: classify each rework finding by root-cause class the same way as `/shell-team:run`'s Same-class-2 rule. The moment the same class reaches 2 cumulative occurrences — before any loop-guard `STOP:` is reached — run `rework-digest.sh` with `--trigger same-class-2` in place of `--stop-reason` (no `STOP:` is required to run it in this mode) and surface the `recommended-action` block to the human early, leading with reconsider-the-design-premise; the script's stdout is the single source of truth for the choice text. This early call does not replace the STOP-mode digest above — that one still runs if a `STOP:` is later reached.
+   - loop-guard prints **`CONTINUE`** and the gate is **not** green → schedule the
+     next tick with `ScheduleWakeup(delaySeconds, <re-invoke this /goal prompt>)`.
+     Pick `delaySeconds` ≤ the 5-minute cache TTL when the loop should continue
+     soon (a cost optimization only — it never affects the bound).
+
+## Telemetry (best-effort)
+
+After each sub-agent call, emit one span (never let it stop the loop — append
+`|| true`):
+
+```
+log-run.sh goal --run-id <run_id> --seq <n> --span <engineer|qa-verifier|codex-reviewer> \
+  --phase <implement|verify|review> --iteration <ITER> --attempt 1 \
+  --status <success|error> [--verdict <PASS|FAIL|APPROVE|REQUEST_CHANGES>] [usage flags…] || true
+```
+
+`log-run.sh` self-resolves the runs dir (no path injection needed). Use `goal`
+as the `loop_id`.
+
+## Rules / boundaries
+
+- **Bounded, not autonomous-to-merge**: the loop drives to green, then stops at
+  the human gate. Never `git merge`/`git push`/tag — quote the contract's
+  `human_gate`.
+- **Reuse, don't modify** the primitives (`loop-guard.sh`, `check-acs.sh`,
+  `log-run.sh`, `goal-state.sh`, the `qa-verifier`/`codex-reviewer` agents).
+- **token/usd is never a hard STOP lever** — the contract's `max_usd: 0` is
+  untracked; the real bounds are iteration + wall-clock.
+
+## Runtime is dogfood-verified, not CI-tested
+
+The `/loop`/`ScheduleWakeup` cadence and the end-to-end implement→verify→stop
+behavior run at **runtime** and are **not** exercised by CI — they depend on
+runtime primitives this skill cannot self-invoke. What CI does verify is the
+machinery this skill leans on: `goal-state.sh` (unit-tested), the
+`goal.contract.yaml` lint, and that the primitives are unchanged. End-to-end loop
+behavior is confirmed by **dogfood** runs, not the test suite. See
+`docs/loop-engineering/goal-loop.md`.
+
+Target task / request:
+$ARGUMENTS

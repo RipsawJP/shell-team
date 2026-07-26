@@ -1,0 +1,92 @@
+# Changelog
+
+Release history of the `shell-team` plugin — one bullet per release, newest first. Release history first moved out of `README.md`'s Versioning section into this file, and was later fully rewritten (reordered to newest-first, split into sub-bullets, and scrubbed of internal task/issue references) as part of public-release preparation; new release entries land here as part of this project's release process.
+
+日本語版: [CHANGELOG.ja.md](CHANGELOG.ja.md)
+
+- **v1.0.0**
+  - **Rebrand to `shell-team`, and the first stable, public-ready release.** The plugin, its namespace, and its flagship command are renamed — `claude-dev-team` → `shell-team` and `team-run` → `run` (invoked as `/shell-team:run`) — and the per-repo footprint directory moves `.team-run/` → `.shell-team/`. All other command names (`team-init`, `goal`, `review`, `loop-triage`, `review-response`) are unchanged.
+  - **A single distribution line.** The parallel v0.2 / v0.3 distribution is retired: `shell-team` ships as one released line on `main`, with no separate maintenance line to pin, switch, or backport to.
+  - **1.0 commits to API stability.** With the namespace and command surface settled in their public form, this release adopts them as the stable public surface under semantic versioning; future breaking changes will bump the major version.
+  - **No behavior change.** This is a pure identifier / brand rename plus distribution simplification — the team loop, agents, checks, and contracts are functionally identical to v0.3.0.
+- **v0.3.0**
+  - **The Oversight-model evolution reaches GA.** The completion gate's core contract moves from a specific human continuously reading generated code to mechanically-grounded knowledge plus an independent AI evaluator, with a human retained as the out-of-distribution (OOD) exception circuit-breaker.
+  - **Five stages, all shipped on this line**: an oversight doctrine naming a new failure mode (a team agreeing with itself at machine speed); a frozen-intent mechanism that hash-pins a task's Goal, acceptance criteria, input space, and non-goals so later drift is fail-closed detectable; a decision-provenance record (decision / reason / grounding quote) for non-trivial implementation choices; an independent drift/alignment evaluator (cross-provider, excluded from prompt-injection) that returns a structured verdict and escalates to a human only when something doesn't check out; and a retrospective process that moves from "human, please answer" to the retrospective agent directly reading the evidence and attesting to it.
+  - **Three non-negotiable foundations hold throughout**: evaluator independence (a different model provider, out of the main loop), mechanical capture (frozen intent and provenance are enforced by checkers, not just aspirational), and the human exception path (never removed).
+  - **Autonomy stays conservative at this stage**: every merge still requires a human "go" — the evaluator informs that decision, it never replaces the cross-provider QA-plus-review two-gate. Further verification and low-risk auto-merge stages are deliberately out of scope for this release.
+  - **Distribution flips at GA**: the main branch now tracks this v0.3 line; adopters who want the prior v0.2 line pin its final tag or a dedicated maintenance branch, and the fix direction reverses to "v0.3 first, v0.2 maintenance-only."
+- **v0.2.15**
+  - **Work preservation at the engineer-to-QA hand-off.** The engineer must commit its implementation before declaring work ready for QA, and QA is banned from destructive git operations on the real working tree (checkout / restore / hard reset / clean / stash, and any operation that could modify, delete, or stash away implementation files) — probes are confined to disposable copies. Both the full team loop and the self-paced runtime loop gained a second-line guard that checks for uncommitted diffs at this hand-off, as defense in depth, after a real cross-repo incident lost uncommitted work.
+  - **Oversight doctrine revision.** The internal "trap" documentation was rewritten from "only human discipline can prevent this" to the grounded-AI-evaluator model, naming a new failure mode and hash-pinning the revised design record so later drift is detectable.
+  - **A parallel-distribution design spike's open decisions were resolved and put on record** — how the drift evaluator shares its model provider while keeping a separate, provider-neutral verdict contract, how frozen intent is hashed, and how decision provenance is structured.
+  - **Changelog split**: release history moved out of both READMEs into this file and its Japanese counterpart, byte-compared for parity; the READMEs keep only a policy summary and a link.
+  - **Several lessons were promoted into the structured playbook**, and a concept diagram was added to both READMEs.
+  - **The v0.2 line's parallel-maintenance slot was frozen** while v0.3 development ran: only safety-class fixes (data loss / security) landed on the shared integration branch for the duration.
+- **v0.2.14**
+  - **Fast-follow record-keeping closed out.** Follow-up items from an earlier review were resolved (one genuine fix and three reasoned won't-fixes, all recorded in the relevant spec's disposition ledger), and a two-sided record-keeping discipline was added so a reviewer's fast-follow intent is transcribed to an issue or explicitly waived rather than silently dropped.
+  - **Scaffolding audit added as a retro checkpoint.** On model-change cycles, the retrospective process now checks whether constraints added for an older model's weaknesses are hiding the current model's actual capability — propose-only, with a legitimate "no candidates" outcome.
+  - **A living-docs staleness sweep** fixed a batch of drifted references across the documentation set, and several more lessons were promoted into the structured playbook.
+  - **The release checklist now requires mechanical-check evidence** in each release's board entry, not just a narrative claim.
+- **v0.2.13**
+  - **Task-fit self-declaration for the self-paced runtime loop.** The README and the loop's own skill now state which tasks the loop is and isn't suited for, led by one question: does the task's final verification surface close inside the loop, or does it ultimately need a human eye (e.g. visual/layout output)? Visual-output tasks get an interim short manual cycle instead of a single full-loop pass.
+  - **Three-way stop re-routing**: when the runtime loop's guard stops a run, it now recommends one of send-back-to-spec, revert, or extend, instead of a bare extend/stop binary.
+  - **Input-space definition required in specs**: every spec must now declare the input space it protects, and QA / review severity judgments are grounded to that declaration.
+  - **A parallel two-line distribution model** distributed a stable line and the next pre-release line in parallel under one plugin name, but installed them mutually exclusively — an adopter got one line or the other, selected by which marketplace ref they added.
+  - **A QA adversarial-fixture synthesis checklist** was introduced, covering corrupted/adversarial input, vocabulary-collision and delimiter cases, fence boundaries, and invocation-shape coverage — with a matching pre-emptive checklist added for the engineer role.
+  - **Several lessons were promoted into the structured playbook.**
+- **v0.2.12**
+  - **Dangling-symlink write-through closed at every unprotected site.** Occupancy/collision checks across the repo-scaffolding and rollup scripts were unified so a dangling symlink is treated as occupied, and a forced overwrite always removes a symlink before writing so content lands where it's supposed to.
+  - **Several lessons were promoted into the structured playbook**, and an earlier task's outstanding acceptance criterion was closed with runtime evidence that the default (non-worktree) engineer behavior lands commits directly on the feature branch.
+- **v0.2.11**
+  - **Engineer isolation default flipped.** The engineer now runs non-worktree by default (edits land directly on the current feature branch); worktree isolation became an explicit opt-in for parallel implementations only.
+  - **Spec completion self-check.** The spec-writer role must now promote every normative statement in a spec's body to an acceptance criterion, with a correspondence table and reasoned exclusions.
+  - **Review verdict contract hardened**: severity levels are normalized, every severity change or rejection is logged in an auditable ledger, and a verdict now states whether it was reached statically or via executed tests.
+  - **A rework-history digest on stop**: when a run stops, a helper formats the round-by-round failure history so the decision to extend or stop is backed by evidence rather than a gut call.
+  - **Same-class inventory precision**: when a repeated root cause is found, the fix inventory must be repo-wide and cross-file, not confined to the one flagged file.
+  - **A per-repo test recipe**: repo scaffolding now includes an append-only file documenting the local test-run procedure, so the engineer and QA don't have to re-derive it each time.
+- **v0.2.10**
+  - **Install-path and CI hardening.** The vendoring fallback script was fixed to follow the current source layout, and its test suite was wired into CI — which immediately caught a real BSD-vs-GNU portability bug in the test harness itself.
+  - **Model-tier scheme formalized.** The judgment-tier agents were aligned onto the same model tier, and the project's three-tier model-assignment scheme (a planning tier, an execution tier, and the cross-provider evaluator) was documented along with explicit re-evaluation triggers.
+  - **Acceptance-criteria dry-run made fail-closed**, so a malformed acceptance-criteria check is caught rather than silently skipped.
+  - **The v0.3.0 oversight-model design note landed**, grounding the next major line's shift from human-comprehension-based safety to a grounded, independent AI evaluator.
+- **v0.2.9**
+  - **Cross-run failure clustering.** A helper aggregates failure patterns across many telemetry runs into ranked, normalized signatures — closing a known gap where a systemic issue was only visible one run at a time.
+  - **A structured, machine-validated lessons playbook.** The lessons file gained a machine-readable schema, a generator now derives per-role prompt digests from it, a validator enforces the schema fail-closed, and updates only ever land through a human-gated promotion script — never a hand edit.
+  - **Rework-discipline backflow from real-world use**: when a review finds two instances of the same root-cause class, the rework instruction now switches from spot fixes to a full inventory sweep, and QA / review invocations state which detection lens (empirical execution vs. static/boundary checking) they're using.
+- **v0.2.8**
+  - **Codex review file-read path canonicalized.** The cross-provider reviewer now reads the branch diff directly through a documented, sandboxed command instead of a retired inline-paste workaround whose original premise had gone stale.
+  - **Outer-loop firing points wired up**: telemetry logging now auto-chains into its linter, the retrospective step is now an explicit item in the release process, a non-executing scheduling example was added, and a helper captures each run's roll-up as a git-tracked artifact with a write-time content guard against accidentally committed personal data.
+  - **Roll-up guard hardened** to also refuse Windows-style home-directory paths and common secret-shaped tokens, each anchored to a minimum length so short unrelated strings aren't falsely rejected.
+- **v0.2.7**
+  - **Board and issue close-out automation.** A script writes the board update and the corresponding issue-close steps, and regenerates only the marker-bounded region of the project-status snapshot.
+  - **Agent-prompt canonicalization and drift checking.** Shared prompt blocks now live in one place, and a checker verifies every agent definition that consumes them stays byte-for-byte in sync.
+  - **An always-on careful-execution discipline** was baked into the core agent definitions: decompose work at verifiable seams, back every completion claim with observed evidence, classify each result as progress / stall / regression with a two-strike replan rule, and surface uncertainty explicitly.
+- **v0.2.6**
+  - **A review-response workflow for feedback that already came back on a PR.** It detects change-request-equivalent comments, has the cross-provider reviewer evaluate each finding, and risk-gates them with a hybrid gate — a deterministic floor sends the riskiest findings straight to a human, while the grey zone is judged by the model — before handing the adopted set to the full team loop as a single spec.
+  - **Every gate decision is logged** for the retrospective process to learn from.
+- **v0.2.5**
+  - **Model-tier realignment.** The highest-volume agent roles (engineer, spec-writer, and the UI designer) moved from the heavier judgment-tier model to a lighter execution-tier model, keeping near-equivalent quality at a large cost reduction, while the planning/routing role stayed on the heavier tier.
+  - **The review, triage, retrospective, and QA roles were already on the lighter tier**, so this release completed the intended cost/quality split across the team.
+- **v0.2.4**
+  - **Outer-loop maturation completed.** A triage-consolidation agent and script merge discovery scanning and telemetry escalations into one de-duplicated, budget-capped, propose-only triage file — it never edits the board itself.
+  - **A host-only scheduling adapter.** A time-driven trigger type was documented with a non-enabled example wrapper and a portability caveat; manual triggering remains the always-available fallback.
+- **v0.2.3**
+  - **Team output now mirrors the user's conversation language**, zero-config, while machine-parsed tokens stay verbatim in English so the hand-off pipeline still parses correctly.
+  - **A cross-repo acceptance-criteria bug was fixed**: `check:` commands now run from the caller's working directory (or an explicit target directory) instead of always running from the plugin's own repository — a bug that only surfaced once the self-paced runtime loop was dogfooded against another repo.
+- **v0.2.2**
+  - **A design-note gate validator** replaced a placeholder existence check with real structural and staleness checks for the UI design hand-off.
+  - **The self-paced runtime loop itself shipped** — a new skill implementing an earlier feasibility spike's wiring: a self-paced cadence, bound by the same runaway guard as the full team loop, with a layered completion gate (deterministic check → QA → cross-provider review) and a helper tracking cross-tick state (elapsed time, iteration count, and a normalized failure signature). End-to-end loop execution was verified by dogfooding, not by CI.
+- **v0.2.1**
+  - **First feature release on the v0.2.0 baseline.** Loop Engineering depth: loop-contract metadata fields, the three operating "traps" turned into explicit discipline, a cross-tool state file, and a feasibility spike for a self-validating runtime loop.
+  - **A conditional UI Designer agent** joins the team only for UI work, using an optional design-guidance skill when available.
+  - **A pre-release documentation-consistency sweep** closed out this cycle.
+- **v0.2.0**
+  - **Footprint consolidation (stable baseline).** Every per-repo operating file moved under a single configurable base directory, and the repo-scaffolding step stopped mutating the host repo's own `CLAUDE.md` or root `.gitignore`. Validated by dogfooding against throwaway repos.
+  - **This became the baseline for the v0.2.x line**, which went on to deepen Loop Engineering with primitives drawn from the broader Loop Engineering concept — loop-contract metadata, the three traps as operating discipline, a cross-tool state file, and a self-validating runtime loop.
+  - **An earlier plan to migrate to a fresh public repository at this version was cancelled** — the repo stayed private and this cycle's effort went into Loop Engineering depth instead.
+- **v0.1.0+**
+  - **The plugin + Loop Engineering line begins.** The project moved from file-copy distribution to a proper Claude Code plugin, installed once and available in every repo.
+  - **Breaking changes were allowed across this boundary** — the v0.0.x pre-plugin baseline and the v0.1.x plugin line are not meant to be compatible.
+- **v0.0.1**
+  - **Pre-plugin baseline.** A five-agent, single-pass pipeline distributed via a snapshot-copy install script.
+  - **No plugin, no marketplace, no operating loop** — just the hand-off contract between agents, the starting point everything since has built on.

@@ -1,0 +1,25 @@
+name: fixture-guard
+
+trigger:
+  type: manual
+
+scope:
+  - tests/loop-guard
+
+action:
+  description: a single fixture iteration
+
+budget:
+  max_iterations: 3
+  max_wallclock_min: 30
+  max_usd: 0
+# ^ usd untracked (0) — iteration/wallclock STOP must still work
+
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+report:
+  to: stderr

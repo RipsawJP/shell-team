@@ -1,0 +1,24 @@
+name: fixture-noprog-off
+
+trigger:
+  type: manual
+
+scope:
+  - tests/loop-guard
+
+action:
+  description: a single fixture iteration
+
+budget:
+  max_iterations: 3
+  max_wallclock_min: 0
+  max_usd: 0
+
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: false       # opt OUT — identical verdicts must NOT trigger STOP
+
+report:
+  to: stderr

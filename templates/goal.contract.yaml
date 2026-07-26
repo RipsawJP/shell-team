@@ -1,0 +1,56 @@
+# Loop contract for the /goal runtime self-verification loop (T-034).
+# The /goal skill drives a self-paced loop (one implement/verify attempt per
+# tick) until a layered completion gate (check-acs -> check-intent, only when
+# the spec carries a frozen intent block -> check-provenance -> qa-verifier ->
+# codex-reviewer) is fully green, or loop-guard.sh returns a STOP. This
+# contract makes that loop explicit in the 8-element vocabulary and is what
+# loop-guard.sh reads each tick. Spec: docs/specs/T-034-goal-skill.md.
+#
+# Unlike shell-team, wall-clock IS a primary stop lever here: the /goal driver
+# persists the loop start time and passes --elapsed-min every tick, so
+# max_wallclock_min below is enforced (loop-guard's ELAPSED_MIN defaults to 0 and
+# the cap is inert if --elapsed-min is omitted — the driver must pass it).
+
+name: goal
+
+# OWNER — the operator who invokes /goal is accountable for the run; the loop
+# pauses at the human_gate before merge/push, so the human owns those.
+owner: the operator who invokes /goal
+
+trigger:
+  type: manual
+  detail: an operator invokes /shell-team:goal with a target task
+
+scope:
+  - the single target task named in the invoking request
+  - tasks/todo.md status flags, docs/specs/*, the loop state under the runs dir, the feature branch
+  - must not merge or push without a human gate (see human_gate below)
+
+action:
+  description: a self-paced loop of one engineer implement/verify attempt per tick, gated each tick by a layered completion check (check-acs -> check-intent, only when the spec carries a frozen intent block -> check-provenance -> qa-verifier -> codex-reviewer) and bounded by loop-guard.sh; it ends green when all four pass (five when the spec carries a frozen intent block), or stops on a loop-guard STOP
+
+budget:
+  max_iterations: 5         # at most 5 implement->verify ticks before escalating
+  max_wallclock_min: 60     # PRIMARY lever — driver passes --elapsed-min each tick
+  max_subagents: 3          # engineer, qa-verifier, codex-reviewer per tick
+  max_usd: 0                # untracked — token/usd is never a hard STOP lever here
+
+stop:
+  all_acs_green: true               # check-acs PASS + check-intent aligned (when applicable) + check-provenance conformant + QA PASS + Codex APPROVE
+  max_iterations_reached: true      # escalate once the iteration cap is hit
+  budget_exhausted: true            # wall-clock cap reached (via --elapsed-min)
+  no_progress: true                 # identical normalized failure signature two ticks running
+
+# Human approval gates — the loop pauses for the operator before these actions.
+human_gate:
+  - merge
+  - push
+
+report:
+  to: tasks/todo.md status flag, tasks/reviews/T-XXX.md, and the PR description
+
+# EVIDENCE — the proof a /goal run must produce to claim "done".
+evidence:
+  - QA verification of the spec's acceptance criteria (check-acs PASS / test output)
+  - the Codex cross-provider review verdict in tasks/reviews/T-XXX.md (APPROVE)
+  - the feature-branch diff / PR for human review

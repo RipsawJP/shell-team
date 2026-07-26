@@ -1,0 +1,4 @@
+# fixture registry — mirrors the real registry's two modes
+marker  core.md    consumer-marker.md
+contain core.md    consumer-tail.md
+contain tokens.md  consumer-tokens.md

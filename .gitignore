@@ -1,0 +1,15 @@
+# Raw review dumps and telemetry are never committed.
+# Mirrors the hygiene rule this project adopted after a 2026 PII incident:
+# curated review notes are tracked, raw transcripts and run logs are not.
+tasks/reviews/*.txt
+tasks/reviews/*.json
+tasks/reviews/*.jsonl
+.codex-review.json
+tasks/runs/
+
+# NOTE: `tasks/rollups` is deliberately NOT ignored — roll-up summaries are
+# meant to be tracked (tests/rollup-track/run.sh asserts this).
+
+# Editor / OS noise
+.DS_Store
+*.swp

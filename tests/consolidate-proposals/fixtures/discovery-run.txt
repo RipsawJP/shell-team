@@ -1,0 +1,7 @@
+# Simulates a candidate carrying a [run:RUN-BAD] key in the DISCOVERY stream so
+# the test can exercise the headline cross-source dedup case (AC2): the same
+# source key surfacing from BOTH discovery and a telemetry escalation must be
+# emitted exactly once. (discover-work.sh itself emits pr/issue/ci keys, not run
+# keys — this fixture pins the union-dedup engine, which is source-agnostic.)
+- [ ] **T-000** triage [run:RUN-BAD]: pre-existing run escalation already on the discovery stream — `READY_FOR_ARCH` — spec: docs/specs/T-000-run-run-bad.md
+- [ ] **T-000** triage [pr#99]: another open PR (feature/bar) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-99.md

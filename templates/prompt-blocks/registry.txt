@@ -1,0 +1,43 @@
+# registry.txt — which consumer files must carry which canonical prompt block (T-039).
+#
+# Format (whitespace-separated, one rule per line, `#` comments and blanks skipped):
+#   <mode> <block-file> <consumer> [<consumer>...]
+#
+# mode:
+#   marker  — the consumer must contain exactly one
+#             `<!-- BEGIN prompt-block: <name> -->` / `<!-- END prompt-block: <name> -->`
+#             pair (<name> = block-file without .md), and the region between them
+#             must match the canonical file byte-for-byte (after CRLF /
+#             trailing-whitespace normalization).
+#   contain — every non-empty line of the canonical file must appear verbatim
+#             (fixed-string substring) somewhere in the consumer. Used for
+#             invariant tokens and for core sentences whose consumers carry a
+#             legitimate role-specific tail (the tail lives OUTSIDE the core).
+#
+# Normalization: marker-mode comparison strips CRs and trailing whitespace per
+# line and ignores leading/trailing blank lines of the region — everything else
+# is compared byte-for-byte.
+#
+# Registered variants: a consumer listed against a `language-<role>.md` block is
+# an EXPLICITLY allowed variant of the shared `language.md` core (e.g.
+# codex-reviewer's gate-specific Language rules).
+#
+# Scope limits (by design): the checker only governs consumers LISTED here — a
+# new agent/skill that copies a block without being registered is invisible to
+# it (registering new consumers is part of adding them; see docs/specs/
+# T-039-prompt-sync.md). Consumer paths must not contain whitespace (the
+# registry is whitespace-delimited; team-paths.sh already rejects such bases).
+
+marker  language.md                       agents/engineer.md agents/pm-spec.md agents/qa-verifier.md agents/tech-lead.md
+contain language.md                       agents/scrum-master.md agents/ui-designer.md
+contain language-triage-orchestrator.md   agents/triage-orchestrator.md
+contain language-codex-reviewer.md        agents/codex-reviewer.md
+contain flag-enum.md                      agents/engineer.md agents/pm-spec.md agents/qa-verifier.md agents/tech-lead.md agents/scrum-master.md agents/ui-designer.md agents/triage-orchestrator.md skills/run/SKILL.md templates/todo-template.md bin/check-handoff.sh
+contain verdict-labels.md                 agents/qa-verifier.md skills/run/SKILL.md skills/goal/SKILL.md bin/log-run.sh bin/goal-state.sh
+contain board-line-format.md              agents/pm-spec.md templates/todo-template.md bin/check-handoff.sh
+contain operating-paths-core.md           agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/ui-designer.md agents/triage-orchestrator.md agents/codex-reviewer.md skills/run/SKILL.md skills/goal/SKILL.md
+marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
+marker  playbook-engineer.md               agents/engineer.md
+marker  playbook-qa-verifier.md            agents/qa-verifier.md
+marker  playbook-tech-lead.md              agents/tech-lead.md
+marker  playbook-pm-spec.md                agents/pm-spec.md

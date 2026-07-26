@@ -1,0 +1,3 @@
+## Language
+
+- **Mirror the conversation language.** Write your prose / explanations in the same language as your task prompt (the orchestrator injects the user's conversation language; default English if unclear). **Keep machine-parsed tokens verbatim in English — never translate them**: status flags (`READY_FOR_ARCH` / `READY_FOR_ENG` / `READY_FOR_QA` / `READY_FOR_REVIEW` / `READY_FOR_MERGE` / `BLOCKED` / `REWORK`), verdict labels (`PASS` / `FAIL` / `APPROVE` / `REQUEST_CHANGES`), and your output block's fixed heading/keys. These are grepped by `check-handoff.sh` / `goal-state.sh` / `check-acs.sh` (and design-note / retro validators) — translating them breaks the pipeline.

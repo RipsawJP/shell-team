@@ -1,0 +1,19 @@
+# round3 regression fixture: PHASE is free text (docs/specs/T-043-rollup-
+# guard-hardening.md Non-goals — log-run.sh --phase / check-run.sh place no
+# charset/shape constraint on it beyond non-empty), so a legitimate `phase`
+# telemetry value containing a space, or its own literal colon, must still be
+# ACCEPTED by CLUSTER_LINE_RE (anchored on the fixed REASON enum, not on
+# constraining PHASE) — this is the exact class of line round2's regex
+# incorrectly rejected (Codex round3 Major, reproduced end-to-end with the
+# real log-run.sh -> cluster-failures.sh chain).
+#   space-containing PHASE (the real "pre deploy" repro, verbatim shape)
+#   colon-containing PHASE (Windows-path-style telemetry value) -- resolves
+#     to the RIGHTMOST enum-anchored `:REASON` match, since REASON is always
+#     the producer's trailing segment
+#   a PHASE that itself contains literal "  count="/"  run "-like text --
+#     also free text, also accepted (this was round2's "embedded marker"
+#     malformed case; round3 correctly re-classifies it as legitimate once
+#     PHASE's charset is unconstrained, per the same free-text contract)
+cluster PRE DEPLOY:ERROR  count=2  run RUN-SPACEY
+cluster LEAK-C:\\USERS\\FOO:TIMEOUT  count=1  run RUN-WIN
+cluster IMPLEMENT  count=99:ERROR  count=2  run RUN-G

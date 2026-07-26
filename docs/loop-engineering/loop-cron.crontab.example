@@ -1,0 +1,58 @@
+# loop-cron.crontab.example — ILLUSTRATIVE host-only scheduling sample
+#
+# This file is documentation, NOT a working install. It is never bundled by
+# team-init, never placed on PATH, and never invoked by CI. Copy it, adapt the
+# paths/cadence to YOUR host, and install it yourself — or don't, and keep
+# driving the loop by hand. `manual` is always the fallback (see below).
+#
+# ---------------------------------------------------------------------------
+# What this wires
+# ---------------------------------------------------------------------------
+# The Loop contract surface already accepts a time-driven trigger:
+#
+#     trigger:
+#       type: schedule        # <- valid enum value (manual | schedule | event)
+#       detail: host-driven cadence
+#
+# A `schedule` trigger only says "this loop is meant to run on a clock". It does
+# NOT itself schedule anything — the *host* supplies the clock. This sample shows
+# two ways a host operator can supply it. Both are OPT-IN and OS/host specific;
+# the framework ships neither enabled.
+#
+# ---------------------------------------------------------------------------
+# Option A — the environment's own /loop + ScheduleWakeup (preferred when present)
+# ---------------------------------------------------------------------------
+# `/loop` and `ScheduleWakeup` are ENVIRONMENT primitives (provided by the agent
+# runtime), not repo scripts — there is no skills/loop/ in this plugin, so the
+# framework cannot self-invoke them. When your environment provides them, drive
+# the cadence there (e.g. `/loop 30m /shell-team:run ...`) and set the
+# loop's contract trigger.type to `schedule` to document the intent. Nothing in
+# this repo needs to change.
+#
+# ---------------------------------------------------------------------------
+# Option B — an OS scheduler (cron / launchctl) calling a host wrapper
+# ---------------------------------------------------------------------------
+# If you want an OS-level clock, point cron at a SMALL host-side wrapper YOU own
+# (not shipped here) that invokes whatever your loop runs. Example crontab line —
+# every night at 02:30, adapt the path and command to your host:
+#
+#   30 2 * * *  cd /path/to/your/repo && /path/to/your/host-loop-wrapper.sh >> /path/to/your/loop.log 2>&1
+#
+# macOS launchd equivalent: a StartCalendarInterval LaunchAgent plist that runs
+# the same wrapper — same idea, different scheduler.
+#
+# The wrapper is THIN and REMOVABLE: it is host glue, not framework code. Delete
+# the crontab line (or the LaunchAgent) and the loop can be run by hand exactly
+# as before — no behavior change inside the repo. (Removing the host clock does
+# NOT rewrite any contract file: a contract left at `trigger.type: schedule`
+# stays valid and runnable by hand; optionally edit it back to `manual` yourself
+# to reflect the new intent.)
+#
+# ---------------------------------------------------------------------------
+# Portability caveat (why this ships disabled)
+# ---------------------------------------------------------------------------
+# Scheduling is the least portable piece of the outer loop: adopters' hosts
+# differ (cron vs launchd vs systemd timers vs a CI scheduler vs an agent
+# runtime's /loop), paths differ, and auth/credentials differ. So the framework
+# documents the wiring but never enables it. `manual` is the always-available
+# baseline; `schedule` + this host glue is a removable opt-in layer on top.

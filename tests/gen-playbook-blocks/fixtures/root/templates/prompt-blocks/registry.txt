@@ -1,0 +1,5 @@
+# fixture registry.txt — playbook-* rows only (tests/gen-playbook-blocks)
+marker  playbook-engineer.md               agents/engineer.md
+marker  playbook-qa-verifier.md            agents/qa-verifier.md
+marker  playbook-tech-lead.md              agents/tech-lead.md
+marker  playbook-pm-spec.md                agents/pm-spec.md

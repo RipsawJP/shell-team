@@ -1,0 +1,12 @@
+- [ ] **T-000** triage [pr#1]: PR one (b1) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-1.md
+- [ ] **T-000** triage [pr#2]: PR two (b2) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-2.md
+- [ ] **T-000** triage [pr#3]: PR three (b3) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-3.md
+- [ ] **T-000** triage [pr#4]: PR four (b4) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-4.md
+- [ ] **T-000** triage [pr#5]: PR five (b5) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-5.md
+- [ ] **T-000** triage [pr#6]: PR six (b6) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-6.md
+- [ ] **T-000** triage [pr#7]: PR seven (b7) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-7.md
+- [ ] **T-000** triage [pr#8]: PR eight (b8) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-8.md
+- [ ] **T-000** triage [pr#9]: PR nine (b9) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-9.md
+- [ ] **T-000** triage [pr#10]: PR ten (b10) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-10.md
+- [ ] **T-000** triage [pr#11]: PR eleven (b11) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-11.md
+- [ ] **T-000** triage [pr#12]: PR twelve (b12) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-12.md

@@ -1,0 +1,22 @@
+name: fixture-bad
+
+trigger:
+  type: manual
+
+scope:
+  - tests/loop-guard
+
+action:
+  description: a single fixture iteration
+
+# budget: section deliberately ABSENT — loop-guard must fail closed
+# (STOP:guard_error) because it cannot determine an iteration cap.
+
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+report:
+  to: stderr

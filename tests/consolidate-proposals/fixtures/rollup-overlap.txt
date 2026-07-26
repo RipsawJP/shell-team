@@ -1,0 +1,9 @@
+# AC6 pairing fixture: escalates run RUN-X via Source B, to be combined with
+# fixtures/cluster-run-overlap.txt (Source C, also representative-run RUN-X)
+# in the same consolidate-proposals.sh invocation.
+run RUN-X  [loop shell-team]  ⚠
+  spans: 1   phases: implement
+  status: error=1
+  verdict: (none)
+  tokens: 0   duration: 0ms
+  window: ? – ?

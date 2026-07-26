@@ -1,0 +1,1 @@
+# note: gh CLI not found — all discovery sources skipped (install/authenticate gh to enable)

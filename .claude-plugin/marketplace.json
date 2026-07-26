@@ -1,0 +1,12 @@
+{
+  "name": "ripsawjp",
+  "owner": { "name": "RipsawJP" },
+  "description": "RipsawJP's Claude Code plugin marketplace.",
+  "plugins": [
+    {
+      "name": "shell-team",
+      "source": "./",
+      "description": "Spec-driven AI dev team + Loop Engineering framework (loop contracts, model routing, operating loop)."
+    }
+  ]
+}

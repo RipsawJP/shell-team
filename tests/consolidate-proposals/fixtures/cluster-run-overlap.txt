@@ -1,0 +1,8 @@
+# AC6 fixture: two DISTINCT cluster signatures whose representative run_id is
+# the SAME run (RUN-X) — paired with fixtures/rollup-overlap.txt (which
+# escalates that same run RUN-X via Source B) to prove Design decision (c):
+# a Source B [run:RUN-X] escalation and two distinct Source C
+# [cluster:...] candidates that both point at RUN-X must ALL be retained
+# (3 lines total), never collapsed by sharing a key.
+cluster IMPLEMENT:ERROR  count=3  run RUN-X
+cluster REVIEW:FAIL  count=2  run RUN-X

@@ -1,0 +1,32 @@
+name: fixture-comment-in-section
+
+owner: the test harness
+
+trigger:
+  type: manual
+
+scope:
+  - tests/check-contract
+
+action:
+  description: a single fixture iteration
+
+budget:
+# a column-0 comment inside the section must NOT truncate it
+  max_iterations: 1
+  max_wallclock_min: 5
+  max_subagents: 1
+  max_usd: 0
+
+stop:
+# likewise here — all four keys below must still be seen
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+report:
+  to: stderr
+
+evidence:
+  - the check-contract fixture-suite exit code

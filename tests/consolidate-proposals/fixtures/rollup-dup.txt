@@ -1,0 +1,12 @@
+run RUN-BAD  [loop shell-team]  ⚠
+  spans: 1   phases: implement
+  status: error=1
+  verdict: (none)
+  tokens: 0   duration: 0ms
+  window: ? → ?
+run RUN-BAD  [loop shell-team]  ⚠
+  spans: 1   phases: review
+  status: stopped=1
+  verdict: REQUEST_CHANGES=1
+  tokens: 0   duration: 0ms
+  window: ? → ?

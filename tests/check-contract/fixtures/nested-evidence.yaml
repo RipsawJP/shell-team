@@ -1,0 +1,34 @@
+name: fixture-nested-evidence
+
+owner: the test harness
+
+trigger:
+  type: manual
+
+scope:
+  - tests/check-contract
+
+action:
+  description: a single fixture iteration
+
+budget:
+  max_iterations: 1
+  max_wallclock_min: 5
+  max_subagents: 1
+  max_usd: 0
+
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+report:
+  to: stderr
+
+# evidence: has NO direct flat list item — the '- ...' below is a grandchild
+# under a nested 'artifacts:' mapping. This must be rejected (regression for the
+# T-028 Codex review minor: a nested list must not satisfy the >=1-item rule).
+evidence:
+  artifacts:
+    - logs/build.log

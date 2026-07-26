@@ -1,0 +1,24 @@
+name: fixture-missing-budget
+
+owner: the test harness
+
+trigger:
+  type: manual
+
+scope:
+  - tests/check-contract
+
+action:
+  description: a single fixture iteration
+
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+report:
+  to: stderr
+
+evidence:
+  - the check-contract fixture-suite exit code

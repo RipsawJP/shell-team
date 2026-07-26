@@ -1,0 +1,47 @@
+PASS: happy path prints the fixed skeleton verbatim (distinct classes)
+PASS: presentation-only: no files created
+PASS: repetition branch: same-class-repetition + repeated-classes + note
+PASS: repetition branch: multiple repeated slugs listed first-seen with counts
+PASS: distinct branch: judgment without repeated-classes line
+PASS: distinct branch: recommended-action block omitted
+PASS: direct execution without bash prefix (executable bit intact)
+PASS: symlink invocation (absolute and relative) resolves the real sibling goal-state.sh
+PASS: reject: unknown flag
+PASS: reject: missing value for --round
+PASS: reject: non-integer --round
+PASS: reject: zero --round
+PASS: reject: 10-digit --round
+PASS: reject: out-of-enum --phase
+PASS: reject: uppercase --class
+PASS: reject: leading-hyphen --class
+PASS: reject: out-of-enum --stop-reason
+PASS: reject: incomplete triple (no --class)
+PASS: reject: incomplete triple (no --phase)
+PASS: reject: orphan --phase before --round
+PASS: reject: duplicate --phase in record
+PASS: reject: zero records
+PASS: reject: missing --stop-reason
+PASS: reject: duplicate --stop-reason
+PASS: reject: missing value for --phase (trailing)
+PASS: reject: missing value for --class (trailing)
+PASS: reject: missing value for --stop-reason (trailing)
+PASS: reject: flag-valued --round
+PASS: reject: flag-valued --class
+PASS: reject: flag-valued --stop-reason
+PASS: reject: signature-leak slug (whole-word verdict token, validate)
+PASS: reject: signature-leak slug (whole-word verdict token, review)
+PASS: reject: signature-leak slug (approval token)
+PASS: reject: signature-leak slug (ac+digits token)
+PASS: signature-leak rejection names the cause
+PASS: early mode (T-100): happy path prints the fixed skeleton verbatim
+PASS: early mode: no stop-reason: line present
+PASS: reject: both --stop-reason and --trigger present
+PASS: reject: neither --stop-reason nor --trigger present
+PASS: reject: --trigger bad value
+PASS: reject: missing value for --trigger (trailing)
+PASS: reject: duplicate --trigger
+PASS: reject: flag-valued --trigger
+PASS: reject: early mode with all-distinct classes (DP-3 contradiction)
+PASS: early mode: signature self-check yields NO_VERDICT
+
+All rework-digest assertions passed.

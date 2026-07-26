@@ -1,0 +1,4 @@
+- [ ] **T-000** triage [ci:check-handoff#123]: failing CI run: check-handoff on develop — `READY_FOR_ARCH` — spec: docs/specs/T-000-ci-check-handoff.md
+- [ ] **T-000** triage [pr#41]: some PR title (feature/foo) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-41.md
+- [ ] **T-000** triage [issue#37]: an issue title — `READY_FOR_ARCH` — spec: docs/specs/T-000-issue-37.md
+# note: truncated: showing 10 of 12 candidates (raise --max to see more)

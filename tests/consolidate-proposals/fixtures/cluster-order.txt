@@ -1,0 +1,7 @@
+# AC7 fixture: deliberately NOT in descending-count order (real
+# cluster-failures.sh output always is), so this pins that Source C performs
+# NO re-sort of its own — it must preserve this exact relative line order in
+# the merged proposal (Design decision (e)).
+cluster PLAN:TIMEOUT  count=1  run RUN-Z
+cluster IMPLEMENT:ERROR  count=5  run RUN-Y
+cluster REVIEW:FAIL  count=3  run RUN-X

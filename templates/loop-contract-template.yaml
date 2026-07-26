@@ -1,0 +1,67 @@
+# Loop Contract — the 8-element contract every autonomous loop must satisfy.
+# Copy this file to tasks/loops/<loop-name>.contract.yaml and adapt it.
+# BUDGET and STOP are MANDATORY (the runaway / billing guardrail); OWNER and
+# EVIDENCE are MANDATORY too (the accountability / "unverified done" guardrail,
+# T-028). Omitting any required section (or any of their required keys/shape)
+# is a hard lint error.  Lint with:
+#   bin/check-contract.sh tasks/loops/<loop-name>.contract.yaml
+#
+# This template is itself a valid contract (it lints clean), so it doubles as
+# a copy-paste starting point.
+
+name: example-loop
+
+# OWNER — who is accountable for this loop's runs (REQUIRED, non-empty scalar).
+# The named role/person answerable when the loop misbehaves (runaway, bad merge,
+# billing). "the operator who invokes it" is a valid answer for a manual loop.
+owner: the operator who invokes the loop
+
+# TRIGGER — what starts the loop. type is one of: manual | schedule | event.
+trigger:
+  type: manual
+  detail: how the loop is kicked off (e.g. an operator runs the command)
+
+# SCOPE — the boundary the loop is allowed to touch.
+scope:
+  - the path or subsystem the loop may modify
+  - the boundaries it must not cross
+
+# ACTION — what a single iteration does.
+action:
+  description: the unit of work performed once per iteration
+
+# BUDGET — hard guardrails (REQUIRED). The primary levers are the iteration and
+# wall-clock caps; subagent count bounds fan-out; max_usd is host-dependent and
+# may be 0 (untracked).
+budget:
+  max_iterations: 3
+  max_wallclock_min: 30
+  max_subagents: 5
+  max_usd: 0
+
+# STOP — terminal conditions (REQUIRED). All four flags must be present.
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+# REPORT — where/how the loop reports its outcome.
+report:
+  to: tasks/todo.md status flag and the PR description
+
+# EVIDENCE — the objective proof a run must produce to claim "done" (REQUIRED,
+# >= 1 list item). This is the anti-"unverified done" guardrail: an agent saying
+# "done" is an assertion, not proof. List the artifacts a human can check. A
+# read-only / no-op loop that genuinely produces no proof states '- none: <why>'
+# explicitly rather than omitting the section.
+evidence:
+  - the test suite output / CI status for the change
+  - the Codex cross-provider review verdict (tasks/reviews/T-XXX.md)
+
+# OPTIONAL — extra fields beyond the eight required elements are accepted and
+# ignored by the linter. e.g. human_gate lists the actions that pause the loop
+# for operator approval:
+#   human_gate:
+#     - merge
+#     - push

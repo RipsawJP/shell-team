@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# check-handoff.sh — lint tasks/todo.md against the team hand-off contract.
+#
+# Validates every top-level `- [ ]` line in the `## Active` section:
+#   - matches `- [ ] **T-NNN** <title> — `<FLAG>` — spec: <path>.md`
+#   - the FLAG is in the allowed status-flag enum
+#
+# The spec path is intentionally NOT prefix-locked to `docs/specs/`: under the
+# T-025 footprint consolidation a host's specs may live under `.shell-team/specs/`
+# (or any base dir), so any non-empty path ending in `.md` is accepted. The
+# legacy `docs/specs/<slug>.md` form still matches.
+#
+# Reads only. Prints `<file>:<lineno>: <reason>: <line>` to stderr per
+# violation and exits non-zero if any were found.
+
+set -euo pipefail
+
+FILE="${1:-tasks/todo.md}"
+
+if [[ ! -r "$FILE" ]]; then
+  printf '%s: cannot read file\n' "$FILE" >&2
+  exit 2
+fi
+
+# Allowed status-flag vocabulary.
+ALLOWED_FLAGS=(
+  READY_FOR_ARCH
+  READY_FOR_ENG
+  READY_FOR_QA
+  READY_FOR_REVIEW
+  READY_FOR_MERGE
+  BLOCKED
+  REWORK
+)
+
+flag_allowed() {
+  local candidate="$1" f
+  for f in "${ALLOWED_FLAGS[@]}"; do
+    [[ "$f" == "$candidate" ]] && return 0
+  done
+  return 1
+}
+
+# Extract the Active section while preserving original line numbers.
+# Output format: `<lineno>\t<line>` for each line strictly between the
+# first `## Active` heading and the next `## ` heading.
+active_block="$(awk '
+  /^## Active[[:space:]]*$/ && !seen { seen=1; in_active=1; next }
+  in_active && /^## / { in_active=0 }
+  in_active { printf "%d\t%s\n", NR, $0 }
+' "$FILE")"
+
+# Top-level task line shape. Em-dash separator is U+2014.
+# The flag token is intentionally widened to `[^`]+` (any non-empty backtick
+# content); flag_allowed() is the source of truth for the vocabulary, so a
+# shape-valid line with a typo'd / lowercase flag is reported as
+# "unknown status flag" rather than misclassified as "format mismatch".
+# The title slot is `.*[^[:space:]].*` — at least one non-whitespace char must
+# appear somewhere in the title, but leading/trailing padding is tolerated
+# (e.g. `  hello world  ` passes; `   ` (whitespace-only) does not).
+# shellcheck disable=SC2016
+LINE_RE='^- \[ \] \*\*T-[0-9]+\*\* .*[^[:space:]].* — `[^`]+` — spec: [^[:space:]]+\.md$'
+# Flag extraction is anchored to the documented separator (` — `<flag>` — spec:`)
+# so a backtick-wrapped token in the task title (e.g. `API`, `URL`) cannot be
+# mistaken for the status flag.
+# shellcheck disable=SC2016
+FLAG_RE='— `([^`]+)` — spec:'
+
+violations=0
+emit() {
+  printf '%s:%s: %s: %s\n' "$FILE" "$1" "$2" "$3" >&2
+  violations=$((violations + 1))
+}
+
+# Read the whole `<lineno>\t<content>` record and split manually. Using
+# `IFS=$'\t' read -r lineno content` would coalesce runs of tab and strip a
+# leading tab from `content`, causing tab-indented sub-bullets to slip past
+# the sub-bullet guard below and be re-evaluated as malformed top-level lines.
+while IFS= read -r raw; do
+  [[ -z "$raw" ]] && continue
+  lineno="${raw%%$'\t'*}"
+  content="${raw#*$'\t'}"
+  [[ -z "$lineno" ]] && continue
+  # Tolerate Windows CRLF line endings: a trailing `\r` survives the awk
+  # extraction and would otherwise break the LINE_RE `$` anchor.
+  content="${content%$'\r'}"
+  # Skip blank lines.
+  [[ -z "${content//[[:space:]]/}" ]] && continue
+  # Skip placeholder lines (start with `_(`).
+  [[ "$content" == _\(* ]] && continue
+  # Skip sub-bullets: leading whitespace followed by `-`.
+  [[ "$content" =~ ^[[:space:]]+- ]] && continue
+  # Only validate top-level checklist lines.
+  [[ "$content" != "- [ ]"* ]] && continue
+
+  if [[ ! "$content" =~ $LINE_RE ]]; then
+    emit "$lineno" "format mismatch" "$content"
+    continue
+  fi
+
+  if [[ "$content" =~ $FLAG_RE ]]; then
+    flag="${BASH_REMATCH[1]}"
+    if ! flag_allowed "$flag"; then
+      emit "$lineno" "unknown status flag '$flag'" "$content"
+    fi
+  fi
+done <<< "$active_block"
+
+[[ "$violations" -gt 0 ]] && exit 1
+exit 0

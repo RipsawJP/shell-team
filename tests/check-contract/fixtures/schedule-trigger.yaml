@@ -1,0 +1,37 @@
+# Positive fixture (T-022): locks `trigger.type: schedule` as an intentionally
+# valid enum value. A host operator wires a real-clock cadence (the environment's
+# /loop + ScheduleWakeup, or an OS scheduler per docs/loop-engineering/
+# loop-cron.crontab.example) to drive a `schedule` trigger; `manual` stays the
+# always-available fallback. If a future edit narrows the enum away from
+# `schedule`, this fixture's clean-lint assert in run.sh fails.
+name: fixture-schedule-trigger
+
+owner: the host operator who wired the schedule cadence
+
+trigger:
+  type: schedule
+  detail: host-driven cadence (/loop + ScheduleWakeup or cron) — manual remains the fallback
+
+scope:
+  - a host-only, opt-in time-driven loop (documentation sample; not bundled)
+
+action:
+  description: a single scheduled iteration kicked off by the host cadence
+
+budget:
+  max_iterations: 1
+  max_wallclock_min: 30
+  max_subagents: 1
+  max_usd: 0
+
+stop:
+  all_acs_green: true
+  max_iterations_reached: true
+  budget_exhausted: true
+  no_progress: true
+
+report:
+  to: stderr
+
+evidence:
+  - the loop's own run artifacts (this fixture exists to lint the schedule trigger)

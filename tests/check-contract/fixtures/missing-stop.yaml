@@ -1,0 +1,24 @@
+name: fixture-missing-stop
+
+owner: the test harness
+
+trigger:
+  type: manual
+
+scope:
+  - tests/check-contract
+
+action:
+  description: a single fixture iteration
+
+budget:
+  max_iterations: 1
+  max_wallclock_min: 5
+  max_subagents: 1
+  max_usd: 0
+
+report:
+  to: stderr
+
+evidence:
+  - the check-contract fixture-suite exit code

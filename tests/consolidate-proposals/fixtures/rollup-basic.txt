@@ -1,0 +1,12 @@
+run RUN-BAD  [loop shell-team]  ⚠
+  spans: 3   phases: plan implement validate
+  status: success=2 error=1
+  verdict: FAIL=1
+  tokens: 500   duration: 5000ms
+  window: 2026-06-18T00:00:01Z → 2026-06-18T00:00:03Z
+run RUN-OK  [loop shell-team]  ✓
+  spans: 4   phases: plan implement validate review
+  status: success=4
+  verdict: PASS=1 APPROVE=1
+  tokens: 1000   duration: 10000ms
+  window: 2026-06-18T01:00:01Z → 2026-06-18T01:00:04Z

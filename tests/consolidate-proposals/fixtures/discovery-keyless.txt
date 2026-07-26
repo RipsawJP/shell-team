@@ -1,0 +1,2 @@
+- [ ] **T-000** triage no-key here: a malformed candidate with no source key — `READY_FOR_ARCH` — spec: docs/specs/T-000-x.md
+- [ ] **T-000** triage [pr#7]: a valid keyed candidate (b7) — `READY_FOR_ARCH` — spec: docs/specs/T-000-pr-7.md

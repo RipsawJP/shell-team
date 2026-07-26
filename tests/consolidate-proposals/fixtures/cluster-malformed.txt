@@ -1,0 +1,35 @@
+# Malformed `cluster ` lines that must each be SKIPPED with a gap note —
+# never trusted as a garbled candidate — while the well-formed sibling line
+# in the same file (VALIDATE:ERROR, last) is still emitted (mirrors
+# cluster-badid.txt's bracket-rejection pattern: reject the bad line, keep
+# the good one). Covers round1 (marker existence) + round2 (signature
+# grammar) repro cases, now closed by ONE anchored whole-line regex
+# (CLUSTER_LINE_RE, anchored on the fixed REASON enum per round3 — see
+# rework3 note in bin/consolidate-proposals.sh) rather than separate guards:
+#   round1 — count=/run markers entirely missing
+#   round1 — count= present but empty
+#   round1 — count= present but non-numeric
+#   round2 — no colon in the signature at all (no enum-anchored `:` present)
+#   round2 — empty PHASE (nothing precedes the enum-anchored `:`)
+#   round2 — empty REASON (colon immediately followed by the `  count=`
+#     delimiter, no enum token in between)
+#   round2 — non-enum text after the `:` (not a valid REASON value either)
+#   round2 — count=0 (producer-impossible: a cluster always recurred >=1x)
+# NOTE (round3): round2's original 8th case — a literal double-space +
+# "count="/"run " embedded inside what would be the PHASE portion — is
+# DELIBERATELY NOT included here anymore: round3 found that constraining
+# PHASE's charset (as round2 did) silently drops legitimate free-text `phase`
+# telemetry values (docs/specs/T-043-rollup-guard-hardening.md's own
+# Non-goals: `--phase` is intentionally free-text, no charset constraint).
+# PHASE is now free text by design, so a signature whose PHASE portion
+# happens to contain "  count="/"  run "-like text is NOT malformed — see
+# cluster-phase-freetext.txt for the fixture proving it is correctly ACCEPTED.
+cluster IMPLEMENT:ERROR no count no run marker at all
+cluster REVIEW:FAIL  count=  run RUN-A
+cluster PLAN:TIMEOUT  count=notanumber  run RUN-B
+cluster garbage  count=1  run RUN-C
+cluster :ERROR  count=1  run RUN-D
+cluster IMPLEMENT:  count=1  run RUN-E
+cluster IMPLEMENT:NOTAREASON  count=1  run RUN-H
+cluster IMPLEMENT:ERROR  count=0  run RUN-F
+cluster VALIDATE:ERROR  count=2  run RUN-OK

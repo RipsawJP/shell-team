@@ -1,0 +1,193 @@
+# shell-team
+
+[![English](https://img.shields.io/badge/lang-English-1f6feb?style=flat-square)](README.md)
+[![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
+
+[![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
+[![version](https://img.shields.io/badge/version-1.0.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
+[![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
+![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
+
+## Why I am building this
+
+**Honestly, I just want less work.**
+
+If I ask AI to implement something but still have to supervise every phase, read the code, request every correction, and make the final call myself, it does not feel particularly autonomous.
+
+shell-team is a personal project testing how much of specification, implementation, verification, and repair an AI team can finish without requiring a human at every step. Zero humans is not the goal, nor is strict loyalty to labels such as Loop Engineering or Graph Engineering. I borrow whatever is useful. The test is whether it reduces my work without making that convenience expensive later.
+
+The longer, personal version is in [“Honestly, I Just Want Less Work — Loop Engineering? Graph Engineering? The Name Is, Well, Not That Important”](docs/essays/i-just-want-less-work.md).
+
+![shell-team concept — Plan → Spec → Build → Test → Codex Review → Merge, bounded by BUDGET/STOP guards, with telemetry, triage, retro and lessons feeding back into the loop](docs/images/shell-team-concept.png)
+
+## What shell-team is
+
+A Claude Code **plugin** that drops a dev team into any repo. **PM, Tech Lead, Engineer, QA, and a Codex-powered cross-provider Reviewer** (plus a UI Designer that joins only for UI work, and a Scrum-Master) follow a Spec-Driven workflow with explicit hand-off gates.
+
+- Enforces **plan → specify → conditional design → implement → validate → cross-provider review**, with a status flag at every boundary.
+- Runs the final review through **Codex CLI (OpenAI)** so it comes from a different model family than the implementation team.
+- Bounds every run with an explicit loop contract (BUDGET/STOP); `/goal` can drive one task to completion under the same guardrails.
+- Feeds phase telemetry, retros, and lessons back into later runs.
+- Installs once as a plugin and works across repos without per-repo copies or version drift.
+
+See [docs/history.md](docs/history.md) for the story of how the project got here.
+
+## Prerequisites
+
+- Claude Code (≥ the version that supports plugins, v2.1.x).
+- Codex CLI installed and authenticated. Run `/codex:setup` once if you have the Codex plugin, or follow https://developers.openai.com/codex/cli.
+- **Sandbox-enabled sessions need extra settings.** See [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) for the Codex review path's required sandbox exclusion (`sandbox.excludedCommands`) and permission settings.
+
+## Install
+
+This repo is both the plugin and its own marketplace (`ripsawjp`). Install once per machine:
+
+```text
+/plugin marketplace add RipsawJP/shell-team
+/plugin install shell-team@ripsawjp
+```
+
+Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir with the board + default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; idempotent — see [docs/adopting.md](docs/adopting.md)):
+
+```text
+/shell-team:team-init
+```
+
+Full details, updates, and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
+
+## Usage
+
+The default way to use shell-team is **conversational — just describe what you want**, the way you'd ask for anything else in a chat session:
+
+```text
+shell-team a /healthz endpoint that returns build sha + uptime
+```
+
+The main Claude session recognizes a non-trivial request and routes it through the team (Plan → Specify → Implement → Validate → Review), pausing for you before any merge — the same way you already get a cross-provider code review without typing a slash command. See [docs/usage-conversational.md](docs/usage-conversational.md) for the full model, more example conversations, and the one opt-in step that makes the *full* loop fire reliably from chat.
+
+It also works standalone, one agent or skill at a time, when you want to be explicit:
+
+```text
+# Full pipeline, explicit slash command
+/shell-team:run add a /healthz endpoint that returns build sha + uptime
+
+# Just an independent cross-provider code review
+/shell-team:review focus on auth and input validation
+
+# Respond to review feedback already on your PR — Codex-evaluate + risk-gate the findings, then shell-team the adopted set
+/shell-team:review-response respond to the review on PR #N
+
+# Scaffold this repo to adopt the team (once per repo)
+/shell-team:team-init
+
+# Discover candidate work (failing CI / open PRs / loop-triage issues) — proposes, never edits the board
+/shell-team:loop-triage
+
+# Drive one board task to done on a self-paced loop (layered gate: check-acs -> check-intent (only when the spec carries a frozen intent block) -> check-provenance -> QA -> Codex, bounded by loop-guard)
+/shell-team:goal T-XXX
+
+# Or invoke an agent directly
+@shell-team:pm-spec turn this request into a spec
+@shell-team:engineer pick up T-XXX
+```
+
+## When the full loop fits (task aptitude)
+
+**First branch — does the final verification surface close inside the loop?**
+
+- **Closes inside the loop** (correctness is settled by *mechanical* verification — tests, lint, execution/output comparison): the full PM → Engineer → QA → Codex loop **fits**. QA and Codex can confirm the acceptance criteria empirically and statically, so a FAIL is caught inside the loop rather than after a human looks at the result.
+- **Does not close inside the loop** (the final gate is *human visual inspection, a real renderer, or subjective evaluation* — e.g. slide/PDF layout, pixel-level UI polish, prose tone): the full loop is a **poor fit, or fits only in a limited way**. QA cannot substitute for the human eye, and the loop only surfaces the human visual gate at the very end, so a visual FAIL costs a whole round-trip and can churn the same code path for many rounds (observed in practice: 10+ rework rounds on a single visual task before a human caught the real issue).
+
+**Provisional operation for visual-output tasks** (a stop-gap until a dedicated short-cycle / variant loop is built): do **not** put such a task on a single full-loop pass. Instead run a short manual cycle (implement, render, human check) where the human views the real rendered output each turn; keep spec / QA in a supporting role rather than as the completion gate.
+
+> This first branch anticipates the same shape as a grounded-AI-evaluator's OOD-novelty / human-gate criterion: a verification surface that cannot be mechanically grounded escalates to a human.
+
+## Layout
+
+```
+.
+├── .claude-plugin/
+│   ├── plugin.json                  # plugin manifest (name, version)
+│   └── marketplace.json             # self-hosted marketplace (ripsawjp)
+├── agents/
+│   ├── tech-lead.md                 # Orchestrator (read-only, returns Routing Map)
+│   ├── pm-spec.md                   # Spec writer
+│   ├── ui-designer.md               # Design for UI work only (frontend-design Skill; optional dep)
+│   ├── engineer.md                  # Implementer (non-worktree by default; opt-in isolation)
+│   ├── qa-verifier.md               # Test runner / acceptance checker
+│   ├── codex-reviewer.md            # Codex CLI cross-provider reviewer
+│   ├── scrum-master.md              # Retro / lessons generator
+│   └── triage-orchestrator.md       # Outer-loop triage consolidator (propose-only)
+├── skills/
+│   ├── run/SKILL.md            # /shell-team:run <request>
+│   ├── goal/SKILL.md                # /shell-team:goal (self-verifying runtime loop)
+│   ├── review/SKILL.md              # /shell-team:review
+│   ├── review-response/SKILL.md     # /shell-team:review-response (triage received review feedback)
+│   ├── team-init/SKILL.md           # /shell-team:team-init (scaffold a repo)
+│   └── loop-triage/SKILL.md         # /shell-team:loop-triage (discover work)
+├── bin/                             # all on PATH while the plugin is enabled
+│   ├── check-handoff.sh             # tasks/todo.md hand-off linter
+│   ├── check-contract.sh            # loop-contract schema linter
+│   ├── loop-guard.sh                # runtime BUDGET/STOP enforcement
+│   ├── log-run.sh / check-run.sh    # telemetry writer + JSONL lint
+│   ├── discover-work.sh             # read-only triage discovery engine
+│   ├── team-init.sh                 # adopting-repo scaffolder
+│   └── install                      # legacy vendoring fallback
+├── templates/                       # generic scaffolds used by team-init
+├── docs/
+│   ├── essays/                      # personal essays behind the project
+│   ├── workflow.md                  # phase diagram + hand-off contract
+│   ├── distribution.md              # install / update / dogfood
+│   ├── history.md                   # how the project evolved
+│   └── specs/                       # one .md per task
+└── tasks/                           # per-repo data (todo, specs, loops, runs, retros, reviews)
+```
+
+## Phase flow
+
+```
+[Plan]      tech-lead       → Routing Map
+[Specify]   pm-spec         → docs/specs/<slug>.md   READY_FOR_ARCH
+[Design]    ui-designer     → (UI only) design note   no new flag
+[Implement] engineer        → code + tests           READY_FOR_QA
+[Validate]  qa-verifier     → run + check criteria   READY_FOR_REVIEW
+[Review]    codex-reviewer  → Codex CLI verdict       READY_FOR_MERGE
+```
+
+`[Design]` is **conditional** (only when the task involves UI work). It carries no new status flag — the design note's existence gates the engineer. The `frontend-design` Skill is an optional dependency (degrades to in-house guidance, announced not silent, when absent).
+
+See [docs/workflow.md](docs/workflow.md) for the hand-off contract and shortcuts.
+
+## Operating loop
+
+The agent pipeline above is the **inner loop**. An **outer loop** of operating discipline wraps it:
+
+- **Loop contracts** — every loop declares TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT in `tasks/loops/*.contract.yaml`; `bin/check-contract.sh` lints them. BUDGET + STOP are mandatory.
+- **Runtime guardrails** — `bin/loop-guard.sh` enforces the contract's BUDGET/STOP at run time (a fail-closed runaway / billing kill-switch).
+- **Telemetry** — `/shell-team:run` emits one span row per phase via `bin/log-run.sh`; `bin/check-run.sh` lints the JSONL, and cross-run roll-ups surface systemic issues instead of showing up one run at a time.
+- **Opt-in triage** — `/shell-team:loop-triage` (`bin/discover-work.sh`) is read-only: it finds failing CI / open PRs / labelled issues and *proposes* todo candidates, never editing the board.
+- **Model routing** — agent roles are assigned across model tiers (planning vs. execution vs. cross-provider review) so cost tracks each role's judgment load, with an explicit re-evaluation trigger whenever the model landscape or cost structure shifts.
+
+See [docs/history.md](docs/history.md) for how this operating discipline evolved.
+
+## Design choices
+
+- **Read-only Orchestrator**: `tech-lead` only plans — the main session executes the map.
+- **Tight tool permissions**: PM is read+spec-write only, QA is read+bash only, Reviewer can't mutate code.
+- **Files are the only shared state**: the board (`todo.md`) + status flags are the single source of truth between agents.
+- **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo itself predates that and uses the legacy `tasks/` + `docs/specs/` layout — which the resolver still detects and supports — so the `tasks/…` paths throughout these docs are this repo's legacy layout. See [docs/adopting.md](docs/adopting.md).
+- **Engineer is non-worktree by default**: its edits land directly on the current feature branch; the orchestrator opts into `isolation: worktree` at invocation only for parallel implementations.
+- **Cross-provider review is mandatory**: if Codex CLI is unavailable, the review returns `BLOCKED` rather than falling back to Claude.
+
+## Versioning
+
+Release history lives in **[CHANGELOG.md](CHANGELOG.md)** (日本語: [CHANGELOG.ja.md](CHANGELOG.ja.md)) — one entry per release, newest first, from the current release back to the pre-plugin baseline (v0.0.1). Line policy in brief: breaking changes were allowed across the `v0.0.x → v0.1.x` boundary, and every release since has deepened the operating loop on top of the stable v0.2.0 footprint-consolidation baseline.
+
+## Develop / dogfood
+
+Working inside this repo, load the plugin from the working directory:
+
+```bash
+claude --plugin-dir ./       # then /reload-plugins after edits
+```

@@ -1,0 +1,323 @@
+#!/usr/bin/env bash
+# bin/install — shell-team agent definition installer (v0).
+#
+# Snapshot-copies the requested team's agent files (plus the always-installed
+# common agents) into a target repository, and writes a `.claude/team-meta.yaml`
+# manifest recording framework_version / commit_hash / team / installed_files /
+# installed_at.
+#
+# External dependencies: bash + standard POSIX tools (cp, mkdir, printf, date,
+# git). No JSON/YAML processors and no language runtimes are required or
+# invoked (intentional, per the v0 spec's "external-dependency-zero" rule).
+#
+# Usage:
+#   bin/install --team <name> [--team <name>...] [--force] <target_path>
+#   bin/install --help
+#
+# Exit codes:
+#   0  success
+#   2  argument / usage error
+
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Locate the shell-team repository root (where this script lives).
+# Resolves regardless of cwd / symlinks so install can be invoked from
+# anywhere, though the spec's primary assumption is that cwd is the repo root.
+# ---------------------------------------------------------------------------
+script_path="${BASH_SOURCE[0]}"
+# Resolve a single layer of symlink without relying on `readlink -f` (BSD
+# readlink lacks `-f`; this keeps macOS / Linux parity).
+while [ -L "$script_path" ]; do
+  link_target="$(readlink "$script_path")"
+  case "$link_target" in
+    /*) script_path="$link_target" ;;
+    *)  script_path="$(cd "$(dirname "$script_path")" && pwd)/$link_target" ;;
+  esac
+done
+SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+AGENTS_SRC_DIR="$REPO_ROOT/agents"
+
+# Common agents installed regardless of which team(s) are requested.
+COMMON_AGENTS=(
+  codex-reviewer.md
+  tech-lead.md
+  scrum-master.md
+)
+
+# ---------------------------------------------------------------------------
+# I/O helpers.
+# ---------------------------------------------------------------------------
+log_err()  { printf '%s\n' "$*" >&2 || true; }
+log_warn() { printf 'WARN: %s\n' "$*" >&2; }
+die()      { log_err "ERROR: $*"; exit 2; }
+
+print_help() {
+  cat <<'EOF'
+Usage: bin/install --team <name> [--team <name>...] [--force] <target_path>
+
+Install shell-team agent definitions into the target repository.
+
+Options:
+  --team <name>   Team to install. Repeatable (--team a --team b). Required.
+  --force         Overwrite existing files. Default: skip with warning.
+  --help, -h      Show this help and exit.
+
+Common agents (codex-reviewer, tech-lead, scrum-master) are always installed.
+A manifest .claude/team-meta.yaml is written to the target.
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Team -> agent-file mapping.
+#
+# Single source of truth for "which agent files belong to which team". When
+# the agent layout migrates to subdir form (agents/teams/<team>/, see
+# T-006), only the source-path computation in `copy_one()` needs to change —
+# the team -> file-list mapping stays here.
+# ---------------------------------------------------------------------------
+team_agent_files() {
+  local team="$1"
+  case "$team" in
+    new-dev)
+      printf '%s\n' \
+        pm-spec.md \
+        engineer.md \
+        qa-verifier.md
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+team_is_known() {
+  team_agent_files "$1" >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing.
+# ---------------------------------------------------------------------------
+TEAMS=()
+FORCE=0
+TARGET=""
+
+# We accept `--team` interleaved with positional args. The single positional
+# arg (target path) must be the last non-flag token. We collect all positional
+# tokens and reject if there are 0 or >1.
+positionals=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --help|-h)
+      print_help
+      exit 0
+      ;;
+    --team)
+      [ "$#" -ge 2 ] || die "--team requires a value"
+      shift
+      # Reject empty string and accidental flag-as-value
+      # (e.g. `bin/install --team --force <target>` should not silently
+      # treat `--force` as the team name).
+      [ -n "$1" ] || die "--team value must not be empty"
+      case "$1" in
+        --*) die "--team value must not start with '--' (got: $1)" ;;
+      esac
+      TEAMS+=("$1")
+      shift
+      ;;
+    --team=*)
+      val="${1#--team=}"
+      [ -n "$val" ] || die "--team= value must not be empty"
+      TEAMS+=("$val")
+      shift
+      ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    --)
+      shift
+      while [ "$#" -gt 0 ]; do
+        positionals+=("$1")
+        shift
+      done
+      ;;
+    --*)
+      die "unknown flag: $1"
+      ;;
+    *)
+      positionals+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Validate positional count.
+case "${#positionals[@]}" in
+  0) die "missing required <target_path> (see --help)" ;;
+  1) TARGET="${positionals[0]}" ;;
+  *) die "expected exactly one <target_path>, got ${#positionals[@]}: ${positionals[*]}" ;;
+esac
+
+# Validate team count.
+[ "${#TEAMS[@]}" -ge 1 ] || die "at least one --team <name> is required (see --help)"
+
+# Validate team names against the known set.
+for t in "${TEAMS[@]}"; do
+  team_is_known "$t" || die "unknown team: '$t' (known: new-dev)"
+done
+
+# Validate target.
+[ -e "$TARGET" ] || die "target path does not exist: $TARGET (mkdir is intentionally not done; create it first)"
+[ -d "$TARGET" ] || die "target path is not a directory: $TARGET"
+
+# Resolve target to an absolute path for stable manifest content / messages.
+TARGET="$(cd "$TARGET" && pwd)"
+
+# ---------------------------------------------------------------------------
+# Framework version + commit hash discovery.
+#
+# Runs from REPO_ROOT so callers invoking from arbitrary cwd still work.
+# `git` failures are tolerated (defensive against running from an exported
+# tarball without .git): we record `unknown` and warn but still exit 0.
+# ---------------------------------------------------------------------------
+discover_version() {
+  local tag short_sha
+  if ! command -v git >/dev/null 2>&1; then
+    FRAMEWORK_VERSION="unknown"
+    COMMIT_HASH="unknown"
+    log_warn "git not found; framework_version and commit_hash recorded as 'unknown'"
+    return 0
+  fi
+  if ! ( cd "$REPO_ROOT" && git rev-parse --git-dir >/dev/null 2>&1 ); then
+    FRAMEWORK_VERSION="unknown"
+    COMMIT_HASH="unknown"
+    log_warn "$REPO_ROOT is not a git repository; framework_version and commit_hash recorded as 'unknown'"
+    return 0
+  fi
+  COMMIT_HASH="$( cd "$REPO_ROOT" && git rev-parse HEAD )"
+  if tag="$( cd "$REPO_ROOT" && git describe --tags --exact-match HEAD 2>/dev/null )"; then
+    FRAMEWORK_VERSION="$tag"
+  else
+    short_sha="$( cd "$REPO_ROOT" && git rev-parse --short HEAD )"
+    FRAMEWORK_VERSION="untagged-$short_sha"
+  fi
+}
+
+FRAMEWORK_VERSION=""
+COMMIT_HASH=""
+discover_version
+
+# ---------------------------------------------------------------------------
+# Copy planning.
+#
+# Build an ordered, de-duplicated list of (source_relpath, dest_relpath) pairs.
+# source_relpath is relative to this repo's agents/ root (AGENTS_SRC_DIR);
+# dest_relpath is relative to the target's install directory (see
+# target_agents_dir below) — a different, unrelated root (see AC2). The
+# mapping point is `copy_one()` below; subdir migration only needs to change
+# how source_abspath is derived from source_relpath.
+# ---------------------------------------------------------------------------
+plan=()  # entries: "<source_relpath>\t<dest_relpath>"
+seen=""  # newline-bracketed list of dest_relpaths already planned
+
+plan_add() {
+  local src="$1" dest="$2"
+  case "$seen" in
+    *$'\n'"$dest"$'\n'*) return 0 ;;  # already planned
+  esac
+  plan+=("$src"$'\t'"$dest")
+  seen="${seen}${dest}"$'\n'
+}
+
+# Common agents first (deterministic regardless of team order).
+for f in "${COMMON_AGENTS[@]}"; do
+  plan_add "$f" "$f"
+done
+
+# Per-team agents in the order teams were specified.
+for t in "${TEAMS[@]}"; do
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    plan_add "$f" "$f"
+  done < <(team_agent_files "$t")
+done
+
+# ---------------------------------------------------------------------------
+# Execute the copy plan.
+# ---------------------------------------------------------------------------
+target_agents_dir="$TARGET/.claude/agents"
+mkdir -p "$target_agents_dir"
+
+installed_files=()  # paths actually written, recorded in manifest
+
+copy_one() {
+  local src_rel="$1" dest_rel="$2"
+  local src_abs="$AGENTS_SRC_DIR/$src_rel"
+  local dest_abs="$target_agents_dir/$dest_rel"
+  local manifest_path=".claude/agents/$dest_rel"
+
+  if [ ! -f "$src_abs" ]; then
+    die "source agent file missing: $src_abs (shell-team install layout drift?)"
+  fi
+
+  mkdir -p "$(dirname "$dest_abs")"
+
+  # -L as well as -e: a DANGLING symlink is invisible to -e, but `cp` would
+  # follow it and write outside the target dir (violating the host-root-
+  # untouched invariant). Any occupant — file, dir, or symlink of either
+  # kind — counts as already claimed.
+  if { [ -e "$dest_abs" ] || [ -L "$dest_abs" ]; } && [ "$FORCE" -eq 0 ]; then
+    log_warn "skipped existing file: $dest_abs (use --force to overwrite)"
+    return 0
+  fi
+
+  # --force still must not follow a symlink (dangling or live) to write
+  # outside the target dir: replace the link with a real file instead.
+  if [ -L "$dest_abs" ]; then
+    rm -f "$dest_abs"
+  fi
+
+  cp "$src_abs" "$dest_abs"
+  installed_files+=("$manifest_path")
+}
+
+for entry in "${plan[@]}"; do
+  src_rel="${entry%%$'\t'*}"
+  dest_rel="${entry#*$'\t'}"
+  copy_one "$src_rel" "$dest_rel"
+done
+
+# ---------------------------------------------------------------------------
+# Write manifest.
+#
+# Always overwritten in v0 (no merge with prior manifest). Field order is
+# fixed for AC6 / human review: framework_version, commit_hash, team,
+# installed_files, installed_at.
+# ---------------------------------------------------------------------------
+manifest_path="$TARGET/.claude/team-meta.yaml"
+installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+{
+  printf 'framework_version: %s\n' "$FRAMEWORK_VERSION"
+  printf 'commit_hash: %s\n' "$COMMIT_HASH"
+  printf 'team:\n'
+  for t in "${TEAMS[@]}"; do
+    printf '  - %s\n' "$t"
+  done
+  printf 'installed_files:\n'
+  if [ "${#installed_files[@]}" -eq 0 ]; then
+    printf '  []\n'
+  else
+    for f in "${installed_files[@]}"; do
+      printf '  - %s\n' "$f"
+    done
+  fi
+  printf 'installed_at: %s\n' "$installed_at"
+} > "$manifest_path"
+
+printf 'Installed %d file(s) into %s\n' "${#installed_files[@]}" "$target_agents_dir"
+printf 'Manifest written to %s\n' "$manifest_path"
+exit 0
