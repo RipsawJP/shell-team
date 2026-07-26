@@ -54,6 +54,11 @@ Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir w
 /shell-team:team-init
 ```
 
+**Decide once whether `.shell-team/` belongs in git.** Because the plugin never edits your root `.gitignore`, the base dir shows up as *untracked* in your repo — only the per-run telemetry inside it is ignored, via a self-contained `<base>/.gitignore`. Both choices are supported, and the plugin will not make the call for you:
+
+- **Track it** — the board, specs, and review artifacts become versioned project records (that is how this repo dogfoods itself).
+- **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore`, or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in.
+
 Full details, updates, and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
 
 ## Usage

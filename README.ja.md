@@ -54,6 +54,11 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 /shell-team:team-init
 ```
 
+**`.shell-team/` を git に載せるかを最初に決めてください。** プラグインはルートの `.gitignore` を編集しないため、base dir は repo 内で *untracked* として現れます（無視されるのは中の run テレメトリのみ。自己完結した `<base>/.gitignore` による）。どちらの選択も想定されており、プラグインが代わりに決めることはありません：
+
+- **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）
+- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる
+
 詳細・更新・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
 ## 使い方
