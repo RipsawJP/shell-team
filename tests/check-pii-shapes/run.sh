@@ -370,6 +370,25 @@ add_fixture_line "$EM_SUF_REPO" "suffix.txt" "$EM_SUF_LINE"
 assert_finding "positive: a suffix-confusable domain at a non-reserved name still fires (anti-swallow)" \
   "email-nonnoreply" "$EM_SUF_REPO" "$EM_SUF_BASE"
 
+# Round 3 blocker regression lock: a DOTTED subdomain of the noreply domain
+# (e.g. some-label.users.noreply.github.com) must still fire. `RE_NOREPLY_
+# DOMAIN` was originally `(^|\.)users\.noreply\.github\.com$`, which
+# admitted any dotted prefix as a legitimate subdomain and silently excluded
+# a mailbox-shaped string with a real-looking local part — a genuine bypass
+# of a required check, reproduced by cross-provider review and never
+# reached by any prior fixture (every existing negative used the bare
+# domain, no prefix at all). Fixed to bare `^users\.noreply\.github\.com$`
+# equality; this fixture proves the fix and locks the regression.
+EM_DOTSUB_L1="ali"; EM_DOTSUB_L2="ce"
+EM_DOTSUB_LOCAL="${EM_DOTSUB_L1}${EM_DOTSUB_L2}"
+EM_DOTSUB_PREFIX="evil"
+EM_DOTSUB_DOMAIN="${EM_DOTSUB_PREFIX}.users.noreply.github.com"
+EM_DOTSUB_LINE="contact ${EM_DOTSUB_LOCAL}@${EM_DOTSUB_DOMAIN} for details"
+EM_DOTSUB_REPO="$(new_repo)"; EM_DOTSUB_BASE="$(git -C "$EM_DOTSUB_REPO" rev-parse HEAD)"
+add_fixture_line "$EM_DOTSUB_REPO" "dotsub.txt" "$EM_DOTSUB_LINE"
+assert_finding "positive: a dotted subdomain of the noreply domain still fires (round 3 blocker regression lock)" \
+  "email-nonnoreply" "$EM_DOTSUB_REPO" "$EM_DOTSUB_BASE"
+
 # Precondition: every negative fixture line above provably reaches the
 # email candidate enumeration (RE_EMAIL_BASE, read from the checker's own
 # source) — never merely a line the base shape never matched at all. The
@@ -473,6 +492,34 @@ URL_REPO="$(new_repo)"; URL_BASE="$(git -C "$URL_REPO" rev-parse HEAD)"
 add_fixture_line "$URL_REPO" "url.txt" "$URL_LINE"
 assert_clean "boundary: a home-path-looking segment inside a URL is not a finding" \
   "$URL_REPO" "$URL_BASE"
+
+# Round 3 major regression lock: the docs' declared-limitation line makes an
+# unqualified claim ("a home-path shape written inside a URL is not
+# reported"), but the FIRST version of the boundary rule excluded only
+# letters/digits — a file://-style triple-slash authority (preceded by
+# another `/`), the same URL wrapped in a Markdown link, and an IPv6
+# literal authority (preceded by `]`) were all still reported, contradicting
+# that frozen (AC18/AC19) doc line. Since the doc line cannot be reworded,
+# the boundary rule was widened to also treat `/` and `]` as characters
+# that can continue a host name or path-separator run. These three fixtures
+# are the regression lock for that widening.
+FILEURL_LINE="backup at file:///Users/${HP_NAME}/secrets.txt for review"
+FILEURL_REPO="$(new_repo)"; FILEURL_BASE="$(git -C "$FILEURL_REPO" rev-parse HEAD)"
+add_fixture_line "$FILEURL_REPO" "fileurl.txt" "$FILEURL_LINE"
+assert_clean "boundary: a file:// triple-slash authority is not a finding (round 3 regression lock)" \
+  "$FILEURL_REPO" "$FILEURL_BASE"
+
+MDURL_LINE="[local notes](file:///home/${HP_NAME}/private.txt)"
+MDURL_REPO="$(new_repo)"; MDURL_BASE="$(git -C "$MDURL_REPO" rev-parse HEAD)"
+add_fixture_line "$MDURL_REPO" "mdurl.txt" "$MDURL_LINE"
+assert_clean "boundary: a Markdown link wrapping a file:// URL is not a finding (round 3 regression lock)" \
+  "$MDURL_REPO" "$MDURL_BASE"
+
+IPV6URL_LINE="see https://[2001:db8::1]/Users/${HP_NAME}/secrets.txt for details"
+IPV6URL_REPO="$(new_repo)"; IPV6URL_BASE="$(git -C "$IPV6URL_REPO" rev-parse HEAD)"
+add_fixture_line "$IPV6URL_REPO" "ipv6url.txt" "$IPV6URL_LINE"
+assert_clean "boundary: an IPv6 literal authority is not a finding (round 3 regression lock)" \
+  "$IPV6URL_REPO" "$IPV6URL_BASE"
 
 # =============================================================================
 # all candidates per line: an excluded address on the same line never
@@ -850,6 +897,51 @@ if [ "$UNREAD_RC" -eq 2 ]; then
   pass "--all no-silent-skip: unreadable is exit 2"
 else
   fail "--all no-silent-skip: unreadable is exit 2 (got rc=$UNREAD_RC)"
+fi
+
+# =============================================================================
+# gitlink: a submodule reference is skipped, announced, never scanned as
+# content, and never a raw unclassified exit (round 3 major regression lock)
+#
+# `git submodule add` (or, equivalently, `git update-index --add --cacheinfo
+# 160000,<sha>,<path>`, used here to avoid a network dependency) creates a
+# gitlink entry (mode 160000) with no blob of its own. `git cat-file -p
+# HEAD:<path>` fails on it (`fatal: Not a valid object name`, rc=128).
+# Before this fix that failure sat on a bare (non-`||`) line under `set -e`,
+# so errexit fired before the classified `rc=$?; if ...` check ever ran —
+# the script exited 128 with NO `check-pii-shapes:` token at all, breaking
+# the documented 0/1/2 exit-code contract (AC2) even though it never
+# reported a false "clean". Fixed by detecting the gitlink's mode during
+# enumeration (from `git diff --raw`'s new-mode field, and from `git
+# ls-files -s`'s mode field for --all) and skipping it explicitly, and
+# separately by moving the `cat-file` failure onto a same-line `||` so any
+# OTHER cat-file failure also lands on the classified path.
+# =============================================================================
+printf '\n--- gitlink: a submodule reference is skipped, never scanned, never a raw unclassified exit ---\n'
+
+GITLINK_REPO="$(new_repo)"; GITLINK_BASE="$(git -C "$GITLINK_REPO" rev-parse HEAD)"
+FAKE_SUBMODULE_SHA="1111111111111111111111111111111111111111"
+git -C "$GITLINK_REPO" update-index --add --cacheinfo 160000,"$FAKE_SUBMODULE_SHA",sub
+git -C "$GITLINK_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: add gitlink sub"
+
+run_checker "$GITLINK_REPO" "$GITLINK_BASE"
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -qF 'check-pii-shapes: skip: gitlink' \
+   && printf '%s\n' "$OUT" | grep -qE 'gitlink.*: sub$'; then
+  pass "gitlink: diff-scoped mode skips a gitlink, announces it, and exits 0 clean (not a raw 128)"
+else
+  fail "gitlink: diff-scoped mode (round 3 regression lock) (rc=$RC out=$OUT)"
+fi
+
+set +e
+GITLINK_ALL_OUT="$(cd "$GITLINK_REPO" && bash "$BIN" --all 2>&1)"
+GITLINK_ALL_RC=$?
+set -e
+if [ "$GITLINK_ALL_RC" -eq 0 ] && printf '%s\n' "$GITLINK_ALL_OUT" | grep -qF 'check-pii-shapes: skip: gitlink' \
+   && printf '%s\n' "$GITLINK_ALL_OUT" | grep -qE 'gitlink.*: sub$'; then
+  pass "gitlink: --all mode skips a gitlink, announces it, and exits 0 clean (not a raw cp failure)"
+else
+  fail "gitlink: --all mode (round 3 regression lock) (rc=$GITLINK_ALL_RC out=$GITLINK_ALL_OUT)"
 fi
 
 # =============================================================================

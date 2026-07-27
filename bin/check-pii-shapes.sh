@@ -48,8 +48,12 @@
 # real content starts with "++ " renders as "+++ "). Two rounds of a
 # hand-rolled diff-text parser landed real blockers here, so the mechanism
 # changed instead of patching the parser a third time:
-#   - Changed paths are enumerated from NUL-separated `git diff --name-status
-#     -z --no-renames` output — never from a textual patch.
+#   - Changed paths are enumerated from NUL-separated `git diff --raw -z
+#     --no-renames` output — never from a textual patch. --raw (rather than
+#     --name-status) also carries each entry's new file MODE, which is what
+#     lets a gitlink (a submodule reference, mode 160000) be recognised and
+#     skipped explicitly rather than only discovered by `git cat-file`
+#     failing.
 #   - Each surviving path's content is read through `git cat-file`, plumbing
 #     that returns the raw committed blob (for a symlink, the target string
 #     git itself stores — never a followed link) with no framing, no colour,
@@ -68,11 +72,18 @@
 #
 # DP-5 (home-path boundary): the home-path shape only matches at the start
 # of a line or when preceded by a character that cannot continue a host
-# name (a letter or digit) — a documentation URL whose path merely contains
-# a home-directory-looking segment (https://example.com/home/products) is
-# therefore not a finding. Declared consequence: a home path written inside
-# a file://-style URL is likewise not reported (a narrower loss than the
-# false positive this rule removes).
+# name or a path-separator run — a letter, a digit, a `/`, or a `]` (the
+# closing bracket of an IPv6 literal authority). This closes every URL-shaped
+# false-positive class this checker's own history has actually hit: an
+# http(s) authority immediately followed by the path
+# (https://example.com/home/products, preceded by a letter), a file://-style
+# triple-slash authority (file:///Users/<name>/..., preceded by the second
+# `/`, including when that whole URL sits inside a Markdown link), and an
+# IPv6 literal authority (https://[::1]/Users/<name>/..., preceded by `]`).
+# Round 3 cross-provider review found the first version of this rule (which
+# excluded only letters/digits) left the latter two classes reachable —
+# widened here rather than narrowing the docs' claim, since the doc line is
+# frozen (AC18/AC19) and the code is what had to change to make it true.
 #
 # DP-7 (reserved-domain exclusion): a mailbox shape at the RFC 2606 /
 # RFC 6761 reserved documentation/testing names (example.com/.org/.net, and
@@ -80,13 +91,18 @@
 # — those domains cannot route to a real mailbox by construction.
 #
 # DP-9 (noreply exclusion, domain-anchored): a mailbox shape whose domain is
-# EXACTLY (end-anchored) the GitHub noreply identity domain is not a
-# finding, regardless of what the local part looks like — a login, a
-# numeric id plus a login, or a printf format placeholder assembled at
-# runtime. The exclusion never inspects the local part; a substring match on
-# the domain is deliberately avoided so a suffix-confusable lookalike domain
-# still fires. The plain web-flow noreply@github.com address is its own,
-# separate, full-address exclusion.
+# EXACTLY the GitHub noreply identity domain — full-string equality, anchored
+# at both ends — is not a finding, regardless of what the local part looks
+# like: a login, a numeric id plus a login, or a printf format placeholder
+# assembled at runtime. The exclusion never inspects the local part, and it
+# never treats a DOTTED SUBDOMAIN of the noreply domain as equivalent to the
+# domain itself — GitHub never hands out subdomains of its noreply zone, so
+# `anything.users.noreply.github.com` is not excluded and still fires (round
+# 3 cross-provider review found the domain regex admitted exactly this
+# dotted-subdomain class via a `(^|\.)` prefix alternative; fixed to a bare
+# `^...$` equality). A concatenated (no separating dot) suffix-confusable
+# lookalike domain still fires for the same reason. The plain web-flow
+# noreply@github.com address is its own, separate, full-address exclusion.
 #
 # DP-8 (known-shapes list): a short, per-file (never a directory or glob)
 # list of paths that deliberately carry a shape as a fixture FOR ANOTHER
@@ -160,7 +176,20 @@ self_name="$(basename "$script_path")" \
 SELF="$SCRIPT_DIR/$self_name"
 
 print_help() {
-  sed -n '2,124p' "$SELF" | sed 's/^# \{0,1\}//' \
+  # The header comment's end is found dynamically (the line right before
+  # `set -euo pipefail`) rather than hardcoded, so a future edit that grows
+  # or shrinks the header comment cannot silently truncate --help output
+  # again — a hardcoded line-range boundary going stale as the file grows is
+  # exactly the "boundary that admits more/less than intended" class round 3
+  # review found elsewhere in this file, and this one bit --help itself
+  # during that same rework (a hardcoded '2,124p' left --all/--base out of
+  # --help's output after the header grew past line 124).
+  local header_end
+  header_end="$(grep -n '^set -euo pipefail$' "$SELF" | head -1 | cut -d: -f1)" \
+    || fail_usage "failed to locate this script's own 'set -euo pipefail' line (--help) in: $SELF"
+  [ -n "$header_end" ] || fail_usage "could not find 'set -euo pipefail' in: $SELF (--help would be empty)"
+  header_end=$((header_end - 2))
+  sed -n "2,${header_end}p" "$SELF" | sed 's/^# \{0,1\}//' \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -197,8 +226,61 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 # exclusions (the domain-anchored noreply rule, the plain web-flow address,
 # the reserved-domain rule, and the home-path boundary rule).
 #
+# Anchoring/boundary inventory (round 3 review requirement — every regex
+# this script ships, audited mechanically): how each end is anchored, what
+# that admits, and whether this round applied a fix.
+#
+#   RE_HOME_PATH_BOUNDARY  left-anchored: start-of-line, OR one character
+#     that is NOT a letter/digit/`/`/`]`. Admits: space, quote, hyphen, dot,
+#     colon, parenthesis, non-ASCII punctuation as a valid "this is a real
+#     path start" boundary. APPLIED a fix this round: widened from
+#     alnum-only to also exclude `/` and `]`, closing a file://-style
+#     triple-slash authority, that same URL inside a Markdown link, and an
+#     IPv6 literal authority — all three were reachable false positives
+#     under the narrower, first-round class.
+#   RE_HOME_PATH_RAW  not end-anchored (greedy through the whole ASCII name
+#     class). Not applicable to this round — it is the base SHAPE, not an
+#     exclusion; unaffected by boundary/anchoring findings.
+#   RE_HOME_PATH_WIN  NOT boundary-guarded at all (any preceding character
+#     admitted). Re-examined under this round's "boundary/anchoring" lens
+#     and left unchanged: a Windows path uses backslashes, which never
+#     appear as a URL authority separator, so there is no reachable
+#     false-positive class analogous to the POSIX form's — a file:// URI
+#     encoding a Windows path uses forward slashes, which this pattern's
+#     literal backslash requirement already rejects regardless of any
+#     boundary. Not applied.
+#   RE_EMAIL_BASE  not anchored at either end (deliberate: `grep -o`
+#     enumerates every non-overlapping candidate on a line, AC26). Being a
+#     PATTERN rather than an EXCLUSION, an unanchored match is safe-directed
+#     (more candidates considered, never fewer) — the asymmetry this round's
+#     blocker turns on: an unanchored EXCLUSION is dangerous (admits a
+#     bypass), an unanchored PATTERN is not. Not applicable.
+#   RE_NOREPLY_DOMAIN  now anchored at BOTH ends (`^...$`, full-string
+#     equality) against the extracted domain. APPLIED the blocker fix this
+#     round: was `(^|\.)users\.noreply\.github\.com$`, which admitted any
+#     dotted subdomain prefix as an alternative to start-of-string — a
+#     genuine required-check bypass, since GitHub never hands out
+#     subdomains of this zone (unlike RE_RESERVED_DOMAIN below).
+#   RE_NOREPLY_PLAIN  anchored at both ends against the whole candidate
+#     address (not just the domain) — full-string equality already, no
+#     dotted-prefix alternative exists to admit. Not applicable.
+#   RE_RESERVED_DOMAIN  end-anchored per alternative, start is either
+#     string-start or a literal preceding dot (`(^|\.)example\.(com|org|net)
+#     $`, and `\.(example|invalid|test|localhost)$`) — deliberately admits a
+#     dotted subdomain, re-examined and left unchanged: RFC 2606 reserves
+#     the WHOLE zone under these names, so any subdomain of example.com is
+#     equally non-routable, unlike the noreply case just above. Not applied.
+#   RE_PRIVATE_KEY  not anchored at either end (a substring match for a
+#     fixed header literal) — no host/domain concept applies; a false
+#     positive would require the literal header text to appear
+#     coincidentally, which is not a boundary/anchoring question. Not
+#     applicable.
+#   RE_TOKEN  not anchored at either end — same asymmetry as RE_EMAIL_BASE:
+#     this is a PATTERN, so an unanchored match only widens detection
+#     (safe-directed), never creates a bypass. Not applicable.
+#
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
-RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9])'
+RE_HOME_PATH_BOUNDARY='(^|[^]/A-Za-z0-9])'
 # shellcheck disable=SC2016
 RE_HOME_PATH_RAW='/(Users|home)/[A-Za-z0-9_.-]+'
 RE_HOME_PATH="${RE_HOME_PATH_BOUNDARY}${RE_HOME_PATH_RAW}"
@@ -206,8 +288,9 @@ RE_HOME_PATH="${RE_HOME_PATH_BOUNDARY}${RE_HOME_PATH_RAW}"
 RE_HOME_PATH_WIN='C:\\{1,2}Users\\{1,2}[A-Za-z0-9_.-]+'
 # shellcheck disable=SC2016
 RE_EMAIL_BASE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-# shellcheck disable=SC2016
-RE_NOREPLY_DOMAIN='(^|\.)users\.noreply\.github\.com$'
+# shellcheck disable=SC2016  # full-string equality, anchored at both ends —
+# never a "same domain or a dotted subdomain of it" match (round 3 fix)
+RE_NOREPLY_DOMAIN='^users\.noreply\.github\.com$'
 # shellcheck disable=SC2016
 RE_NOREPLY_PLAIN='^noreply@github\.com$'
 # shellcheck disable=SC2016
@@ -322,15 +405,40 @@ if [ "$MODE" = "all" ]; then
     || fail_structural "git rev-parse --show-toplevel failed — cannot resolve the repository root for --all"
   cd "$TOPLEVEL" || fail_structural "failed to change into the repository root ($TOPLEVEL) for --all"
 
-  FILELIST_Z="$WORKDIR/filelist-z"
-  git ls-files -z --cached --others --exclude-standard > "$FILELIST_Z" \
-    || fail_structural "git ls-files failed — cannot enumerate the tree for --all"
-
   FILELIST="$WORKDIR/filelist"
   : > "$FILELIST"
+
+  # Tracked files via `ls-files -s` (not the plain `--cached` form used
+  # below for untracked), because `-s` carries each entry's MODE — needed to
+  # recognise and skip a gitlink (a submodule reference, mode 160000, no
+  # blob of its own to scan) explicitly, the same class round 3 review found
+  # falling through to a raw, unclassified `cp` failure otherwise. Each `-z`
+  # record is "<mode> <sha> <stage>\t<path>\0" — one NUL-terminated read,
+  # then split once on the (single, literal) tab.
+  TRACKED_S_Z="$WORKDIR/tracked-s-z"
+  git ls-files -s -z --cached > "$TRACKED_S_Z" \
+    || fail_structural "git ls-files -s failed — cannot enumerate tracked files for --all"
+  while IFS= read -r -d '' rec; do
+    [ -n "$rec" ] || continue
+    meta="${rec%%$'\t'*}"
+    p="${rec#*$'\t'}"
+    mode="${meta%% *}"
+    if [ "$mode" = "160000" ]; then
+      printf 'check-pii-shapes: skip: gitlink (submodule reference, no scannable content): %s\n' "$p" >&2 || true
+      continue
+    fi
+    printf '%s\n' "$p" >> "$FILELIST"
+  done < "$TRACKED_S_Z"
+
+  # Untracked-but-not-ignored files never carry a git mode at all (they are
+  # not gitlinks by construction — a gitlink only exists as a tracked index
+  # entry), so no mode filtering applies here.
+  OTHERS_Z="$WORKDIR/others-z"
+  git ls-files -z --others --exclude-standard > "$OTHERS_Z" \
+    || fail_structural "git ls-files --others failed — cannot enumerate untracked files for --all"
   while IFS= read -r -d '' p; do
     printf '%s\n' "$p" >> "$FILELIST"
-  done < "$FILELIST_Z"
+  done < "$OTHERS_Z"
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
@@ -383,32 +491,59 @@ else
   POINT="$(git merge-base "$CHOSEN" HEAD 2>/dev/null || true)"
   [ -n "$POINT" ] || POINT="$CHOSEN"
 
-  NAMESTATUS_Z="$WORKDIR/namestatus-z"
-  # --no-color pins the rendering (free insurance under DP-4, since
-  # --name-status is never colourised regardless); --no-renames disables
-  # rename detection so every entry below is exactly two NUL-separated
-  # tokens (status, path) — never the three-token rename/copy form.
-  git diff --no-color --no-renames --name-status -z "$POINT" HEAD > "$NAMESTATUS_Z" 2>/dev/null \
-    || fail_structural "git diff --name-status failed against resolved point ($POINT)"
+  RAW_Z="$WORKDIR/raw-z"
+  # --no-color pins the rendering (free insurance under DP-4, since --raw is
+  # never colourised regardless); --no-renames disables rename detection so
+  # every entry below is exactly two NUL-separated records (metadata, path)
+  # — never the three-record rename/copy form. --raw (not --name-status) is
+  # used specifically so the NEW MODE field is available: it is what lets a
+  # gitlink (a submodule reference, mode 160000 — no blob, so `git cat-file`
+  # cannot read it as content) be recognised and skipped explicitly, rather
+  # than only discovered by cat-file failing (round 3 fix: that failure used
+  # to be dead code under errexit — see below).
+  git diff --no-color --no-renames --raw -z "$POINT" HEAD > "$RAW_Z" 2>/dev/null \
+    || fail_structural "git diff --raw failed against resolved point ($POINT)"
 
   CHANGED_PATHS="$WORKDIR/changed-paths"
   : > "$CHANGED_PATHS"
   {
-    while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-      [ "$status" = "D" ] && continue
+    while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
+      [ -n "$meta" ] || continue
+      # meta is ":<old-mode> <new-mode> <old-sha> <new-sha> <status>" — only
+      # the new mode and the status are needed.
+      # shellcheck disable=SC2086  # intentional word-splitting on spaces
+      set -- ${meta#:}
+      new_mode="${2:-}"
+      diff_status="${5:-}"
+      [ "$diff_status" = "D" ] && continue
+      if [ "$new_mode" = "160000" ]; then
+        # A gitlink (submodule reference) has no blob of its own in this
+        # repository — there is no content to scan, and reading one via
+        # `git cat-file` risks returning an unrelated commit object that
+        # happens to share the reference's SHA in this repo's object
+        # database (round 3 finding) rather than failing outright. Skipped
+        # explicitly, announced, never silently and never scanned.
+        printf 'check-pii-shapes: skip: gitlink (submodule reference, no scannable content): %s\n' "$path" >&2 || true
+        continue
+      fi
       printf '%s\n' "$path" >> "$CHANGED_PATHS"
     done
-  } < "$NAMESTATUS_Z"
+  } < "$RAW_Z"
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     is_known_shape "$path" && continue
 
-    git cat-file -p "HEAD:$path" > "$CONTENT_FILE" 2>/dev/null
-    rc=$?
-    if [ "$rc" -ne 0 ]; then
-      fail_structural "failed to read committed content via git cat-file for: $path"
-    fi
+    # Same-line `||` (round 3 fix): under `set -e`, a failing simple command
+    # NOT in an `if`/`&&`/`||` position triggers errexit immediately, so a
+    # separate `rc=$?; if [ "$rc" -ne 0 ]; then ...` on the NEXT line never
+    # runs — the script would exit with git's own raw exit code (128) and no
+    # classified token. An ordinary `git submodule add` reproduces this via
+    # a gitlink entry, but the gitlink skip above already routes that case
+    # away from cat-file entirely; this guard is the general fail-closed net
+    # for any other reason `cat-file` might fail on a surviving path.
+    git cat-file -p "HEAD:$path" > "$CONTENT_FILE" 2>/dev/null \
+      || fail_structural "failed to read committed content via git cat-file for: $path"
     if is_binary_file "$CONTENT_FILE"; then
       announce_skip "$path" blob
       continue

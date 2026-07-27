@@ -50,11 +50,13 @@ error (an unresolvable base ref, an unreadable input, an unknown flag, or
 only the pattern id, the path, and a line number (when available) are
 reported — so a public CI log never carries the byte that tripped the gate.
 
-`--all` is a full-tree audit mode, not a required CI check: it necessarily
-reports the deliberately PII-shaped adversarial fixtures that already live
-under `tests/` (used to prove this project's own guards actually fire), so
-running it always finds something on this repository. Use it locally when
-you want to sweep further than the current change.
+`--all` is a full-tree audit mode, not a required CI check. A short,
+per-file, test-locked list in the checker source excludes the paths that
+deliberately carry a PII shape as fixtures for another guard's own suite
+(`tests/rollup-track/run.sh`) — so `--all` currently exits `0` (clean) on
+this repository; a newly added shape-bearing path anywhere else would still
+be reported. Use it locally when you want to sweep further than the current
+change.
 
 ## What this gate does not cover
 
