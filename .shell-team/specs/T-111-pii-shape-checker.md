@@ -423,26 +423,13 @@ to reopen them.
 
 ## Notes from engineer
 
-- **Blocking defect found in AC18, AC19 and AC20's frozen `check:` lines
-  (not touched here — inside the intent block, requires a pm-spec rework +
-  human re-ratification of the intent-hash).** Every `grep -qxF '<pattern>'
-  <file>` sub-invocation in these three `check:` lines whose `<pattern>`
-  begins with a literal `-` (the four English scope-limit bullets in AC18,
-  their four Japanese counterparts in AC19, and the `--all`-audit-flag
-  bullet in AC20) fails with `grep: invalid option --` / exit 2 — on BSD
-  grep (macOS, verified) and, per POSIX/GNU getopt convention, on GNU grep
-  in CI as well — because the pattern argument is not preceded by `--` (or
-  `-e`) to end option parsing. This is a shell-quoting defect in the check
-  command itself, **not a gap in `docs/pii-controls.md` /
-  `docs/pii-controls.ja.md`**: every one of the required lines is present,
-  byte-exact, in both files — independently verified by re-running the same
-  assertions with `--` inserted (`grep -qxF -- '<pattern>' <file>`), which
-  all PASS. `bash bin/check-acs.sh .shell-team/specs/T-111-pii-shape-checker.md`
-  therefore reports `21 passed, 3 failed` (AC18/AC19/AC20) with everything
-  else green, including AC15's self-application.
-  Suggested fix (for pm-spec to apply and re-ratify, not applied here): in
-  each of AC18/AC19/AC20's `check:` lines, insert `--` immediately after
-  `grep -qxF` for every invocation whose pattern begins with `-` (i.e.
-  `grep -qxF -- '- Named entities ...'` etc.) — the `-x`/`-F` flags and the
-  patterns/paths themselves are otherwise correct and require no other
-  change.
+- **Resolved in v2.** The blocking `grep -qxF` leading-hyphen defect
+  originally reported here for AC18/AC19/AC20 was inventoried across all
+  three specs (15 sites) and fixed by pm-spec's v1→v2 re-freeze (`--`
+  inserted at every site, nothing else changed; user-ratified, committed as
+  763fae7). `bash bin/check-acs.sh .shell-team/specs/T-111-pii-shape-checker.md`
+  now reports 24 passed, 0 failed. A separate, small rendering fix (bullet
+  list/paragraph ordering and a missing blank line in
+  `docs/pii-controls.md`'s "## What this gate does not cover" section, AC18
+  and AC20's matched lines left byte-identical) is recorded in
+  `.shell-team/provenance/T-111.md`.

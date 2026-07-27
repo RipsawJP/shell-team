@@ -48,13 +48,14 @@ running it always finds something on this repository. Use it locally when
 you want to sweep further than the current diff.
 
 ## What this gate does not cover
+
 - Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.
 - The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.
 - Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.
 - Image content is not inspected; metadata only, if anything.
+- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.
 
 This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.
-- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.
 
 ## Known limitation
 
