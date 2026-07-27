@@ -59,23 +59,40 @@ that file's order.
   needs `--` (or `-e`) before the pattern or it fails with "invalid option"
   on BOTH BSD and GNU grep — worth checking for when authoring or reviewing
   new `check:` lines.
-- T-112: in an interactive sandboxed shell (not real CI), a bare `mktemp`
-  call (no explicit template) can fail with "Operation not permitted" on
-  macOS even when `$TMPDIR` is exported to an allowed scratch dir — the
+- T-112: a bare `mktemp` call (no explicit template) is a real, latent
+  portability defect, not merely a local sandbox quirk — on macOS the
   bare/`-t` forms resolve against the OS default temp dir regardless of
   `$TMPDIR`, only an explicit template (`mktemp "${TMPDIR:-/tmp}/name.XXXXXX"`)
-  respects it. `tests/check-handoff/run.sh` uses the bare form and fails this
-  way in such a sandbox; reproduced identically against `develop` HEAD, so it
-  is a sandbox-only artifact, not a regression — verify affected suites via
-  actual CI (GitHub Actions has a normal writable `/tmp`) rather than treating
-  a local sandboxed failure as authoritative.
+  respects it, and this repo's own convention (`tests/rollup-track/run.sh`,
+  2026-06-16 / T-038) already documents the explicit-template form. In an
+  interactive sandboxed shell this surfaces as "Operation not permitted"
+  even with `$TMPDIR` exported to an allowed scratch dir, but the underlying
+  defect is real regardless of the shell. Before touching one bare-`mktemp`
+  site, inventory the WHOLE class first: `grep -rn 'mktemp' bin tests
+  --include='*.sh'`, then classify each hit as already-explicit-template
+  (no change) or bare/OS-default (needs the explicit-template fix) — do not
+  fix a single file and assume the class is covered. After converting a bare
+  call, check whether it already fails closed on a `set -euo pipefail` script
+  without any extra guard: a plain top-level `x="$(mktemp ...)"` assignment
+  (not inside `if`/`&&`/`||`) already aborts the script via errexit on
+  failure (verified: `set -e; x="$(false)"` aborts immediately) — no
+  additional `|| die` is needed unless the assignment sits inside a context
+  that would otherwise swallow the failure.
 - T-112: a diff-scoped checker's self-application check against `--base
   develop` (e.g. `bin/check-pii-shapes.sh --base develop`, T-111) scans
   EVERY commit since develop, including already-committed QA/review
   artifacts (`.shell-team/reviews/*.md`) from a task that is still mid-flight
-  (`REWORK`). If that task's own review prose quotes adversarial
-  example content by shape (to describe a bug), the still-unfixed checker
-  can legitimately flag it — this is an external, cross-task dependency, not
-  a defect in a later task sharing the branch. Confirm with `git stash -u`
-  (temporarily removing your own in-progress changes) before concluding a
-  self-application AC failure is caused by your own diff.
+  (`REWORK`), so it can legitimately flag adversarial example shapes that
+  review prose quotes to describe a bug — an external, cross-task dependency,
+  not necessarily a defect in a later task sharing the branch. But when using
+  `git stash -u` to test whether a failure is caused by your own diff, `-u`
+  also removes your OWN new **untracked** files from the scan — so a finding
+  inside a file you just added can look identical to a pre-existing one
+  once stashed. Always check the reported path(s) against your own file
+  list BEFORE concluding a failure is external; do not rely on "still fails
+  after `git stash -u`" alone. (Confirmed case: a `%s+%s@users.noreply.
+  github.com` format-string helper in a fixture suite matches the checker's
+  generic mailbox shape and fails its digits-first noreply exclusion — a
+  checker-pattern gap on the assembled placeholder, not a real identity
+  leak; the correct fix was in the checker's own exclusion shape, not the
+  fragment-assembly helper.)

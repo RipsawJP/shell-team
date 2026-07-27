@@ -16,18 +16,29 @@ fail() {
   exit 1
 }
 
-valid_out="$(mktemp)"
-valid_err="$(mktemp)"
-bf_out="$(mktemp)"
-bf_err="$(mktemp)"
-flag_out="$(mktemp)"
-flag_err="$(mktemp)"
-crlf_out="$(mktemp)"
-crlf_err="$(mktemp)"
-ws_out="$(mktemp)"
-ws_err="$(mktemp)"
-tab_out="$(mktemp)"
-tab_err="$(mktemp)"
+# Explicit ${TMPDIR:-/tmp} template (repo lesson, 2026-06-16 / T-038, per
+# tests/rollup-track/run.sh's precedent): a bare `mktemp` with no template
+# resolves against the OS default temp dir regardless of $TMPDIR on some
+# platforms (observed on macOS), which fails closed in a sandbox whose
+# writable allowlist does not include that OS default. An explicit template
+# under $TMPDIR avoids that mismatch. A failing mktemp here still fails
+# closed on its own: each assignment below is a plain top-level command
+# substitution under `set -euo pipefail`, so a failure aborts the script
+# immediately (verified: `set -e` triggers on a failing `x="$(false)"`
+# assignment even with no surrounding `||`/`if`) rather than continuing with
+# an empty path.
+valid_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-valid-out.XXXXXX")"
+valid_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-valid-err.XXXXXX")"
+bf_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-bf-out.XXXXXX")"
+bf_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-bf-err.XXXXXX")"
+flag_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-flag-out.XXXXXX")"
+flag_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-flag-err.XXXXXX")"
+crlf_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-crlf-out.XXXXXX")"
+crlf_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-crlf-err.XXXXXX")"
+ws_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-ws-out.XXXXXX")"
+ws_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-ws-err.XXXXXX")"
+tab_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-tab-out.XXXXXX")"
+tab_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-tab-err.XXXXXX")"
 trap 'rm -f "$valid_out" "$valid_err" "$bf_out" "$bf_err" "$flag_out" "$flag_err" "$crlf_out" "$crlf_err" "$ws_out" "$ws_err" "$tab_out" "$tab_err"' EXIT
 
 # AC4: valid fixture exits 0. The fixture also includes T-103 with a
