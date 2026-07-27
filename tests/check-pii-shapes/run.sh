@@ -481,45 +481,66 @@ assert_clean "placeholder forms are not findings (all four documented forms, one
   "$PH_REPO" "$PH_BASE"
 
 # =============================================================================
-# boundary: a home-path-looking segment inside a URL is not a finding
-# (AC28 / DP-5) — empirically earned: this exact class is live in this
-# repository's own documentation today.
+# boundary (AC28 / DP-5 final narrow form, DP-10 bias-toward-firing):
+# suppression happens ONLY when the character immediately before the
+# leading `/` can continue a host name (an ASCII letter, digit, dot, or
+# hyphen). That is exactly what closes the one measured, in-tree false
+# positive (a bare documentation URL) and nothing more. Round 3 widened the
+# suppression to also exclude `/` and `]`, quieting a file://-style
+# authority, a Markdown-wrapped one, and an IPv6 literal authority — round 4
+# reverts that: it silenced two mechanically reachable true positives (a
+# doubled-leading-slash path, a bracket-adjacent path), and a reviewer or
+# QA finding that some input "looks like a false positive" is no longer
+# grounds for widening this rule (DP-10) — it is grounds for the declared
+# classes in the documents (AC18/AC19) or the placeholder discipline (AC9)
+# at the authoring site instead. The three previously-suppressed classes
+# are therefore expected to FIRE below, same as the two new positives.
 # =============================================================================
-printf '\n--- boundary: a home-path-looking segment inside a URL is not a finding ---\n'
+printf '\n--- boundary: only a host-name character suppresses, so the bare documentation URL stays clean ---\n'
 
 URL_LINE="See https://example.com/home/products for details"
 URL_REPO="$(new_repo)"; URL_BASE="$(git -C "$URL_REPO" rev-parse HEAD)"
 add_fixture_line "$URL_REPO" "url.txt" "$URL_LINE"
-assert_clean "boundary: a home-path-looking segment inside a URL is not a finding" \
+assert_clean "boundary: only a host-name character suppresses, so the bare documentation URL stays clean" \
   "$URL_REPO" "$URL_BASE"
 
-# Round 3 major regression lock: the docs' declared-limitation line makes an
-# unqualified claim ("a home-path shape written inside a URL is not
-# reported"), but the FIRST version of the boundary rule excluded only
-# letters/digits — a file://-style triple-slash authority (preceded by
-# another `/`), the same URL wrapped in a Markdown link, and an IPv6
-# literal authority (preceded by `]`) were all still reported, contradicting
-# that frozen (AC18/AC19) doc line. Since the doc line cannot be reworded,
-# the boundary rule was widened to also treat `/` and `]` as characters
-# that can continue a host name or path-separator run. These three fixtures
-# are the regression lock for that widening.
+printf '\n--- positive: a doubled-leading-slash home path fires (fail-noisy, bash diagnostics emit this) ---\n'
+
+DBLSLASH_LINE="bash: //Users/${HP_NAME}/data: No such file or directory"
+DBLSLASH_REPO="$(new_repo)"; DBLSLASH_BASE="$(git -C "$DBLSLASH_REPO" rev-parse HEAD)"
+add_fixture_line "$DBLSLASH_REPO" "dblslash.txt" "$DBLSLASH_LINE"
+assert_finding "positive: a doubled-leading-slash home path fires (fail-noisy, bash diagnostics emit this)" \
+  "home-path" "$DBLSLASH_REPO" "$DBLSLASH_BASE"
+
+printf '\n--- positive: a home path preceded by a bracket fires (fail-noisy, xtrace prefixes emit this) ---\n'
+
+BRACKET_LINE="[worker-3]/Users/${HP_NAME}/data processed"
+BRACKET_REPO="$(new_repo)"; BRACKET_BASE="$(git -C "$BRACKET_REPO" rev-parse HEAD)"
+add_fixture_line "$BRACKET_REPO" "bracket.txt" "$BRACKET_LINE"
+assert_finding "positive: a home path preceded by a bracket fires (fail-noisy, xtrace prefixes emit this)" \
+  "home-path" "$BRACKET_REPO" "$BRACKET_BASE"
+
+# DP-10: the three classes round 3 suppressed are accepted noise now,
+# declared in the documents (AC18/AC19) rather than chased in the regex —
+# these are positive fixtures (not silence locks) so a future round cannot
+# quietly re-widen the boundary and have this suite stay silent about it.
 FILEURL_LINE="backup at file:///Users/${HP_NAME}/secrets.txt for review"
 FILEURL_REPO="$(new_repo)"; FILEURL_BASE="$(git -C "$FILEURL_REPO" rev-parse HEAD)"
 add_fixture_line "$FILEURL_REPO" "fileurl.txt" "$FILEURL_LINE"
-assert_clean "boundary: a file:// triple-slash authority is not a finding (round 3 regression lock)" \
-  "$FILEURL_REPO" "$FILEURL_BASE"
+assert_finding "accepted noise: a file:// triple-slash authority fires (declared in docs, not suppressed — round 4)" \
+  "home-path" "$FILEURL_REPO" "$FILEURL_BASE"
 
 MDURL_LINE="[local notes](file:///home/${HP_NAME}/private.txt)"
 MDURL_REPO="$(new_repo)"; MDURL_BASE="$(git -C "$MDURL_REPO" rev-parse HEAD)"
 add_fixture_line "$MDURL_REPO" "mdurl.txt" "$MDURL_LINE"
-assert_clean "boundary: a Markdown link wrapping a file:// URL is not a finding (round 3 regression lock)" \
-  "$MDURL_REPO" "$MDURL_BASE"
+assert_finding "accepted noise: a Markdown link wrapping a file:// URL fires (declared in docs, not suppressed — round 4)" \
+  "home-path" "$MDURL_REPO" "$MDURL_BASE"
 
 IPV6URL_LINE="see https://[2001:db8::1]/Users/${HP_NAME}/secrets.txt for details"
 IPV6URL_REPO="$(new_repo)"; IPV6URL_BASE="$(git -C "$IPV6URL_REPO" rev-parse HEAD)"
 add_fixture_line "$IPV6URL_REPO" "ipv6url.txt" "$IPV6URL_LINE"
-assert_clean "boundary: an IPv6 literal authority is not a finding (round 3 regression lock)" \
-  "$IPV6URL_REPO" "$IPV6URL_BASE"
+assert_finding "accepted noise: an IPv6 literal authority fires (declared in docs, not suppressed — round 4)" \
+  "home-path" "$IPV6URL_REPO" "$IPV6URL_BASE"
 
 # =============================================================================
 # all candidates per line: an excluded address on the same line never
@@ -788,7 +809,6 @@ sed -n '/^KNOWN_SHAPE_PATHS=(/,/^)/p' "$BIN" | grep -oE '"[^"]*"' | tr -d '"' | 
 
 KNOWN_EXPECTED_FILE="$WORK/known-expected.txt"
 {
-  printf '%s\n' "tests/rollup-track/fixtures/pii.jsonl"
   printf '%s\n' "tests/rollup-track/fixtures/secret-aws.jsonl"
   printf '%s\n' "tests/rollup-track/fixtures/secret-github.jsonl"
   printf '%s\n' "tests/rollup-track/fixtures/secret-openai.jsonl"

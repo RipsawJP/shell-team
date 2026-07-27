@@ -64,11 +64,11 @@ change.
 - The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.
 - Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.
 - Image content is not inspected; metadata only, if anything.
-- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.
+- The deliberate shape-bearing fixtures under tests/ are carried by the test-locked known-shapes list, so --all exits 0 on this tree; --all remains an audit flag and is deliberately not a required CI check.
 - The commit-identity gate checks only the non-merge commits a pull request adds; merge commits are excluded because their identity is set by the merging party, not by the author of the change.
 - The gate is forward-looking: it does not remove identity metadata from commits that are already published, and the remediation for a past exposure is an operator-side account setting, not a repository change.
 - A PII shape in a filename or a path is not inspected; this gate reads file content only.
-- A home-path shape written inside a URL is not reported: the pattern requires the path to begin at a boundary that a URL authority does not provide, which is the same rule that keeps a documentation URL from being a false positive.
+- Some URL-adjacent and log-prefixed forms may be reported even though they carry no personal data: a file scheme URL, a path wrapped in markdown link syntax, and a path following an IPv6 authority. That noise is accepted deliberately, because a one-character lookbehind cannot tell those apart from a real path in prose; the resolution is to write the placeholder form, never to widen the suppression.
 - The home-path shapes match a conservative ASCII name segment only; a name written in non-ASCII characters, and unusual case spellings of the Windows form, are not covered.
 - A mailbox shape is not reported when its domain cannot hold a deliverable mailbox: a domain reserved for documentation and testing, or the GitHub noreply domain used for pseudonymous identities. The excluded domains are listed in the checker source.
 - The gate reads the committed content of each path the change touches, resolved against the base ref; a change that exists only in the working tree is not scanned, and --all is the mode that reads the working tree.

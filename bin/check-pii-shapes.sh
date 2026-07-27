@@ -70,20 +70,27 @@
 # this mechanism that can no longer change a verdict, so it is free
 # insurance, not a defence this script depends on.
 #
-# DP-5 (home-path boundary): the home-path shape only matches at the start
-# of a line or when preceded by a character that cannot continue a host
-# name or a path-separator run — a letter, a digit, a `/`, or a `]` (the
-# closing bracket of an IPv6 literal authority). This closes every URL-shaped
-# false-positive class this checker's own history has actually hit: an
-# http(s) authority immediately followed by the path
-# (https://example.com/home/products, preceded by a letter), a file://-style
-# triple-slash authority (file:///Users/<name>/..., preceded by the second
-# `/`, including when that whole URL sits inside a Markdown link), and an
-# IPv6 literal authority (https://[::1]/Users/<name>/..., preceded by `]`).
-# Round 3 cross-provider review found the first version of this rule (which
-# excluded only letters/digits) left the latter two classes reachable —
-# widened here rather than narrowing the docs' claim, since the doc line is
-# frozen (AC18/AC19) and the code is what had to change to make it true.
+# DP-5 (home-path boundary, final narrow form) / DP-10 (bias toward firing):
+# the home-path shape is suppressed ONLY when the character immediately
+# before its leading `/` can continue a host name — an ASCII letter, digit,
+# dot, or hyphen. A bare documentation URL authority
+# (https://example.com/home/products, preceded by a letter) therefore
+# suppresses — the one false-positive class actually measured in this
+# tree. Everything else FIRES: a quoted path, a path after a space, a path
+# at line start, a path after a bracket (`]`), and a path after another `/`
+# all still match. Round 3 widened the suppression to also exclude `/` and
+# `]`, aiming to quiet a file://-style triple-slash authority, that same
+# URL in a Markdown link, and an IPv6 literal authority — round 4 found
+# that widening silences genuine true positives that are mechanically
+# reachable (a doubled-leading-slash path bash's own diagnostics emit, and
+# a bracket-adjacent path an xtrace prefix emits), so it is reverted. A
+# one-character lookbehind cannot cleanly separate "inside a URL" from "in
+# prose or a log line", and DP-10 is the ratified answer to that
+# convergence failure: for a PII gate a false positive costs a moment of
+# review, a false negative is a silent, second-chance-less exposure, so
+# where the rule cannot separate the populations it prefers firing. The
+# three accepted noisy classes are declared in the documents (AC18/AC19)
+# instead of chased in the regex.
 #
 # DP-7 (reserved-domain exclusion): a mailbox shape at the RFC 2606 /
 # RFC 6761 reserved documentation/testing names (example.com/.org/.net, and
@@ -231,13 +238,19 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 # that admits, and whether this round applied a fix.
 #
 #   RE_HOME_PATH_BOUNDARY  left-anchored: start-of-line, OR one character
-#     that is NOT a letter/digit/`/`/`]`. Admits: space, quote, hyphen, dot,
-#     colon, parenthesis, non-ASCII punctuation as a valid "this is a real
-#     path start" boundary. APPLIED a fix this round: widened from
-#     alnum-only to also exclude `/` and `]`, closing a file://-style
-#     triple-slash authority, that same URL inside a Markdown link, and an
-#     IPv6 literal authority — all three were reachable false positives
-#     under the narrower, first-round class.
+#     that is NOT a letter, digit, dot, or hyphen. Suppresses only when
+#     preceded by a host-name-continuing character (the one measured
+#     false-positive class, a bare URL authority); a bracket, another `/`,
+#     a space, a quote or full-width punctuation all still FIRE. Round 3
+#     widened this to also suppress on `/` and `]` (closing file://,
+#     Markdown-wrapped file://, and IPv6-literal-authority noise); round 4
+#     REVERTED that widening — it silenced two mechanically reachable true
+#     positives (a doubled-leading-slash path, a bracket-adjacent path) —
+#     per DP-10's ratified bias-toward-firing: a false positive costs a
+#     review, a false negative is a silent, second-chance-less exposure.
+#     The reverted noisy classes are declared in the documents (AC18/AC19)
+#     instead of suppressed in this regex, and AC28's two positive fixtures
+#     lock the fail-noisy direction against a future re-widening.
 #   RE_HOME_PATH_RAW  not end-anchored (greedy through the whole ASCII name
 #     class). Not applicable to this round — it is the base SHAPE, not an
 #     exclusion; unaffected by boundary/anchoring findings.
@@ -280,7 +293,7 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     (safe-directed), never creates a bypass. Not applicable.
 #
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
-RE_HOME_PATH_BOUNDARY='(^|[^]/A-Za-z0-9])'
+RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9.-])'
 # shellcheck disable=SC2016
 RE_HOME_PATH_RAW='/(Users|home)/[A-Za-z0-9_.-]+'
 RE_HOME_PATH="${RE_HOME_PATH_BOUNDARY}${RE_HOME_PATH_RAW}"
@@ -307,7 +320,6 @@ RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|sk-[A-Za-z0-9_-]{16,}'
 # under tests/check-pii-shapes/ — those stay runtime-generated (DP-1) and a
 # shape in them is always reported (AC13).
 KNOWN_SHAPE_PATHS=(
-  "tests/rollup-track/fixtures/pii.jsonl"
   "tests/rollup-track/fixtures/winpath.jsonl"
   "tests/rollup-track/fixtures/secret-aws.jsonl"
   "tests/rollup-track/fixtures/secret-github.jsonl"
