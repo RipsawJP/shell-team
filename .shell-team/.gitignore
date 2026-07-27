@@ -1,0 +1,8 @@
+# shell-team: this .gitignore is self-contained to the shell-team base dir,
+# so the host repo's root .gitignore is never touched. Operating-Loop telemetry
+# is regenerated each run and is not meant to be committed.
+runs/
+# codex-capture.sh per-invocation temps — a SIGKILL-orphaned temp can
+# hold raw Codex output with PII; the trap-based cleanup doesn't fire on
+# SIGKILL, so this pattern is the mandatory backstop (both-layout coverage).
+reviews/.codex-capture.*

@@ -144,9 +144,8 @@ It also works standalone, one agent or skill at a time, when you want to be expl
 │   ├── essays/                      # personal essays behind the project
 │   ├── workflow.md                  # phase diagram + hand-off contract
 │   ├── distribution.md              # install / update / dogfood
-│   ├── history.md                   # how the project evolved
-│   └── specs/                       # one .md per task
-└── tasks/                           # per-repo data (todo, specs, loops, runs, retros, reviews)
+│   └── history.md                   # how the project evolved
+└── .shell-team/                     # this repo's own per-repo data (board, specs, loops, retros, reviews)
 ```
 
 ## Phase flow
@@ -181,7 +180,7 @@ See [docs/history.md](docs/history.md) for how this operating discipline evolved
 - **Read-only Orchestrator**: `tech-lead` only plans — the main session executes the map.
 - **Tight tool permissions**: PM is read+spec-write only, QA is read+bash only, Reviewer can't mutate code.
 - **Files are the only shared state**: the board (`todo.md`) + status flags are the single source of truth between agents.
-- **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo itself predates that and uses the legacy `tasks/` + `docs/specs/` layout — which the resolver still detects and supports — so the `tasks/…` paths throughout these docs are this repo's legacy layout. See [docs/adopting.md](docs/adopting.md).
+- **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo runs on that same default layout, so its own board, specs, and retros live under `.shell-team/` too. The resolver still detects and supports the earlier `tasks/` + `docs/specs/` layout for repos that adopted the team before the base dir was consolidated — where these docs write `tasks/…` or `docs/specs/…`, they name the same artifacts in that legacy layout. See [docs/adopting.md](docs/adopting.md).
 - **Engineer is non-worktree by default**: its edits land directly on the current feature branch; the orchestrator opts into `isolation: worktree` at invocation only for parallel implementations.
 - **Cross-provider review is mandatory**: if Codex CLI is unavailable, the review returns `BLOCKED` rather than falling back to Claude.
 

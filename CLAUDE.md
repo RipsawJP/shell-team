@@ -18,6 +18,8 @@ Read the file — do not reconstruct these from conversation:
 | Phase flow, layout, versioning, dogfood setup | `README.md` |
 | Contribution rules and review expectations | `CONTRIBUTING.md` |
 | Vulnerability reporting | `SECURITY.md` |
+| The task board and its status flags | `.shell-team/todo.md` — this repo runs on the shipped default layout, so resolve paths with `bin/team-paths.sh --get todo\|specs\|reviews` rather than assuming either layout |
+| How to run this repo's tests | `.shell-team/test-recipe.md` — read it before running suites, and append procedures you establish |
 
 The role table is deliberately **not** duplicated here. A second copy drifts
 from the frontmatter that actually configures the agents, and the copy is the
