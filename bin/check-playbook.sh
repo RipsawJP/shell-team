@@ -12,6 +12,7 @@
 #   - **Status**:       active | superseded
 #   - **Source**:       <non-empty free text — task/issue/PR ref, external
 #                        citation, or "n/a">
+#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.
 #   - **Rule**:         <existing field>
 #   - **Why**:          <existing field>
 #   - **How to apply**: <existing field>

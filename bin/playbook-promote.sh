@@ -73,6 +73,7 @@
 #                   pm-spec, all}
 #   --status        active | superseded
 #   --source        task/issue/PR reference, external citation, or n/a
+#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.
 #   --rule          the takeaway, in one sentence (this is what eventually
 #                   gets injected by bin/gen-playbook-blocks.sh)
 #   --why           the incident or reasoning (full prose, never injected)
