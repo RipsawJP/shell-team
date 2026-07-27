@@ -99,3 +99,22 @@ that file's order.
   fix was in the checker's own exclusion shape, not the fragment-assembly
   helper. Resolved by T-111's v4 rework (DP-9): the noreply exclusion is now
   matched on the domain, end-anchored, never on the local part's shape.)
+- T-111 (v4 rework): `bash bin/check-acs.sh <spec>` for `T-111-pii-shape-checker.md`
+  runs `bin/check-pii-shapes.sh --all` against the whole tree as part of
+  AC16, which takes noticeably longer than this repo's other suites (tens
+  of seconds) — if invoking it through a tool with a short default timeout,
+  run it as a background/long-running command rather than assuming a hang.
+  Separately: `grep -nE`/`grep -noE`/`grep -qoE` calls whose PATTERN
+  argument is a shell variable need an explicit `--` before that variable
+  (the same leading-hyphen defect class already documented above for
+  `grep -qxF`), because `RE_PRIVATE_KEY`'s value begins with `-----BEGIN`
+  and grep otherwise parses it as a run of short options and exits 2
+  instead of scanning. When writing a NEW process artifact (a lessons
+  entry, a provenance file, a spec) that needs to DISCUSS a PII shape
+  already reported by `check-pii-shapes.sh` (e.g. quoting a fixture's own
+  content to explain a design decision), do not transcribe the literal
+  match — describe it in words or use the documented placeholder form
+  instead, and then run `bin/check-pii-shapes.sh --all` again before
+  hand-off: transcribing a real match into a NEW file reproduces the same
+  finding on the new file, which is easy to miss since the file you just
+  wrote is not the file the original finding named.
