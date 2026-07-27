@@ -3,6 +3,14 @@
 **Status**: READY_FOR_ARCH
 **Owner**: pm-spec
 **Task ID**: T-111
+**Intent version**: v2 — re-frozen 2026-07-27 under a human-ratified v1→v2. The
+only change was inserting `--` after the option cluster of every `grep` whose
+fixed-string pattern begins with a literal `-` (15 sites across the three
+specs), because getopt made grep parse the pattern as an option and exit 2. The
+asserted semantics (whole-line fixed-string match) are identical to v1. This
+line lives OUTSIDE the intent block: the version of record is the board's
+`intent-hash (vN)` ledger, and the marker lines themselves are matched by exact
+full-line compare, so neither may carry a version token.
 **Source**: GitHub issue #6 (RipsawJP/shell-team) — Layer 2 items 4 and 5, plus the
 user instruction that the out-of-scope declarations be stated in `docs/`.
 **Branch**: `feature/pii-controls` (from `develop`). Executed first of three tasks
@@ -151,17 +159,17 @@ Every `check:` runs from the repository root. `<base>` in the checks below is
   line, in both `docs/pii-controls.md` and `docs/pii-controls.ja.md`, under the
   canonical heading of each file. The exact lines are fixed in
   "Canonical document lines" below.
-  - check: grep -qxF '## What this gate does not cover' docs/pii-controls.md && grep -qxF '- Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.' docs/pii-controls.md && grep -qxF '- The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.' docs/pii-controls.md && grep -qxF '- Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.' docs/pii-controls.md && grep -qxF '- Image content is not inspected; metadata only, if anything.' docs/pii-controls.md
+  - check: grep -qxF '## What this gate does not cover' docs/pii-controls.md && grep -qxF -- '- Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.' docs/pii-controls.md && grep -qxF -- '- The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.' docs/pii-controls.md && grep -qxF -- '- Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.' docs/pii-controls.md && grep -qxF -- '- Image content is not inspected; metadata only, if anything.' docs/pii-controls.md
 - [ ] **AC19** The Japanese counterpart carries the same four limits, each as one
   physical line, under its own canonical heading.
-  - check: grep -qxF '## このゲートが扱わないもの' docs/pii-controls.ja.md && grep -qxF '- 固有名詞（顧客名・内部ホスト名・プロジェクトコード）は形状では一致させられないため、このゲートの対象外である。' docs/pii-controls.ja.md && grep -qxF '- 固有名詞に一致させるためのパターン自体が機密であるため、この公開リポジトリには置けない。リポジトリ外のオペレータ手元のチェックに置く。' docs/pii-controls.ja.md && grep -qxF '- 意味的な機微さ（設計判断や文脈から読み手が業務上の関係を推測できてしまう類）は PII の形状ではなく、対象外である。' docs/pii-controls.ja.md && grep -qxF '- 画像の内容は検査しない。検査するとしてもメタデータのみである。' docs/pii-controls.ja.md
+  - check: grep -qxF '## このゲートが扱わないもの' docs/pii-controls.ja.md && grep -qxF -- '- 固有名詞（顧客名・内部ホスト名・プロジェクトコード）は形状では一致させられないため、このゲートの対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 固有名詞に一致させるためのパターン自体が機密であるため、この公開リポジトリには置けない。リポジトリ外のオペレータ手元のチェックに置く。' docs/pii-controls.ja.md && grep -qxF -- '- 意味的な機微さ（設計判断や文脈から読み手が業務上の関係を推測できてしまう類）は PII の形状ではなく、対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 画像の内容は検査しない。検査するとしてもメタデータのみである。' docs/pii-controls.ja.md
 - [ ] **AC20** No wording that implies complete coverage. Positive half: the
   canonical "shapes only" sentence is present as one physical line in each doc,
   and so is the categorical `--all` statement. Negative half: none of the
   badge-shaped claim compounds `PII-gated`, `PII-free`, `PII-clean`, `PII-safe`
   appears in the docs pair or in either README (each file is proved readable
   first, so an unreadable file cannot masquerade as "no match").
-  - check: grep -qxF 'This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.' docs/pii-controls.md && grep -qxF 'このゲートは形状だけを見る。PII 対策として完全ではなく、通過したことは変更に PII が含まれないことの証拠にはならない。' docs/pii-controls.ja.md && grep -qxF '- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.ja.md && grep -qF 'shell-team' README.md && grep -qF 'shell-team' README.ja.md && ! grep -F -e 'PII-gated' -e 'PII-free' -e 'PII-clean' -e 'PII-safe' docs/pii-controls.md docs/pii-controls.ja.md README.md README.ja.md
+  - check: grep -qxF 'This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.' docs/pii-controls.md && grep -qxF 'このゲートは形状だけを見る。PII 対策として完全ではなく、通過したことは変更に PII が含まれないことの証拠にはならない。' docs/pii-controls.ja.md && grep -qxF -- '- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.ja.md && grep -qF 'shell-team' README.md && grep -qF 'shell-team' README.ja.md && ! grep -F -e 'PII-gated' -e 'PII-free' -e 'PII-clean' -e 'PII-safe' docs/pii-controls.md docs/pii-controls.ja.md README.md README.ja.md
 - [ ] **AC21** Every stderr write in the new script — outside comment lines —
   carries a `|| true` guard on the same physical line, so a write failure on a
   path whose contract exit is 2 cannot be downgraded to errexit's own fallback of

@@ -3,6 +3,14 @@
 **Status**: READY_FOR_ARCH
 **Owner**: pm-spec
 **Task ID**: T-113
+**Intent version**: v2 — re-frozen 2026-07-27 under a human-ratified v1→v2. The
+only change was inserting `--` after the option cluster of every `grep` whose
+fixed-string pattern begins with a literal `-` (15 sites across the three
+specs), because getopt made grep parse the pattern as an option and exit 2. The
+asserted semantics (whole-line fixed-string match) are identical to v1. This
+line lives OUTSIDE the intent block: the version of record is the board's
+`intent-hash (vN)` ledger, and the marker lines themselves are matched by exact
+full-line compare, so neither may carry a version token.
 **Source**: GitHub issue #6 (RipsawJP/shell-team) — Layer 1 item 3.
 **Branch**: `feature/pii-controls` (from `develop`). Third of three tasks on this
 one branch; depends on T-112 (and through it on T-111, whose checkers this
@@ -65,7 +73,7 @@ canonical lines are fixed under "Canonical lines" below.
   (`bin/check-playbook.sh`), the CLI that authors an entry
   (`bin/playbook-promote.sh`), and the drafting agent
   (`agents/scrum-master.md`).
-  - check: grep -qxF '#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.' bin/check-playbook.sh && grep -qxF '#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.' bin/playbook-promote.sh && grep -qxF '- **De-identify lessons.** A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.' agents/scrum-master.md
+  - check: grep -qxF '#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.' bin/check-playbook.sh && grep -qxF '#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.' bin/playbook-promote.sh && grep -qxF -- '- **De-identify lessons.** A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.' agents/scrum-master.md
 - [ ] **AC2** Surface completeness: exactly three files under `bin/`, `agents/`
   and `docs/` carry the English canonical rule — no surface is missing, and no
   unreviewed fourth copy has appeared.
@@ -82,7 +90,7 @@ canonical lines are fixed under "Canonical lines" below.
   - check: grep -qF 'or is n/a.' bin/check-playbook.sh && grep -qF 'or is n/a.' bin/playbook-promote.sh && grep -qF 'or is n/a.' agents/scrum-master.md && ! grep -qE 'Source: (none|omitted)' bin/check-playbook.sh bin/playbook-promote.sh agents/scrum-master.md
 - [ ] **AC5** The rule is stated as authoring-time discipline, never as a
   detector: the canonical limitation line is present in `agents/scrum-master.md`.
-  - check: grep -qxF '- **The de-identification rule is an authoring-time discipline, not a detector.** It prevents identifying detail from being written down; it does not find identifying detail that is already there.' agents/scrum-master.md
+  - check: grep -qxF -- '- **The de-identification rule is an authoring-time discipline, not a detector.** It prevents identifying detail from being written down; it does not find identifying detail that is already there.' agents/scrum-master.md
 - [ ] **AC6** The Japanese-language drafting surface carries the same rule and
   the same limitation, each as one physical line, inside the lesson-candidate
   guidance of `docs/templates/retro-template.md`.

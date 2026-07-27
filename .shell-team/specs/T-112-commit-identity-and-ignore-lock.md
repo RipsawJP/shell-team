@@ -3,6 +3,14 @@
 **Status**: READY_FOR_ARCH
 **Owner**: pm-spec
 **Task ID**: T-112
+**Intent version**: v2 — re-frozen 2026-07-27 under a human-ratified v1→v2. The
+only change was inserting `--` after the option cluster of every `grep` whose
+fixed-string pattern begins with a literal `-` (15 sites across the three
+specs), because getopt made grep parse the pattern as an option and exit 2. The
+asserted semantics (whole-line fixed-string match) are identical to v1. This
+line lives OUTSIDE the intent block: the version of record is the board's
+`intent-hash (vN)` ledger, and the marker lines themselves are matched by exact
+full-line compare, so neither may carry a version token.
 **Source**: GitHub issue #6 (RipsawJP/shell-team) — Layer 1 items 1 and 2.
 **Branch**: `feature/pii-controls` (from `develop`). Second of three tasks on this
 one branch; depends on T-111 (both edit the same shellcheck argument line, and
@@ -164,7 +172,7 @@ Every `check:` runs from the repository root. `<base>` is `develop`.
   as one physical line, in both documents (exact text under "Canonical document
   lines"): the merge-commit exclusion, and the forward-looking-only limitation
   whose remediation is an operator-side account setting.
-  - check: grep -qxF '- The commit-identity gate checks only the non-merge commits a pull request adds; merge commits are excluded because their identity is set by the merging party, not by the author of the change.' docs/pii-controls.md && grep -qxF '- The gate is forward-looking: it does not remove identity metadata from commits that are already published, and the remediation for a past exposure is an operator-side account setting, not a repository change.' docs/pii-controls.md && grep -qxF '- commit identity のゲートは pull request が追加する非マージコミットだけを見る。マージコミットの identity はマージした側が決めるものであり、変更の作者には直せないため対象外とする。' docs/pii-controls.ja.md && grep -qxF '- このゲートは前向きの制御であり、すでに公開されたコミットの identity メタデータは取り除かない。過去の露出に対する是正はリポジトリの変更ではなくオペレータ側のアカウント設定で行う。' docs/pii-controls.ja.md
+  - check: grep -qxF -- '- The commit-identity gate checks only the non-merge commits a pull request adds; merge commits are excluded because their identity is set by the merging party, not by the author of the change.' docs/pii-controls.md && grep -qxF -- '- The gate is forward-looking: it does not remove identity metadata from commits that are already published, and the remediation for a past exposure is an operator-side account setting, not a repository change.' docs/pii-controls.md && grep -qxF -- '- commit identity のゲートは pull request が追加する非マージコミットだけを見る。マージコミットの identity はマージした側が決めるものであり、変更の作者には直せないため対象外とする。' docs/pii-controls.ja.md && grep -qxF -- '- このゲートは前向きの制御であり、すでに公開されたコミットの identity メタデータは取り除かない。過去の露出に対する是正はリポジトリの変更ではなくオペレータ側のアカウント設定で行う。' docs/pii-controls.ja.md
 - [ ] **AC22** No wording that implies complete coverage: T-111's canonical
   "shapes only" line is still present in both documents after this task edits
   them, and none of the badge-shaped claim compounds appears in the documents or
