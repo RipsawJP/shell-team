@@ -11,16 +11,51 @@
 
 <!-- The canonical command(s) to run the test suite in this repo. -->
 
-(not written yet — the first engineer/human to run tests here documents the command)
+Load the plugin from this checkout so `bin/` is on `PATH`:
+
+```bash
+claude --plugin-dir ./     # then /reload-plugins after editing agents, skills or bin
+```
+
+Run a single suite directly with bash (works with or without the plugin loaded):
+
+```bash
+bash tests/<suite>/run.sh
+```
+
+To check one spec's acceptance criteria mechanically (dry-run first to catch
+unrecognized AC labels, then live):
+
+```bash
+bash bin/check-acs.sh --dry-run .shell-team/specs/<slug>.md
+bash bin/check-acs.sh .shell-team/specs/<slug>.md
+```
+
+There is no single "run everything" entrypoint; CI (`.github/workflows/check-handoff.yml`)
+is the authoritative list of every suite + dogfood step that must pass, run in
+that file's order.
 
 ## Environment quirks / prerequisite builds
 
 <!-- Anything the launch command assumes: test-only images to build first,
      extras to install (e.g. a `.[dev]` extra), services to start, env vars. -->
 
-(none recorded yet)
+- `shellcheck` is required, pinned to the version CI installs (currently
+  0.11.0 — see `.github/workflows/check-handoff.yml`'s `SHELLCHECK_VERSION`).
+  Verify locally with `shellcheck --version` before trusting a shellcheck-clean
+  claim; CI installs its own pinned copy regardless of what's on the runner.
+- No other prerequisite builds or services — every suite is bash + git +
+  standard POSIX tools, run directly from the repo root.
 
 ## Appended by tasks
 
 <!-- Append-only log: when a task (T-NNN) establishes a new environment
      procedure, add it here with the task id so the next task inherits it. -->
+
+- T-111: `bash bin/check-acs.sh --dry-run <spec>` then `bash bin/check-acs.sh
+  <spec>` (live) is the mechanical per-AC gate; run both, in that order,
+  before trusting a spec's acceptance criteria are green. A `check:` line
+  that begins a `grep`/`grep -x` invocation with a pattern starting with `-`
+  needs `--` (or `-e`) before the pattern or it fails with "invalid option"
+  on BOTH BSD and GNU grep — worth checking for when authoring or reviewing
+  new `check:` lines.

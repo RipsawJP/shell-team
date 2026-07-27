@@ -412,3 +412,29 @@ to reopen them.
   share one branch, so a file-set allow-list authored now would go stale the
   moment T-112 lands. AC24 pins the specific files that must stay untouched
   instead.
+
+## Notes from engineer
+
+- **Blocking defect found in AC18, AC19 and AC20's frozen `check:` lines
+  (not touched here — inside the intent block, requires a pm-spec rework +
+  human re-ratification of the intent-hash).** Every `grep -qxF '<pattern>'
+  <file>` sub-invocation in these three `check:` lines whose `<pattern>`
+  begins with a literal `-` (the four English scope-limit bullets in AC18,
+  their four Japanese counterparts in AC19, and the `--all`-audit-flag
+  bullet in AC20) fails with `grep: invalid option --` / exit 2 — on BSD
+  grep (macOS, verified) and, per POSIX/GNU getopt convention, on GNU grep
+  in CI as well — because the pattern argument is not preceded by `--` (or
+  `-e`) to end option parsing. This is a shell-quoting defect in the check
+  command itself, **not a gap in `docs/pii-controls.md` /
+  `docs/pii-controls.ja.md`**: every one of the required lines is present,
+  byte-exact, in both files — independently verified by re-running the same
+  assertions with `--` inserted (`grep -qxF -- '<pattern>' <file>`), which
+  all PASS. `bash bin/check-acs.sh .shell-team/specs/T-111-pii-shape-checker.md`
+  therefore reports `21 passed, 3 failed` (AC18/AC19/AC20) with everything
+  else green, including AC15's self-application.
+  Suggested fix (for pm-spec to apply and re-ratify, not applied here): in
+  each of AC18/AC19/AC20's `check:` lines, insert `--` immediately after
+  `grep -qxF` for every invocation whose pattern begins with `-` (i.e.
+  `grep -qxF -- '- Named entities ...'` etc.) — the `-x`/`-F` flags and the
+  patterns/paths themselves are otherwise correct and require no other
+  change.

@@ -26,7 +26,7 @@ jobs:
           shellcheck --version
 
       - name: shellcheck
-        run: shellcheck bin/check-handoff.sh tests/check-handoff/run.sh bin/check-contract.sh tests/check-contract/run.sh bin/loop-guard.sh tests/loop-guard/run.sh bin/log-run.sh tests/log-run/run.sh bin/check-run.sh tests/check-run/run.sh bin/team-init.sh tests/team-init/run.sh bin/discover-work.sh tests/discover-work/run.sh tests/discover-work/fixtures/gh bin/check-acs.sh tests/check-acs/run.sh bin/check-retro.sh tests/check-retro/run.sh bin/check-readme-version.sh tests/check-readme-version/run.sh bin/rollup-runs.sh tests/rollup-runs/run.sh bin/rollup-track.sh tests/rollup-track/run.sh bin/team-paths.sh tests/team-paths/run.sh bin/check-design-note.sh tests/check-design-note/run.sh bin/goal-state.sh tests/goal-state/run.sh bin/consolidate-proposals.sh tests/consolidate-proposals/run.sh bin/review-gate.sh tests/review-gate/run.sh bin/close-out.sh bin/gen-project-status.sh tests/close-out/run.sh bin/check-prompt-sync.sh tests/check-prompt-sync/run.sh bin/cluster-failures.sh tests/cluster-failures/run.sh bin/check-playbook.sh tests/check-playbook/run.sh bin/gen-playbook-blocks.sh tests/gen-playbook-blocks/run.sh bin/playbook-promote.sh tests/playbook-promote/run.sh bin/install tests/install/run.sh bin/rework-digest.sh tests/rework-digest/run.sh bin/check-intent.sh tests/check-intent/run.sh bin/check-provenance.sh tests/check-provenance/run.sh bin/check-board-headings.sh tests/check-board-headings/run.sh tests/errexit-safe/run.sh bin/codex-capture.sh tests/codex-skeleton-hygiene/run.sh
+        run: shellcheck bin/check-handoff.sh tests/check-handoff/run.sh bin/check-contract.sh tests/check-contract/run.sh bin/loop-guard.sh tests/loop-guard/run.sh bin/log-run.sh tests/log-run/run.sh bin/check-run.sh tests/check-run/run.sh bin/team-init.sh tests/team-init/run.sh bin/discover-work.sh tests/discover-work/run.sh tests/discover-work/fixtures/gh bin/check-acs.sh tests/check-acs/run.sh bin/check-retro.sh tests/check-retro/run.sh bin/check-readme-version.sh tests/check-readme-version/run.sh bin/rollup-runs.sh tests/rollup-runs/run.sh bin/rollup-track.sh tests/rollup-track/run.sh bin/team-paths.sh tests/team-paths/run.sh bin/check-design-note.sh tests/check-design-note/run.sh bin/goal-state.sh tests/goal-state/run.sh bin/consolidate-proposals.sh tests/consolidate-proposals/run.sh bin/review-gate.sh tests/review-gate/run.sh bin/close-out.sh bin/gen-project-status.sh tests/close-out/run.sh bin/check-prompt-sync.sh tests/check-prompt-sync/run.sh bin/cluster-failures.sh tests/cluster-failures/run.sh bin/check-playbook.sh tests/check-playbook/run.sh bin/gen-playbook-blocks.sh tests/gen-playbook-blocks/run.sh bin/playbook-promote.sh tests/playbook-promote/run.sh bin/install tests/install/run.sh bin/rework-digest.sh tests/rework-digest/run.sh bin/check-intent.sh tests/check-intent/run.sh bin/check-provenance.sh tests/check-provenance/run.sh bin/check-board-headings.sh tests/check-board-headings/run.sh tests/errexit-safe/run.sh bin/codex-capture.sh tests/codex-skeleton-hygiene/run.sh bin/check-pii-shapes.sh tests/check-pii-shapes/run.sh
 
       - name: Lint the shipped board template (hand-off linter)
         run: bash bin/check-handoff.sh templates/todo-template.md
@@ -141,3 +141,9 @@ jobs:
 
       - name: Run codex-skeleton-hygiene suite
         run: bash tests/codex-skeleton-hygiene/run.sh
+
+      - name: Run check-pii-shapes fixture suite
+        run: bash tests/check-pii-shapes/run.sh
+
+      - name: check-pii-shapes on the PR diff
+        run: bash bin/check-pii-shapes.sh --base "origin/${GITHUB_BASE_REF:-develop}"
