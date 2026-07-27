@@ -1,0 +1,53 @@
+# Loop contract for the shell-team inner loop.
+# Describes the shell-team pipeline in the 8-element contract vocabulary:
+# PM -> Engineer -> QA -> Codex-Reviewer with status-flag gates and a bounded QA retry.
+# BUDGET and STOP are MANDATORY (runaway / billing guardrail); OWNER and EVIDENCE
+# are MANDATORY too (accountability / "unverified done" guardrail).
+# Lint with: bin/check-contract.sh tasks/loops/shell-team.contract.yaml
+#
+# This is the generic default dropped into an adopting repo by `team-init`.
+# Adapt the budget/scope/owner to your project; keep BUDGET/STOP/OWNER/EVIDENCE intact.
+
+name: shell-team
+
+# OWNER — who is accountable for the run (adapt to your team; the loop pauses at
+# the human_gate before merge/push, so the human owns those actions).
+owner: the operator who invokes /shell-team:run
+
+trigger:
+  type: manual
+  detail: an operator invokes /shell-team:run with a request
+
+scope:
+  - the single task/feature named in the invoking request
+  - tasks/todo.md status flags, docs/specs/*, the feature branch
+  - must not merge or push without a human gate (see human_gate below)
+
+action:
+  description: one PM -> Engineer -> QA -> Codex-Reviewer pass over the task, advancing the tasks/todo.md status flag at each phase gate
+
+budget:
+  max_iterations: 3        # QA allows 2 retries, so up to 3 implement->verify passes
+  max_wallclock_min: 0     # untracked (host-dependent)
+  max_subagents: 5         # tech-lead, pm-spec, engineer, qa-verifier, codex-reviewer
+  max_usd: 0               # untracked (host-dependent)
+
+stop:
+  all_acs_green: true              # QA + Codex Reviewer both reach READY_FOR_MERGE
+  max_iterations_reached: true     # escalate to a human once the retry cap is hit
+  budget_exhausted: true
+  no_progress: true                # a REWORK round that makes no advance escalates
+
+# Human approval gates — the loop pauses for the operator before these actions.
+human_gate:
+  - merge
+  - push
+
+report:
+  to: tasks/todo.md status flag, tasks/reviews/*, and the PR description
+
+# EVIDENCE — the proof a /shell-team:run pass must produce to claim "done".
+evidence:
+  - QA verification of the spec's acceptance criteria (check-acs PASS / test output)
+  - the Codex cross-provider review verdict in tasks/reviews/* (APPROVE)
+  - the feature-branch diff / PR for human review

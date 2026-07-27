@@ -1,14 +1,24 @@
+# This repo dogfoods the layout it ships, so its own operating files live under
+# .shell-team/. Ignoring `.shell-team/` globally is a reasonable thing for an
+# adopter to do (see the README's note on deciding whether to track the base
+# dir), and a global core.excludesFile that does so would hide these files here
+# too. Re-include the directory explicitly: this repo tracks its own board,
+# specs, retros, and curated reviews as versioned project records.
+!.shell-team/
+
 # Raw review dumps and telemetry are never committed.
 # Mirrors the hygiene rule this project adopted after a 2026 PII incident:
 # curated review notes are tracked, raw transcripts and run logs are not.
-tasks/reviews/*.txt
-tasks/reviews/*.json
-tasks/reviews/*.jsonl
+# `.shell-team/.gitignore` already covers `runs/` telemetry and the
+# codex-capture temps; these patterns add the raw review dumps, which the
+# shipped base-dir template deliberately leaves to the host repo.
+.shell-team/reviews/*.txt
+.shell-team/reviews/*.json
+.shell-team/reviews/*.jsonl
 .codex-review.json
-tasks/runs/
 
-# NOTE: `tasks/rollups` is deliberately NOT ignored — roll-up summaries are
-# meant to be tracked (tests/rollup-track/run.sh asserts this).
+# NOTE: `.shell-team/rollups` is deliberately NOT ignored — roll-up summaries
+# are meant to be tracked (tests/rollup-track/run.sh asserts this).
 
 # Editor / OS noise
 .DS_Store

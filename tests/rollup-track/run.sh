@@ -137,27 +137,56 @@ pass "legacy layout (tasks/loops/shell-team.contract.yaml present) -> tasks/roll
 
 # --- AC6: the new rollups/ dir is not swept in by any existing .gitignore
 #         rule (raw runs/ dirs stay ignored) — locks Design decision 4(c).
-#         Uses THIS repo's own git history (legacy layout, root .gitignore)
-#         plus a throwaway git repo seeded with the default-layout
-#         team-init template (.shell-team/.gitignore). --------------------
+#         `git check-ignore` consults the operator's global core.excludesFile,
+#         so every assertion below pins that input explicitly instead of
+#         inheriting it. Otherwise an operator who ignores `.shell-team/`
+#         globally — a reasonable thing to do, and what the README tells them to
+#         decide — turns these into false failures on their machine while CI
+#         stays green, which makes the suite useless exactly where it is run
+#         most often.
+#
+#         Three checks, none redundant:
+#           1. THIS repo's real config under a deliberately hostile
+#              excludesFile: the root .gitignore re-includes `.shell-team/`, so
+#              the base dir must survive. Pinning the hostile file makes this
+#              meaningful on a bare CI runner too, where an inherited (empty)
+#              global config would let it pass for the wrong reason.
+#           2. A control proving the hostile file has teeth — the same path in a
+#              repo with no re-include must come back ignored. Without this,
+#              check 1 could pass because the hostile file was silently ineffective.
+#           3. The shipped template in isolation (excludesFile pinned empty) —
+#              the hermetic lock on Design decision 4(c) itself.
+printf '.shell-team/\n' > "$WORK/hostile-excludes"
+
 if git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-  if git -C "$REPO_ROOT" check-ignore -q tasks/rollups/dummy.md; then
-    fail "legacy .gitignore: tasks/rollups/dummy.md must NOT be ignored"
+  if git -C "$REPO_ROOT" -c core.excludesFile="$WORK/hostile-excludes" \
+       check-ignore -q .shell-team/rollups/dummy.md; then
+    fail "this repo's .gitignore: .shell-team/rollups/dummy.md must NOT be ignored (root .gitignore must re-include the base dir)"
   fi
-  git -C "$REPO_ROOT" check-ignore -q tasks/runs/dummy.jsonl \
-    || fail "legacy .gitignore: tasks/runs/dummy.jsonl should still be ignored (regression)"
-  pass "legacy .gitignore: rollups/ not swept in, runs/ stays ignored"
+  git -C "$REPO_ROOT" -c core.excludesFile="$WORK/hostile-excludes" \
+      check-ignore -q .shell-team/runs/dummy.jsonl \
+    || fail "this repo's .gitignore: .shell-team/runs/dummy.jsonl should still be ignored (regression)"
+  pass "this repo's .gitignore: base dir survives a hostile global ignore, runs/ stays ignored"
 else
-  printf 'SKIP: legacy .gitignore check (no .git dir found at %s)\n' "$REPO_ROOT"
+  printf 'SKIP: this repo .gitignore check (no .git dir found at %s)\n' "$REPO_ROOT"
 fi
 
 GITCHK="$WORK/gitignore-default"; mkdir -p "$GITCHK/.shell-team"
 ( cd "$GITCHK" && git init -q )
 cp "$REPO_ROOT/templates/shell-team.gitignore" "$GITCHK/.shell-team/.gitignore"
-if git -C "$GITCHK" check-ignore -q .shell-team/rollups/dummy.md; then
+
+# Control for check 1: no re-include here, so the hostile file must bite.
+git -C "$GITCHK" -c core.excludesFile="$WORK/hostile-excludes" \
+    check-ignore -q .shell-team/rollups/dummy.md \
+  || fail "control: the hostile excludesFile did not ignore .shell-team/ — check 1 above would pass vacuously"
+pass "control: hostile excludesFile has teeth (so the re-include check above is not vacuous)"
+
+if git -C "$GITCHK" -c core.excludesFile=/dev/null \
+     check-ignore -q .shell-team/rollups/dummy.md; then
   fail "default .gitignore template: .shell-team/rollups/dummy.md must NOT be ignored"
 fi
-git -C "$GITCHK" check-ignore -q .shell-team/runs/dummy.jsonl \
+git -C "$GITCHK" -c core.excludesFile=/dev/null \
+    check-ignore -q .shell-team/runs/dummy.jsonl \
   || fail "default .gitignore template: .shell-team/runs/dummy.jsonl should still be ignored (regression)"
 pass "default .gitignore template: rollups/ not swept in, runs/ stays ignored"
 
