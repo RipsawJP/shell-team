@@ -54,6 +54,8 @@ you want to sweep further than the current diff.
 - Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.
 - Image content is not inspected; metadata only, if anything.
 - The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.
+- The commit-identity gate checks only the non-merge commits a pull request adds; merge commits are excluded because their identity is set by the merging party, not by the author of the change.
+- The gate is forward-looking: it does not remove identity metadata from commits that are already published, and the remediation for a past exposure is an operator-side account setting, not a repository change.
 
 This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.
 

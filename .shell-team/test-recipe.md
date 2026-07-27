@@ -59,3 +59,23 @@ that file's order.
   needs `--` (or `-e`) before the pattern or it fails with "invalid option"
   on BOTH BSD and GNU grep — worth checking for when authoring or reviewing
   new `check:` lines.
+- T-112: in an interactive sandboxed shell (not real CI), a bare `mktemp`
+  call (no explicit template) can fail with "Operation not permitted" on
+  macOS even when `$TMPDIR` is exported to an allowed scratch dir — the
+  bare/`-t` forms resolve against the OS default temp dir regardless of
+  `$TMPDIR`, only an explicit template (`mktemp "${TMPDIR:-/tmp}/name.XXXXXX"`)
+  respects it. `tests/check-handoff/run.sh` uses the bare form and fails this
+  way in such a sandbox; reproduced identically against `develop` HEAD, so it
+  is a sandbox-only artifact, not a regression — verify affected suites via
+  actual CI (GitHub Actions has a normal writable `/tmp`) rather than treating
+  a local sandboxed failure as authoritative.
+- T-112: a diff-scoped checker's self-application check against `--base
+  develop` (e.g. `bin/check-pii-shapes.sh --base develop`, T-111) scans
+  EVERY commit since develop, including already-committed QA/review
+  artifacts (`.shell-team/reviews/*.md`) from a task that is still mid-flight
+  (`REWORK`). If that task's own review prose quotes adversarial
+  example content by shape (to describe a bug), the still-unfixed checker
+  can legitimately flag it — this is an external, cross-task dependency, not
+  a defect in a later task sharing the branch. Confirm with `git stash -u`
+  (temporarily removing your own in-progress changes) before concluding a
+  self-application AC failure is caused by your own diff.
