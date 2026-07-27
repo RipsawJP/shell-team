@@ -206,25 +206,34 @@ Every `check:` runs from the repository root. `<base>` in the checks below is
 - [ ] **AC18** Every limit this gate accepts is stated verbatim in
   `docs/pii-controls.md`, each as one physical line under the canonical heading:
   the **four** scope limits issue #6 mandates, and the **six** limitations this
-  design declares (content-only inspection, the URL-boundary consequence, the
-  conservative ASCII name segment, the undeliverable-domain exclusion, the
-  committed-content reading point, and the known-shapes list). Each is a whole-line
+  design declares (content-only inspection, the accepted false-positive classes
+  around URLs and log prefixes, the conservative ASCII name segment, the
+  undeliverable-domain exclusion, the committed-content reading point, and the
+  known-shapes list). Each is a whole-line
   exact match, so other tasks can add their own lines to this file freely —
   T-112 writes two — because nothing here constrains the file's overall shape or
   its line count. Exact text in "Canonical document lines" below.
-  - check: grep -qxF '## What this gate does not cover' docs/pii-controls.md && grep -qxF -- '- A PII shape in a filename or a path is not inspected; this gate reads file content only.' docs/pii-controls.md && grep -qxF -- '- A home-path shape written inside a URL is not reported: the pattern requires the path to begin at a boundary that a URL authority does not provide, which is the same rule that keeps a documentation URL from being a false positive.' docs/pii-controls.md && grep -qxF -- '- The home-path shapes match a conservative ASCII name segment only; a name written in non-ASCII characters, and unusual case spellings of the Windows form, are not covered.' docs/pii-controls.md && grep -qxF -- '- A mailbox shape is not reported when its domain cannot hold a deliverable mailbox: a domain reserved for documentation and testing, or the GitHub noreply domain used for pseudonymous identities. The excluded domains are listed in the checker source.' docs/pii-controls.md && grep -qxF -- '- The gate reads the committed content of each path the change touches, resolved against the base ref; a change that exists only in the working tree is not scanned, and --all is the mode that reads the working tree.' docs/pii-controls.md && grep -qxF -- '- A short list of paths that deliberately carry shapes, as fixtures another guard needs, is excluded by name; the list lives in the checker source and its exact contents are asserted by the test suite.' docs/pii-controls.md && grep -qxF -- '- Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.' docs/pii-controls.md && grep -qxF -- '- The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.' docs/pii-controls.md && grep -qxF -- '- Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.' docs/pii-controls.md && grep -qxF -- '- Image content is not inspected; metadata only, if anything.' docs/pii-controls.md
+  - check: grep -qxF '## What this gate does not cover' docs/pii-controls.md && grep -qxF -- '- A PII shape in a filename or a path is not inspected; this gate reads file content only.' docs/pii-controls.md && grep -qxF -- '- Some URL-adjacent and log-prefixed forms may be reported even though they carry no personal data: a file scheme URL, a path wrapped in markdown link syntax, and a path following an IPv6 authority. That noise is accepted deliberately, because a one-character lookbehind cannot tell those apart from a real path in prose; the resolution is to write the placeholder form, never to widen the suppression.' docs/pii-controls.md && grep -qxF -- '- The home-path shapes match a conservative ASCII name segment only; a name written in non-ASCII characters, and unusual case spellings of the Windows form, are not covered.' docs/pii-controls.md && grep -qxF -- '- A mailbox shape is not reported when its domain cannot hold a deliverable mailbox: a domain reserved for documentation and testing, or the GitHub noreply domain used for pseudonymous identities. The excluded domains are listed in the checker source.' docs/pii-controls.md && grep -qxF -- '- The gate reads the committed content of each path the change touches, resolved against the base ref; a change that exists only in the working tree is not scanned, and --all is the mode that reads the working tree.' docs/pii-controls.md && grep -qxF -- '- A short list of paths that deliberately carry shapes, as fixtures another guard needs, is excluded by name; the list lives in the checker source and its exact contents are asserted by the test suite.' docs/pii-controls.md && grep -qxF -- '- Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.' docs/pii-controls.md && grep -qxF -- '- The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.' docs/pii-controls.md && grep -qxF -- '- Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.' docs/pii-controls.md && grep -qxF -- '- Image content is not inspected; metadata only, if anything.' docs/pii-controls.md
 - [ ] **AC19** The Japanese counterpart carries the same ten lines — the four
   mandated scope limits and the six declared limitations — each as one physical
   line under its own canonical heading, with the same whole-line-exact,
-  shape-agnostic matching.
-  - check: grep -qxF '## このゲートが扱わないもの' docs/pii-controls.ja.md && grep -qxF -- '- ファイル名やパス自体に含まれる PII 形状は検査しない。このゲートはファイルの内容だけを読む。' docs/pii-controls.ja.md && grep -qxF -- '- URL の中に書かれた home-path 形状は報告しない。パスの開始位置に境界を要求する規則の帰結であり、同じ規則がドキュメント URL の誤検知を防いでいる。' docs/pii-controls.ja.md && grep -qxF -- '- home-path の形状は ASCII の保守的な名前セグメントにだけ一致する。非 ASCII の名前や Windows 形式の異なる大小文字表記は対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 配送可能なメールボックスが存在し得ないドメインのメールアドレス形状は報告しない。ドキュメントおよびテスト用に予約されたドメインと、GitHub の擬名 identity 用 noreply ドメインが該当する。除外ドメインの一覧はチェッカーのソースにある。' docs/pii-controls.ja.md && grep -qxF -- '- このゲートは変更が触れた各パスのコミット済み内容を、base ref に対して解決して読む。ワーキングツリーにだけある変更は検査せず、ワーキングツリーを読むのは --all のモードである。' docs/pii-controls.ja.md && grep -qxF -- '- 別のガードが必要とする fixture として意図的に形状を持つパスの短い一覧を、名前で除外する。一覧はチェッカーのソースにあり、その正確な内容はテストスイートが検証する。' docs/pii-controls.ja.md && grep -qxF -- '- 固有名詞（顧客名・内部ホスト名・プロジェクトコード）は形状では一致させられないため、このゲートの対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 固有名詞に一致させるためのパターン自体が機密であるため、この公開リポジトリには置けない。リポジトリ外のオペレータ手元のチェックに置く。' docs/pii-controls.ja.md && grep -qxF -- '- 意味的な機微さ（設計判断や文脈から読み手が業務上の関係を推測できてしまう類）は PII の形状ではなく、対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 画像の内容は検査しない。検査するとしてもメタデータのみである。' docs/pii-controls.ja.md
+  shape-agnostic matching. Its lines stay consistent with the English side: the
+  Japanese file never claimed the stale `--all` behaviour AC20 corrects, and the
+  accepted-noise line below replaces its URL-silence line for the same reason.
+  - check: grep -qxF '## このゲートが扱わないもの' docs/pii-controls.ja.md && grep -qxF -- '- ファイル名やパス自体に含まれる PII 形状は検査しない。このゲートはファイルの内容だけを読む。' docs/pii-controls.ja.md && grep -qxF -- '- URL に隣接する形やログ接頭辞の付いた形は、個人データを含まないのに報告されることがある。file スキームの URL、markdown のリンク記法で囲まれたパス、IPv6 の authority に続くパスが該当する。1 文字の後読みではこれらを散文中の実際のパスと区別できないため、この雑音は意図して受け入れる。解消はプレースホルダ形で書くことであり、抑制範囲を広げることではない。' docs/pii-controls.ja.md && grep -qxF -- '- home-path の形状は ASCII の保守的な名前セグメントにだけ一致する。非 ASCII の名前や Windows 形式の異なる大小文字表記は対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 配送可能なメールボックスが存在し得ないドメインのメールアドレス形状は報告しない。ドキュメントおよびテスト用に予約されたドメインと、GitHub の擬名 identity 用 noreply ドメインが該当する。除外ドメインの一覧はチェッカーのソースにある。' docs/pii-controls.ja.md && grep -qxF -- '- このゲートは変更が触れた各パスのコミット済み内容を、base ref に対して解決して読む。ワーキングツリーにだけある変更は検査せず、ワーキングツリーを読むのは --all のモードである。' docs/pii-controls.ja.md && grep -qxF -- '- 別のガードが必要とする fixture として意図的に形状を持つパスの短い一覧を、名前で除外する。一覧はチェッカーのソースにあり、その正確な内容はテストスイートが検証する。' docs/pii-controls.ja.md && grep -qxF -- '- 固有名詞（顧客名・内部ホスト名・プロジェクトコード）は形状では一致させられないため、このゲートの対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 固有名詞に一致させるためのパターン自体が機密であるため、この公開リポジトリには置けない。リポジトリ外のオペレータ手元のチェックに置く。' docs/pii-controls.ja.md && grep -qxF -- '- 意味的な機微さ（設計判断や文脈から読み手が業務上の関係を推測できてしまう類）は PII の形状ではなく、対象外である。' docs/pii-controls.ja.md && grep -qxF -- '- 画像の内容は検査しない。検査するとしてもメタデータのみである。' docs/pii-controls.ja.md
 - [ ] **AC20** No wording that implies complete coverage. Positive half: the
   canonical "shapes only" sentence is present as one physical line in each doc,
-  and so is the categorical `--all` statement. Negative half: none of the
-  badge-shaped claim compounds `PII-gated`, `PII-free`, `PII-clean`, `PII-safe`
-  appears in the docs pair or in either README (each file is proved readable
-  first, so an unreadable file cannot masquerade as "no match").
-  - check: grep -qxF 'This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.' docs/pii-controls.md && grep -qxF 'このゲートは形状だけを見る。PII 対策として完全ではなく、通過したことは変更に PII が含まれないことの証拠にはならない。' docs/pii-controls.ja.md && grep -qxF -- '- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.ja.md && grep -qF 'shell-team' README.md && grep -qF 'shell-team' README.ja.md && ! grep -F -e 'PII-gated' -e 'PII-free' -e 'PII-clean' -e 'PII-safe' docs/pii-controls.md docs/pii-controls.ja.md README.md README.ja.md
+  and so is the categorical `--all` statement — which states the **shipped**
+  invariant, that the deliberate shape-bearing fixtures are carried by the
+  test-locked known-shapes list and `--all` therefore exits 0 on this tree. (The
+  pre-v3 wording claimed the opposite, that those fixtures are known *findings*
+  of `--all`; it contradicted the corrected prose beside it and, being matched
+  whole-line-exact here, could only be fixed in the recorded intent.) Negative
+  half: none of the badge-shaped claim compounds `PII-gated`, `PII-free`,
+  `PII-clean`, `PII-safe` appears in the docs pair or in either README (each file
+  is proved readable first, so an unreadable file cannot masquerade as "no
+  match").
+  - check: grep -qxF 'This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.' docs/pii-controls.md && grep -qxF 'このゲートは形状だけを見る。PII 対策として完全ではなく、通過したことは変更に PII が含まれないことの証拠にはならない。' docs/pii-controls.ja.md && grep -qxF -- '- The deliberate shape-bearing fixtures under tests/ are carried by the test-locked known-shapes list, so --all exits 0 on this tree; --all remains an audit flag and is deliberately not a required CI check.' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.md && grep -qF 'PII' docs/pii-controls.ja.md && grep -qF 'shell-team' README.md && grep -qF 'shell-team' README.ja.md && ! grep -F -e 'PII-gated' -e 'PII-free' -e 'PII-clean' -e 'PII-safe' docs/pii-controls.md docs/pii-controls.ja.md README.md README.ja.md
 - [ ] **AC21** Every stderr write in the new script — outside comment lines —
   carries a `|| true` guard on the same physical line, so a write failure on a
   path whose contract exit is 2 cannot be downgraded to errexit's own fallback of
@@ -267,12 +276,20 @@ Every `check:` runs from the repository root. `<base>` in the checks below is
   announced on stderr, never silent. A path that cannot be read at all is exit 2,
   never a skip.
   - check: bash tests/check-pii-shapes/run.sh && grep -qF 'text-vs-binary: NUL byte decides, Japanese prose is scanned, a skip is announced' tests/check-pii-shapes/run.sh
-- [ ] **AC28** The URL false positive is closed by the boundary requirement
-  (DP-5) and stays closed: a line containing an ordinary documentation URL whose
-  path carries a home-directory-looking segment is not a finding. This class is
-  live in this repository today (Assumptions), so it is a permanent negative
-  fixture in the same class as AC9, not a one-off check.
-  - check: bash tests/check-pii-shapes/run.sh && grep -qF 'boundary: a home-path-looking segment inside a URL is not a finding' tests/check-pii-shapes/run.sh
+- [ ] **AC28** The boundary rule stays at its narrow form and the gate **prefers
+  firing** (DP-5, DP-10). Suppression happens only when the character immediately
+  before the leading `/` can continue a host name — an ASCII letter or digit, a
+  dot, or a hyphen. That is exactly what closes the one measured, in-tree false
+  positive: a bare documentation URL whose path carries a home-directory-looking
+  segment. Its negative fixture is permanent, in the same class as AC9.
+  Everything else fires. Two positive fixtures lock the direction, both
+  mechanically reachable rather than contrived — the doubled-leading-slash form
+  of a home path, which bash's own diagnostics emit, and a home path immediately
+  preceded by `]`, which an xtrace prefix emits. Neither `/` nor `]` is a
+  suppressing character, and no criterion here may be satisfied by widening the
+  lookbehind: the accepted false-positive classes are declared in the documents
+  (AC18 / AC19) instead.
+  - check: bash tests/check-pii-shapes/run.sh && grep -qF 'boundary: only a host-name character suppresses, so the bare documentation URL stays clean' tests/check-pii-shapes/run.sh && grep -qF 'positive: a doubled-leading-slash home path fires (fail-noisy, bash diagnostics emit this)' tests/check-pii-shapes/run.sh && grep -qF 'positive: a home path preceded by a bracket fires (fail-noisy, xtrace prefixes emit this)' tests/check-pii-shapes/run.sh
 - [ ] **AC29** `--all` never silently skips: it enumerates from the repository top
   level regardless of the directory it was invoked from; it scans the target
   string git stores for a symbolic link instead of following the link; it reads a
@@ -325,10 +342,15 @@ repository can contain, and what the checker must therefore handle correctly:
     discipline necessarily contains — observed in T-112's suite, not hypothesised
     (DP-9).
 13. **A URL whose path contains a home-directory-looking segment**, written in
-    ordinary English or Japanese documentation prose.
-14. **A NUL-bearing blob** (a genuine binary), and a path that cannot be read at
+    ordinary English or Japanese documentation prose — in its bare form (measured
+    in-tree), and in the file-scheme, markdown-wrapped and IPv6-authority variants.
+14. **Machine-emitted path prefixes**: the doubled-leading-slash form bash's own
+    diagnostics produce, and the bracket-adjacent form an xtrace / `PS4` prefix
+    produces. Both are genuine paths and must fire (AC28); round 4 proved they are
+    mechanically reachable rather than contrived.
+15. **A NUL-bearing blob** (a genuine binary), and a path that cannot be read at
     all (must exit 2, never a skip).
-15. **A tracked path that deliberately carries a shape** as an adversarial fixture
+16. **A tracked path that deliberately carries a shape** as an adversarial fixture
     for another guard — this repository has five such files today.
 
 **Declared limitations — reachable, knowingly not covered.** These are stated
@@ -339,8 +361,9 @@ worse than none:
 1. Content that exists only in the working tree. The change-scoped mode reads
    committed content (DP-6); `--all` is the mode that reads the working tree.
 2. A shape carried by a **filename or path** rather than by file content.
-3. A home-path shape written inside a URL — the boundary rule (DP-5) that closes
-   the URL false-positive class also declines this form.
+3. A home-path shape whose leading `/` directly follows a host-name character —
+   the bare documentation URL of DP-5, the one measured false positive, and the
+   only form the boundary rule suppresses.
 4. A home-directory name segment written in **non-ASCII** characters, and unusual
    **case** spellings of the Windows form. The name class stays conservative ASCII
    on purpose: widening it under a full-content unit buys more false positives
@@ -353,6 +376,22 @@ worse than none:
 6. Any shape inside a path on the **known-shapes list** (DP-8). The list is
    per-file, short, in the checker source, and its exact contents are asserted by
    the suite, so what it hides is always visible in a diff.
+
+**Accepted noise — reachable inputs that fire without carrying personal data.**
+Declared, not suppressed, per DP-10, and stated in the documents (AC18 / AC19):
+
+1. A home-path-looking segment in a **file scheme URL**, where the leading `/`
+   follows another `/` rather than a host-name character.
+2. A path wrapped in **markdown link syntax**, where the character before it is a
+   bracket or parenthesis.
+3. A path following an **IPv6 authority**, where the character before it is a
+   closing bracket.
+
+The resolution for all three is the placeholder discipline of AC9 at the authoring
+site — write the placeholder form — never a wider suppression rule. Two shapes in
+this same neighbourhood are **not** noise and must fire: the doubled-leading-slash
+form bash's diagnostics emit and the bracket-adjacent form an xtrace prefix emits
+(AC28), which is why the lookbehind cannot be widened to quiet the three above.
 
 **Out-of-scope synthetic extremes** — declined deliberately, so a reviewer or QA
 finding built on one of these is not grounds for rework:
@@ -600,6 +639,38 @@ contains `<` and `>`, which are outside the local-part class, so it still never
 reaches any exclusion branch; that gap is closed separately by requiring
 realistic negative fixtures (AC6) and it stays closed on its own terms.
 
+### DP-10 — asymmetric error costs: where a shape rule cannot separate, it fires
+
+For a PII gate the two errors do not cost the same. A **false positive** costs a
+moment of human review — read the finding, see it is a URL or a log prefix, write
+the placeholder form instead. A **false negative** is a silent exposure in a
+public repository, with no second chance and nobody looking. So where a shape rule
+cannot cleanly separate the two populations, **the rule prefers firing**, and the
+resulting noise is declared in the documents rather than suppressed in the code.
+
+This is the ratified answer to a convergence failure, not a preference: the
+boundary see-saw (DP-5) produced a defect on one side or the other in six
+findings across three review rounds, and the loop reached
+`STOP:max_iterations_reached` still oscillating. When a rule's discriminator is
+structurally too weak to separate its inputs — a one-character lookbehind here —
+tightening and loosening it alternately cannot converge, so the decision has to be
+made at the level of *which error we choose to make*.
+
+Consequences, which are the operative part:
+
+- Suppression is added only for a false-positive class that has been **measured in
+  this repository**, never for one imagined during review. Exactly one qualifies
+  today (DP-5's bare documentation URL).
+- A reviewer or QA finding of the form "input X is a false positive" is **not**
+  grounds for widening a suppression rule. It is grounds for a declared class in
+  the documents, or for the placeholder discipline (AC9) at the authoring site.
+  The fail-noisy direction is itself locked by test (AC28's two positives), so a
+  future round cannot quietly re-widen the boundary.
+- The declared classes must be worded so they cannot be read as a completeness
+  claim — the same discipline as every other line in that documentation section.
+- This principle is scoped to **shape-rule boundaries**, not to the fail-closed
+  exit contract (AC2) or to the no-leak property (AC14), which are unaffected.
+
 ### DP-5 — the home-path boundary requirement, closing the URL false positive
 
 An unanchored home-path pattern fires on an ordinary documentation URL whose path
@@ -611,18 +682,28 @@ previous justification for leaving the pattern unanchored reached two tested
 near-misses (a relative path, the `<name>` placeholder) and did not reach this
 class.
 
-Resolution: the shape only matches when its leading `/` is at the start of the
-line or is preceded by a character that cannot continue a host name or another
-path segment. A URL authority (`example.com/…`) therefore does not qualify,
-while a quoted path, a path after a space, and a path at line start all do.
-Consequence, declared in the documents (AC18 / AC19) and the Input space: a home
-path written inside a `file://`-style URL is not reported. That is a narrower loss
-than the false positive it removes, and it is stated rather than absorbed.
+Resolution, and its **final, narrow** form: the shape is suppressed only when the
+character immediately before its leading `/` can continue a **host name** — an
+ASCII letter or digit, a dot, or a hyphen. A URL authority (`example.com/…`)
+therefore suppresses; a quoted path, a path after a space, a path at line start,
+a path after a bracket and a path after another slash all still fire.
 
 This rule is **empirically earned, not defensive gold-plating**: the measurement
 in Assumptions found a URL path fragment of exactly this shape already in the
 tracked tree, so without the rule the required gate would red on existing,
-harmless documentation content.
+harmless documentation content. That single measured case is the whole warrant for
+the rule — and, per DP-10, the whole extent of it.
+
+**What was tried and reverted.** Round 3 widened the suppression so that a `/` or
+a `]` before the match also silenced it, aiming to quiet the `file://`,
+markdown-link and IPv6-authority variants. Round 4 then proved the widening
+silences genuine true positives that are mechanically reachable: the
+doubled-leading-slash form bash's own diagnostics emit, and the bracket-adjacent
+form an xtrace prefix emits. The widening is reverted (AC28 locks both of those as
+positives). A one-character lookbehind cannot separate "a path inside a URL" from
+"a path in prose or a log line" — the class recurred six times across three
+rounds, each adjustment leaking on the opposite side — so the choice is not which
+regex to write next but which way the rule should lean. DP-10 answers that.
 
 ### DP-6 — where the changed-path set comes from, and which content is read
 
@@ -650,9 +731,9 @@ matches). `docs/pii-controls.md`:
 - Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.
 - Image content is not inspected; metadata only, if anything.
 This gate sees shapes only. It is not a complete PII control, and passing it is not evidence that a change is free of PII.
-- The deliberately PII-shaped adversarial fixtures that already live under tests/ are known findings of --all; --all is an audit flag and is deliberately not a required CI check.
+- The deliberate shape-bearing fixtures under tests/ are carried by the test-locked known-shapes list, so --all exits 0 on this tree; --all remains an audit flag and is deliberately not a required CI check.
 - A PII shape in a filename or a path is not inspected; this gate reads file content only.
-- A home-path shape written inside a URL is not reported: the pattern requires the path to begin at a boundary that a URL authority does not provide, which is the same rule that keeps a documentation URL from being a false positive.
+- Some URL-adjacent and log-prefixed forms may be reported even though they carry no personal data: a file scheme URL, a path wrapped in markdown link syntax, and a path following an IPv6 authority. That noise is accepted deliberately, because a one-character lookbehind cannot tell those apart from a real path in prose; the resolution is to write the placeholder form, never to widen the suppression.
 - The home-path shapes match a conservative ASCII name segment only; a name written in non-ASCII characters, and unusual case spellings of the Windows form, are not covered.
 - A mailbox shape is not reported when its domain cannot hold a deliverable mailbox: a domain reserved for documentation and testing, or the GitHub noreply domain used for pseudonymous identities. The excluded domains are listed in the checker source.
 - The gate reads the committed content of each path the change touches, resolved against the base ref; a change that exists only in the working tree is not scanned, and --all is the mode that reads the working tree.
@@ -674,7 +755,7 @@ two lines can land in the same file without interference.
 - 画像の内容は検査しない。検査するとしてもメタデータのみである。
 このゲートは形状だけを見る。PII 対策として完全ではなく、通過したことは変更に PII が含まれないことの証拠にはならない。
 - ファイル名やパス自体に含まれる PII 形状は検査しない。このゲートはファイルの内容だけを読む。
-- URL の中に書かれた home-path 形状は報告しない。パスの開始位置に境界を要求する規則の帰結であり、同じ規則がドキュメント URL の誤検知を防いでいる。
+- URL に隣接する形やログ接頭辞の付いた形は、個人データを含まないのに報告されることがある。file スキームの URL、markdown のリンク記法で囲まれたパス、IPv6 の authority に続くパスが該当する。1 文字の後読みではこれらを散文中の実際のパスと区別できないため、この雑音は意図して受け入れる。解消はプレースホルダ形で書くことであり、抑制範囲を広げることではない。
 - home-path の形状は ASCII の保守的な名前セグメントにだけ一致する。非 ASCII の名前や Windows 形式の異なる大小文字表記は対象外である。
 - 配送可能なメールボックスが存在し得ないドメインのメールアドレス形状は報告しない。ドキュメントおよびテスト用に予約されたドメインと、GitHub の擬名 identity 用 noreply ドメインが該当する。除外ドメインの一覧はチェッカーのソースにある。
 - このゲートは変更が触れた各パスのコミット済み内容を、base ref に対して解決して読む。ワーキングツリーにだけある変更は検査せず、ワーキングツリーを読むのは --all のモードである。
@@ -711,7 +792,9 @@ known-shapes list: exact contents asserted, per-file only, no directory or glob 
 temp hygiene: every throwaway repo is created inside the trap-cleaned work dir
 all candidates per line: an excluded address on the same line never masks a real mailbox shape
 text-vs-binary: NUL byte decides, Japanese prose is scanned, a skip is announced
-boundary: a home-path-looking segment inside a URL is not a finding
+boundary: only a host-name character suppresses, so the bare documentation URL stays clean
+positive: a doubled-leading-slash home path fires (fail-noisy, bash diagnostics emit this)
+positive: a home path preceded by a bracket fires (fail-noisy, xtrace prefixes emit this)
 --all no-silent-skip: repo-root scope, symlink target, = in a filename, unreadable is exit 2
 ```
 
@@ -725,7 +808,11 @@ boundary: a home-path-looking segment inside a URL is not a finding
 | Full content of each changed path, no base-blob comparison | AC15, AC16, and DP-4's unit statement |
 | Every candidate on a line is judged, not the leftmost | AC26 |
 | Text vs binary decided by the NUL byte; a skip is announced; unreadable is exit 2 | AC27 |
-| The URL false positive is closed by a boundary rule (DP-5) | AC28 |
+| The one measured URL false positive is closed by a narrow boundary rule (DP-5) | AC28 (its negative fixture) |
+| Where a shape rule cannot separate the populations, it fires (DP-10) | AC28 (two positive fixtures lock the direction), AC18 / AC19 (the accepted classes are declared instead of suppressed) |
+| The round-3 boundary widening is reverted; `/` and `]` do not suppress | AC28 |
+| A false-positive report is not grounds for widening a suppression rule | info-only (not promoted to AC) — a rule about how future review rounds are handled, not a property of the artifact; AC28's positives are what make a quiet re-widening fail |
+| The `--all` documentation bullet states the shipped invariant | AC20 |
 | The reserved-domain exclusion, with an anti-swallow positive (DP-7) | AC6, AC10 |
 | The noreply exclusion is an end-anchored domain match, not an address shape (DP-9) | AC6 (three negatives including the format-placeholder class, plus the suffix-confusable anti-swallow positive), AC10 (individually load-bearing) |
 | A suffix-confusable or subdomain trick on the noreply domain still fires | AC6 |
@@ -791,6 +878,14 @@ boundary: a home-path-looking segment inside a URL is not a finding
   `.shell-team/reviews/T-111.md`. AC15 and AC16 will red until it is normalised to
   the AC9 placeholder form. Normalising it changes no finding, no verdict and no
   severity — only the shape literal.
+- **The boundary see-saw, and how it was settled.** Round 3 widened the
+  suppression to quiet the URL-adjacent variants; round 4 proved the widening also
+  silences two mechanically reachable true positives. Six findings of this one
+  class across three rounds, and the loop reached
+  `STOP:max_iterations_reached` still oscillating. The human's decision — recorded
+  here as the warrant for DP-10 and AC28 — is to **bias toward firing**. That is a
+  directional choice about which error to accept, not a new mechanism, which is why
+  the criteria count does not grow.
 - **A second dogfooding measurement, taken after v4's draft** and verified against
   the mechanism rather than accepted on report: T-112's implementation
   (`fdfd5f9`) tripped this checker, and one of the findings is in T-112's **own**
@@ -854,6 +949,12 @@ locally.
   is what flagged T-112's runtime identity helper, and it also rejects GitHub's
   older login-only form. Whatever the local part looks like — a login, an id plus
   a login, or a printf placeholder — the domain decides.
+- **The boundary lookbehind suppresses host-name characters only** (DP-5): an
+  ASCII letter or digit, a dot, a hyphen. Do not re-add `/` or `]` — round 3 did,
+  and round 4 proved it silences real paths. If a review round hands you another
+  false-positive input, the answer is a declared class in the documents or the
+  placeholder form at the authoring site (DP-10), not a wider rule; AC28's two
+  positives will fail if you widen it.
 - When you write the suffix-confusable anti-swallow fixture, pick a domain that is
   **not** reserved. A reserved one would be excluded by DP-7, the fixture would
   pass while proving nothing about anchoring, and that is precisely the vacuity
