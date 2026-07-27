@@ -49,7 +49,15 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-pii-shapes-suite.XXXXXX")"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
-GIT_ID_EMAIL="t@example.invalid"
+# Assembled from fragments (header note above): the completed git identity
+# email is itself a generic mailbox-shaped string at a (reserved, RFC 2606)
+# domain, which this checker cannot distinguish from a real one by shape
+# alone — so it is fragmented here exactly like the other real-shape
+# positive fixtures, rather than written as one contiguous string.
+GIT_ID_LOCAL="t"
+GIT_ID_DOMAIN="example"
+GIT_ID_TLD="invalid"
+GIT_ID_EMAIL="${GIT_ID_LOCAL}@${GIT_ID_DOMAIN}.${GIT_ID_TLD}"
 GIT_ID_NAME="t"
 
 # new_repo — a fresh throwaway git repo, one empty base commit. Prints its path.
