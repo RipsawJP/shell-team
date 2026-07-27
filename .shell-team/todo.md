@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-111** Diff-scoped PII shape checker with a vacuity-guarded fixture suite — `READY_FOR_QA` — spec: .shell-team/specs/T-111-pii-shape-checker.md
+- [ ] **T-111** Diff-scoped PII shape checker with a vacuity-guarded fixture suite — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-111-pii-shape-checker.md
   - source: GitHub issue #6, Layer 2 items 4 and 5 plus the user instruction that the out-of-scope declarations be stated in docs/. First of three sequential tasks on `feature/pii-controls`.
   - resolved for the engineer: the self-reference problem is solved by runtime-generated fixtures (option (a)); a path allowlist (b) and inline allow markers (c) are rejected and locked out behaviorally by AC13. Diff unit, base resolution and the split shape of the no-completeness-wording check are also fixed in the spec.
   - 24 acceptance criteria, all with `check:` lines runnable from the repo root.
@@ -19,6 +19,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - intent-hash (v2): 02a52c11a8381023be78f10b53528d93f35cea9c
   - intent-ratified (2026-07-27): v1→v2 — human GO given in-session on the orchestrator's ratification request (bulk option, all three specs at once) — the frozen `check:` lines passed a fixed-string pattern beginning with a literal `-` to `grep` without `--`, so getopt made grep parse the pattern as an option and exit 2; `--` was inserted at all 15 sites across T-111/T-112/T-113 with the asserted semantics (whole-line fixed-string match) unchanged
   - engineer (T-111): the v1→v2 re-freeze (763fae7) resolved the blocker — `check-acs.sh` now reports 24 passed, 0 failed. Also fixed a docs/pii-controls.md rendering defect (bullet-list/paragraph ordering + missing blank line under "## What this gate does not cover"; AC18/AC20's matched lines stayed byte-identical). Self-application, check-intent (v2 aligned) and check-provenance all re-verified green.
+  - qa-verifier (T-111): PASS. 24/24 ACs green, check-intent aligned (v2), check-provenance conformant (7 honest, non-trivial decisions). Fixture suite green; vacuity guard independently re-verified in scratch copies (all 5 patterns load-bearing, suite FAILs when a positive fixture is neutralised). Exit-code contract, no-leak, `--all`/CI wiring, docs (en/ja substance + rendering), and PII hygiene of the change itself all independently confirmed. Regression suites green. Full record: .shell-team/reviews/T-111.md.
 - [ ] **T-112** Commit-identity assertion plus a lock on the raw-dump ignore coverage — `READY_FOR_ARCH` — spec: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
   - source: GitHub issue #6, Layer 1 items 1 and 2. Second of three; depends on T-111 (same shellcheck argument line, and its own diff is measured by T-111's checker).
   - resolved for the engineer: the range is the non-merge commits from the merge-base to HEAD; merge commits are excluded, and the plain web-flow noreply identity is allowed on the committer side only, refused on the author side. Both halves are fixture-covered. Item 2 is lock-by-test only, with both ignore files byte-unchanged.
