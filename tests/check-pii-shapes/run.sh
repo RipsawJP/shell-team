@@ -1,38 +1,55 @@
 #!/usr/bin/env bash
 # run.sh — fixture suite for bin/check-pii-shapes.sh (T-111,
-# docs/specs/T-111-pii-shape-checker.md).
+# .shell-team/specs/T-111-pii-shape-checker.md, v4).
 #
 # No PII-shaped byte ever enters this tree (spec DP-1 / AC12): every fixture
-# below is assembled AT RUNTIME from short fragments concatenated into a
-# variable, and is only ever written to a throwaway git repo under mktemp —
-# never to a file this suite itself commits. A completed placeholder form
-# (`/Users/<name>/`, `C:\Users\<name>\`, `<id>+<login>@users.noreply.github.com`,
-# `noreply@github.com`) is the one exception, written here literally on
-# purpose: it is documented, non-PII, non-matching-by-design content (that
-# is exactly what AC9 proves), so it carries no shape to fragment. The same
-# is true of the short "lookalike" labels (this repo's own `task-0NN`
-# convention, a truncated `ghp_` prefix): they are deliberately too short to
-# match any pattern, so they are not PII-shaped either.
+# that carries a REAL shape below is assembled AT RUNTIME from short
+# fragments concatenated into a variable, and is only ever written to a
+# throwaway git repo under mktemp — never to a file this suite itself
+# commits to this tree. Two classes of literal ARE written directly,
+# because they carry no shape to fragment by design:
+#   - the four documented placeholder forms (/Users/<name>/, C:\Users\<name>\,
+#     <id>+<login>@users.noreply.github.com, noreply@github.com) — AC9's own
+#     subject matter;
+#   - GitHub noreply identity shapes used as NEGATIVE (excluded) fixtures —
+#     a numeric-id-plus-login form, the older login-only form, and a printf
+#     format placeholder local part — because the whole point of DP-9 is
+#     that these are not PII regardless of shape (a real mailbox cannot
+#     exist at that domain), and this project's own existing convention
+#     (the pre-v4 suite) already treats the bracketed placeholder form this
+#     way;
+#   - RFC 2606 / RFC 6761 reserved-domain addresses (example.com/.org/.net,
+#     .example/.invalid/.test/.localhost) — reserved precisely so nothing
+#     real can live there;
+#   - short "lookalike" labels (this repo's own task-0NN convention, a
+#     truncated ghp_ prefix) — deliberately too short to match any pattern.
 #
-# Covers, in order:
-#   - exit-code contract (0/1/2, including the default-base-chain-exhausted
-#     and not-a-git-repo forms of "unresolvable base ref" / unreadable input)
-#   - POS/NEG fixture pairs for all five pattern ids, each asserting the
-#     reported pattern id by name
+# Covers, in order (see "Canonical suite assertion labels" in the spec for
+# the exact label strings this file must contain verbatim):
+#   - exit-code contract (0/1/2)
+#   - POS/NEG fixture pairs for all five pattern ids
+#   - AC6: the domain-anchored noreply exclusion (DP-9), the reserved-domain
+#     exclusion (DP-7), the anti-swallow positives, and the precondition
+#     that every negative fixture actually reaches the email candidate
+#     enumeration
 #   - AC9: the four documented placeholder forms are clean, together
-#   - AC10 (vacuity guard, detector side): neutralising one pattern's own
-#     regex in a throwaway copy of the checker makes that pattern's positive
-#     fixture stop being reported
-#   - AC11 (vacuity guard, fixture side / meta-assertion): the same
-#     positive-assertion helper, run against each pattern's own (already
-#     proven-clean) near-miss fixture, must itself FAIL — proving the
-#     assertion is not vacuously "always passes"
-#   - AC13: no path allowlist, not even for the checker's own path or a path
-#     under tests/check-pii-shapes/
+#   - AC10 (vacuity guard, detector side): nine independently load-bearing
+#     rules — five patterns, four exclusions
+#   - AC11 (vacuity guard, fixture side / meta-assertion)
+#   - AC13: no path allowlist for this task's own files; the known-shapes
+#     list's exact contents are asserted
 #   - AC14: a finding never echoes the matched text
+#   - AC26: every mailbox candidate on a line is judged, not just the first
+#   - AC27: text/binary is decided by the NUL byte, not printability
+#   - AC28: the home-path URL false positive stays closed
+#   - AC29: --all never silently skips
 #
 # Temp roots live under $TMPDIR (2026-07-06 lesson: bare macOS mktemp can
-# ignore /tmp in a sandbox); no process substitution (2026-07-06 lesson).
+# ignore /tmp in a sandbox); no process substitution (2026-07-06 lesson);
+# every throwaway git repository lives inside $WORK, the one directory the
+# EXIT trap removes (AC12 — a Codex-round finding against the prior
+# implementation, whose repos were siblings of $WORK and were never
+# cleaned up).
 
 set -euo pipefail
 
@@ -60,10 +77,21 @@ GIT_ID_TLD="invalid"
 GIT_ID_EMAIL="${GIT_ID_LOCAL}@${GIT_ID_DOMAIN}.${GIT_ID_TLD}"
 GIT_ID_NAME="t"
 
-# new_repo — a fresh throwaway git repo, one empty base commit. Prints its path.
+# new_repo — a fresh throwaway git repo INSIDE $WORK, one empty base commit.
+# Prints its path, and records it (one line per call, appended to a plain
+# file rather than a shell array: most call sites use `$(new_repo)` command
+# substitution, which forks a subshell — an array mutated there would never
+# be visible back in this script) so the "temp hygiene" assertion below can
+# prove every single one actually lives inside $WORK (AC12: never as a
+# sibling of it — a Codex-round finding against the prior implementation,
+# whose repos were created under $TMPDIR directly and were never cleaned
+# up).
+CREATED_REPOS_LOG="$WORK/.created-repos.log"
+: > "$CREATED_REPOS_LOG"
 new_repo() {
   local d
-  d="$(mktemp -d "${TMPDIR:-/tmp}/check-pii-shapes-repo.XXXXXX")"
+  d="$(mktemp -d "$WORK/repo.XXXXXX")"
+  printf '%s\n' "$d" >> "$CREATED_REPOS_LOG"
   git -C "$d" init -q
   git -C "$d" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
     commit -q --allow-empty -m base
@@ -76,6 +104,22 @@ add_fixture_line() {
   local repo="$1" relpath="$2" content="$3"
   mkdir -p "$(dirname "$repo/$relpath")"
   printf '%s\n' "$content" > "$repo/$relpath"
+  git -C "$repo" add -- "$relpath"
+  git -C "$repo" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+    commit -q -m "fixture: $relpath"
+}
+
+# add_fixture_lines <repo> <relpath> <content...> — like add_fixture_line
+# but writes one commit carrying several lines (used for reserved-domain
+# forms, one line per form, in a single fixture).
+add_fixture_lines() {
+  local repo="$1" relpath="$2"; shift 2
+  mkdir -p "$(dirname "$repo/$relpath")"
+  : > "$repo/$relpath"
+  local line
+  for line in "$@"; do
+    printf '%s\n' "$line" >> "$repo/$relpath"
+  done
   git -C "$repo" add -- "$relpath"
   git -C "$repo" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
     commit -q -m "fixture: $relpath"
@@ -139,7 +183,7 @@ printf '\n--- exit-code contract ---\n'
 CLEAN_REPO="$(new_repo)"
 CLEAN_BASE="$(git -C "$CLEAN_REPO" rev-parse HEAD)"
 add_fixture_line "$CLEAN_REPO" "clean.txt" "nothing sensitive in this line at all"
-assert_clean "exit-code contract: 0 = clean diff" "$CLEAN_REPO" "$CLEAN_BASE"
+assert_clean "exit-code contract: 0 = clean change" "$CLEAN_REPO" "$CLEAN_BASE"
 
 # --- unresolvable base ref: an explicit bad ref ---
 set +e
@@ -166,7 +210,7 @@ else
 fi
 
 # --- unreadable input: not inside a git working tree at all ---
-NONGIT="$(mktemp -d "${TMPDIR:-/tmp}/check-pii-shapes-nongit.XXXXXX")"
+NONGIT="$(mktemp -d "$WORK/nongit.XXXXXX")"
 set +e
 ( cd "$NONGIT" && bash "$BIN" >/dev/null 2>&1 )
 rc_nogit=$?
@@ -241,32 +285,116 @@ assert_clean "POS/NEG pair: home-path-win (near-miss negative NOT reported)" \
 
 # =============================================================================
 # POS/NEG pair: email-nonnoreply
-# negative: both noreply identity shapes
+#
+# DP-9: the noreply exclusion is a domain match, end-anchored, never a
+# local-part shape test — three negatives share the noreply domain and
+# differ only in local part (a realistic numeric-id+login form, the older
+# login-only form, and a printf format placeholder — the shape every suite
+# that assembles an identity at runtime necessarily carries). DP-7: the
+# reserved-domain exclusion, one negative per form. Two anti-swallow
+# positives prove neither exclusion swallows the rule. A precondition
+# proves every negative fixture actually reaches the email candidate
+# enumeration rather than merely never matching the base shape at all.
 # =============================================================================
 printf '\n--- POS/NEG pair: email-nonnoreply ---\n'
-printf '\n--- negative: both noreply identity shapes ---\n'
+printf '\n--- negative: the noreply domain, end-anchored, whatever the local part is ---\n'
+printf '\n--- negative: a printf format placeholder local part at the noreply domain (runtime-assembly helpers carry one) ---\n'
+printf '\n--- negative: one fixture per reserved-domain form ---\n'
+printf '\n--- positive: an ordinary domain still fires (anti-swallow) ---\n'
+printf '\n--- positive: a suffix-confusable domain at a non-reserved name still fires (anti-swallow) ---\n'
+printf '\n--- precondition: each negative fixture reaches the email candidate enumeration ---\n'
 
 EM_L1="ali"; EM_L2="ce"
 EM_LOCAL="${EM_L1}${EM_L2}"
-EM_D1="examp"; EM_D2="le"
-EM_DOMAIN="${EM_D1}${EM_D2}"
-EM_TLD="com"
-EM_POS_LINE="contact ${EM_LOCAL}@${EM_DOMAIN}.${EM_TLD} for details"
-# Both documented, non-PII, by-design-excluded GitHub noreply identity shapes
-# — written here literally (they carry no shape to fragment; see header note).
-EM_NEG_LINE_1="reviewer: <id>+<login>@users.noreply.github.com"
-EM_NEG_LINE_2="reviewer: noreply@github.com"
+EM_ORD_D1="ord"; EM_ORD_D2="inary"
+EM_ORD_DOMAIN="${EM_ORD_D1}${EM_ORD_D2}"
+EM_POS_LINE="contact ${EM_LOCAL}@${EM_ORD_DOMAIN}.io for details"
+
+# Domain-based noreply negatives (DP-9). Written literally, not fragmented:
+# each is a GitHub noreply identity shape, non-PII by design regardless of
+# local-part shape (see header note).
+EM_NEG_NUMID_LINE="reviewer: 87654321+octocat@users.noreply.github.com"
+EM_NEG_LOGINONLY_LINE="reviewer: octocat@users.noreply.github.com"
+EM_NEG_FMT_LINE="reviewer: %s+%s@users.noreply.github.com"
+EM_NEG_PLAIN_LINE="reviewer: noreply@github.com"
 
 EM_POS_REPO="$(new_repo)"; EM_POS_BASE="$(git -C "$EM_POS_REPO" rev-parse HEAD)"
 add_fixture_line "$EM_POS_REPO" "pos.txt" "$EM_POS_LINE"
 assert_finding "POS/NEG pair: email-nonnoreply (positive reported as pattern=email-nonnoreply)" \
   "email-nonnoreply" "$EM_POS_REPO" "$EM_POS_BASE"
+assert_finding "positive: an ordinary domain still fires (anti-swallow)" \
+  "email-nonnoreply" "$EM_POS_REPO" "$EM_POS_BASE"
 
-EM_NEG_REPO="$(new_repo)"; EM_NEG_BASE="$(git -C "$EM_NEG_REPO" rev-parse HEAD)"
-add_fixture_line "$EM_NEG_REPO" "neg1.txt" "$EM_NEG_LINE_1"
-add_fixture_line "$EM_NEG_REPO" "neg2.txt" "$EM_NEG_LINE_2"
-assert_clean "negative: both noreply identity shapes (placeholder id+login and plain web-flow forms both clean)" \
-  "$EM_NEG_REPO" "$EM_NEG_BASE"
+EM_NEGDOM_REPO="$(new_repo)"; EM_NEGDOM_BASE="$(git -C "$EM_NEGDOM_REPO" rev-parse HEAD)"
+add_fixture_line "$EM_NEGDOM_REPO" "numid.txt" "$EM_NEG_NUMID_LINE"
+add_fixture_line "$EM_NEGDOM_REPO" "loginonly.txt" "$EM_NEG_LOGINONLY_LINE"
+add_fixture_line "$EM_NEGDOM_REPO" "fmt.txt" "$EM_NEG_FMT_LINE"
+assert_clean "negative: the noreply domain, end-anchored, whatever the local part is" \
+  "$EM_NEGDOM_REPO" "$EM_NEGDOM_BASE"
+assert_clean "negative: a printf format placeholder local part at the noreply domain (runtime-assembly helpers carry one)" \
+  "$EM_NEGDOM_REPO" "$EM_NEGDOM_BASE"
+
+EM_NEGPLAIN_REPO="$(new_repo)"; EM_NEGPLAIN_BASE="$(git -C "$EM_NEGPLAIN_REPO" rev-parse HEAD)"
+add_fixture_line "$EM_NEGPLAIN_REPO" "plain.txt" "$EM_NEG_PLAIN_LINE"
+assert_clean "POS/NEG pair: email-nonnoreply (plain web-flow noreply@github.com clean)" \
+  "$EM_NEGPLAIN_REPO" "$EM_NEGPLAIN_BASE"
+
+# Reserved-domain negatives (DP-7): one line per form.
+RD_L1="som"; RD_L2="ebody"
+RD_LOCAL="${RD_L1}${RD_L2}"
+EM_NEG_RESERVED_LINES=(
+  "contact ${RD_LOCAL}@example.com for details"
+  "contact ${RD_LOCAL}@example.org for details"
+  "contact ${RD_LOCAL}@example.net for details"
+  "contact ${RD_LOCAL}@mail.example for details"
+  "contact ${RD_LOCAL}@mail.invalid for details"
+  "contact ${RD_LOCAL}@mail.test for details"
+  "contact ${RD_LOCAL}@mail.localhost for details"
+)
+EM_NEGRES_REPO="$(new_repo)"; EM_NEGRES_BASE="$(git -C "$EM_NEGRES_REPO" rev-parse HEAD)"
+add_fixture_lines "$EM_NEGRES_REPO" "reserved.txt" "${EM_NEG_RESERVED_LINES[@]}"
+assert_clean "negative: one fixture per reserved-domain form" \
+  "$EM_NEGRES_REPO" "$EM_NEGRES_BASE"
+
+# Anti-swallow positive #2: a suffix-confusable domain that merely ENDS WITH
+# the noreply domain as a substring (no dot boundary) must still fire, and
+# its own domain must not be reserved (or DP-7 would clean it for the wrong
+# reason and the fixture would prove nothing about anchoring).
+EM_SUF_L1="ali"; EM_SUF_L2="ce"
+EM_SUF_LOCAL="${EM_SUF_L1}${EM_SUF_L2}"
+EM_SUF_PREFIX="evil"
+EM_SUF_DOMAIN="${EM_SUF_PREFIX}users.noreply.github.com"
+EM_SUF_LINE="contact ${EM_SUF_LOCAL}@${EM_SUF_DOMAIN} for details"
+EM_SUF_REPO="$(new_repo)"; EM_SUF_BASE="$(git -C "$EM_SUF_REPO" rev-parse HEAD)"
+add_fixture_line "$EM_SUF_REPO" "suffix.txt" "$EM_SUF_LINE"
+assert_finding "positive: a suffix-confusable domain at a non-reserved name still fires (anti-swallow)" \
+  "email-nonnoreply" "$EM_SUF_REPO" "$EM_SUF_BASE"
+
+# Precondition: every negative fixture line above provably reaches the
+# email candidate enumeration (RE_EMAIL_BASE, read from the checker's own
+# source) — never merely a line the base shape never matched at all. The
+# bracketed AC9 placeholder form deliberately does NOT satisfy this (the
+# brackets fall outside the local-part class), which is why it belongs to
+# AC9 and can never stand in for one of these fixtures.
+RE_EMAIL_BASE_FOR_TEST="$(grep '^RE_EMAIL_BASE=' "$BIN" | sed -E "s/^RE_EMAIL_BASE='(.*)'\$/\\1/")"
+[ -n "$RE_EMAIL_BASE_FOR_TEST" ] || fail "precondition: could not read RE_EMAIL_BASE out of $BIN"
+
+assert_reaches_email_candidates() {  # $1 = label suffix, $2 = line
+  local label="precondition: each negative fixture reaches the email candidate enumeration ($1)" line="$2"
+  printf '%s\n' "$line" > "$WORK/precond-line.txt"
+  if grep -qoE -- "$RE_EMAIL_BASE_FOR_TEST" "$WORK/precond-line.txt"; then
+    pass "$label"
+  else
+    fail "$label (line did not reach the email candidate enumeration at all: $line)"
+  fi
+}
+assert_reaches_email_candidates "numeric-id+login" "$EM_NEG_NUMID_LINE"
+assert_reaches_email_candidates "login-only" "$EM_NEG_LOGINONLY_LINE"
+assert_reaches_email_candidates "printf-format-placeholder" "$EM_NEG_FMT_LINE"
+assert_reaches_email_candidates "plain-web-flow" "$EM_NEG_PLAIN_LINE"
+for _rd_line in "${EM_NEG_RESERVED_LINES[@]}"; do
+  assert_reaches_email_candidates "reserved-domain" "$_rd_line"
+done
 
 # =============================================================================
 # POS/NEG pair: private-key
@@ -315,7 +443,8 @@ assert_clean "negative: short lookalike must not fire (task-043 / ghp_short both
 
 # =============================================================================
 # placeholder forms are not findings (AC9) — a permanent false-positive
-# regression case: all four documented placeholder forms in one diff, clean.
+# regression case: all four documented placeholder forms in one change,
+# clean.
 # =============================================================================
 printf '\n--- placeholder forms are not findings ---\n'
 
@@ -329,59 +458,221 @@ PH_REPO="$(new_repo)"; PH_BASE="$(git -C "$PH_REPO" rev-parse HEAD)"
 git -C "$PH_REPO" add placeholders.md
 git -C "$PH_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
   commit -q -m "fixture: placeholders.md"
-assert_clean "placeholder forms are not findings (all four documented forms, one diff, clean)" \
+assert_clean "placeholder forms are not findings (all four documented forms, one change, clean)" \
   "$PH_REPO" "$PH_BASE"
 
 # =============================================================================
-# mutation: pattern is load-bearing (AC10, vacuity guard / detector side)
+# boundary: a home-path-looking segment inside a URL is not a finding
+# (AC28 / DP-5) — empirically earned: this exact class is live in this
+# repository's own documentation today.
+# =============================================================================
+printf '\n--- boundary: a home-path-looking segment inside a URL is not a finding ---\n'
+
+URL_LINE="See https://example.com/home/products for details"
+URL_REPO="$(new_repo)"; URL_BASE="$(git -C "$URL_REPO" rev-parse HEAD)"
+add_fixture_line "$URL_REPO" "url.txt" "$URL_LINE"
+assert_clean "boundary: a home-path-looking segment inside a URL is not a finding" \
+  "$URL_REPO" "$URL_BASE"
+
+# =============================================================================
+# all candidates per line: an excluded address on the same line never
+# masks a real mailbox shape (AC26)
+# =============================================================================
+printf '\n--- all candidates per line: an excluded address on the same line never masks a real mailbox shape ---\n'
+
+MIXED_LINE="reviewer: ${EM_NEG_PLAIN_LINE#reviewer: } and contact ${EM_LOCAL}@${EM_ORD_DOMAIN}.io for details"
+EXCLUDED_ONLY_LINE="reviewer: ${EM_NEG_PLAIN_LINE#reviewer: } and 87654321+octocat@users.noreply.github.com"
+
+MIXED_REPO="$(new_repo)"; MIXED_BASE="$(git -C "$MIXED_REPO" rev-parse HEAD)"
+add_fixture_line "$MIXED_REPO" "mixed.txt" "$MIXED_LINE"
+assert_finding "all candidates per line: an excluded address on the same line never masks a real mailbox shape (mixed line fires)" \
+  "email-nonnoreply" "$MIXED_REPO" "$MIXED_BASE"
+
+EXCLONLY_REPO="$(new_repo)"; EXCLONLY_BASE="$(git -C "$EXCLONLY_REPO" rev-parse HEAD)"
+add_fixture_line "$EXCLONLY_REPO" "exclonly.txt" "$EXCLUDED_ONLY_LINE"
+assert_clean "all candidates per line: a line carrying only excluded forms is clean" \
+  "$EXCLONLY_REPO" "$EXCLONLY_BASE"
+
+# =============================================================================
+# text-vs-binary: NUL byte decides, Japanese prose is scanned, a skip is
+# announced (AC27)
+# =============================================================================
+printf '\n--- text-vs-binary: NUL byte decides, Japanese prose is scanned, a skip is announced ---\n'
+
+JP_N1="ke"; JP_N2="nji"
+JP_NAME="${JP_N1}${JP_N2}"
+# A UTF-8 Japanese sentence (full-width punctuation included) that also
+# carries a home-path shape with an ASCII name segment.
+JP_LINE="日本語の文章です。/Users/${JP_NAME}/secret.txt が含まれています。"
+
+JP_REPO="$(new_repo)"; JP_BASE="$(git -C "$JP_REPO" rev-parse HEAD)"
+add_fixture_line "$JP_REPO" "jp.txt" "$JP_LINE"
+assert_finding "text-vs-binary: NUL byte decides, Japanese prose is scanned (diff mode)" \
+  "home-path" "$JP_REPO" "$JP_BASE"
+
+set +e
+JP_ALL_OUT="$(cd "$JP_REPO" && bash "$BIN" --all 2>&1)"
+JP_ALL_RC=$?
+set -e
+if [ "$JP_ALL_RC" -eq 1 ] && printf '%s\n' "$JP_ALL_OUT" | grep -qE 'pattern=home-path path=jp\.txt'; then
+  pass "text-vs-binary: NUL byte decides, Japanese prose is scanned (--all mode)"
+else
+  fail "text-vs-binary: NUL byte decides, Japanese prose is scanned (--all mode) (rc=$JP_ALL_RC out=$JP_ALL_OUT)"
+fi
+
+# A blob containing a NUL byte is not scanned, and the skip is announced on
+# stderr — never silent. This fixture's ONLY other content is a home-path
+# shape sharing the same commit; if the binary blob were skipped SILENTLY
+# there would be no stderr trace at all, and if it were scanned as text the
+# run would still be rc=1 for an unrelated reason, so the assertion checks
+# BOTH the exit code (clean — nothing else in this repo carries a shape)
+# AND the presence of an explicit skip announcement.
+NUL_REPO="$(new_repo)"; NUL_BASE="$(git -C "$NUL_REPO" rev-parse HEAD)"
+printf 'binary\x00blob\x00with\x00nul\x00bytes\n' > "$NUL_REPO/bin.dat"
+git -C "$NUL_REPO" add bin.dat
+git -C "$NUL_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: bin.dat"
+set +e
+NUL_OUT="$(cd "$NUL_REPO" && bash "$BIN" --base "$NUL_BASE" 2>&1)"
+NUL_RC=$?
+set -e
+if [ "$NUL_RC" -eq 0 ] && printf '%s\n' "$NUL_OUT" | grep -qE 'skip: binary blob \(NUL byte present\), not scanned: bin\.dat'; then
+  pass "text-vs-binary: NUL byte decides, Japanese prose is scanned, a skip is announced (binary blob skipped, announced, not silent)"
+else
+  fail "text-vs-binary: NUL byte decides, a skip is announced (rc=$NUL_RC out=$NUL_OUT)"
+fi
+
+# =============================================================================
+# mutation: pattern is load-bearing (AC10, vacuity guard / detector side,
+# patterns half)
 #
-# For every pattern: rewrite JUST that pattern's RE_* assignment line, in a
-# throwaway copy of the real checker, to a placeholder that can never match
-# real content, then re-run that pattern's OWN positive fixture (already
-# proven, above, to be reported by the REAL checker) against the copy. The
-# copy must now report NOTHING — proving the pattern is individually
-# load-bearing, and that the fixture was not being caught by some OTHER,
-# still-active pattern.
+# For every pattern: rewrite JUST that pattern's own regex assignment line,
+# in a throwaway copy of the real checker, to a placeholder that can never
+# match real content, then re-run that pattern's OWN positive fixture
+# (already proven, above, to be reported by the REAL checker) against the
+# copy. The copy must now report NOTHING for that pattern — proving the
+# pattern is individually load-bearing.
 # =============================================================================
 printf '\n--- mutation: pattern is load-bearing ---\n'
 
-neutralize_copy() {  # $1 = RE_ variable name; prints path to a mutated copy
-  local varname="$1" copy
-  copy="$(mktemp "${TMPDIR:-/tmp}/check-pii-shapes-mut.XXXXXX")"
-  sed "s/^${varname}=.*/${varname}='NEUTRALISED_NO_MATCH_PLACEHOLDER_ZZZ_T111'/" "$BIN" > "$copy"
+NEVER_MATCH="NEUTRALISED_NO_MATCH_PLACEHOLDER_ZZZ_T111"
+
+neutralize_copy() {  # $1 = variable name, $2 = replacement (single-quoted
+                      # bash literal, no embedded quotes); prints copy path
+  local varname="$1" replacement="$2" copy
+  copy="$(mktemp "$WORK/mut.XXXXXX")"
+  sed "s/^${varname}=.*/${varname}='${replacement}'/" "$BIN" > "$copy"
   printf '%s' "$copy"
 }
 
-assert_neutralised_reports_nothing() {  # $1=RE var, $2=label, $3=repo, $4=base
+assert_neutralised_pattern_unreported() {  # $1=var $2=label $3=repo $4=base
   local varname="$1" label="$2" repo="$3" base="$4" copy out rc
-  copy="$(neutralize_copy "$varname")"
+  copy="$(neutralize_copy "$varname" "$NEVER_MATCH")"
   set +e
   out="$(cd "$repo" && bash "$copy" --base "$base" 2>&1)"
   rc=$?
   set -e
   rm -f "$copy"
-  if [ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q '^FINDING'; then
-    pass "$label"
+  if [ "$rc" -eq 0 ] || ! printf '%s\n' "$out" | grep -q '^FINDING'; then
+    if [ "$rc" -eq 0 ]; then
+      pass "$label"
+    else
+      fail "$label (neutralised copy exited $rc with no FINDING line — unexpected shape of failure: $out)"
+    fi
   else
     fail "$label (neutralised copy still reported something: rc=$rc out=$out)"
   fi
 }
 
-assert_neutralised_reports_nothing RE_HOME_PATH \
+assert_neutralised_pattern_unreported RE_HOME_PATH_RAW \
   "mutation: pattern is load-bearing (home-path neutralised -> its own positive fixture reports nothing)" \
   "$HP_POS_REPO" "$HP_POS_BASE"
-assert_neutralised_reports_nothing RE_HOME_PATH_WIN \
+assert_neutralised_pattern_unreported RE_HOME_PATH_WIN \
   "mutation: pattern is load-bearing (home-path-win neutralised -> its own positive fixture reports nothing)" \
   "$WP_POS_REPO" "$WP_POS_BASE"
-assert_neutralised_reports_nothing RE_EMAIL \
+assert_neutralised_pattern_unreported RE_EMAIL_BASE \
   "mutation: pattern is load-bearing (email-nonnoreply neutralised -> its own positive fixture reports nothing)" \
   "$EM_POS_REPO" "$EM_POS_BASE"
-assert_neutralised_reports_nothing RE_PRIVATE_KEY \
+assert_neutralised_pattern_unreported RE_PRIVATE_KEY \
   "mutation: pattern is load-bearing (private-key neutralised -> its own positive fixture reports nothing)" \
   "$PK_POS_REPO" "$PK_POS_BASE"
-assert_neutralised_reports_nothing RE_TOKEN \
+assert_neutralised_pattern_unreported RE_TOKEN \
   "mutation: pattern is load-bearing (token neutralised -> its own positive fixture reports nothing)" \
   "$TK_POS_REPO" "$TK_POS_BASE"
+
+# =============================================================================
+# mutation: each exclusion is load-bearing (AC10, vacuity guard / detector
+# side, exclusions half)
+#
+# For every one of the four exclusions: neutralise JUST that exclusion's own
+# rule in a throwaway copy, then re-run that exclusion's OWN negative
+# fixture(s) (already proven, above, to be clean against the REAL checker)
+# against the copy. Each must now become a FINDING — proving the exclusion
+# is the reason the fixture was clean, not that it never reached the base
+# pattern at all.
+# =============================================================================
+printf '\n--- mutation: each exclusion is load-bearing ---\n'
+
+assert_neutralised_exclusion_fires() {  # $1=label $2=id $3=copy $4=repo $5=base
+  local label="$1" id="$2" copy="$3" repo="$4" base="$5" out rc
+  set +e
+  out="$(cd "$repo" && bash "$copy" --base "$base" 2>&1)"
+  rc=$?
+  set -e
+  if [ "$rc" -eq 1 ] && printf '%s\n' "$out" | grep -qE "pattern=${id} path="; then
+    pass "$label"
+  else
+    fail "$label (neutralised exclusion did not become a finding: rc=$rc out=$out)"
+  fi
+}
+
+# Domain-anchored noreply rule (DP-9): neutralising it must flip ALL of its
+# negatives, the format-placeholder fixture included.
+NOREPLY_DOMAIN_MUT="$(neutralize_copy RE_NOREPLY_DOMAIN "$NEVER_MATCH")"
+assert_neutralised_exclusion_fires \
+  "mutation: each exclusion is load-bearing (domain-anchored noreply rule, numeric-id+login negative flips)" \
+  "email-nonnoreply" "$NOREPLY_DOMAIN_MUT" "$EM_NEGDOM_REPO" "$EM_NEGDOM_BASE"
+set +e
+NOREPLY_DOMAIN_MUT_OUT="$(cd "$EM_NEGDOM_REPO" && bash "$NOREPLY_DOMAIN_MUT" --base "$EM_NEGDOM_BASE" 2>&1)"
+set -e
+if printf '%s\n' "$NOREPLY_DOMAIN_MUT_OUT" | grep -qE 'pattern=email-nonnoreply path=loginonly\.txt' \
+   && printf '%s\n' "$NOREPLY_DOMAIN_MUT_OUT" | grep -qE 'pattern=email-nonnoreply path=fmt\.txt'; then
+  pass "mutation: each exclusion is load-bearing (domain-anchored noreply rule flips the login-only AND the format-placeholder negatives too)"
+else
+  fail "mutation: each exclusion is load-bearing (domain-anchored noreply rule did not flip all its negatives: $NOREPLY_DOMAIN_MUT_OUT)"
+fi
+rm -f "$NOREPLY_DOMAIN_MUT"
+
+# Plain web-flow address: its own, separate exclusion.
+NOREPLY_PLAIN_MUT="$(neutralize_copy RE_NOREPLY_PLAIN "$NEVER_MATCH")"
+assert_neutralised_exclusion_fires \
+  "mutation: each exclusion is load-bearing (plain web-flow address)" \
+  "email-nonnoreply" "$NOREPLY_PLAIN_MUT" "$EM_NEGPLAIN_REPO" "$EM_NEGPLAIN_BASE"
+rm -f "$NOREPLY_PLAIN_MUT"
+
+# Reserved-domain rule (DP-7): neutralising it must flip every reserved form.
+RESERVED_MUT="$(neutralize_copy RE_RESERVED_DOMAIN "$NEVER_MATCH")"
+set +e
+RESERVED_MUT_OUT="$(cd "$EM_NEGRES_REPO" && bash "$RESERVED_MUT" --base "$EM_NEGRES_BASE" 2>&1)"
+RESERVED_MUT_RC=$?
+set -e
+RESERVED_MUT_HITS="$(printf '%s\n' "$RESERVED_MUT_OUT" | grep -c '^FINDING pattern=email-nonnoreply path=reserved\.txt' || true)"
+if [ "$RESERVED_MUT_RC" -eq 1 ] && [ "$RESERVED_MUT_HITS" = "${#EM_NEG_RESERVED_LINES[@]}" ]; then
+  pass "mutation: each exclusion is load-bearing (reserved-domain rule flips every reserved form)"
+else
+  fail "mutation: each exclusion is load-bearing (reserved-domain rule) (rc=$RESERVED_MUT_RC hits=$RESERVED_MUT_HITS out=$RESERVED_MUT_OUT)"
+fi
+rm -f "$RESERVED_MUT"
+
+# Home-path boundary rule (DP-5): neutralising it (stripping just the
+# boundary alternation, not the shape) must flip the URL negative to a
+# finding.
+BOUNDARY_MUT="$(mktemp "$WORK/mut.XXXXXX")"
+sed "s/^RE_HOME_PATH_BOUNDARY=.*/RE_HOME_PATH_BOUNDARY=''/" "$BIN" > "$BOUNDARY_MUT"
+assert_neutralised_exclusion_fires \
+  "mutation: each exclusion is load-bearing (home-path boundary rule flips the URL negative)" \
+  "home-path" "$BOUNDARY_MUT" "$URL_REPO" "$URL_BASE"
+rm -f "$BOUNDARY_MUT"
 
 # =============================================================================
 # meta: neutralised positive fixture makes the assertion FAIL (AC11, vacuity
@@ -415,7 +706,7 @@ assert_meta_fails home-path "$HP_NEG_REPO" "$HP_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (home-path)"
 assert_meta_fails home-path-win "$WP_NEG_REPO" "$WP_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (home-path-win)"
-assert_meta_fails email-nonnoreply "$EM_NEG_REPO" "$EM_NEG_BASE" \
+assert_meta_fails email-nonnoreply "$EM_NEGPLAIN_REPO" "$EM_NEGPLAIN_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (email-nonnoreply)"
 assert_meta_fails private-key "$PK_NEG_REPO" "$PK_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (private-key)"
@@ -440,6 +731,44 @@ else
 fi
 
 # =============================================================================
+# known-shapes list: exact contents asserted, per-file only, no directory
+# or glob entry (AC13, DP-8)
+# =============================================================================
+printf '\n--- known-shapes list: exact contents asserted, per-file only, no directory or glob entry ---\n'
+
+KNOWN_ACTUAL_FILE="$WORK/known-actual.txt"
+sed -n '/^KNOWN_SHAPE_PATHS=(/,/^)/p' "$BIN" | grep -oE '"[^"]*"' | tr -d '"' | sort > "$KNOWN_ACTUAL_FILE"
+
+KNOWN_EXPECTED_FILE="$WORK/known-expected.txt"
+{
+  printf '%s\n' "tests/rollup-track/fixtures/pii.jsonl"
+  printf '%s\n' "tests/rollup-track/fixtures/secret-aws.jsonl"
+  printf '%s\n' "tests/rollup-track/fixtures/secret-github.jsonl"
+  printf '%s\n' "tests/rollup-track/fixtures/secret-openai.jsonl"
+  printf '%s\n' "tests/rollup-track/fixtures/winpath.jsonl"
+} | sort > "$KNOWN_EXPECTED_FILE"
+
+if cmp -s "$KNOWN_ACTUAL_FILE" "$KNOWN_EXPECTED_FILE"; then
+  pass "known-shapes list: exact contents asserted"
+else
+  fail "known-shapes list: exact contents asserted (actual: $(tr '\n' ' ' < "$KNOWN_ACTUAL_FILE"); expected: $(tr '\n' ' ' < "$KNOWN_EXPECTED_FILE"))"
+fi
+
+known_list_ok=1
+while IFS= read -r entry; do
+  [ -n "$entry" ] || continue
+  case "$entry" in
+    */) known_list_ok=0 ;;          # a directory entry
+    *'*'*|*'?'*|*'['*) known_list_ok=0 ;;  # a glob entry
+  esac
+done < "$KNOWN_ACTUAL_FILE"
+if [ "$known_list_ok" -eq 1 ]; then
+  pass "known-shapes list: exact contents asserted, per-file only, no directory or glob entry"
+else
+  fail "known-shapes list: exact contents asserted, per-file only, no directory or glob entry (a directory or glob entry was found)"
+fi
+
+# =============================================================================
 # no-leak: finding output never echoes the matched text (AC14)
 # =============================================================================
 printf '\n--- no-leak: finding output never echoes the matched text ---\n'
@@ -455,6 +784,94 @@ if [ "$RC" -eq 1 ] \
   pass "no-leak: finding output never echoes the matched text"
 else
   fail "no-leak: finding output never echoes the matched text (rc=$RC out=$OUT)"
+fi
+
+# =============================================================================
+# --all no-silent-skip: repo-root scope, symlink target, = in a filename,
+# unreadable is exit 2 (AC29)
+# =============================================================================
+printf '\n--- --all no-silent-skip: repo-root scope, symlink target, = in a filename, unreadable is exit 2 ---\n'
+
+ALL_REPO="$(new_repo)"
+mkdir -p "$ALL_REPO/deepsub"
+printf 'nothing sensitive here\n' > "$ALL_REPO/deepsub/placeholder.txt"
+git -C "$ALL_REPO" add deepsub/placeholder.txt
+git -C "$ALL_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: deepsub/placeholder.txt"
+
+# repo-root scope: a shape at the repo root must still be found when
+# invoked from a subdirectory.
+printf '%s\n' "$HP_POS_LINE" > "$ALL_REPO/root-shape.txt"
+git -C "$ALL_REPO" add root-shape.txt
+git -C "$ALL_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: root-shape.txt"
+
+# symlink target: git stores the target STRING as the blob content — must
+# be scanned as that string, never by following the link.
+SYM_TARGET="/Users/${HP_NAME}/data"
+( cd "$ALL_REPO" && ln -s "$SYM_TARGET" symlink-fixture )
+git -C "$ALL_REPO" add symlink-fixture
+git -C "$ALL_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: symlink-fixture"
+
+# = in a filename: must be read via redirection, never passed as a bare
+# argument to a tool that could parse "name=value" as an assignment.
+printf '%s\n' "$HP_POS_LINE" > "$ALL_REPO/notes=with-equals.txt"
+git -C "$ALL_REPO" add "notes=with-equals.txt"
+git -C "$ALL_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: notes=with-equals.txt"
+
+set +e
+ALL_OUT="$(cd "$ALL_REPO/deepsub" && bash "$BIN" --all 2>&1)"
+ALL_RC=$?
+set -e
+if [ "$ALL_RC" -eq 1 ] \
+   && printf '%s\n' "$ALL_OUT" | grep -qE 'pattern=home-path path=root-shape\.txt' \
+   && printf '%s\n' "$ALL_OUT" | grep -qE 'pattern=home-path path=symlink-fixture' \
+   && printf '%s\n' "$ALL_OUT" | grep -qE 'pattern=home-path path=notes=with-equals\.txt'; then
+  pass "--all no-silent-skip: repo-root scope, symlink target, = in a filename"
+else
+  fail "--all no-silent-skip: repo-root scope, symlink target, = in a filename (rc=$ALL_RC out=$ALL_OUT)"
+fi
+
+# unreadable is exit 2, never a skip.
+UNREAD_REPO="$(new_repo)"
+printf 'irrelevant content\n' > "$UNREAD_REPO/unreadable.txt"
+git -C "$UNREAD_REPO" add unreadable.txt
+git -C "$UNREAD_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
+  commit -q -m "fixture: unreadable.txt"
+chmod 000 "$UNREAD_REPO/unreadable.txt"
+set +e
+( cd "$UNREAD_REPO" && bash "$BIN" --all >/dev/null 2>&1 )
+UNREAD_RC=$?
+set -e
+chmod 644 "$UNREAD_REPO/unreadable.txt"
+if [ "$UNREAD_RC" -eq 2 ]; then
+  pass "--all no-silent-skip: unreadable is exit 2"
+else
+  fail "--all no-silent-skip: unreadable is exit 2 (got rc=$UNREAD_RC)"
+fi
+
+# =============================================================================
+# temp hygiene: every throwaway repo is created inside the trap-cleaned
+# work dir (AC12)
+# =============================================================================
+printf '\n--- temp hygiene: every throwaway repo is created inside the trap-cleaned work dir ---\n'
+
+stray_repos=0
+total_repos=0
+while IFS= read -r _created; do
+  [ -n "$_created" ] || continue
+  total_repos=$((total_repos + 1))
+  case "$_created" in
+    "$WORK"/*) ;;
+    *) stray_repos=$((stray_repos + 1)) ;;
+  esac
+done < "$CREATED_REPOS_LOG"
+if [ "$total_repos" -gt 0 ] && [ "$stray_repos" -eq 0 ]; then
+  pass "temp hygiene: every throwaway repo is created inside the trap-cleaned work dir ($total_repos repos, all under \$WORK)"
+else
+  fail "temp hygiene: every throwaway repo is created inside the trap-cleaned work dir ($stray_repos of $total_repos repo(s) found outside \$WORK)"
 fi
 
 # =============================================================================

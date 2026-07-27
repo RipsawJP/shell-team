@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # bin/check-pii-shapes.sh — diff-scoped PII shape checker (T-111, GitHub issue
-# #6 Layer 2 items 4-5; docs/specs/T-111-pii-shape-checker.md).
+# #6 Layer 2 items 4-5; .shell-team/specs/T-111-pii-shape-checker.md, v4).
 #
 # Development on this repository happens in the open, so a PII-shaped byte
 # (an email-shaped string, a home-directory absolute path, a private-key
 # header, a credential-token prefix) is a per-commit risk. This script gives
-# that risk a mechanical gate: by default it looks only at what a change
-# ADDS (diff-scoped, never the whole tree), and it is fail-closed — a run
-# that cannot evaluate its input never reports clean.
+# that risk a mechanical gate: by default it looks at the full committed
+# content of each path a change touches (change-scoped, never the whole
+# tree), and it is fail-closed — a run that cannot evaluate its input never
+# reports clean.
 #
 # Five shapes are matched, each identified by a stable pattern id used in
 # every finding line:
@@ -16,13 +17,21 @@
 #                     written here with angle brackets precisely so this
 #                     file, this spec, and the docs pair can discuss the
 #                     shape without becoming a finding themselves; see AC9).
+#                     Matched only at a boundary that cannot continue a host
+#                     name (see DP-5 below) — a URL authority is therefore
+#                     never a match.
 #   home-path-win     the Windows C: user-directory form (same placeholder
-#                     convention, C:\Users\<name>\).
-#   email-nonnoreply  a mailbox-shaped string at a real domain. Both GitHub
-#                     noreply identity shapes — <id>+<login>@users.noreply.
-#                     github.com and the plain web-flow noreply@github.com —
-#                     are deliberately NOT findings: they are public
-#                     identifiers by GitHub's own design, not PII.
+#                     convention, C:\Users\<name>\). Not boundary-guarded:
+#                     a backslash-delimited path never appears as a URL
+#                     authority, so the false-positive class DP-5 closes for
+#                     home-path does not reach this form.
+#   email-nonnoreply  a mailbox-shaped string at a real, deliverable domain.
+#                     Every mailbox-shaped candidate on a line is judged
+#                     (AC26), not just the first. Excluded, by domain
+#                     (never by local-part shape — DP-9): the GitHub noreply
+#                     identity domain (end-anchored) and the plain web-flow
+#                     noreply@github.com address; and by domain (DP-7): the
+#                     RFC 2606 / 6761 reserved documentation/testing names.
 #   private-key       a PEM private-key header line (named by id only in
 #                     this file's prose; never transcribed literally here,
 #                     since a document that transcribed a real match would
@@ -32,43 +41,77 @@
 #                     body, not a short lookalike such as this project's own
 #                     `task-0NN` label convention.
 #
-# Design decisions (full detail: docs/specs/T-111-pii-shape-checker.md):
-#   DP-1  No PII-shaped byte enters the tree. Every fixture the test suite
-#         uses is assembled at runtime, under mktemp, from fragments — never
-#         written here as a completed literal. There is no path allowlist
-#         and no inline allow marker: a finding is reported even when the
-#         carrying path is this very script or a file under
-#         tests/check-pii-shapes/ (AC13).
-#   DP-2  Scanned unit (diff mode): the ADDED lines of `git diff <point>` —
-#         lines starting with a single `+`, excluding the `+++` file header.
-#         Comparison point: `git merge-base <base> HEAD` when that resolves,
-#         else <base> itself. Default base chain when --base is omitted:
-#         $PII_CHECK_BASE, then origin/$GITHUB_BASE_REF (only when
-#         GITHUB_BASE_REF is set), then origin/develop, then develop —
-#         first one that resolves. Unlike some of this repo's other
-#         base-resolution checkers, this chain is FAIL-CLOSED at the end:
-#         if nothing resolves, this script exits 2 rather than silently
-#         skipping the scan. CI always passes --base explicitly anyway.
-#         Known limitation: untracked files carry no diff and are therefore
-#         not scanned in diff mode; --all is the mode that sees them.
-#   DP-3  --all is a full-tree AUDIT flag, not a required CI check (it
-#         necessarily reports the deliberately PII-shaped adversarial
-#         fixtures that already live under tests/, by design). It walks
-#         every file git already knows about (tracked + untracked-but-not-
-#         ignored), skipping binary files (image content is a declared
-#         non-goal — see docs/pii-controls.md).
+# Mechanism (DP-4, v4's premise change): this script NEVER parses git's
+# textual diff rendering. A rendering is a human-facing format whose framing
+# is configuration-dependent (colour, external diff, textconv, a -diff
+# gitattribute) and whose escape syntax collides with content (a line whose
+# real content starts with "++ " renders as "+++ "). Two rounds of a
+# hand-rolled diff-text parser landed real blockers here, so the mechanism
+# changed instead of patching the parser a third time:
+#   - Changed paths are enumerated from NUL-separated `git diff --name-status
+#     -z --no-renames` output — never from a textual patch.
+#   - Each surviving path's content is read through `git cat-file`, plumbing
+#     that returns the raw committed blob (for a symlink, the target string
+#     git itself stores — never a followed link) with no framing, no colour,
+#     no escape grammar to get wrong.
+#   - The scanned unit is the FULL committed content of each changed path
+#     (DP-6), not "added lines" — there is no base-blob comparison. A
+#     one-time measurement found every currently tracked path that carries a
+#     shape carries a false positive or a deliberate fixture, never a real
+#     value, so the noise a per-path diff would have suppressed is handled
+#     at the pattern level (DP-5, DP-7) and by name (DP-8) instead.
+#   - Text vs binary is decided by the presence of a NUL byte (git's own
+#     convention), never a printable-character heuristic — see AC27.
+# Every `git` invocation below still pins its rendering (--no-color); under
+# this mechanism that can no longer change a verdict, so it is free
+# insurance, not a defence this script depends on.
+#
+# DP-5 (home-path boundary): the home-path shape only matches at the start
+# of a line or when preceded by a character that cannot continue a host
+# name (a letter or digit) — a documentation URL whose path merely contains
+# a home-directory-looking segment (https://example.com/home/products) is
+# therefore not a finding. Declared consequence: a home path written inside
+# a file://-style URL is likewise not reported (a narrower loss than the
+# false positive this rule removes).
+#
+# DP-7 (reserved-domain exclusion): a mailbox shape at the RFC 2606 /
+# RFC 6761 reserved documentation/testing names (example.com/.org/.net, and
+# any domain ending in .example/.invalid/.test/.localhost) is not a finding
+# — those domains cannot route to a real mailbox by construction.
+#
+# DP-9 (noreply exclusion, domain-anchored): a mailbox shape whose domain is
+# EXACTLY (end-anchored) the GitHub noreply identity domain is not a
+# finding, regardless of what the local part looks like — a login, a
+# numeric id plus a login, or a printf format placeholder assembled at
+# runtime. The exclusion never inspects the local part; a substring match on
+# the domain is deliberately avoided so a suffix-confusable lookalike domain
+# still fires. The plain web-flow noreply@github.com address is its own,
+# separate, full-address exclusion.
+#
+# DP-8 (known-shapes list): a short, per-file (never a directory or glob)
+# list of paths that deliberately carry a shape as a fixture FOR ANOTHER
+# GUARD's own suite. It is not an exemption for this task's own files —
+# this script's own path and any path under tests/check-pii-shapes/ are
+# never listed and stay runtime-generated (DP-1); a shape in either is still
+# reported (AC13).
+#
+# DP-1: no PII-shaped byte enters this tree. Every fixture the test suite
+# uses is assembled at runtime, under mktemp, from fragments — never
+# written here as a completed literal. There is no path allowlist beyond
+# DP-8's narrow, test-locked, other-guard-only list, and no inline allow
+# marker anywhere in this file.
 #
 # A finding never echoes the matched text — only the pattern id, the path,
-# and a line number are reported — so a public CI log never carries the
-# byte that tripped the gate.
+# and a line number (when available) are reported — so a public CI log
+# never carries the byte that tripped the gate (AC14).
 #
 # This is a discipline aid for a trusted, reviewed artifact, not a security
-# boundary against an author editing the checker itself in the same commit
+# boundary against an author editing this checker itself in the same commit
 # (same trust boundary as bin/check-acs.sh's TRUST BOUNDARY note and
 # bin/check-intent.sh's ledger note) — PR review is that layer.
 #
 # Usage:
-#   check-pii-shapes.sh [--base <ref>]     diff-scoped (default)
+#   check-pii-shapes.sh [--base <ref>]     change-scoped (default)
 #   check-pii-shapes.sh --all              full-tree audit (never in CI)
 #   check-pii-shapes.sh --help
 #
@@ -117,7 +160,7 @@ self_name="$(basename "$script_path")" \
 SELF="$SCRIPT_DIR/$self_name"
 
 print_help() {
-  sed -n '2,70p' "$SELF" | sed 's/^# \{0,1\}//' \
+  sed -n '2,124p' "$SELF" | sed 's/^# \{0,1\}//' \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -147,55 +190,53 @@ fi
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || fail_structural "not inside a git working tree (check-pii-shapes.sh must be run from inside a git repository)"
 
-# --- pattern definitions (each on its own line, so a fixture suite can
-# neutralise exactly one at a time by rewriting its whole line) -------------
+# --- pattern + exclusion definitions -----------------------------------------
+# Each rule lives on its own assignment line so a fixture suite can
+# neutralise exactly one at a time by rewriting that one line. There are
+# nine independently load-bearing rules: five patterns, plus four
+# exclusions (the domain-anchored noreply rule, the plain web-flow address,
+# the reserved-domain rule, and the home-path boundary rule).
+#
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
-RE_HOME_PATH='/(Users|home)/[A-Za-z0-9_.-]+'
+RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9])'
+# shellcheck disable=SC2016
+RE_HOME_PATH_RAW='/(Users|home)/[A-Za-z0-9_.-]+'
+RE_HOME_PATH="${RE_HOME_PATH_BOUNDARY}${RE_HOME_PATH_RAW}"
 # shellcheck disable=SC2016
 RE_HOME_PATH_WIN='C:\\{1,2}Users\\{1,2}[A-Za-z0-9_.-]+'
 # shellcheck disable=SC2016
-RE_EMAIL='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+RE_EMAIL_BASE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 # shellcheck disable=SC2016
-RE_NOREPLY_ID='^[0-9]+\+[A-Za-z0-9_-]+@users\.noreply\.github\.com$'
+RE_NOREPLY_DOMAIN='(^|\.)users\.noreply\.github\.com$'
 # shellcheck disable=SC2016
 RE_NOREPLY_PLAIN='^noreply@github\.com$'
+# shellcheck disable=SC2016
+RE_RESERVED_DOMAIN='(^|\.)example\.(com|org|net)$|\.(example|invalid|test|localhost)$'
 # shellcheck disable=SC2016
 RE_PRIVATE_KEY='-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
 # shellcheck disable=SC2016
 RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|sk-[A-Za-z0-9_-]{16,}'
 
-SEP=$'\x1f'  # ASCII unit separator: delimits file/line/content triples
+# --- known-shapes list (DP-8) ------------------------------------------------
+# Per-file only — no directory entry, no glob, no pattern. Fixtures that
+# deliberately carry a PII shape FOR ANOTHER GUARD's own suite
+# (tests/rollup-track/run.sh). Never this script's own path, never a path
+# under tests/check-pii-shapes/ — those stay runtime-generated (DP-1) and a
+# shape in them is always reported (AC13).
+KNOWN_SHAPE_PATHS=(
+  "tests/rollup-track/fixtures/pii.jsonl"
+  "tests/rollup-track/fixtures/winpath.jsonl"
+  "tests/rollup-track/fixtures/secret-aws.jsonl"
+  "tests/rollup-track/fixtures/secret-github.jsonl"
+  "tests/rollup-track/fixtures/secret-openai.jsonl"
+)
 
-# scan_triples <triples-file> <out-file>
-# Reads SEP-delimited (file, line, content) triples and appends one
-# "FINDING pattern=<id> path=<file> line=<n>" line per match to <out-file>.
-# The matched TEXT itself is never written anywhere (AC14).
-scan_triples() {
-  local triples="$1" out="$2" f ln content m
-  while IFS="$SEP" read -r f ln content || [ -n "${f:-}" ]; do
-    [ -n "${f:-}" ] || continue
-    content="${content%$'\r'}"
-    if [[ "$content" =~ $RE_HOME_PATH ]]; then
-      printf 'FINDING pattern=home-path path=%s line=%s\n' "$f" "$ln" >> "$out"
-    fi
-    if [[ "$content" =~ $RE_HOME_PATH_WIN ]]; then
-      printf 'FINDING pattern=home-path-win path=%s line=%s\n' "$f" "$ln" >> "$out"
-    fi
-    if [[ "$content" =~ $RE_EMAIL ]]; then
-      m="${BASH_REMATCH[0]}"
-      if [[ "$m" =~ $RE_NOREPLY_ID ]] || [[ "$m" =~ $RE_NOREPLY_PLAIN ]]; then
-        :  # a public GitHub noreply identity — not a finding, by design
-      else
-        printf 'FINDING pattern=email-nonnoreply path=%s line=%s\n' "$f" "$ln" >> "$out"
-      fi
-    fi
-    if [[ "$content" =~ $RE_PRIVATE_KEY ]]; then
-      printf 'FINDING pattern=private-key path=%s line=%s\n' "$f" "$ln" >> "$out"
-    fi
-    if [[ "$content" =~ $RE_TOKEN ]]; then
-      printf 'FINDING pattern=token path=%s line=%s\n' "$f" "$ln" >> "$out"
-    fi
-  done < "$triples"
+is_known_shape() {  # $1 = path (repo-root-relative)
+  local p="$1" k
+  for k in "${KNOWN_SHAPE_PATHS[@]}"; do
+    [ "$p" = "$k" ] && return 0
+  done
+  return 1
 }
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/check-pii-shapes.XXXXXX")" \
@@ -205,31 +246,121 @@ cleanup() { rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 
 FINDINGS_FILE="$WORKDIR/findings"
+CONTENT_FILE="$WORKDIR/content"
 : > "$FINDINGS_FILE"
 
+# is_binary_file <file> — true (0) iff <file> contains a NUL byte (git's own
+# text/binary convention — never a printable-character heuristic, AC27).
+is_binary_file() {
+  LC_ALL=C tr -d '\000' < "$1" > "$WORKDIR/stripped" 2>/dev/null || return 1
+  ! cmp -s "$WORKDIR/stripped" "$1"
+}
+
+# report_pattern_lines <id> <path> <contentfile> <regex> — one FINDING line
+# per matching line number. grep's own "N:content" output is read but only
+# the N field is ever used; the content half is discarded before it can be
+# written anywhere (AC14: a finding never echoes the matched text).
+report_pattern_lines() {
+  local id="$1" path="$2" file="$3" re="$4" ln rest
+  # `--` guards against a regex that itself begins with a literal `-`
+  # (RE_PRIVATE_KEY does) being parsed as a grep option instead of a
+  # pattern argument.
+  grep -nE -- "$re" "$file" > "$WORKDIR/matches" 2>/dev/null || true
+  while IFS=: read -r ln rest; do
+    [ -n "${ln:-}" ] || continue
+    printf 'FINDING pattern=%s path=%s line=%s\n' "$id" "$path" "$ln" >> "$FINDINGS_FILE"
+  done < "$WORKDIR/matches"
+}
+
+# scan_email_candidates <path> <contentfile> — every mailbox-shaped
+# candidate on every line is judged individually (AC26), never only the
+# leftmost: an excluded noreply/reserved-domain address earlier on a line
+# never masks a real mailbox shape later on the same line. At most one
+# FINDING line is emitted per (path, line) pair even if several candidates
+# on that line survive exclusion.
+scan_email_candidates() {
+  local path="$1" file="$2" ln cand domain excluded last_ln=""
+  grep -noE -- "$RE_EMAIL_BASE" "$file" > "$WORKDIR/emails" 2>/dev/null || true
+  while IFS=: read -r ln cand; do
+    [ -n "${ln:-}" ] || continue
+    domain="${cand#*@}"
+    excluded=0
+    if [[ "$cand" =~ $RE_NOREPLY_PLAIN ]]; then
+      excluded=1
+    elif [[ "$domain" =~ $RE_NOREPLY_DOMAIN ]]; then
+      excluded=1
+    elif [[ "$domain" =~ $RE_RESERVED_DOMAIN ]]; then
+      excluded=1
+    fi
+    if [ "$excluded" -eq 0 ] && [ "$ln" != "$last_ln" ]; then
+      printf 'FINDING pattern=email-nonnoreply path=%s line=%s\n' "$path" "$ln" >> "$FINDINGS_FILE"
+      last_ln="$ln"
+    fi
+  done < "$WORKDIR/emails"
+}
+
+# scan_content_file <path> <contentfile> — runs all five pattern checks
+# against already-materialized, already-confirmed-non-binary content.
+scan_content_file() {
+  local path="$1" file="$2"
+  report_pattern_lines home-path "$path" "$file" "$RE_HOME_PATH"
+  report_pattern_lines home-path-win "$path" "$file" "$RE_HOME_PATH_WIN"
+  report_pattern_lines private-key "$path" "$file" "$RE_PRIVATE_KEY"
+  report_pattern_lines token "$path" "$file" "$RE_TOKEN"
+  scan_email_candidates "$path" "$file"
+}
+
+announce_skip() {  # $1 = path, $2 = mode label (blob|file)
+  printf 'check-pii-shapes: skip: binary %s (NUL byte present), not scanned: %s\n' "$2" "$1" >&2 || true
+}
+
 if [ "$MODE" = "all" ]; then
-  # --- full-tree audit: every file git knows about (tracked + untracked
-  # but not ignored), binary files skipped (image content is a non-goal). --
-  is_binary() {
-    head -c 8000 "$1" 2>/dev/null | LC_ALL=C tr -d '[:print:][:space:]' | LC_ALL=C grep -q . 2>/dev/null
-  }
-  TRIPLES_FILE="$WORKDIR/triples-all"
-  : > "$TRIPLES_FILE"
-  FILELIST="$WORKDIR/filelist"
-  git ls-files -z --cached --others --exclude-standard > "$FILELIST" \
+  # --- full-tree audit: repo-root scope regardless of invoking directory,
+  # tracked + untracked-but-not-ignored files, symlinks scanned by their
+  # stored target string rather than followed, never a silent skip (AC29).
+  TOPLEVEL="$(git rev-parse --show-toplevel)" \
+    || fail_structural "git rev-parse --show-toplevel failed — cannot resolve the repository root for --all"
+  cd "$TOPLEVEL" || fail_structural "failed to change into the repository root ($TOPLEVEL) for --all"
+
+  FILELIST_Z="$WORKDIR/filelist-z"
+  git ls-files -z --cached --others --exclude-standard > "$FILELIST_Z" \
     || fail_structural "git ls-files failed — cannot enumerate the tree for --all"
-  while IFS= read -r -d '' f; do
-    [ -f "$f" ] || continue
-    [ -r "$f" ] || fail_structural "cannot read file listed by git ls-files: $f"
-    if is_binary "$f"; then
+
+  FILELIST="$WORKDIR/filelist"
+  : > "$FILELIST"
+  while IFS= read -r -d '' p; do
+    printf '%s\n' "$p" >> "$FILELIST"
+  done < "$FILELIST_Z"
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    is_known_shape "$path" && continue
+
+    if [ -L "$path" ]; then
+      # A tracked/untracked symbolic link: scan the target string git
+      # itself stores, never the file the link points at (which need not
+      # even exist on this machine) — the classic --all blind spot.
+      target="$(readlink "$path")" \
+        || fail_structural "cannot read symlink target for: $path"
+      printf '%s' "$target" > "$CONTENT_FILE"
+      scan_content_file "$path" "$CONTENT_FILE"
       continue
     fi
-    awk -v SEP="$SEP" -v F="$f" '{ print F SEP FNR SEP $0 }' "$f" >> "$TRIPLES_FILE" \
-      || fail_structural "failed to read lines from: $f"
+
+    [ -e "$path" ] || fail_structural "path listed by git ls-files no longer exists on disk: $path"
+    [ -r "$path" ] || fail_structural "cannot read file listed by git ls-files: $path"
+    if is_binary_file "$path"; then
+      announce_skip "$path" file
+      continue
+    fi
+    cp "$path" "$CONTENT_FILE" 2>/dev/null \
+      || fail_structural "failed to read file listed by git ls-files: $path"
+    scan_content_file "$path" "$CONTENT_FILE"
   done < "$FILELIST"
-  scan_triples "$TRIPLES_FILE" "$FINDINGS_FILE"
 else
-  # --- diff-scoped: resolve the comparison point, then scan added lines. ---
+  # --- change-scoped: resolve the comparison point, then read the FULL
+  # committed content of each changed path (DP-4/DP-6) — never a diff
+  # rendering, never a base-blob comparison.
   resolve_ref() {
     git rev-parse --verify --quiet "${1}^{commit}" >/dev/null 2>&1
   }
@@ -252,43 +383,38 @@ else
   POINT="$(git merge-base "$CHOSEN" HEAD 2>/dev/null || true)"
   [ -n "$POINT" ] || POINT="$CHOSEN"
 
-  DIFF_FILE="$WORKDIR/diff"
-  git diff "$POINT" > "$DIFF_FILE" 2>/dev/null \
-    || fail_structural "git diff against resolved point ($POINT) failed"
+  NAMESTATUS_Z="$WORKDIR/namestatus-z"
+  # --no-color pins the rendering (free insurance under DP-4, since
+  # --name-status is never colourised regardless); --no-renames disables
+  # rename detection so every entry below is exactly two NUL-separated
+  # tokens (status, path) — never the three-token rename/copy form.
+  git diff --no-color --no-renames --name-status -z "$POINT" HEAD > "$NAMESTATUS_Z" 2>/dev/null \
+    || fail_structural "git diff --name-status failed against resolved point ($POINT)"
 
-  TRIPLES_FILE="$WORKDIR/triples-diff"
-  awk -v SEP="$SEP" '
-    /^diff --git / { file = ""; next }
-    /^\+\+\+ / {
-      f = $0
-      sub(/^\+\+\+ /, "", f)
-      sub(/\t.*$/, "", f)
-      if (f == "/dev/null") { file = "" }
-      else { sub(/^b\//, "", f); file = f }
-      next
-    }
-    /^--- / { next }
-    /^@@/ {
-      if (match($0, /\+[0-9]+/)) { newline = substr($0, RSTART + 1, RLENGTH - 1) + 0 }
-      next
-    }
-    /^Binary files / { next }
-    /^\\ / { next }
-    {
-      first = substr($0, 1, 1)
-      if (first == "+") {
-        content = substr($0, 2)
-        sub(/\r$/, "", content)
-        if (file != "") { printf "%s%s%s%s%s\n", file, SEP, newline, SEP, content }
-        newline++
-      } else if (first == " ") {
-        newline++
-      }
-    }
-  ' "$DIFF_FILE" > "$TRIPLES_FILE" \
-    || fail_structural "failed to parse the diff against resolved point ($POINT)"
+  CHANGED_PATHS="$WORKDIR/changed-paths"
+  : > "$CHANGED_PATHS"
+  {
+    while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+      [ "$status" = "D" ] && continue
+      printf '%s\n' "$path" >> "$CHANGED_PATHS"
+    done
+  } < "$NAMESTATUS_Z"
 
-  scan_triples "$TRIPLES_FILE" "$FINDINGS_FILE"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    is_known_shape "$path" && continue
+
+    git cat-file -p "HEAD:$path" > "$CONTENT_FILE" 2>/dev/null
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      fail_structural "failed to read committed content via git cat-file for: $path"
+    fi
+    if is_binary_file "$CONTENT_FILE"; then
+      announce_skip "$path" blob
+      continue
+    fi
+    scan_content_file "$path" "$CONTENT_FILE"
+  done < "$CHANGED_PATHS"
 fi
 
 if [ -s "$FINDINGS_FILE" ]; then

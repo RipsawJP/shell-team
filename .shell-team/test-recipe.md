@@ -90,9 +90,12 @@ that file's order.
   inside a file you just added can look identical to a pre-existing one
   once stashed. Always check the reported path(s) against your own file
   list BEFORE concluding a failure is external; do not rely on "still fails
-  after `git stash -u`" alone. (Confirmed case: a `%s+%s@users.noreply.
-  github.com` format-string helper in a fixture suite matches the checker's
-  generic mailbox shape and fails its digits-first noreply exclusion — a
-  checker-pattern gap on the assembled placeholder, not a real identity
-  leak; the correct fix was in the checker's own exclusion shape, not the
-  fragment-assembly helper.)
+  after `git stash -u`" alone. (Confirmed case: a printf format-string
+  helper that assembles a GitHub noreply identity at runtime — a `+`-joined
+  local part built from two `%s` placeholders, at GitHub's noreply domain —
+  in a fixture suite matches the checker's generic mailbox shape and fails
+  its (then) digits-first-local-part noreply exclusion — a checker-pattern
+  gap on the assembled placeholder, not a real identity leak; the correct
+  fix was in the checker's own exclusion shape, not the fragment-assembly
+  helper. Resolved by T-111's v4 rework (DP-9): the noreply exclusion is now
+  matched on the domain, end-anchored, never on the local part's shape.)
