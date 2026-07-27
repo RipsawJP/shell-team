@@ -3,14 +3,6 @@
 **Status**: READY_FOR_ARCH
 **Owner**: pm-spec
 **Task ID**: T-113
-**Intent version**: v2 — re-frozen 2026-07-27 under a human-ratified v1→v2. The
-only change was inserting `--` after the option cluster of every `grep` whose
-fixed-string pattern begins with a literal `-` (15 sites across the three
-specs), because getopt made grep parse the pattern as an option and exit 2. The
-asserted semantics (whole-line fixed-string match) are identical to v1. This
-line lives OUTSIDE the intent block: the version of record is the board's
-`intent-hash (vN)` ledger, and the marker lines themselves are matched by exact
-full-line compare, so neither may carry a version token.
 **Source**: GitHub issue #6 (RipsawJP/shell-team) — Layer 1 item 3.
 **Branch**: `feature/pii-controls` (from `develop`). Third of three tasks on this
 one branch; depends on T-112 (and through it on T-111, whose checkers this
