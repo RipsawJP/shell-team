@@ -80,11 +80,9 @@ what adopters run.
 
 ## Branches and pull requests
 
-- Branch from `develop`. `main` is the release line.
-- Both branches require the `check-handoff lint` check and reject force pushes
-  and deletion.
-- Run the relevant `tests/*/run.sh` suites locally before pushing. CI runs all of
-  them and is the merge gate.
+- The pull-request flow, the release procedure, confirming the CI check is
+  green, and the board line format are all documented in
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) rather than restated here.
 
 ## Security invariant
 
