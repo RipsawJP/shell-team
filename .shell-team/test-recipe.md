@@ -44,6 +44,13 @@ that file's order.
   0.11.0 — see `.github/workflows/check-handoff.yml`'s `SHELLCHECK_VERSION`).
   Verify locally with `shellcheck --version` before trusting a shellcheck-clean
   claim; CI installs its own pinned copy regardless of what's on the runner.
+- Assertions about ignore behavior must pin the excludes file. `git check-ignore`
+  reads the operator's global `core.excludesFile`, so a check that inherits it can
+  fail on a contributor's machine while CI stays green (runners have no global
+  excludes) — the least useful direction for the discrepancy to run. Pin it with
+  `git -c core.excludesFile=…`; `tests/rollup-track/run.sh` and
+  `tests/gitignore-raw-dumps/run.sh` show the pattern, asserting once under a
+  hostile excludes fixture and once under `/dev/null`.
 - No other prerequisite builds or services — every suite is bash + git +
   standard POSIX tools, run directly from the repo root.
 

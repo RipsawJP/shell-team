@@ -57,7 +57,7 @@ Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir w
 **Decide once whether `.shell-team/` belongs in git.** Because the plugin never edits your root `.gitignore`, the base dir shows up as *untracked* in your repo — only the per-run telemetry inside it is ignored, via a self-contained `<base>/.gitignore`. Both choices are supported, and the plugin will not make the call for you:
 
 - **Track it** — the board, specs, and review artifacts become versioned project records (that is how this repo dogfoods itself).
-- **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore`, or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in.
+- **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore` (scoped to that repo, trivially reversed), or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in. The global route is machine-wide, so it also hides the base dir in a repo where you later *do* want the board tracked; `!.shell-team/` in that repo's root `.gitignore` brings it back, because repo-level patterns outrank the global file. This repo carries that line for exactly that reason. [docs/adopting.md](docs/adopting.md) covers one further consequence, for tooling that asks git whether a path is ignored.
 
 Full details, updates, and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
 
