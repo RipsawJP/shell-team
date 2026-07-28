@@ -20,6 +20,12 @@
 # NOTE: `.shell-team/rollups` is deliberately NOT ignored — roll-up summaries
 # are meant to be tracked (tests/rollup-track/run.sh asserts this).
 
+# Personal, per-checkout configuration. How much the session checks in with you
+# is a working preference, not a property of the project, so these stay out of
+# git — see docs/tuning-oversight.md.
+CLAUDE.local.md
+.claude/settings.local.json
+
 # Editor / OS noise
 .DS_Store
 *.swp

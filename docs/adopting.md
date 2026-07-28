@@ -37,6 +37,10 @@ self-contained `<base>/.gitignore`. Whether to also git-ignore the whole base
 dir — and whether to copy the operating rules below into your own `CLAUDE.md` —
 is your call; the plugin will not make those edits for you.
 
+How often the session stops to check with you is your call too, and it is set
+per-checkout rather than shipped: see
+[tuning-oversight.md](tuning-oversight.md).
+
 ## `AGENTS.md` — a cross-tool pointer doc
 
 `team-init` also scaffolds **`<base>/AGENTS.md`**: a portable doc that tells any
