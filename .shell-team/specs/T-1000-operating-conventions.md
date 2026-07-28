@@ -105,7 +105,14 @@ line in `CONTRIBUTING.md`.
   the observed types as observed, with the set left open — the measurement is
   `docs` 5, `chore` 3, `feature` 1, `fix` 0, so a claim that `fix` is "in use"
   would be false while a prohibition on ever using it would be an invention.
-  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF -- '- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line and is never the base of a feature branch.' CONTRIBUTING.md && grep -qxF -- '- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.' CONTRIBUTING.md && grep -qxF -- '- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.' CONTRIBUTING.md && grep -qxF -- '- **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.' CONTRIBUTING.md && grep -qxF -- '- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.' CONTRIBUTING.md
+  **The same bullet states the `main` rule as a rule, not as a fact about the
+  history.** The tree contradicts the factual form exactly once: the branch behind
+  the first pull request has its merge base at the commit that was `main`'s tip at
+  the time, before the `develop` flow existed. A contributor does not need that
+  exception, and a "never" that the tree disproves is the same defect class as the
+  `fix` claim, so the clause becomes an instruction. The superseded wording is
+  asserted absent.
+  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF -- '- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line: do not branch from it.' CONTRIBUTING.md && ! grep -qF -- 'is never the base of a feature branch' CONTRIBUTING.md && grep -qxF -- '- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.' CONTRIBUTING.md && grep -qxF -- '- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.' CONTRIBUTING.md && grep -qxF -- '- **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.' CONTRIBUTING.md && grep -qxF -- '- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.' CONTRIBUTING.md
 - [ ] **AC4** The manual-close claim is grounded in the producer, not in
   recollection: `bin/close-out.sh` itself says a `develop` merge does not
   auto-close, and the suite that locks both halves of that behaviour (the printed
@@ -114,11 +121,18 @@ line in `CONTRIBUTING.md`.
 - [ ] **AC5** The contradicted branch form is not propagated: no `feat/T-` string
   appears anywhere in `CONTRIBUTING.md`.
   - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && ! grep -qF 'feat/T-' CONTRIBUTING.md
-- [ ] **AC6** The release procedure is stated as six canonical bullets: the single
-  version location, the badge bump and what actually enforces it, the explicit
-  list of what is *not* checked, the promotion-by-pull-request and merge style,
-  the annotated tag, and the pointers to the install side and the changelog.
-  - check: grep -qxF -- '- **The version lives in one place**: the `version` field of `.claude-plugin/plugin.json`. `.claude-plugin/marketplace.json` carries no version field.' CONTRIBUTING.md && grep -qxF -- '- **Bump the static version badge in both `README.md` and `README.ja.md` to match.** `bin/check-readme-version.sh` compares each badge against the manifest, but it checks only the files handed to it as arguments — the enforced set is decided by the invocation line in the workflow, not by the script.' CONTRIBUTING.md && grep -qxF -- '- **Nothing else is machine-checked.** `CHANGELOG.md` and `CHANGELOG.ja.md` parity, `marketplace.json`, git tags, and version numbers mentioned in prose have no check at all; the badge is the only enforced site.' CONTRIBUTING.md && grep -qxF -- '- **Promote `develop` to `main` through a pull request**, not a direct push, and merge it as a merge commit rather than a squash, once `check-handoff lint` has reported success.' CONTRIBUTING.md && grep -qxF -- '- **Tag the release on `main` with an annotated tag `vX.Y.Z`** after that merge lands.' CONTRIBUTING.md && grep -qxF -- '- **The install side is documented elsewhere**: [`docs/distribution.md`](docs/distribution.md) covers what an adopter does after a bump, and [`CHANGELOG.md`](CHANGELOG.md) carries the release history that [`README.md`](README.md) points at.' CONTRIBUTING.md
+- [ ] **AC6** The release procedure is stated as six canonical bullets: the manifest
+  bump, the badge bump and what actually enforces it, the explicit list of what is
+  *not* checked, the promotion-by-pull-request and merge style, the annotated tag,
+  and the pointers to the install side and the changelog. **Every bullet in a
+  section that calls itself a procedure has to be an instruction.** The first bullet
+  used to describe where the version lives, which left the reader with a badge-bump
+  instruction and nothing telling them to change what the badge is matched against —
+  following the section top to bottom produced a new badge against an old manifest.
+  It is now an imperative and still carries the `marketplace.json` fact, in the form
+  that matters to someone executing the steps: there is nothing to change there. A
+  seventh bullet was deliberately not added; the section stays a list of steps.
+  - check: grep -qxF -- '- **Bump the `version` field of `.claude-plugin/plugin.json`.** That manifest is the single source of the version — `.claude-plugin/marketplace.json` carries no version field, so there is nothing to change there.' CONTRIBUTING.md && ! grep -qF -- '- **The version lives in one place**' CONTRIBUTING.md && grep -qxF -- '- **Bump the static version badge in both `README.md` and `README.ja.md` to match.** `bin/check-readme-version.sh` compares each badge against the manifest, but it checks only the files handed to it as arguments — the enforced set is decided by the invocation line in the workflow, not by the script.' CONTRIBUTING.md && grep -qxF -- '- **Nothing else is machine-checked.** `CHANGELOG.md` and `CHANGELOG.ja.md` parity, `marketplace.json`, git tags, and version numbers mentioned in prose have no check at all; the badge is the only enforced site.' CONTRIBUTING.md && grep -qxF -- '- **Promote `develop` to `main` through a pull request**, not a direct push, and merge it as a merge commit rather than a squash, once `check-handoff lint` has reported success.' CONTRIBUTING.md && grep -qxF -- '- **Tag the release on `main` with an annotated tag `vX.Y.Z`** after that merge lands.' CONTRIBUTING.md && grep -qxF -- '- **The install side is documented elsewhere**: [`docs/distribution.md`](docs/distribution.md) covers what an adopter does after a bump, and [`CHANGELOG.md`](CHANGELOG.md) carries the release history that [`README.md`](README.md) points at.' CONTRIBUTING.md
 - [ ] **AC7** Every mechanical claim in the release section is true of this tree:
   the manifest carries a version field, `marketplace.json` does not, the checker
   declares badge-only scope, CI's invocation line is exactly the two READMEs, and
@@ -140,7 +154,7 @@ line in `CONTRIBUTING.md`.
   through `git cat-file`, and "The scanned unit is the FULL committed content of
   each changed path … there is no base-blob comparison" — so "on the diff against
   the base branch" was false in the way that costs a contributor real time: a shape
-  a file already carried is reported by a change that touched a different part of
+  a file already carries can surface on a change that touched a different part of
   that file, and a document that promised diff scoping would send that contributor
   to the maintainer instead of to the cause. `bin/check-commit-identity.sh` is
   tightened from the merely loose "on the commits" to its measured range — its
@@ -149,7 +163,15 @@ line in `CONTRIBUTING.md`.
   into a branch needs to know which side of that line the merge commit falls on.
   The old text of both is additionally asserted absent, since a rework that adds a
   corrected line without removing the superseded one would otherwise pass.
-  - check: grep -qxF -- '- **There is one workflow and one job.** `.github/workflows/check-handoff.yml` — its job display name, and the check name to look for on a pull request, is `check-handoff lint`.' CONTRIBUTING.md && grep -qxF -- '- **Confirm the reported conclusion of that check on the pull-request head commit.** A mergeability field such as `mergeable_state: clean` is not evidence: it describes whether the branches can be combined, and it can read clean before any check has reported a conclusion at all.' CONTRIBUTING.md && grep -qxF -- '- **Run the suites locally before pushing.** There is no single "run everything" entry point; the workflow file is the authoritative list of every suite and dogfood step, in the order it runs them, and `.shell-team/test-recipe.md` records how to run one.' CONTRIBUTING.md && grep -qxF -- '- **Two CI steps apply even to a documentation-only pull request.** `bin/check-pii-shapes.sh` uses the base branch only to enumerate the paths a change touches and then scans the full committed content of each of them, not the added lines alone — so a shape a file already carried is reported by a change that touched a different part of that file. `bin/check-commit-identity.sh` inspects the non-merge commits from the merge base to the head, and never a merge commit.' CONTRIBUTING.md && ! grep -qF -- 'on the diff against the base branch' CONTRIBUTING.md && ! grep -qF -- '`bin/check-commit-identity.sh` on the commits' CONTRIBUTING.md && grep -qxF -- '- **What CI does not do.** It lints the shipped board template, not the board in this repository, and although the spec-layer checkers (`bin/check-acs.sh`, `bin/check-intent.sh`, `bin/check-provenance.sh`) have fixture suites in CI, no step runs them against the specs here. Run those yourself.' CONTRIBUTING.md
+  **One more narrowing, found by re-reading the checker rather than by review.** The
+  previous version of this bullet said a pre-existing shape "is reported" — an
+  unconditional claim, while the checker ships `KNOWN_SHAPE_PATHS` (DP-8): a short,
+  per-file, test-locked list of paths that deliberately carry a shape as a fixture
+  for another guard, on which nothing is reported. That is the same defect class as
+  the three lines this round was opened for — a sentence wider than the mechanism it
+  describes — so the exception is named in the bullet instead of being papered over
+  with a weaker verb, and the superseded wording is asserted absent as well.
+  - check: grep -qxF -- '- **There is one workflow and one job.** `.github/workflows/check-handoff.yml` — its job display name, and the check name to look for on a pull request, is `check-handoff lint`.' CONTRIBUTING.md && grep -qxF -- '- **Confirm the reported conclusion of that check on the pull-request head commit.** A mergeability field such as `mergeable_state: clean` is not evidence: it describes whether the branches can be combined, and it can read clean before any check has reported a conclusion at all.' CONTRIBUTING.md && grep -qxF -- '- **Run the suites locally before pushing.** There is no single "run everything" entry point; the workflow file is the authoritative list of every suite and dogfood step, in the order it runs them, and `.shell-team/test-recipe.md` records how to run one.' CONTRIBUTING.md && grep -qxF -- '- **Two CI steps apply even to a documentation-only pull request.** `bin/check-pii-shapes.sh` uses the base branch only to enumerate the paths a change touches and then scans the full committed content of each of them, not the added lines alone — so a shape a file already carried surfaces on a change that touched a different part of that file, unless that path is on the short, test-locked known-shapes list inside the checker. `bin/check-commit-identity.sh` inspects the non-merge commits from the merge base to the head, and never a merge commit.' CONTRIBUTING.md && ! grep -qF -- 'on the diff against the base branch' CONTRIBUTING.md && ! grep -qF -- '`bin/check-commit-identity.sh` on the commits' CONTRIBUTING.md && ! grep -qF -- 'already carried is reported by a change' CONTRIBUTING.md && grep -qxF -- '- **What CI does not do.** It lints the shipped board template, not the board in this repository, and although the spec-layer checkers (`bin/check-acs.sh`, `bin/check-intent.sh`, `bin/check-provenance.sh`) have fixture suites in CI, no step runs them against the specs here. Run those yourself.' CONTRIBUTING.md
 - [ ] **AC10** The check name in the document is not transcribed from memory: it
   equals the job display name extracted from the workflow file itself.
   - check: n="$(awk -F': ' '/^    name: /{print $2; exit}' .github/workflows/check-handoff.yml)" && test "$n" = 'check-handoff lint' && grep -qF "$n" CONTRIBUTING.md
@@ -164,7 +186,18 @@ line in `CONTRIBUTING.md`.
   DASH, the no-parenthetical rule, the note-placement rule with its consequence
   for `## Done`, how to lint the board locally through the path resolver, and the
   deferral of the flag vocabulary to the shipped template.
-  - check: grep -qxF -- '- **The `## Active` section is machine-linted.** `bin/check-handoff.sh` validates every top-level `- [ ]` line in it against a fixed shape and rejects an unrecognised status flag; both separators in that shape are a space-padded U+2014 EM DASH.' CONTRIBUTING.md && grep -qxF -- '- **Nothing may come between the status flag and the spec pointer.** A parenthetical — a date, a review round, a pull-request number — placed after the flag breaks the match; the closing backtick of the flag must be followed directly by the spec pointer.' CONTRIBUTING.md && grep -qxF -- '- **Notes go in indented sub-bullets under the entry.** The linter skips indented lines, the `_(none)_` placeholder, and any top-level line that is not `- [ ]`, which is why the `- [x]` entries under `## Done` are never inspected.' CONTRIBUTING.md && grep -qxF -- '- **Lint the board before pushing**: `bash bin/check-handoff.sh "$(bash bin/team-paths.sh --get todo)"`, and `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base develop`, which is the only check that catches an edit that silently replaced the heading line of an existing entry.' CONTRIBUTING.md && grep -qxF -- '- **The status-flag vocabulary is not restated here**: it is listed in `templates/todo-template.md` and enforced by `bin/check-handoff.sh`.' CONTRIBUTING.md
+  **The linting bullet describes what `bin/check-board-headings.sh` can actually
+  see.** Its header states that it diffs the set of `T-NNN` heading ids and fails on
+  deletion, id-level replacement, or duplication, and its extraction takes one
+  `T-[0-9]+` per line — so an edit that rewrites a title, a flag or a spec path
+  while leaving the id in place is invisible to it. The incident it was built for is
+  covered (a clobbered heading loses its old id), which is why "catches an edit that
+  silently replaced the heading line" was true of the accident and too wide for the
+  mechanism. "Only" is separately true and kept: no other checker compares board
+  headings against a base ref. The boundary is stated in the bullet rather than
+  omitted, so a contributor does not over-trust the check; the superseded wording is
+  asserted absent.
+  - check: grep -qxF -- '- **The `## Active` section is machine-linted.** `bin/check-handoff.sh` validates every top-level `- [ ]` line in it against a fixed shape and rejects an unrecognised status flag; both separators in that shape are a space-padded U+2014 EM DASH.' CONTRIBUTING.md && grep -qxF -- '- **Nothing may come between the status flag and the spec pointer.** A parenthetical — a date, a review round, a pull-request number — placed after the flag breaks the match; the closing backtick of the flag must be followed directly by the spec pointer.' CONTRIBUTING.md && grep -qxF -- '- **Notes go in indented sub-bullets under the entry.** The linter skips indented lines, the `_(none)_` placeholder, and any top-level line that is not `- [ ]`, which is why the `- [x]` entries under `## Done` are never inspected.' CONTRIBUTING.md && grep -qxF -- '- **Lint the board before pushing**: `bash bin/check-handoff.sh "$(bash bin/team-paths.sh --get todo)"`, and `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base develop`, which compares the set of `T-NNN` heading ids against the base ref — it is the only check that notices an id deleted, overwritten with a different id, or duplicated, and it cannot see a rewrite that leaves the id in place.' CONTRIBUTING.md && ! grep -qF -- 'silently replaced the heading line of an existing entry' CONTRIBUTING.md && grep -qxF -- '- **The status-flag vocabulary is not restated here**: it is listed in `templates/todo-template.md` and enforced by `bin/check-handoff.sh`.' CONTRIBUTING.md
 - [ ] **AC13** Positive-and-negative control on the documented format: the worked
   example line is extracted from `CONTRIBUTING.md` itself and fed through the real
   enforcer. In the documented shape — with an indented sub-bullet note, and with a
@@ -428,7 +461,7 @@ rather than measurements, per DP-5.
 
 | # | Claim | Evidence in this tree | AC |
 |---|---|---|---|
-| P1 | Branch from `develop`, named `<type>/<slug>`; the observed types are reported as observed and the set is open; `main` is the release line | `docs/distribution.md:91-93` ("`main` carries releases and `develop` is its integration branch"); `.github/workflows/check-handoff.yml:3-7`. Branch form measured 9/9 across merged pull requests, split `docs` 5 / `chore` 3 / `feature` 1 / `fix` 0 — **ratified** as the written convention (DP-5). The zero rules out the word "in use" for `fix` | AC3, AC5 |
+| P1 | Branch from `develop`, named `<type>/<slug>`; the observed types are reported as observed and the set is open; `main` is the release line and the instruction is not to branch from it | `docs/distribution.md`'s Version-line section — "`main` carries releases and `develop` is its integration branch"; `.github/workflows/check-handoff.yml:3-7`. Branch form measured 9/9 across merged pull requests, split `docs` 5 / `chore` 3 / `feature` 1 / `fix` **0** (the zero rules out "in use" for `fix`) — **ratified** as the written convention (DP-5). The `main` clause is **normative, not factual**: the tree disproves the factual form once, at the branch behind the first pull request, whose merge base is the commit that was `main`'s tip before the `develop` flow existed | AC3, AC5 |
 | P2 | Open the pull request against `develop`; the check reports on the PR | `.github/workflows/check-handoff.yml:4-7` (`pull_request` *and* `push`, branches `[main, develop]`) | AC3 |
 | P3 | Both gates green before merge — deferred to the existing statement | `CONTRIBUTING.md:23-34`; also `CLAUDE.md:40-42`, `docs/adopting.md:106-111` | AC3, AC25 |
 | P4 | Board hygiene runs through `bin/close-out.sh` | `bin/close-out.sh:1-44` (the four steps), `:225-236` (fail-closed rewrite) | AC3, AC4 |
@@ -436,16 +469,16 @@ rather than measurements, per DP-5.
 | C1 | One workflow, one job; check name `check-handoff lint` | `.github/workflows/check-handoff.yml:10-12` | AC9, AC10 |
 | C2 | A mergeability field is not evidence of a reported conclusion | **No in-tree evidence** — `mergeable_state` appears nowhere in the tree (full-text search, zero hits). Written as an operational observation with its consequence | AC9 (presence); reasoning info-only |
 | C3 | No "run everything" entry point; the workflow file is the authoritative list | `.shell-team/test-recipe.md:34-36` | AC9, AC19 |
-| C4 | Two CI steps apply to a documentation-only pull request, each stated at its **measured scope** rather than at its invocation shape: the shape check uses the base only to enumerate the paths a change touches and then reads each of those paths in full, and the identity check covers the non-merge commits from the merge base to the head | `bin/check-pii-shapes.sh`'s own header — "The scanned unit is the FULL committed content of each changed path" and "there is no base-blob comparison", with changed paths enumerated from `git diff --raw` and content read through `git cat-file`. `bin/check-commit-identity.sh`'s own header — `git rev-list --no-merges <merge-base>..HEAD` and "Merge commits are excluded wholesale". CI wiring at `.github/workflows/check-handoff.yml:148-149`, `:157-158` (both pass `--base "origin/${GITHUB_BASE_REF:-develop}"`, which is what makes the invocation shape misleading if quoted as the scope) | AC9, AC16 |
+| C4 | Two CI steps apply to a documentation-only pull request, each stated at its **measured scope** rather than at its invocation shape: the shape check uses the base only to enumerate the paths a change touches and then reads each of those paths in full, and the identity check covers the non-merge commits from the merge base to the head | `bin/check-pii-shapes.sh`'s own header — "The scanned unit is the FULL committed content of each changed path" and "there is no base-blob comparison", with changed paths enumerated from `git diff --raw` and content read through `git cat-file`. `bin/check-commit-identity.sh`'s own header — `git rev-list --no-merges <merge-base>..HEAD` and "Merge commits are excluded wholesale". The one exception to the scan is named rather than elided: the same header declares `KNOWN_SHAPE_PATHS` (DP-8), "a short, per-file (never a directory or glob) list of paths that deliberately carry a shape as a fixture FOR ANOTHER GUARD's own suite", on which nothing is reported. CI wiring at `.github/workflows/check-handoff.yml:148-149`, `:157-158` (both pass `--base "origin/${GITHUB_BASE_REF:-develop}"`, which is what makes the invocation shape misleading if quoted as the scope) | AC9, AC16 |
 | C5 | No CI step **lints** the board this repository runs on (the lint target is the shipped template) and no step **evaluates** a task spec against its acceptance criteria (the spec-layer checkers appear only as fixture suites). This is an absence of two specific actions, **not** an absence of those files from CI — the byte-level scan in C4 still reads them when a change touches them, and the two rows must be read together | `:31-32` (the lint target is `templates/todo-template.md`); `:64-65`, `:130-134` (fixture suites only); `:136-137` (`check-board-headings` likewise); the scan half is C4's evidence | AC9, AC11, AC27 |
 | B1 | `## Active` is machine-linted against a fixed shape; both separators are U+2014 | `bin/check-handoff.sh:62` (`LINE_RE`), `:47-51` (section extraction), `:26-34` + `:101-106` (flag enum) | AC12, AC13 |
 | B2 | Nothing may sit between the flag and the spec pointer | `bin/close-out.sh:8-11` ("NO parenthetical after the flag"); mechanically, `bin/check-handoff.sh:62` | AC12, AC13 |
 | B3 | Notes go in indented sub-bullets; `## Done`'s `- [x]` lines are never inspected | `bin/check-handoff.sh:88-94` (blank / `_(` / indented / non-`- [ ]` all skipped) | AC12, AC13 |
-| B4 | Lint locally with both board checkers, resolving the path through `bin/team-paths.sh` | `bin/check-board-headings.sh:1-13` (the gap it closes and why `check-handoff.sh` cannot); `bin/team-paths.sh:32-36` (`--get` interface) | AC12, AC14 |
+| B4 | Lint locally with both board checkers, resolving the path through `bin/team-paths.sh`; the heading checker sees **id-level** change only — deletion, replacement, duplication — and not a rewrite that keeps the id | `bin/check-board-headings.sh`'s own header: it "diffs the whole-board (Active + Done) set of `T-NNN` heading ids" and fails on "deletion, replacement (id-level: same as deletion), or duplication", and the same header records why `check-handoff.sh` cannot do this ("never compares against a base ref"). The extraction takes one `T-[0-9]+` per line, which is what bounds it to ids. "Only" is separately measured: no other checker compares board headings against a base ref. `bin/team-paths.sh`'s `--get KEY` interface for the path | AC12, AC14 |
 | B5 | The flag vocabulary is not restated; it lives in the shipped template | `templates/todo-template.md:7-10`, `:20-28`; `templates/prompt-blocks/registry.txt:35,37` (the canonical block and its registered consumers) | AC12, AC26 |
-| R1 | The version lives only in `.claude-plugin/plugin.json`; `marketplace.json` has no version field | `.claude-plugin/plugin.json:4`; `.claude-plugin/marketplace.json` (read in full — no version field) | AC6, AC7 |
-| R2 | Badge in both READMEs; the script is argument-driven and CI's invocation decides the enforced set | `bin/check-readme-version.sh:6-8`, `:31`, `:63-78`; `.github/workflows/check-handoff.yml:82-83` (`README.md README.ja.md`) | AC6, AC7 |
-| R3 | Nothing else is machine-checked (CHANGELOG parity, `marketplace.json`, tags, prose mentions) | `bin/check-readme-version.sh:24-26` (declared badge-only scope); no CHANGELOG/tag step anywhere in the workflow | AC6, AC7 |
+| R1 | **Bump** the `version` field of `.claude-plugin/plugin.json`; there is nothing to change in `marketplace.json`, which carries no version field | The `"version"` field of `.claude-plugin/plugin.json`; `.claude-plugin/marketplace.json` read in full — its keys are `name`, `owner`, `description`, `plugins`, with no version field at any level. Stated as an imperative because the section calls itself a procedure and the badge bullet has nothing to match against otherwise | AC6, AC7 |
+| R2 | Badge in both READMEs; the script is argument-driven and CI's invocation decides the enforced set | `bin/check-readme-version.sh` — its loop is `for FILE in "$@"`, and its header says the badge must equal the manifest version "For each README on the command line"; the enforced set is therefore the invocation at `.github/workflows/check-handoff.yml:82-83` (`README.md README.ja.md`) | AC6, AC7 |
+| R3 | Nothing else is machine-checked (CHANGELOG parity, `marketplace.json`, tags, prose mentions) | `bin/check-readme-version.sh`'s own scope note — "this check looks ONLY at the badge". Re-verified this round across `bin/` and `.github/`: zero references to `marketplace.json`, zero to `CHANGELOG`, and the only tag-touching code **reads** a tag rather than validating one (`bin/install` reports the tag at `HEAD`, `bin/gen-project-status.sh` reads the newest tag for a generated block, and `bin/check-readme-version.sh` explains in a comment why a tag is *not* the reference) — no step validates a tag, and neither tag reader runs in CI | AC6, AC7 |
 | R4 | Promote `develop` to `main` by pull request, merged as a merge commit, after the check reports success | **Ratified decision** (DP-5). Merge style is measured: **9 of 9** merges reachable from either branch (`git log --merges main develop`) are merge commits, zero squashes. An earlier 10 in this spec double-counted the one merge into `main`, which `develop` also reaches | AC6, AC8 |
 | R5 | Tag `main` with an annotated `vX.Y.Z` after the merge | **Ratified decision** (DP-5). Grounded only in part: the sole tag `v1.0.0` is annotated (objecttype `tag`); the after-the-merge timing is an extrapolation | AC6, AC8 |
 | R6 | Install side, changelog and README are pointed at, not copied | `docs/distribution.md:81-93`; `README.md:187-189`; `CHANGELOG.md:1-5` | AC6, AC25 |
@@ -471,7 +504,10 @@ rather than measurements, per DP-5.
 | Each check is described at its measured scope, never at its invocation shape (`--base` is not diff scoping) | AC9 (the fourth bullet, byte-exact), grounded in row C4 |
 | The board and the specs are still byte-scanned when a change touches them; only the lint and the acceptance-criteria evaluation are absent | AC27 (the second canonical line asserts the scan explicitly), AC9's fourth bullet, rows C4 and C5 read together |
 | The commit-identity range is the non-merge commits from the merge base to the head | AC9 (the fourth bullet), grounded in row C4 |
-| A superseded canonical line must not survive alongside its replacement | AC9 and AC27 each assert the absence of the text they replace, in addition to the presence of the new text |
+| A superseded canonical line must not survive alongside its replacement | AC3, AC6, AC9, AC12 and AC27 each assert the absence of the text they replace, in addition to the presence of the new text |
+| Every bullet of a section that calls itself a procedure is an instruction, not a fact about where something lives | AC6 (the manifest-bump bullet, byte-exact), grounded in row R1 |
+| A sentence must not be wider than the mechanism it describes — state the boundary instead of implying there is none | AC12 (the heading checker sees id-level change only), AC9 (the shape scan has a named per-file exception), each grounded in the checker header quoted in rows B4 and C4 |
+| A rule the contributor must follow is written as a rule, never as a claim about the history that the history disproves | AC3 (`main` is not to be branched from), grounded in row P1 |
 | The release procedure includes the changelog step | AC28 |
 | A procedural step and a machine-enforced step are different claims, and the changelog bullet states both | AC28 (the bullet), AC6 (the compatible "nothing else is machine-checked" bullet) |
 | `fix` is not claimed to be in use; the type set is open while the `<type>/<slug>` form is normative | AC3 (the corrected bullet); measurement recorded in DP-5 and row P1 |
@@ -565,16 +601,29 @@ carrying that disclosure to the reader as well.
 - **The changelog bullet (AC28) goes inside `## Cutting a release`**, after the
   badge-bump bullet and before the promotion bullet. Its position is not pinned
   mechanically, but that is where the procedure reads in order.
-- **Two lines already on this branch are superseded and must be *replaced*, not
-  joined.** The second canonical line of AC27 and the fourth canonical bullet of
-  AC9 both changed this round: each described a check by the flag it takes rather
-  than by what it reads, and the two errors pointed the same way, so a contributor
-  reading both would have concluded that only the lines they added are scanned.
-  Swap each line for the new pattern in the AC — both criteria assert the absence
-  of the text they replace as well as the presence of the new text, so leaving the
-  old line in place fails. **This does not affect AC2**: neither superseded line
-  exists in `develop:CONTRIBUTING.md`, so replacing an added line changes only the
-  added side of the diff and the licensed deletion set is untouched.
+- **Six lines already on this branch are superseded and must be *replaced*, not
+  joined.** Swap each for the new pattern in its criterion; every one of the six
+  criteria asserts the absence of the text it replaces as well as the presence of
+  the new text, so leaving an old line in place fails even though the new one is
+  there. The six, and why each moved:
+  - AC27's second canonical line and AC9's fourth bullet — each described a check by
+    the flag it takes rather than by what it reads, and the two pointed the same
+    way, so a contributor reading both would have concluded that only added lines
+    are scanned.
+  - AC9's fourth bullet again, this round — "is reported" was unconditional while
+    the checker ships a short per-file known-shapes list on which nothing is
+    reported.
+  - AC3's naming bullet — the `main` clause was a claim about the history, and the
+    history disproves it once.
+  - AC6's first bullet — it described where the version lives in a section that
+    calls itself a procedure, leaving the badge bullet with nothing to match.
+  - AC12's linting bullet — "catches an edit that silently replaced the heading
+    line" is true of the accident but wider than the mechanism, which compares ids.
+- **None of this affects AC2.** Every superseded line was added by this branch, so
+  none of them exists in `develop:CONTRIBUTING.md`. Replacing an added line changes
+  only the added side of `git diff develop`, and the licensed deletion set stays
+  exactly the four-line About-CI paragraph of the base blob. The same reasoning
+  covers AC6's first bullet, which is likewise a line this branch introduced.
 - **The worked board example** belongs in `## The board line format`, inside a
   fenced block tagged `markdown`, containing a `## Active` heading, the example
   entry, and one indented sub-bullet note. It must be one physical line and
@@ -608,10 +657,10 @@ carrying that disclosure to the reader as well.
   `.shell-team/provenance/T-1000.md` (new). Nothing else — AC22 and AC24 both
   fail on anything outside that set.
 - **Before hand-off**, run `bash bin/check-acs.sh --dry-run` then
-  `bash bin/check-acs.sh` on this spec, and mutation-check at least AC13, AC17, AC2
-  and the two absence assertions: break the documented example line, break the
-  pointer bullet, delete one extra line somewhere else in `CONTRIBUTING.md`, and
-  paste the superseded AC9 / AC27 lines back in *alongside* their replacements —
-  each must turn its check red, and restoring must turn it green again. AC13 is a
-  positive-and-negative control pair, AC2 is a set-equality lock, and the absence
-  assertions are new this round; all three are exactly the class that ships blind.
+  `bash bin/check-acs.sh` on this spec, and mutation-check AC13, AC17, AC2 and **all
+  six absence assertions**: break the documented example line, break the pointer
+  bullet, delete one extra line somewhere else in `CONTRIBUTING.md`, and paste each
+  superseded line (AC3, AC6, AC9 twice, AC12, AC27) back in *alongside* its
+  replacement — every one must turn its check red, and restoring must turn it green
+  again. Do the absence assertions one at a time: a single mutation that trips two
+  criteria at once proves neither of them individually.
