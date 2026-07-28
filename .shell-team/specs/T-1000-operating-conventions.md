@@ -82,16 +82,30 @@ line in `CONTRIBUTING.md`.
 - [ ] **AC1** `CONTRIBUTING.md` carries all five new section headings, exactly as
   spelled, and the file is readable (positive control).
   - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF '## The pull-request flow' CONTRIBUTING.md && grep -qxF '## Confirming the CI check is green' CONTRIBUTING.md && grep -qxF '## The board line format' CONTRIBUTING.md && grep -qxF '## Cutting a release' CONTRIBUTING.md && grep -qxF '## What does not belong in this file' CONTRIBUTING.md
-- [ ] **AC2** The new content is attached to `CONTRIBUTING.md`, not written over
-  it: the diff against `develop` has zero deleted lines and a non-zero number of
-  added lines. (Deletion counting uses `--numstat`'s own column rather than a
-  `^-` diff-line pattern, which mis-reads a bullet-heavy markdown file.)
-  - check: test "$(git diff --numstat develop -- CONTRIBUTING.md | awk '{print $2}')" = "0" && test "$(git diff --numstat develop -- CONTRIBUTING.md | awk '{print $1}')" -gt 0
+- [ ] **AC2** The new content is attached to `CONTRIBUTING.md` rather than written
+  over it, with exactly one licensed exception: the opening paragraph of the
+  existing `## About CI on your pull request` section, whose enumeration of what CI
+  checks is inaccurate and is corrected in place by AC27. **The set of deleted lines
+  must equal that paragraph exactly** — every line of it and nothing else — so a
+  reflow, a re-punctuation, or a deletion anywhere else in the file still fails. A
+  bare "at most N deletions" bound is deliberately not used: it does not constrain
+  *where* the deletion happened. The expected set is derived from the base blob by
+  content anchor rather than transcribed here, both because the paragraph contains
+  an ASCII apostrophe a single-quoted pattern cannot hold and so the criterion
+  reads the real base text instead of a copy of it; the line count is asserted as a
+  positive control that the anchor actually found the paragraph. **Merge-point-scoped**:
+  it resolves `develop:CONTRIBUTING.md` and therefore goes stale once other work
+  changes that file on `develop`. That is expected; do not widen its base-ref
+  resolution or re-derive it per rework round.
+  - check: exp="$(git show develop:CONTRIBUTING.md | awk '/^Some checks in this repository test the shipped scripts/{f=1} f{print} f&&/your change\.$/{exit}')" && test "$(printf '%s\n' "$exp" | wc -l | tr -d ' ')" -eq 4 && del="$(git diff develop -- CONTRIBUTING.md | grep -E '^-' | grep -vE '^---' | sed 's/^-//')" && test "$del" = "$exp" && test "$(git diff --numstat develop -- CONTRIBUTING.md | awk '{print $1}')" -gt 0
 - [ ] **AC3** The pull-request flow is stated as five canonical bullets: the base
   branch and branch-name form, the pull-request target, the deferral to the
   existing two-gate statement, the board-hygiene step, and the manual issue
-  close.
-  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF -- '- **Branch from `develop`**, named `<type>/<slug>` — the types in use are `docs`, `chore`, `feature` and `fix`. `main` is the release line and is never the base of a feature branch.' CONTRIBUTING.md && grep -qxF -- '- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.' CONTRIBUTING.md && grep -qxF -- '- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.' CONTRIBUTING.md && grep -qxF -- '- **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.' CONTRIBUTING.md && grep -qxF -- '- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.' CONTRIBUTING.md
+  close. The naming bullet makes the *form* `<type>/<slug>` normative and reports
+  the observed types as observed, with the set left open — the measurement is
+  `docs` 5, `chore` 3, `feature` 1, `fix` 0, so a claim that `fix` is "in use"
+  would be false while a prohibition on ever using it would be an invention.
+  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF -- '- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line and is never the base of a feature branch.' CONTRIBUTING.md && grep -qxF -- '- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.' CONTRIBUTING.md && grep -qxF -- '- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.' CONTRIBUTING.md && grep -qxF -- '- **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.' CONTRIBUTING.md && grep -qxF -- '- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.' CONTRIBUTING.md
 - [ ] **AC4** The manual-close claim is grounded in the producer, not in
   recollection: `bin/close-out.sh` itself says a `develop` merge does not
   auto-close, and the suite that locks both halves of that behaviour (the printed
@@ -211,6 +225,25 @@ line in `CONTRIBUTING.md`.
 - [ ] **AC26** Negative — the status-flag enum is not reproduced: only the single
   flag inside the worked example may appear, and none of the other six.
   - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && ! grep -q -e 'READY_FOR_ENG' -e 'READY_FOR_QA' -e 'READY_FOR_REVIEW' -e 'READY_FOR_MERGE' -e 'BLOCKED' -e 'REWORK' CONTRIBUTING.md
+- [ ] **AC27** The document does not contradict itself: the inaccurate enumeration
+  in the existing `## About CI on your pull request` section is gone, replaced by a
+  pair of canonical lines that are accurate about all three of the things the old
+  sentence named, and the correct half of that section — the instruction to say so
+  in the pull request when a failure looks unrelated — survives. The replacement
+  deliberately does **not** present an exhaustive list of the checks that run
+  against this tree: there are five dogfood steps plus the shipped template and
+  contract lints, and an enumeration would be a fresh unverified claim of exactly
+  the kind this task exists to prevent. It is precise only where the old text was
+  wrong, and the positive half (prompt blocks) is named because it is the one item
+  of the three that was right.
+  - check: grep -qxF -- 'Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.' CONTRIBUTING.md && grep -qxF -- 'Two things are **not** in that second set: the board and the task specs. CI lints the shipped board template, `templates/todo-template.md`, and never the board this repository runs on; and the spec-layer checkers have fixture suites in CI while no step runs them against the specs here. The generated prompt blocks, by contrast, are checked — `bin/check-prompt-sync.sh` runs against this tree on every pull request.' CONTRIBUTING.md && ! grep -qF -- '— the board, the task specs, the generated prompt blocks' CONTRIBUTING.md && grep -qF 'If a check fails in a way that looks unrelated to what you touched' CONTRIBUTING.md
+- [ ] **AC28** The release procedure is complete rather than merely correct: it
+  carries the changelog step, grounded in the declaration `CHANGELOG.md` makes
+  about itself, and both language files exist to be updated. This does not
+  contradict AC6, which states that nothing compares the two files — a step that is
+  part of the procedure and a step that is not machine-enforced are different
+  claims, and the bullet states both.
+  - check: grep -qxF -- '- **Add the release entry to `CHANGELOG.md` and `CHANGELOG.ja.md`.** The changelog is where release history lives and, by its own account, is written as part of this release process; nothing checks the two files against each other, so the parity is yours to keep.' CONTRIBUTING.md && grep -qF 'new release entries land here as part of this project' CHANGELOG.md && test -r CHANGELOG.ja.md
 
 ## Input space
 
@@ -242,6 +275,10 @@ produce, and what the document must therefore be correct about:
    written `--`).
 7. A documentation-only pull request against `develop`, which still reaches the
    diff-scoped PII shape check and the commit-identity check.
+8. The base-branch content of `CONTRIBUTING.md` as `git show develop:CONTRIBUTING.md`
+   returns it — specifically the four-line opening paragraph of
+   `## About CI on your pull request`, which AC2 reads by content anchor to decide
+   which deletions are licensed and which are not.
 
 **Out-of-scope synthetic extremes** — named and declined:
 
@@ -266,6 +303,10 @@ produce, and what the document must therefore be correct about:
    load-bearing (the linting bullet in AC12), but every worked example is written
    for the default layout this repository actually runs on. Explaining the legacy
    layout to an adopter is `docs/adopting.md`'s job, not this file's.
+7. A base branch whose About-CI paragraph has itself changed shape. AC2 asserts a
+   four-line anchor result and therefore fails loudly in that case rather than
+   adapting to whatever it finds; adapting would silently widen the set of
+   deletions it licenses, which is the one thing that criterion exists to bound.
 
 <!-- END intent-block: T-1000 -->
 
@@ -333,17 +374,22 @@ The branch-name form and the release procedure are the two places where this
 document is at risk of laundering a decision into a fact:
 
 - **Branch naming** is measured (9 of 9 merged pull requests use
-  `<type>/<slug>`: `docs/`, `chore/`, `feature/`; zero use `feat/T-XXX-<slug>`),
-  so the *form* is grounded. Ratification only settles that this is the written
-  convention and that `docs/workflow.md`'s contradicting line is wrong rather
-  than authoritative.
+  `<type>/<slug>`, split `docs` 5 / `chore` 3 / `feature` 1 / `fix` **0**; zero
+  use `feat/T-XXX-<slug>`), so the *form* is grounded. Ratification only settles
+  that this is the written convention and that `docs/workflow.md`'s contradicting
+  line is wrong rather than authoritative. The `fix` count is the reason AC3's
+  bullet reports the observed types as observed and leaves the set open instead of
+  claiming four types are "in use" — a claim that was false for one of the four.
 - **The release procedure** is not measured at all. `develop..main` is empty —
   `develop` has never been promoted to `main` — and `main`'s first-parent history
   is the initial public-release commit plus one merge. The single tag `v1.0.0` is
   annotated and points at that initial commit, which is reachable from both
   branches, so it evidences the *annotated* tag form and nothing about tagging
-  after a merge. Merge style *is* measured: 10 of 10 merges into either branch are
-  merge commits, never squashes.
+  after a merge. Merge style *is* measured: **9 of 9** merges reachable from
+  either branch (`git log --merges main develop`) are merge commits, never
+  squashes. An earlier figure of 10 in this spec double-counted the single merge
+  into `main`, which is reachable from `develop` as well; corrected on the record
+  rather than silently.
 
 The consequence is a document-level obligation, not just a spec-level note: the
 release section carries the disclosure bullet AC8 pins, so a reader six months
@@ -357,7 +403,7 @@ rather than measurements, per DP-5.
 
 | # | Claim | Evidence in this tree | AC |
 |---|---|---|---|
-| P1 | Branch from `develop`, named `<type>/<slug>`; `main` is the release line | `docs/distribution.md:91-93` ("`main` carries releases and `develop` is its integration branch"); `.github/workflows/check-handoff.yml:3-7`. Branch form measured 9/9 across merged pull requests — **ratified** as the written convention (DP-5) | AC3, AC5 |
+| P1 | Branch from `develop`, named `<type>/<slug>`; the observed types are reported as observed and the set is open; `main` is the release line | `docs/distribution.md:91-93` ("`main` carries releases and `develop` is its integration branch"); `.github/workflows/check-handoff.yml:3-7`. Branch form measured 9/9 across merged pull requests, split `docs` 5 / `chore` 3 / `feature` 1 / `fix` 0 — **ratified** as the written convention (DP-5). The zero rules out the word "in use" for `fix` | AC3, AC5 |
 | P2 | Open the pull request against `develop`; the check reports on the PR | `.github/workflows/check-handoff.yml:4-7` (`pull_request` *and* `push`, branches `[main, develop]`) | AC3 |
 | P3 | Both gates green before merge — deferred to the existing statement | `CONTRIBUTING.md:23-34`; also `CLAUDE.md:40-42`, `docs/adopting.md:106-111` | AC3, AC25 |
 | P4 | Board hygiene runs through `bin/close-out.sh` | `bin/close-out.sh:1-44` (the four steps), `:225-236` (fail-closed rewrite) | AC3, AC4 |
@@ -375,14 +421,16 @@ rather than measurements, per DP-5.
 | R1 | The version lives only in `.claude-plugin/plugin.json`; `marketplace.json` has no version field | `.claude-plugin/plugin.json:4`; `.claude-plugin/marketplace.json` (read in full — no version field) | AC6, AC7 |
 | R2 | Badge in both READMEs; the script is argument-driven and CI's invocation decides the enforced set | `bin/check-readme-version.sh:6-8`, `:31`, `:63-78`; `.github/workflows/check-handoff.yml:82-83` (`README.md README.ja.md`) | AC6, AC7 |
 | R3 | Nothing else is machine-checked (CHANGELOG parity, `marketplace.json`, tags, prose mentions) | `bin/check-readme-version.sh:24-26` (declared badge-only scope); no CHANGELOG/tag step anywhere in the workflow | AC6, AC7 |
-| R4 | Promote `develop` to `main` by pull request, merged as a merge commit, after the check reports success | **Ratified decision** (DP-5). Merge style is measured: 10/10 merges into either branch are merge commits, zero squashes | AC6, AC8 |
+| R4 | Promote `develop` to `main` by pull request, merged as a merge commit, after the check reports success | **Ratified decision** (DP-5). Merge style is measured: **9 of 9** merges reachable from either branch (`git log --merges main develop`) are merge commits, zero squashes. An earlier 10 in this spec double-counted the one merge into `main`, which `develop` also reaches | AC6, AC8 |
 | R5 | Tag `main` with an annotated `vX.Y.Z` after the merge | **Ratified decision** (DP-5). Grounded only in part: the sole tag `v1.0.0` is annotated (objecttype `tag`); the after-the-merge timing is an extrapolation | AC6, AC8 |
 | R6 | Install side, changelog and README are pointed at, not copied | `docs/distribution.md:81-93`; `README.md:187-189`; `CHANGELOG.md:1-5` | AC6, AC25 |
 | R7 | The promotion and tag are a maintainer decision, not an observed practice | `develop..main` is empty; `main`'s first-parent history is the initial release commit plus one merge — measured, and the reason the disclosure is required | AC8 |
 | S1 | Nothing machine- or operator-specific in a tracked file | `CLAUDE.md:123-128` (this repository's own Hygiene rule) | AC15, AC16 |
 | S2 | Oversight preferences live in the gitignored `CLAUDE.local.md`; `docs/tuning-oversight.md` documents the mechanism | `docs/tuning-oversight.md:10-20`, `:34-49`; `.gitignore:23-27` | AC15 |
 | S3 | Both branches are protected and the check must report success; the rule set is not readable from a clone | GitHub API reports `protected: true` for both branches (external measurement); the protection-detail endpoint is unreachable from this environment, so nothing more is asserted | AC15, AC20 |
+| R8 | The release procedure includes adding the entry to `CHANGELOG.md` and `CHANGELOG.ja.md`, and says that nothing enforces their parity | `CHANGELOG.md`'s own opening description, which declares that "new release entries land here as part of this project" release process — the project stating its own procedure, so a release runbook that omits the step is incomplete against the tree; both files exist (`CHANGELOG.md`, `CHANGELOG.ja.md`), and the absence of any enforcement is R3's evidence | AC28, and AC6 for the compatible "nothing else is machine-checked" bullet |
 | X1 | `CLAUDE.md` keeps one pointer bullet instead of a second copy | `CLAUDE.md:81-87` (the copy being replaced), `:24-26` (the no-second-copy principle it violates) | AC17 |
+| X2 | The existing `## About CI on your pull request` opening paragraph is corrected: of the three things it named as CI-verified repository conventions, only the generated prompt blocks is right — the board is linted only as the shipped template and the task specs are not in CI at all | `.github/workflows/check-handoff.yml:31-32` (the lint target is `templates/todo-template.md`); `:106-107` (`check-prompt-sync` dogfood, the one correct item); `:64-65`, `:130-134` (spec-layer checkers appear as fixture suites only). Same evidence as C5, which is how the contradiction was found | AC27, AC2 (which licenses the deletion) |
 
 ## Body-to-AC correspondence
 
@@ -391,7 +439,13 @@ rather than measurements, per DP-5.
 | `CONTRIBUTING.md` carries the four content areas | AC1 (sections), AC3/AC6/AC9/AC12 (the sentences) |
 | Every convention sentence is grounded in this tree or marked as a decision | the claim-to-evidence table above + AC4, AC7, AC8, AC10, AC11 |
 | `CLAUDE.md` gets one pointer bullet, not a second copy | AC17 |
-| The new content attaches to the existing sections rather than overwriting them | AC2 (zero deletions) |
+| The new content attaches to the existing sections rather than overwriting them | AC2 (deletions confined to exactly one licensed paragraph, set-equality against the base blob) |
+| The one inaccurate existing sentence is corrected in place, not left to contradict the new section | AC27; AC2 is what licenses its deletion |
+| The correct half of the existing About-CI section survives | AC27 (the retained sentence is asserted present) |
+| The corrected text does not claim an exhaustive list of what CI runs against this tree | AC27's body states the restraint; mechanically, the canonical lines it pins contain no enumeration |
+| The release procedure includes the changelog step | AC28 |
+| A procedural step and a machine-enforced step are different claims, and the changelog bullet states both | AC28 (the bullet), AC6 (the compatible "nothing else is machine-checked" bullet) |
+| `fix` is not claimed to be in use; the type set is open while the `<type>/<slug>` form is normative | AC3 (the corrected bullet); measurement recorded in DP-5 and row P1 |
 | No duplication of what `README.md` / `CLAUDE.md` / `docs/` already carry | AC25, and AC12's B5 + AC26 for the flag enum |
 | No operator- or machine-specific content in a tracked file | AC16 |
 | No personal oversight preferences; point at `docs/tuning-oversight.md` | AC15 |
@@ -413,6 +467,8 @@ rather than measurements, per DP-5.
 | `mergeable_state` is not sufficient evidence because it reports mergeability | info-only (not promoted to AC) — an operational observation with no in-tree referent (zero hits repository-wide); AC9 pins the sentence, and inventing a grep to "prove" the reasoning would be a hollow check |
 | Prose ordering of the five new sections | info-only (not promoted to AC) — a readability choice; no consumer depends on it |
 | `CLAUDE.md` is a trusted instruction channel, so keep its diff obviously intentional | info-only (not promoted to AC) — a reviewer-attention argument; the mechanical half of it is AC17's one-bullet and no-heading-churn assertions |
+| The changelog bullet sits after the badge bump and before the promotion bullet | info-only (not promoted to AC) — a logical-ordering choice inside one section, same class as the prose-ordering row above; AC28 pins the text, not its position |
+| The merge-style measurement is 9, not 10 (the earlier figure double-counted the single merge into `main`) | info-only (not promoted to AC) — a correction to this spec's own evidence record, outside the frozen block; it changes no AC and no canonical line, and is stated in DP-5 and row R4 rather than hidden |
 
 ## Assumptions
 
@@ -435,7 +491,16 @@ rather than measurements, per DP-5.
 - Every canonical line is free of the ASCII apostrophe, deliberately: the
   patterns are single-quoted inside a `bash -c` string, and an apostrophe would
   need escaping that is easy to get wrong. This constrains wording (no "the
-  repository's own board") and is why some bullets read slightly formally.
+  repository's own board") and is why some bullets read slightly formally. It is
+  also why AC2 derives its expected deletion set from the base blob instead of
+  transcribing it: the paragraph being replaced contains `repository's`, which no
+  single-quoted pattern in this spec could hold.
+- `git show develop:CONTRIBUTING.md` is resolvable and its opening About-CI
+  paragraph is exactly four physical lines, anchored by the sentence that starts
+  `Some checks in this repository test the shipped scripts` and the one that ends
+  `your change.`. Verified by reading the base file; AC2 asserts the count of four
+  as its own positive control, so a change to that paragraph on `develop` fails the
+  criterion loudly rather than silently widening what may be deleted.
 - pm-spec has no shell, so none of the `check:` lines above has been executed.
   The executing side runs them all — and corrects anything broken or vacuous with
   the semantics unchanged — *before* the intent-hash is computed and recorded.
@@ -450,15 +515,27 @@ carrying that disclosure to the reader as well.
 ## Notes for engineer
 
 - **The canonical text is the `grep -qxF` pattern in each AC** (DP-2). Copy each
-  line out of AC3, AC6, AC8, AC9, AC12 and AC15 verbatim, including the U+2014 EM
-  DASH characters and the backticks, and write each as one physical, unwrapped
-  line. There is no second copy in this spec to consult.
+  line out of AC3, AC6, AC8, AC9, AC12, AC15, AC27 and AC28 verbatim, including the
+  U+2014 EM DASH characters and the backticks, and write each as one physical,
+  unwrapped line. There is no second copy in this spec to consult.
 - **Where the new sections go in `CONTRIBUTING.md`**: after `## About CI on your
   pull request` and before `## Where the behavior is documented`, in the order
   `## The pull-request flow`, `## Confirming the CI check is green`,
   `## The board line format`, `## Cutting a release`,
-  `## What does not belong in this file`. Insert only — AC2 requires zero deleted
-  lines, so do not reflow, re-wrap or re-punctuate any existing paragraph.
+  `## What does not belong in this file`.
+- **The one existing paragraph you may touch** is the opening paragraph of
+  `## About CI on your pull request` — currently four physical lines, from
+  `Some checks in this repository test the shipped scripts` through
+  `…nothing to do with your change.`. Delete all four and put AC27's two canonical
+  lines in their place, each one physical unwrapped line. **Leave the paragraph
+  that follows alone** (`If a check fails in a way that looks unrelated…`): it is
+  correct, AC27 asserts it is still there, and AC2 fails if it is touched.
+  Everywhere else in the file, insert only — AC2 compares the set of deleted lines
+  against that one paragraph and fails on any other deletion, including a reflow,
+  a re-wrap or a re-punctuation of an existing paragraph.
+- **The changelog bullet (AC28) goes inside `## Cutting a release`**, after the
+  badge-bump bullet and before the promotion bullet. Its position is not pinned
+  mechanically, but that is where the procedure reads in order.
 - **The worked board example** belongs in `## The board line format`, inside a
   fenced block tagged `markdown`, containing a `## Active` heading, the example
   entry, and one indented sub-bullet note. It must be one physical line and
@@ -492,7 +569,9 @@ carrying that disclosure to the reader as well.
   `.shell-team/provenance/T-1000.md` (new). Nothing else — AC22 and AC24 both
   fail on anything outside that set.
 - **Before hand-off**, run `bash bin/check-acs.sh --dry-run` then
-  `bash bin/check-acs.sh` on this spec, and mutation-check at least AC13 and AC17:
-  break the documented example line (or the pointer bullet) in a scratch copy,
-  confirm the check turns red, restore, confirm it turns green. AC13 is a new
-  positive-and-negative control pair, which is exactly the class that ships blind.
+  `bash bin/check-acs.sh` on this spec, and mutation-check at least AC13, AC17 and
+  AC2: break the documented example line, break the pointer bullet, and (in a
+  scratch copy) delete one extra line somewhere else in `CONTRIBUTING.md` — each
+  must turn its check red, and restoring must turn it green again. AC13 is a
+  positive-and-negative control pair and AC2 is a set-equality lock rewritten this
+  round; both are exactly the class that ships blind.
