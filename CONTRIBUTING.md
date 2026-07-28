@@ -37,7 +37,7 @@ is the loop doing its job, not a verdict on the contribution.
 
 Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.
 
-Two things are **not** in that second set: the board and the task specs. CI lints the shipped board template, `templates/todo-template.md`, and never the board this repository runs on; and the spec-layer checkers have fixture suites in CI while no step runs them against the specs here. The generated prompt blocks, by contrast, are checked — `bin/check-prompt-sync.sh` runs against this tree on every pull request.
+Two CI steps a reader might expect do not exist: nothing lints the board this repository runs on — the lint target is the shipped template, `templates/todo-template.md` — and nothing evaluates a task spec against its acceptance criteria, since the spec-layer checkers appear in CI only as fixture suites. The board and the specs are still read in full by the PII shape check whenever a change touches them, and the generated prompt blocks are genuinely verified: `bin/check-prompt-sync.sh` runs against this tree on every pull request.
 
 If a check fails in a way that looks unrelated to what you touched, **say so in
 the pull request rather than trying to satisfy it.** Sorting that out is the
@@ -61,7 +61,7 @@ looks similar but answers a different question:
 - **There is one workflow and one job.** `.github/workflows/check-handoff.yml` — its job display name, and the check name to look for on a pull request, is `check-handoff lint`.
 - **Confirm the reported conclusion of that check on the pull-request head commit.** A mergeability field such as `mergeable_state: clean` is not evidence: it describes whether the branches can be combined, and it can read clean before any check has reported a conclusion at all.
 - **Run the suites locally before pushing.** There is no single "run everything" entry point; the workflow file is the authoritative list of every suite and dogfood step, in the order it runs them, and `.shell-team/test-recipe.md` records how to run one.
-- **Two CI steps apply even to a documentation-only pull request**: `bin/check-pii-shapes.sh` on the diff against the base branch, and `bin/check-commit-identity.sh` on the commits.
+- **Two CI steps apply even to a documentation-only pull request.** `bin/check-pii-shapes.sh` uses the base branch only to enumerate the paths a change touches and then scans the full committed content of each of them, not the added lines alone — so a shape a file already carried is reported by a change that touched a different part of that file. `bin/check-commit-identity.sh` inspects the non-merge commits from the merge base to the head, and never a merge commit.
 - **What CI does not do.** It lints the shipped board template, not the board in this repository, and although the spec-layer checkers (`bin/check-acs.sh`, `bin/check-intent.sh`, `bin/check-provenance.sh`) have fixture suites in CI, no step runs them against the specs here. Run those yourself.
 
 ## The board line format
