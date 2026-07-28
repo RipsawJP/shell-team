@@ -11,7 +11,15 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-_(none)_
+- [ ] **T-1000** Operating conventions for this repository, written into CONTRIBUTING.md — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1000-operating-conventions.md
+  - source: GitHub issue #25. Docs-only, no behaviour change; base `develop`, branch `docs/operating-conventions`.
+  - resolved for the engineer: `CLAUDE.md`'s `## Branches and pull requests` section is reduced to one pointer bullet (the issue's own instruction, and its own no-second-copy principle); `CONTRIBUTING.ja.md` is not created; `docs/workflow.md`'s contradicted branch form and the stale CI step name inside the generated playbook block are both non-goals and locked byte-untouched.
+  - the release procedure and the branch-name form are recorded as human-ratified decisions, not measurements — `develop` has never been promoted to `main`, so the promotion and tag steps have no in-tree precedent, and the document itself carries that disclosure to the reader (AC8).
+  - 26 acceptance criteria, all with `check:` lines runnable from the repo root. The canonical bytes of every line this task adds are the `grep -qxF` patterns inside those criteria and exist nowhere else in the spec, so there is no second copy to drift from.
+  - intent-freeze: the intent-block markers are placed in the spec; the intent-hash (v1) sub-bullet is recorded below by the executing side after it verified the `check:` lines.
+  - intent-hash (v1): 38967acb8b03594bc1afa87118004a2287baf668
+  - orchestrator (T-1000): all 26 `check:` lines executed before the freeze — 11 pass against the pre-implementation tree, 15 fail, every failure exit 1 (assertion unmet) except AC21's exit 2, which is `check-provenance.sh` failing closed on a file the engineer has not written yet. No line needed correcting. Verified beyond the aggregate: AC10's and AC17's `awk` extractions isolated (both return the intended value; AC17 correctly reports 3 top-level bullets against the section it will reduce to 1); AC13's positive-and-negative control pair simulated end to end against a synthesized `T-1042` line, confirming exit 0 on the documented shape (with a sub-bullet note, a free top-level prose line and a deliberately malformed `- [x]` under `## Done`) and exit exactly 1 with a parenthetical inserted after the flag; and the current occurrence count in `CONTRIBUTING.md` measured for all eight forbidden strings plus all seven flag tokens, so no negative criterion can self-hit pre-existing prose (the one legitimate occurrence AC16 pins at a count of one is on the existing settings line).
+  - note for the engineer: every diff-based criterion (AC2, AC17, AC18, AC22, AC24) reads `git diff` and is therefore blind to untracked files — commit the work before treating any of them as evidence.
 
 ## Done
 
