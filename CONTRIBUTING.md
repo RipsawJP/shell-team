@@ -35,10 +35,9 @@ is the loop doing its job, not a verdict on the contribution.
 
 ## About CI on your pull request
 
-Some checks in this repository test the shipped scripts (shellcheck, the fixture
-suites under `tests/`) and some test the repository's **own working
-conventions** — the board, the task specs, the generated prompt blocks. The
-second kind can fail for reasons that have nothing to do with your change.
+Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.
+
+Two things are **not** in that second set: the board and the task specs. CI lints the shipped board template, `templates/todo-template.md`, and never the board this repository runs on; and the spec-layer checkers have fixture suites in CI while no step runs them against the specs here. The generated prompt blocks, by contrast, are checked — `bin/check-prompt-sync.sh` runs against this tree on every pull request.
 
 If a check fails in a way that looks unrelated to what you touched, **say so in
 the pull request rather than trying to satisfy it.** Sorting that out is the
@@ -48,7 +47,7 @@ maintainer's side of the work, not yours.
 
 The mechanics around opening, merging, and closing out a pull request:
 
-- **Branch from `develop`**, named `<type>/<slug>` — the types in use are `docs`, `chore`, `feature` and `fix`. `main` is the release line and is never the base of a feature branch.
+- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line and is never the base of a feature branch.
 - **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.
 - **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.
 - **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.
@@ -94,6 +93,7 @@ measured and which are a standing decision:
 
 - **The version lives in one place**: the `version` field of `.claude-plugin/plugin.json`. `.claude-plugin/marketplace.json` carries no version field.
 - **Bump the static version badge in both `README.md` and `README.ja.md` to match.** `bin/check-readme-version.sh` compares each badge against the manifest, but it checks only the files handed to it as arguments — the enforced set is decided by the invocation line in the workflow, not by the script.
+- **Add the release entry to `CHANGELOG.md` and `CHANGELOG.ja.md`.** The changelog is where release history lives and, by its own account, is written as part of this release process; nothing checks the two files against each other, so the parity is yours to keep.
 - **Nothing else is machine-checked.** `CHANGELOG.md` and `CHANGELOG.ja.md` parity, `marketplace.json`, git tags, and version numbers mentioned in prose have no check at all; the badge is the only enforced site.
 - **Promote `develop` to `main` through a pull request**, not a direct push, and merge it as a merge commit rather than a squash, once `check-handoff lint` has reported success.
 - **Tag the release on `main` with an annotated tag `vX.Y.Z`** after that merge lands.
