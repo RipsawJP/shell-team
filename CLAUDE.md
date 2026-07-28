@@ -25,6 +25,71 @@ The role table is deliberately **not** duplicated here. A second copy drifts
 from the frontmatter that actually configures the agents, and the copy is the
 one people read.
 
+## Routing
+
+The block below is `templates/CLAUDE-routing-snippet.md`, verbatim. That file is
+what this project tells an adopting repo to paste into its own `CLAUDE.md`, so
+this repo runs on the same text it ships rather than on a paraphrase of it.
+
+<!-- shell-team:routing:begin -->
+## AI dev team — conversational routing (shell-team)
+
+This repo uses the **shell-team** plugin. When you (the main Claude session)
+work here, route work to the team instead of doing everything inline — the user
+should be able to ask in plain language without typing slash commands.
+
+- **Non-trivial code change** — a feature, a multi-file change, anything that
+  warrants a spec or acceptance criteria → run the full loop via the `run`
+  skill (equivalent to `/shell-team:run <the request>`). Do **not**
+  implement it directly in the main session.
+- **"Review this" / a second opinion on a diff / PR** → delegate to the
+  `codex-reviewer` agent (cross-provider review on a different model family).
+- **"Write the spec" / "clarify the requirements" only** → delegate to `pm-spec`.
+- **"What should we pick up next?" / triage failing CI, open PRs, labelled issues**
+  → run the `loop-triage` skill (read-only — it *proposes* candidates, never edits
+  the board).
+- **"Run a retro" / "summarize what we learned this cycle" / a request to reflect
+  on a development cycle's learnings** → delegate to the `scrum-master` agent.
+  This trigger is **manual only** — the loop never invokes it automatically.
+- **Trivial fix** (typo, one-liner, obvious bugfix) → just do it; no loop needed.
+
+The loop advances a status flag in the board (`.shell-team/todo.md` by default; the
+resolver `team-paths.sh` decides the base dir) at each phase gate, and pauses for a
+human before merge/push. A task is done only when the Codex reviewer sets
+`READY_FOR_MERGE` — which requires QA to have passed first (`READY_FOR_REVIEW`);
+both the QA pass and the cross-provider review must clear.
+<!-- shell-team:routing:end -->
+
+## When to stop and ask
+
+The routing block above pauses before merge. These are the other points where
+work stops and waits, so that the gates are a property of this repository rather
+than of one maintainer's personal configuration.
+
+- **Before a change that spans more than one file**, state the change set first —
+  which files, which base branch, whether it is additive or destructive, and the
+  issue it serves — and wait for agreement. Do not begin editing while that
+  proposal is unanswered.
+- **Before implementing a feature**, agree the issue and the branch name. Do not
+  create a branch and start work off the back of a conversation alone.
+- **Outward-facing actions need agreement first** — pushing, opening or merging a
+  pull request, filing an issue, deleting a remote branch. This repository is
+  public: those actions are visible immediately and are not cleanly reversible.
+- **A destructive or irreversible step must verify its own safety net.** When the
+  step is only safe because something was preserved first (a copy, a commit, a
+  stash), check mechanically that the preservation actually succeeded before
+  destroying anything. If it did not, stop and ask rather than proceeding on the
+  assumption that a copy exists somewhere.
+- **If you asked a question, wait for the answer.** Do not ask and then act in the
+  same turn, and do not treat an unrelated message as consent.
+
+These are instructions, not enforcement: Claude Code treats a `CLAUDE.md` as
+context rather than as configuration it must obey. Anything that has to hold
+regardless belongs in CI — as `bin/check-pii-shapes.sh` and
+`bin/check-commit-identity.sh` do — or in a hook, which this repository
+deliberately does not ship (a hook is executable configuration, and a public
+repository is the wrong place to make one arrive by default).
+
 ## Working rules
 
 - **Git-tracked files are the only shared state.** Sub-agents do not share a
