@@ -77,6 +77,8 @@
 > ラベルは `[common]`（ターゲットリポジトリ非依存の汎用知見）/
 > `[target-specific]`（このリポ固有の知見）の 2 値。
 > ラベル無しの bare item は出してはいけない。
+> **匿名化**: lesson には再発するパターンとその理由だけを書き、インシデント固有の識別情報は書かない。Source はこのリポジトリ内の成果物を指すか、n/a とする。
+> この匿名化ルールは書く時点の規律であり、検出器ではない。すでに書かれてしまった識別情報を見つける機能はない。
 > **モデル更新サイクル限定のヒント（scaffolding 監査）**: 実行モデルが前サイクルから変わった回のみ、`agents/*.md` の手順固定・禁止事項や loop-guard / contract yaml の bound から「旧モデルの弱さ由来の制約」の緩和候補をラベル付き候補 or issue 提案としてここに載せる（unhobbling・`docs/loop-engineering/model-tiering.md` §再評価トリガ）。監査を実行して正当な候補が 0 件だった場合は `## Notes` に `no scaffolding relaxation candidates` と明示すればよい（0 件は正当な結果・弱い候補を捏造しない）。モデル更新のないサイクルでは何も足さない。
 
 - `[common]` `<lesson 文 — 1〜3 行>`

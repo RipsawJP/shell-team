@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # playbook-promote.sh — append ONE human-approved lesson candidate to
 # tasks/lessons.md as a schema-valid structured entry (T-045, issue #116).
+#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.
 #
 # This is step 3 of the playbook update path (see
 # docs/loop-engineering/playbook-update-path.md):
@@ -73,6 +74,7 @@
 #                   pm-spec, all}
 #   --status        active | superseded
 #   --source        task/issue/PR reference, external citation, or n/a
+#   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.
 #   --rule          the takeaway, in one sentence (this is what eventually
 #                   gets injected by bin/gen-playbook-blocks.sh)
 #   --why           the incident or reasoning (full prose, never injected)
