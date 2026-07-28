@@ -49,6 +49,23 @@ one people read.
   an error; it never silently passes. Suppressing a non-zero exit status to keep
   output tidy converts a real failure into a false pass.
 
+## Task IDs
+
+New task IDs start at **`T-1000`**. The range below it is already spoken for,
+twice over:
+
+- **`T-001`–`T-111` is this project's pre-publication task history.** Those specs
+  are not part of this repository, but markers referencing them survive in code
+  comments, agent instructions, and test suites. A `T-NNN` in a comment is
+  provenance for why a line exists — not a link to something you can open.
+- **`T-000`–`T-999` is also the fixture range** used throughout `tests/`. Once
+  live ids climb that far, a `grep` for one stops distinguishing a fixture from a
+  real task — ambiguity in the checker layer, of all places.
+
+The convention applies forward only: `T-111`–`T-113` predate it and keep their
+ids. It is also the answer to why the board starts at `T-111` with no
+`T-001`–`T-110` in sight.
+
 ## Dogfood
 
 Load the plugin from a checkout:
