@@ -133,8 +133,23 @@ line in `CONTRIBUTING.md`.
 - [ ] **AC9** The CI-green procedure is stated as five canonical bullets: the one
   workflow and its check name, the confirm-the-conclusion rule with the
   mergeability caution, local running, the two checks that apply to a
-  documentation-only pull request, and what CI does not do.
-  - check: grep -qxF -- '- **There is one workflow and one job.** `.github/workflows/check-handoff.yml` — its job display name, and the check name to look for on a pull request, is `check-handoff lint`.' CONTRIBUTING.md && grep -qxF -- '- **Confirm the reported conclusion of that check on the pull-request head commit.** A mergeability field such as `mergeable_state: clean` is not evidence: it describes whether the branches can be combined, and it can read clean before any check has reported a conclusion at all.' CONTRIBUTING.md && grep -qxF -- '- **Run the suites locally before pushing.** There is no single "run everything" entry point; the workflow file is the authoritative list of every suite and dogfood step, in the order it runs them, and `.shell-team/test-recipe.md` records how to run one.' CONTRIBUTING.md && grep -qxF -- '- **Two CI steps apply even to a documentation-only pull request**: `bin/check-pii-shapes.sh` on the diff against the base branch, and `bin/check-commit-identity.sh` on the commits.' CONTRIBUTING.md && grep -qxF -- '- **What CI does not do.** It lints the shipped board template, not the board in this repository, and although the spec-layer checkers (`bin/check-acs.sh`, `bin/check-intent.sh`, `bin/check-provenance.sh`) have fixture suites in CI, no step runs them against the specs here. Run those yourself.' CONTRIBUTING.md
+  documentation-only pull request, and what CI does not do. **The fourth bullet
+  states both checks at their measured scope, not at their invocation shape.**
+  `bin/check-pii-shapes.sh` takes `--base`, but its own header records that changed
+  paths are enumerated from `git diff --raw`, each surviving path is then read
+  through `git cat-file`, and "The scanned unit is the FULL committed content of
+  each changed path … there is no base-blob comparison" — so "on the diff against
+  the base branch" was false in the way that costs a contributor real time: a shape
+  a file already carried is reported by a change that touched a different part of
+  that file, and a document that promised diff scoping would send that contributor
+  to the maintainer instead of to the cause. `bin/check-commit-identity.sh` is
+  tightened from the merely loose "on the commits" to its measured range — its
+  header declares `git rev-list --no-merges <merge-base>..HEAD` and that "Merge
+  commits are excluded wholesale" — because a contributor who merges the base back
+  into a branch needs to know which side of that line the merge commit falls on.
+  The old text of both is additionally asserted absent, since a rework that adds a
+  corrected line without removing the superseded one would otherwise pass.
+  - check: grep -qxF -- '- **There is one workflow and one job.** `.github/workflows/check-handoff.yml` — its job display name, and the check name to look for on a pull request, is `check-handoff lint`.' CONTRIBUTING.md && grep -qxF -- '- **Confirm the reported conclusion of that check on the pull-request head commit.** A mergeability field such as `mergeable_state: clean` is not evidence: it describes whether the branches can be combined, and it can read clean before any check has reported a conclusion at all.' CONTRIBUTING.md && grep -qxF -- '- **Run the suites locally before pushing.** There is no single "run everything" entry point; the workflow file is the authoritative list of every suite and dogfood step, in the order it runs them, and `.shell-team/test-recipe.md` records how to run one.' CONTRIBUTING.md && grep -qxF -- '- **Two CI steps apply even to a documentation-only pull request.** `bin/check-pii-shapes.sh` uses the base branch only to enumerate the paths a change touches and then scans the full committed content of each of them, not the added lines alone — so a shape a file already carried is reported by a change that touched a different part of that file. `bin/check-commit-identity.sh` inspects the non-merge commits from the merge base to the head, and never a merge commit.' CONTRIBUTING.md && ! grep -qF -- 'on the diff against the base branch' CONTRIBUTING.md && ! grep -qF -- '`bin/check-commit-identity.sh` on the commits' CONTRIBUTING.md && grep -qxF -- '- **What CI does not do.** It lints the shipped board template, not the board in this repository, and although the spec-layer checkers (`bin/check-acs.sh`, `bin/check-intent.sh`, `bin/check-provenance.sh`) have fixture suites in CI, no step runs them against the specs here. Run those yourself.' CONTRIBUTING.md
 - [ ] **AC10** The check name in the document is not transcribed from memory: it
   equals the job display name extracted from the workflow file itself.
   - check: n="$(awk -F': ' '/^    name: /{print $2; exit}' .github/workflows/check-handoff.yml)" && test "$n" = 'check-handoff lint' && grep -qF "$n" CONTRIBUTING.md
@@ -236,7 +251,17 @@ line in `CONTRIBUTING.md`.
   the kind this task exists to prevent. It is precise only where the old text was
   wrong, and the positive half (prompt blocks) is named because it is the one item
   of the three that was right.
-  - check: grep -qxF -- 'Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.' CONTRIBUTING.md && grep -qxF -- 'Two things are **not** in that second set: the board and the task specs. CI lints the shipped board template, `templates/todo-template.md`, and never the board this repository runs on; and the spec-layer checkers have fixture suites in CI while no step runs them against the specs here. The generated prompt blocks, by contrast, are checked — `bin/check-prompt-sync.sh` runs against this tree on every pull request.' CONTRIBUTING.md && ! grep -qF -- '— the board, the task specs, the generated prompt blocks' CONTRIBUTING.md && grep -qF 'If a check fails in a way that looks unrelated to what you touched' CONTRIBUTING.md
+  **The second line asserts the absence of a specific CI action, never the absence
+  of a file from CI.** The distinction is the whole point: no step *lints* the board
+  this repository runs on and no step *evaluates* a task spec against its
+  acceptance criteria, yet both are read byte-for-byte by the shape check the moment
+  a change touches them. A line that said they are simply "not in that set" would be
+  false in the same direction as the sentence it replaced, and two mutually
+  reinforcing understatements in one document are worse than one — a contributor who
+  reads both arrives at a wrong conclusion with more confidence, not less.
+  Two prior versions of this line are therefore asserted absent: the original
+  pre-task enumeration, and the superseded set-membership claim.
+  - check: grep -qxF -- 'Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.' CONTRIBUTING.md && grep -qxF -- 'Two CI steps a reader might expect do not exist: nothing lints the board this repository runs on — the lint target is the shipped template, `templates/todo-template.md` — and nothing evaluates a task spec against its acceptance criteria, since the spec-layer checkers appear in CI only as fixture suites. The board and the specs are still read in full by the PII shape check whenever a change touches them, and the generated prompt blocks are genuinely verified: `bin/check-prompt-sync.sh` runs against this tree on every pull request.' CONTRIBUTING.md && ! grep -qF -- '— the board, the task specs, the generated prompt blocks' CONTRIBUTING.md && ! grep -qF -- 'Two things are **not** in that second set' CONTRIBUTING.md && grep -qF 'If a check fails in a way that looks unrelated to what you touched' CONTRIBUTING.md
 - [ ] **AC28** The release procedure is complete rather than merely correct: it
   carries the changelog step, grounded in the declaration `CHANGELOG.md` makes
   about itself, and both language files exist to be updated. This does not
@@ -411,8 +436,8 @@ rather than measurements, per DP-5.
 | C1 | One workflow, one job; check name `check-handoff lint` | `.github/workflows/check-handoff.yml:10-12` | AC9, AC10 |
 | C2 | A mergeability field is not evidence of a reported conclusion | **No in-tree evidence** — `mergeable_state` appears nowhere in the tree (full-text search, zero hits). Written as an operational observation with its consequence | AC9 (presence); reasoning info-only |
 | C3 | No "run everything" entry point; the workflow file is the authoritative list | `.shell-team/test-recipe.md:34-36` | AC9, AC19 |
-| C4 | Two CI steps apply to a documentation-only PR | `.github/workflows/check-handoff.yml:148-149`, `:157-158` (both `--base "origin/${GITHUB_BASE_REF:-develop}"`) | AC9, AC16 |
-| C5 | CI lints the shipped template, not this board; the spec-layer checkers have suites but no run-against-this-repo step | `:31-32` (template is the target); `:64-65`, `:130-134` (fixture suites only); `:136-137` (`check-board-headings` likewise) | AC9, AC11 |
+| C4 | Two CI steps apply to a documentation-only pull request, each stated at its **measured scope** rather than at its invocation shape: the shape check uses the base only to enumerate the paths a change touches and then reads each of those paths in full, and the identity check covers the non-merge commits from the merge base to the head | `bin/check-pii-shapes.sh`'s own header — "The scanned unit is the FULL committed content of each changed path" and "there is no base-blob comparison", with changed paths enumerated from `git diff --raw` and content read through `git cat-file`. `bin/check-commit-identity.sh`'s own header — `git rev-list --no-merges <merge-base>..HEAD` and "Merge commits are excluded wholesale". CI wiring at `.github/workflows/check-handoff.yml:148-149`, `:157-158` (both pass `--base "origin/${GITHUB_BASE_REF:-develop}"`, which is what makes the invocation shape misleading if quoted as the scope) | AC9, AC16 |
+| C5 | No CI step **lints** the board this repository runs on (the lint target is the shipped template) and no step **evaluates** a task spec against its acceptance criteria (the spec-layer checkers appear only as fixture suites). This is an absence of two specific actions, **not** an absence of those files from CI — the byte-level scan in C4 still reads them when a change touches them, and the two rows must be read together | `:31-32` (the lint target is `templates/todo-template.md`); `:64-65`, `:130-134` (fixture suites only); `:136-137` (`check-board-headings` likewise); the scan half is C4's evidence | AC9, AC11, AC27 |
 | B1 | `## Active` is machine-linted against a fixed shape; both separators are U+2014 | `bin/check-handoff.sh:62` (`LINE_RE`), `:47-51` (section extraction), `:26-34` + `:101-106` (flag enum) | AC12, AC13 |
 | B2 | Nothing may sit between the flag and the spec pointer | `bin/close-out.sh:8-11` ("NO parenthetical after the flag"); mechanically, `bin/check-handoff.sh:62` | AC12, AC13 |
 | B3 | Notes go in indented sub-bullets; `## Done`'s `- [x]` lines are never inspected | `bin/check-handoff.sh:88-94` (blank / `_(` / indented / non-`- [ ]` all skipped) | AC12, AC13 |
@@ -430,7 +455,7 @@ rather than measurements, per DP-5.
 | S3 | Both branches are protected and the check must report success; the rule set is not readable from a clone | GitHub API reports `protected: true` for both branches (external measurement); the protection-detail endpoint is unreachable from this environment, so nothing more is asserted | AC15, AC20 |
 | R8 | The release procedure includes adding the entry to `CHANGELOG.md` and `CHANGELOG.ja.md`, and says that nothing enforces their parity | `CHANGELOG.md`'s own opening description, which declares that "new release entries land here as part of this project" release process — the project stating its own procedure, so a release runbook that omits the step is incomplete against the tree; both files exist (`CHANGELOG.md`, `CHANGELOG.ja.md`), and the absence of any enforcement is R3's evidence | AC28, and AC6 for the compatible "nothing else is machine-checked" bullet |
 | X1 | `CLAUDE.md` keeps one pointer bullet instead of a second copy | `CLAUDE.md:81-87` (the copy being replaced), `:24-26` (the no-second-copy principle it violates) | AC17 |
-| X2 | The existing `## About CI on your pull request` opening paragraph is corrected: of the three things it named as CI-verified repository conventions, only the generated prompt blocks is right — the board is linted only as the shipped template and the task specs are not in CI at all | `.github/workflows/check-handoff.yml:31-32` (the lint target is `templates/todo-template.md`); `:106-107` (`check-prompt-sync` dogfood, the one correct item); `:64-65`, `:130-134` (spec-layer checkers appear as fixture suites only). Same evidence as C5, which is how the contradiction was found | AC27, AC2 (which licenses the deletion) |
+| X2 | The existing `## About CI on your pull request` opening paragraph is corrected: of the three things it named as CI-verified repository conventions, only the generated prompt blocks is right; for the other two the accurate claim is narrow — no step **lints** the board this repository runs on, and no step **evaluates** a spec against its acceptance criteria — while both are still scanned byte-for-byte when a change touches them | `.github/workflows/check-handoff.yml:31-32` (the lint target is `templates/todo-template.md`); `:106-107` (`check-prompt-sync` dogfood, the one correct item); `:64-65`, `:130-134` (spec-layer checkers appear as fixture suites only); and C4's evidence for the scan half, which is what makes "not in CI at all" the wrong correction | AC27, AC2 (which licenses the deletion) |
 
 ## Body-to-AC correspondence
 
@@ -443,6 +468,10 @@ rather than measurements, per DP-5.
 | The one inaccurate existing sentence is corrected in place, not left to contradict the new section | AC27; AC2 is what licenses its deletion |
 | The correct half of the existing About-CI section survives | AC27 (the retained sentence is asserted present) |
 | The corrected text does not claim an exhaustive list of what CI runs against this tree | AC27's body states the restraint; mechanically, the canonical lines it pins contain no enumeration |
+| Each check is described at its measured scope, never at its invocation shape (`--base` is not diff scoping) | AC9 (the fourth bullet, byte-exact), grounded in row C4 |
+| The board and the specs are still byte-scanned when a change touches them; only the lint and the acceptance-criteria evaluation are absent | AC27 (the second canonical line asserts the scan explicitly), AC9's fourth bullet, rows C4 and C5 read together |
+| The commit-identity range is the non-merge commits from the merge base to the head | AC9 (the fourth bullet), grounded in row C4 |
+| A superseded canonical line must not survive alongside its replacement | AC9 and AC27 each assert the absence of the text they replace, in addition to the presence of the new text |
 | The release procedure includes the changelog step | AC28 |
 | A procedural step and a machine-enforced step are different claims, and the changelog bullet states both | AC28 (the bullet), AC6 (the compatible "nothing else is machine-checked" bullet) |
 | `fix` is not claimed to be in use; the type set is open while the `<type>/<slug>` form is normative | AC3 (the corrected bullet); measurement recorded in DP-5 and row P1 |
@@ -536,6 +565,16 @@ carrying that disclosure to the reader as well.
 - **The changelog bullet (AC28) goes inside `## Cutting a release`**, after the
   badge-bump bullet and before the promotion bullet. Its position is not pinned
   mechanically, but that is where the procedure reads in order.
+- **Two lines already on this branch are superseded and must be *replaced*, not
+  joined.** The second canonical line of AC27 and the fourth canonical bullet of
+  AC9 both changed this round: each described a check by the flag it takes rather
+  than by what it reads, and the two errors pointed the same way, so a contributor
+  reading both would have concluded that only the lines they added are scanned.
+  Swap each line for the new pattern in the AC — both criteria assert the absence
+  of the text they replace as well as the presence of the new text, so leaving the
+  old line in place fails. **This does not affect AC2**: neither superseded line
+  exists in `develop:CONTRIBUTING.md`, so replacing an added line changes only the
+  added side of the diff and the licensed deletion set is untouched.
 - **The worked board example** belongs in `## The board line format`, inside a
   fenced block tagged `markdown`, containing a `## Active` heading, the example
   entry, and one indented sub-bullet note. It must be one physical line and
@@ -569,9 +608,10 @@ carrying that disclosure to the reader as well.
   `.shell-team/provenance/T-1000.md` (new). Nothing else — AC22 and AC24 both
   fail on anything outside that set.
 - **Before hand-off**, run `bash bin/check-acs.sh --dry-run` then
-  `bash bin/check-acs.sh` on this spec, and mutation-check at least AC13, AC17 and
-  AC2: break the documented example line, break the pointer bullet, and (in a
-  scratch copy) delete one extra line somewhere else in `CONTRIBUTING.md` — each
-  must turn its check red, and restoring must turn it green again. AC13 is a
-  positive-and-negative control pair and AC2 is a set-equality lock rewritten this
-  round; both are exactly the class that ships blind.
+  `bash bin/check-acs.sh` on this spec, and mutation-check at least AC13, AC17, AC2
+  and the two absence assertions: break the documented example line, break the
+  pointer bullet, delete one extra line somewhere else in `CONTRIBUTING.md`, and
+  paste the superseded AC9 / AC27 lines back in *alongside* their replacements —
+  each must turn its check red, and restoring must turn it green again. AC13 is a
+  positive-and-negative control pair, AC2 is a set-equality lock, and the absence
+  assertions are new this round; all three are exactly the class that ships blind.
