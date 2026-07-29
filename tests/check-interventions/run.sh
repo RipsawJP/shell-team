@@ -157,7 +157,26 @@ for body in \
   [ "$RC" -eq 1 ] || fail "missing field: expected exit 1 (schema), got $RC: $ERR"
   grep -q 'schema' <<< "$ERR" || fail "missing field: stderr must carry 'schema' token, got: $ERR"
 done
-pass "an entry missing date/summary/effect (each in turn) is a schema violation (exit 1, token present)"
+# Regression lock (self-chosen mutation, per this task's "Notes for engineer"
+# final paragraph): a SECOND entry that carries none of its own date/summary/
+# effect fields, immediately following a FULLY well-formed first entry, must
+# still be caught — a per-entry counter that is not reset when a new
+# `- intervention:` anchor begins would let the second entry's finalize()
+# check spuriously pass on the FIRST entry's leftover counts. This is
+# deliberately a MULTI-entry fixture (every case above is single-entry) —
+# mutating away the three `..._count_cur=0` resets inside the entry-anchor
+# branch reproduces this exact false-conformant outcome, confirmed by hand
+# during this task's mutation self-check before this fixture was added.
+{
+  printf '<!-- BEGIN interventions: %s -->\n\n' "$TASK_ID"
+  printf -- '- intervention: human-stop\n  date: 2026-07-30\n  summary: first entry, complete\n  effect: e1\n\n'
+  printf -- '- intervention: human-correction\n\n'
+  printf '<!-- END interventions: %s -->\n' "$TASK_ID"
+} > "$C/f.md"
+run_checker "$C/f.md"
+[ "$RC" -eq 1 ] || fail "second entry with none of its own fields (after a complete first entry): expected exit 1 (schema), got $RC: $ERR"
+grep -q 'schema' <<< "$ERR" || fail "second entry with none of its own fields: stderr must carry 'schema' token, got: $ERR"
+pass "an entry missing date/summary/effect (each in turn, single-entry) is a schema violation (exit 1, token present); a second entry with NONE of its own fields, following a complete first entry, is likewise caught — not masked by leftover per-entry field counters"
 
 # ============================================================================
 case_start "case: a duplicated field within one entry is a schema violation"
