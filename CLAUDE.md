@@ -80,9 +80,9 @@ what adopters run.
 
 ## Branches and pull requests
 
-- The pull-request flow, the release procedure, confirming the CI check is
-  green, and the board line format are all documented in
-  [`CONTRIBUTING.md`](CONTRIBUTING.md) rather than restated here.
+- The `## The pull-request flow`, `## Confirming the CI check is green` and
+  `## The board line format` sections of [`CONTRIBUTING.md`](CONTRIBUTING.md)
+  document how work gets done here; this file does not restate them.
 
 ## Security invariant
 
