@@ -245,7 +245,28 @@ line in `CONTRIBUTING.md`.
   no heading line anywhere in `CLAUDE.md` was added or removed, and the file did
   change (positive control). A wrapped continuation of the single bullet is
   allowed; a second top-level line is not.
-  - check: grep -qxF '## Branches and pull requests' CLAUDE.md && s="$(awk '/^## Branches and pull requests$/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)" && test "$(printf '%s\n' "$s" | grep -cE '^[^[:space:]]')" -eq 1 && printf '%s\n' "$s" | grep -qE '^- ' && printf '%s\n' "$s" | grep -qF 'CONTRIBUTING.md' && ! grep -qF 'reject force pushes' CLAUDE.md && test "$(git diff develop -- CLAUDE.md | grep -cE '^[+-]#')" -eq 0 && test "$(git diff --numstat develop -- CLAUDE.md | awk '{print $1}')" -gt 0
+  **The bullet also has to point at something that exists.** The shape assertions
+  above cannot tell: they check that a bullet is there and mentions the file, never
+  what it sends the reader to look for. When `## Cutting a release` was deferred out
+  of `CONTRIBUTING.md`, the bullet went on naming a release procedure that no longer
+  had a section — a file this repository treats as a trusted instruction channel,
+  directing a reader to a heading that is not there, with two criteria watching and
+  neither able to see it, because one inspected form and the other inspected a
+  different file. The gap was the **correspondence between them**, so that is what
+  is checked now: the topics are **read out of the bullet at run time** — it names
+  each destination as a backticked `## …` heading token — and every one of them must
+  match a real heading in `CONTRIBUTING.md`. A byte-exact pin on the bullet would
+  not do this; it would catch the bullet changing, whereas what happened is the
+  bullet staying still while its destination was removed. The direction is
+  deliberately one-way: a named topic must have a section, but a section need not be
+  named (`## What does not belong in this file` is real and unnamed by design). The
+  count is pinned at three as the extraction positive control — a broken pattern
+  yields zero and fails loudly instead of passing a vacuous empty loop — and it also
+  makes any change to the pointer scope require a spec change, which is the right
+  friction for this file. Absence of the superseded wording is asserted two ways:
+  the exact phrase, and any mention of releasing at all, so a reworded revival is
+  caught as well as a verbatim one.
+  - check: grep -qxF '## Branches and pull requests' CLAUDE.md && s="$(awk '/^## Branches and pull requests$/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)" && test "$(printf '%s\n' "$s" | grep -cE '^[^[:space:]]')" -eq 1 && printf '%s\n' "$s" | grep -qE '^- ' && printf '%s\n' "$s" | grep -qF 'CONTRIBUTING.md' && ! printf '%s\n' "$s" | grep -qF 'the release procedure' && ! printf '%s\n' "$s" | grep -qiF 'releas' && hs="$(printf '%s\n' "$s" | grep -oE '`## [^`]+`' | tr -d '`')" && test "$(printf '%s\n' "$hs" | grep -c '^## ')" -eq 3 && ok=1 && while IFS= read -r h; do [ -n "$h" ] || continue; grep -qxF "$h" CONTRIBUTING.md || ok=0; done <<< "$hs" && test "$ok" -eq 1 && ! grep -qF 'reject force pushes' CLAUDE.md && test "$(git diff develop -- CLAUDE.md | grep -cE '^[+-]#')" -eq 0 && test "$(git diff --numstat develop -- CLAUDE.md | awk '{print $1}')" -gt 0
 - [ ] **AC18** Negative — the generated prompt blocks and every agent definition are
   byte-unchanged, and prompt-sync is green. Paired with a positive control proving
   the diff command sees this task's own change.
@@ -430,6 +451,16 @@ the only copy, and the Notes for engineer say so explicitly.
 Cost, accepted: the engineer reads the exact text out of the AC lines rather than
 out of a prose block.
 
+**One deliberate exception, added with AC17's correspondence check.** The
+`CLAUDE.md` pointer bullet is *not* a canonical line: no criterion pins its bytes,
+so its wording is given in the engineer notes instead. That is the point of the
+strengthening — a byte-exact pin would freeze the sentence while saying nothing
+about whether it points anywhere real, and pinning both the bytes and the
+correspondence would make the bullet unrewordable for no gain. What is frozen is
+the *property*: every destination it names exists. The three heading tokens do
+appear inside AC17's check, but as values read out of the file at run time, not as
+a transcribed copy — there is still exactly one place the text lives.
+
 ### DP-3 — the worked board example uses the id `T-1042`
 
 `CONTRIBUTING.md` needs one concrete Active line, because a template line
@@ -554,7 +585,7 @@ carried forward in DP-7 for the task that writes that section after running one.
 | S1 | Nothing machine- or operator-specific in a tracked file | `CLAUDE.md:123-128` (this repository's own Hygiene rule) | AC15, AC16 |
 | S2 | Oversight preferences live in the gitignored `CLAUDE.local.md`; `docs/tuning-oversight.md` documents the mechanism | `docs/tuning-oversight.md:10-20`, `:34-49`; `.gitignore:23-27` | AC15 |
 | S3 | Both branches are protected and the check must report success; the rule set is not readable from a clone | GitHub API reports `protected: true` for both branches (external measurement); the protection-detail endpoint is unreachable from this environment, so nothing more is asserted | AC15, AC20 |
-| X1 | `CLAUDE.md` keeps one pointer bullet instead of a second copy | `CLAUDE.md:81-87` (the copy being replaced), `:24-26` (the no-second-copy principle it violates) | AC17 |
+| X1 | `CLAUDE.md` keeps one pointer bullet instead of a second copy, and every destination it names is a real heading in `CONTRIBUTING.md` | `CLAUDE.md:81-87` (the copy being replaced), `:24-26` (the no-second-copy principle it violates). The correspondence half is grounded in the deliverable itself rather than in a fixed list: AC17 reads the destinations out of the bullet and looks each up, so the evidence is whatever `CONTRIBUTING.md` actually contains at check time. Measured cause: after the release section was deferred, the bullet still named four destinations while only three headings existed | AC17 |
 | X2 | The existing `## About CI on your pull request` opening paragraph is corrected: of the three things it named as CI-verified repository conventions, only the generated prompt blocks is right; for the other two the accurate claim is narrow — no step **lints** the board this repository runs on, and no step **evaluates** a spec against its acceptance criteria — while both are still scanned byte-for-byte when a change touches them | `.github/workflows/check-handoff.yml:31-32` (the lint target is `templates/todo-template.md`); `:106-107` (`check-prompt-sync` dogfood, the one correct item); `:64-65`, `:130-134` (spec-layer checkers appear as fixture suites only); and C4's evidence for the scan half, which is what makes "not in CI at all" the wrong correction | AC27, AC2 (which licenses the deletion) |
 
 ## Body-to-AC correspondence
@@ -563,7 +594,9 @@ carried forward in DP-7 for the task that writes that section after running one.
 |---|---|
 | `CONTRIBUTING.md` carries the three content areas this repository has executed | AC1 (sections), AC3/AC9/AC12 (the sentences) |
 | Every convention sentence is grounded in this tree or marked as a decision | the claim-to-evidence table above + AC4, AC10, AC11 |
-| The release procedure is deferred to a task that runs one first, and no trace of the drafted section is left behind | AC1 (the heading and all eight of its bullets asserted absent); the reasoning is the Non-goals entry and DP-7 |
+| The release procedure is deferred to a task that runs one first, and no trace of the drafted section is left behind | AC1 (the heading and all eight of its bullets asserted absent) **and AC17** (the `CLAUDE.md` pointer must not name it, in the exact wording or any other); the reasoning is the Non-goals entry and DP-7 |
+| Removing a section is not finished until everything that points at it has been followed | AC17 (each destination the pointer names is looked up in `CONTRIBUTING.md` at check time, so a dangling one fails) |
+| A pointer is verified by correspondence with its target, not by pinning its bytes | AC17; a byte-exact pin catches the pointer changing, and what happened was the pointer standing still while the target was removed |
 | The documented flow reaches a committed state — the board edit is published, not left uncommitted | AC3 (the publish bullet, byte-exact), AC4 (the no-git-command grounding, with a positive control on its own pattern), grounded in row P4b |
 | `CLAUDE.md` gets one pointer bullet, not a second copy | AC17 |
 | The new content attaches to the existing sections rather than overwriting them | AC2 (deletions confined to exactly one licensed paragraph, set-equality against the base blob) |
@@ -598,6 +631,7 @@ carried forward in DP-7 for the task that writes that section after running one.
 | `mergeable_state` is not sufficient evidence because it reports mergeability | info-only (not promoted to AC) — an operational observation with no in-tree referent (zero hits repository-wide); AC9 pins the sentence, and inventing a grep to "prove" the reasoning would be a hollow check |
 | Prose ordering of the four new sections | info-only (not promoted to AC) — a readability choice; no consumer depends on it |
 | `CLAUDE.md` is a trusted instruction channel, so keep its diff obviously intentional | info-only (not promoted to AC) — a reviewer-attention argument; the mechanical half of it is AC17's one-bullet and no-heading-churn assertions |
+| The pointer names its destinations exactly once, as heading tokens, and not again in prose | info-only (not promoted to AC) — a drift-surface argument about how the bullet is written; its observable consequence is that AC17 finds exactly three tokens, which the count assertion pins |
 | The publish bullet sits directly after the board-hygiene bullet | info-only (not promoted to AC) — a logical-ordering choice inside one section, same class as the prose-ordering row above; AC3 pins the text, not its position |
 | The merge-style measurement is 9, not 10 (the earlier figure double-counted the single merge into `main`) | info-only (not promoted to AC) — a correction to this spec's own evidence record, outside the frozen block; it changes no AC and no canonical line, and it now lives in DP-7 with the rest of the release measurements rather than being dropped with the section |
 | The deferred release prose was mostly *correct*, and is removed for incompleteness rather than error | info-only (not promoted to AC) — a statement about work that is leaving the deliverable, so there is nothing left in the tree for a criterion to hold; recorded in DP-7 so the follow-up task does not start by re-litigating text that was already measured |
@@ -717,6 +751,24 @@ than leaving it open.
   `CONTRIBUTING.md`. It may wrap across physical lines (a continuation line starts
   with whitespace); it may not become two bullets. Do not touch any other section
   — AC17 fails if any heading line in the file is added or removed.
+- **The `CLAUDE.md` pointer bullet is replaced this round.** The one currently on
+  the branch names four destinations, one of which (the release procedure) no longer
+  has a section — the section removal did not reach the file that points at it.
+  Write this in its place, wrapped as shown; each backticked heading token must sit
+  whole on one physical line, because AC17 extracts them with
+  `grep -oE '`## [^`]+`'` and looks each one up in `CONTRIBUTING.md`:
+
+  ```markdown
+  - The `## The pull-request flow`, `## Confirming the CI check is green` and
+    `## The board line format` sections of [`CONTRIBUTING.md`](CONTRIBUTING.md)
+    document how work gets done here; this file does not restate them.
+  ```
+
+  The topics are named **once**, as those tokens, and not again in prose — a second
+  naming would be a drift surface between the sentence and the list the checker
+  reads. Do not mention releasing in this section in any form: AC17 asserts the
+  absence of both the exact superseded phrase and the substring, so a reworded
+  revival fails too.
 - **Do not add a `tests/<name>/run.sh` path to `CONTRIBUTING.md`** (AC19 requires
   zero of them). Point at `.shell-team/test-recipe.md` for how to run one, as the
   canonical bullet already does.
@@ -747,6 +799,14 @@ than leaving it open.
   the point: a single mutation that trips two criteria at once proves neither of
   them individually, and AC1 now carries nine independent assertions that have never
   been exercised.
+- **Mutation-check AC17's correspondence half specifically**, because it is new and
+  its failure mode is silence. In a scratch copy: (a) add a fourth backticked
+  `## …` token to the bullet naming a section that does not exist — it must go red
+  on the count *and* on the lookup, so try it once with the count relaxed to see the
+  lookup fire on its own; (b) rename one heading in `CONTRIBUTING.md` while leaving
+  the bullet alone — this is the exact defect that got through, and it must now go
+  red; (c) mangle the backticks so extraction finds nothing — it must go red on the
+  count rather than pass an empty loop.
 - **AC4's no-git assertion has a positive control on its own pattern** — the same
   regex must match `bin/check-pii-shapes.sh`, which does invoke git in command
   position. If you change that regex for any reason, re-check both halves: an
