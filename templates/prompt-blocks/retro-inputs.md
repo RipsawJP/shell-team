@@ -1,0 +1,12 @@
+- input: cycle-window
+- input: review-artifacts
+- input: provenance
+- input: specs
+- input: run-telemetry
+- input: previous-retro
+- input: lessons
+- input: pr-metadata
+- status: read
+- status: empty
+- status: unavailable
+empty means the input was consulted and held nothing; unavailable means it could not be consulted at all. Never report one as the other.

@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# fixtures/git — a PATH-shadowing `git` stub for retro-inputs tests that
+# selectively fails specific subcommands to simulate a failing or
+# unanswerable git invocation (e.g. a `safe.directory` refusal, an unreadable
+# object store, or a git too old to answer a query), while delegating
+# everything else to the real git so the rest of the script still resolves
+# correctly (rev-parse, git-dir, etc.).
+#
+# Controls:
+#   GIT_STUB_REAL                path to the real git binary (required)
+#   GIT_STUB_FAIL_MERGES         "1" => any `git log --merges ...` fails
+#   GIT_STUB_FAIL_SHALLOW_PROBE  "1" => `git rev-parse --is-shallow-repository`
+#                                 fails (simulates a git too old to answer,
+#                                 or any other unanswerable shallow query)
+#   GIT_STUB_FAIL_DEVELOP_PROBE  "1" => `git rev-parse --verify --quiet
+#                                 develop^{commit}` fails with a non-1 exit
+#                                 code (simulates "git could not answer",
+#                                 distinct from the ref genuinely not existing
+#                                 -- real git's --quiet contract exits 1 for
+#                                 a genuine absence and something else, e.g.
+#                                 128, for a real error)
+
+REAL="${GIT_STUB_REAL:?GIT_STUB_REAL not set}"
+
+if [ "${1:-}" = "log" ] && [ "${GIT_STUB_FAIL_MERGES:-0}" = "1" ]; then
+  for a in "$@"; do
+    if [ "$a" = "--merges" ]; then
+      printf 'stub: simulated git log failure\n' >&2
+      exit 128
+    fi
+  done
+fi
+
+if [ "${1:-}" = "rev-parse" ] && [ "${GIT_STUB_FAIL_SHALLOW_PROBE:-0}" = "1" ]; then
+  for a in "$@"; do
+    if [ "$a" = "--is-shallow-repository" ]; then
+      printf 'stub: simulated unanswerable shallow probe (old git)\n' >&2
+      exit 129
+    fi
+  done
+fi
+
+if [ "${1:-}" = "rev-parse" ] && [ "${GIT_STUB_FAIL_DEVELOP_PROBE:-0}" = "1" ]; then
+  saw_verify=0 saw_quiet=0 saw_develop=0
+  for a in "$@"; do
+    case "$a" in
+      --verify)                saw_verify=1 ;;
+      --quiet)                 saw_quiet=1 ;;
+      'develop^{commit}')      saw_develop=1 ;;
+    esac
+  done
+  if [ "$saw_verify" = 1 ] && [ "$saw_quiet" = 1 ] && [ "$saw_develop" = 1 ]; then
+    printf 'stub: simulated git error answering whether develop exists\n' >&2
+    exit 128
+  fi
+fi
+
+exec "$REAL" "$@"
