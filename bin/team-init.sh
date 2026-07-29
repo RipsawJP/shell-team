@@ -68,6 +68,7 @@ override with $TEAM_RUN_BASE; an existing tasks/ layout is detected and reused):
   <base>/reviews/.gitkeep
   <base>/specs/.gitkeep                 (docs/specs/ in a legacy layout)
   <base>/provenance/.gitkeep
+  <base>/interventions/.gitkeep
   <base>/AGENTS.md                      (from templates/AGENTS.md; cross-tool pointer doc)
   <base>/test-recipe.md                 (from templates/test-recipe.md; per-repo test-run
                                          recipe — protected: never overwritten, even with --force)
@@ -228,6 +229,7 @@ ensure_gitkeep "$TEAM_RETROS_DIR"
 ensure_gitkeep "$TEAM_REVIEWS_DIR"
 ensure_gitkeep "$TEAM_SPECS_DIR"
 ensure_gitkeep "$TEAM_PROVENANCE_DIR"
+ensure_gitkeep "$TEAM_INTERVENTIONS_DIR"
 # Cross-tool pointer/mirror doc, under the base dir (never the host root). It is
 # a portable pointer to the truth sources, not a source of truth or a changelog.
 copy_template "$AGENTS_TPL"   "$TEAM_RUN_BASE/AGENTS.md"
