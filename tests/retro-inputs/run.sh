@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-# run.sh — drive bin/retro-inputs.sh against real (throwaway) git repositories
-# and env-driven gh/git stubs, asserting the documented behavior (T-1001
-# acceptance criteria). Six of the criteria (AC7, AC9, AC11, AC12, AC13, AC14)
-# pin a fixture *case* by label because the behaviour needs a purpose-built
-# git history or a stubbed PATH that a spec `check:` line must not build in
-# the working repository — the "case: ..." strings below are asserted
-# verbatim by the spec.
+# run.sh — drive bin/retro-inputs.sh against real (throwaway) git repositories,
+# permission-restricted directories, a linked worktree, and env-driven gh/git
+# stubs, asserting the documented behavior (T-1001 v2 acceptance criteria).
+# Several criteria (AC4, AC5, AC7, AC9, AC11, AC12, AC13, AC14) pin a fixture
+# *case* by label because the behaviour needs a purpose-built git history, a
+# permission-restricted directory, a linked worktree, or a stubbed PATH that a
+# spec `check:` line must not build in the working repository — the
+# "case: ..." strings below are asserted verbatim by the spec.
 #
-# Writes under $HERE/tmp (no mktemp) so the suite runs in restricted
-# sandboxes, cleaned via trap. Real (throwaway) `git init` repos are used
-# instead of mocking git entirely, because the cycle-window logic is git's
-# own merge/first-parent/shallow semantics — mocking it would test the mock,
-# not the script. A shallow repository is SIMULATED by placing a dummy
-# `.git/shallow` file rather than an actual `git clone --depth`, which sandbox
-# policy has denied in this repository before (per the spec's own Assumption).
+# Temp roots live under $TMPDIR when set (sandboxed runs deny writes to a
+# nested .git/ inside this repo's own tree, and these fixtures need real
+# `git init` repos), falling back to $HERE/tmp on plain CI runners. Real
+# (throwaway) git repos are used instead of mocking git entirely, because the
+# cycle-window logic is git's own merge/first-parent/shallow semantics —
+# mocking it would test the mock, not the script. A shallow repository is
+# SIMULATED by placing a dummy `.git/shallow` file rather than an actual
+# `git clone --depth`, which sandbox policy has denied in this repository
+# before (per the spec's own Assumption). A linked worktree is real
+# (`git worktree add`), since nothing prevents that in a sandbox.
 
 set -euo pipefail
 
@@ -25,9 +29,6 @@ STUB_GH="$HERE/fixtures/gh"
 STUB_GIT="$HERE/fixtures/git"
 ORIG_PATH="$PATH"
 
-# Temp roots live under $TMPDIR when set (sandboxed runs deny writes to any
-# nested .git/ inside the repo tree, and these fixtures need real `git init`
-# repos), falling back to $HERE/tmp on plain CI runners. Cleaned via trap.
 if [ -n "${TMPDIR:-}" ]; then
   TMP="${TMPDIR%/}/retro-inputs-test-roots"
 else
@@ -37,8 +38,11 @@ fi
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
-trap 'rm -rf "$TMP"' EXIT
+# Any 0600-permission directories built below are chmod'd back to 0700 before
+# this runs, so `rm -rf` (which needs traverse permission on every ancestor)
+# can actually clean up the whole tree.
+rm -rf "$TMP" 2>/dev/null || true
+trap 'chmod -R u+rwx "$TMP" 2>/dev/null || true; rm -rf "$TMP"' EXIT
 mkdir -p "$TMP"
 
 chmod +x "$STUB_GH" "$STUB_GIT"
@@ -109,16 +113,28 @@ done
 pass "case: every ledger is complete (all eight input ids, exactly once)"
 
 # ---------------------------------------------------------------------------
-# case: no develop branch falls back to HEAD and declares the fallback
+# case: no develop branch falls back to HEAD and declares the fallback in
+# every status branch — exercised on all three: read (merges present), empty
+# (confirmed-zero merges), and unavailable (an unanswerable shallow probe).
 # ---------------------------------------------------------------------------
 MAIN_REPO="$TMP/main-repo"
 build_repo "$MAIN_REPO" main 2
 out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS")"
 printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: read — detail: .*HEAD' \
-  || fail "case: no develop branch falls back to HEAD and declares the fallback (ref)"
+  || fail "case: no develop branch falls back to HEAD and declares the fallback in every status branch (read)"
 printf '%s\n' "$out" | grep -qF -- 'fell back to HEAD' \
-  || fail "case: no develop branch falls back to HEAD and declares the fallback (declared)"
-pass "case: no develop branch falls back to HEAD and declares the fallback"
+  || fail "case: no develop branch falls back to HEAD and declares the fallback in every status branch (read, not declared)"
+
+ZERO_NO_DEV="$TMP/zero-no-dev"
+build_repo "$ZERO_NO_DEV" main 0
+out="$(cd "$ZERO_NO_DEV" && bash "$RETRO_INPUTS")"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: empty — detail: .*HEAD.*fell back to HEAD' \
+  || fail "case: no develop branch falls back to HEAD and declares the fallback in every status branch (empty)"
+
+out="$(cd "$MAIN_REPO" && GIT_STUB_REAL="$REAL_GIT" GIT_STUB_FAIL_SHALLOW_PROBE=1 PATH="$GITBIN:$ORIG_PATH" bash "$RETRO_INPUTS")"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: .*fell back to HEAD' \
+  || fail "case: no develop branch falls back to HEAD and declares the fallback in every status branch (unavailable)"
+pass "case: no develop branch falls back to HEAD and declares the fallback in every status branch"
 
 # ---------------------------------------------------------------------------
 # case: --last-n caps the window and the cap is declared, distinct from a
@@ -132,13 +148,27 @@ printf '%s\n' "$out" | grep -qF -- 'shallow' \
 pass "case: --last-n caps the window and the cap is declared, distinct from a shallow truncation"
 
 # ---------------------------------------------------------------------------
-# case: --last-n 0 is a degenerate but valid cap and must not crash
-# retro-inputs.sh — exercised against a repo with >=1 merge commit (MAIN_REPO
-# has 2), so the capping branch is actually reached; a merge-free repo would
-# never touch this code path and would not be evidence of anything.
-# BSD `head -n 0` exits non-zero ("illegal line count"), which used to abort
-# the script under errexit before the cap value ever reached emit_ledger — a
-# 0 must read as a declared cap (status read, digit 0), never as a crash.
+# case: a shallow repository with a cap states both qualifiers — a cap and a
+# shallow truncation are different facts and can both be true; the detail
+# must mention both, not just the first one an if/elif would have picked.
+# ---------------------------------------------------------------------------
+SHALLOW_CAP="$TMP/shallow-cap"
+build_repo "$SHALLOW_CAP" main 3
+: > "$SHALLOW_CAP/.git/shallow"
+out="$(cd "$SHALLOW_CAP" && bash "$RETRO_INPUTS" --base main --last-n 1)"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: read — detail: 1 merge commits from main' \
+  || fail "case: a shallow repository with a cap states both qualifiers (status/count)"
+printf '%s\n' "$out" | grep -qF -- 'shallow clone truncates history at the boundary' \
+  || fail "case: a shallow repository with a cap states both qualifiers (shallow qualifier missing)"
+printf '%s\n' "$out" | grep -qF -- 'capped at --last-n 1' \
+  || fail "case: a shallow repository with a cap states both qualifiers (cap qualifier missing)"
+pass "case: a shallow repository with a cap states both qualifiers"
+
+# ---------------------------------------------------------------------------
+# case: --last-n 0 is a degenerate but valid cap and must not crash (regression
+# lock, not spec-required by name, but a real defect fixed in an earlier
+# round: BSD `head -n 0` exits non-zero, which used to abort the script under
+# errexit before the cap value ever reached emission).
 # ---------------------------------------------------------------------------
 rc=0
 out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base main --last-n 0)" || rc=$?
@@ -160,6 +190,20 @@ printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailab
 pass "case: --base names a ref that does not exist locally -> unavailable"
 
 # ---------------------------------------------------------------------------
+# case: the default-ref probe cannot answer -> unavailable with a reason
+# distinct from ref-absent (AC5) — a git stub makes `rev-parse --verify
+# --quiet develop^{commit}` fail with a non-1 exit code (real git's --quiet
+# contract exits 1 for a genuine absence; anything else is git failing to
+# answer), so this must NOT read the same as a plain missing ref.
+# ---------------------------------------------------------------------------
+out="$(cd "$MAIN_REPO" && GIT_STUB_REAL="$REAL_GIT" GIT_STUB_FAIL_DEVELOP_PROBE=1 PATH="$GITBIN:$ORIG_PATH" bash "$RETRO_INPUTS")"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: git could not answer whether develop exists' \
+  || fail "case: the default-ref probe cannot answer -> unavailable with a reason distinct from ref-absent"
+printf '%s\n' "$out" | grep -qF -- 'does not resolve locally' \
+  && fail "case: the default-ref probe cannot answer -> unavailable with a reason distinct from ref-absent (misreported as ref-absent)"
+pass "case: the default-ref probe cannot answer -> unavailable with a reason distinct from ref-absent"
+
+# ---------------------------------------------------------------------------
 # case: zero merge commits (squash-merge history) -> empty (retro-inputs.sh against a merge-free history)
 # ---------------------------------------------------------------------------
 ZERO_REPO="$TMP/zero-repo"
@@ -171,6 +215,7 @@ pass "case: zero merge commits (squash-merge history) -> empty"
 
 # ---------------------------------------------------------------------------
 # case: shallow repository with zero merges in the boundary -> unavailable
+# case: DS-2 a shallow repository with zero merges blocks the empty promotion -> unavailable
 # (simulated: a dummy .git/shallow file, per the spec's Assumption — avoids
 # `git clone --depth`, denied by sandbox policy in this repository before)
 # ---------------------------------------------------------------------------
@@ -181,6 +226,7 @@ out="$(cd "$SHALLOW_ZERO" && bash "$RETRO_INPUTS" --base main)"
 printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: shallow' \
   || fail "case: shallow repository with zero merges in the boundary -> unavailable"
 pass "case: shallow repository with zero merges in the boundary -> unavailable"
+pass "case: DS-2 a shallow repository with zero merges blocks the empty promotion -> unavailable"
 
 # ---------------------------------------------------------------------------
 # case: shallow repository with merges -> read with a truncation note
@@ -204,6 +250,73 @@ printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailab
 [ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 8 ] \
   || fail "case: git invocation failure -> unavailable, complete ledger, exit 0 (ledger incomplete)"
 pass "case: git invocation failure -> unavailable, complete ledger, exit 0"
+
+# ---------------------------------------------------------------------------
+# case: DS-1 an unanswerable shallow probe blocks the read promotion -> unavailable
+# A repo WITH real merges, but the shallow probe itself cannot answer (an old
+# git or any other unanswerable git rev-parse --is-shallow-repository) — even
+# though merges clearly exist, the read promotion must not be reached.
+# ---------------------------------------------------------------------------
+out="$(cd "$MAIN_REPO" && GIT_STUB_REAL="$REAL_GIT" GIT_STUB_FAIL_SHALLOW_PROBE=1 PATH="$GITBIN:$ORIG_PATH" bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: could not determine whether main is a shallow repository' \
+  || fail "case: DS-1 an unanswerable shallow probe blocks the read promotion -> unavailable"
+pass "case: DS-1 an unanswerable shallow probe blocks the read promotion -> unavailable"
+
+# ---------------------------------------------------------------------------
+# case: a directory containing files but not traversable -> unavailable, never empty
+# case: DS-3 a directory containing files but not traversable blocks the read promotion -> unavailable
+# A directory that IS readable (glob can list names) but not TRAVERSABLE
+# (chmod removes execute/search) can list a matching filename via readdir
+# without being able to stat it — the exact substitution this whole task
+# exists to prevent. Must be unavailable, never empty (the naive
+# "0 matches found" reading) nor read (a false confirmation).
+# ---------------------------------------------------------------------------
+DS3_REPO="$TMP/ds3-repo"
+build_repo "$DS3_REPO" main 1
+mkdir -p "$DS3_REPO/.shell-team/reviews"
+printf 'x' > "$DS3_REPO/.shell-team/reviews/T-1.md"
+chmod 0600 "$DS3_REPO/.shell-team/reviews"
+out="$(cd "$DS3_REPO" && bash "$RETRO_INPUTS" --base main)"
+chmod 0700 "$DS3_REPO/.shell-team/reviews"
+printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: unavailable — detail: .*not traversable' \
+  || fail "case: a directory containing files but not traversable -> unavailable, never empty"
+pass "case: a directory containing files but not traversable -> unavailable, never empty"
+pass "case: DS-3 a directory containing files but not traversable blocks the read promotion -> unavailable"
+
+# ---------------------------------------------------------------------------
+# case: DS-4 a directory with only non-matching files and not traversable
+# blocks the empty promotion -> unavailable. Distinct from DS-3: here the
+# directory would look EMPTY of matches if enumeration silently returned
+# nothing, so this proves the guard also catches the "looks empty" shape,
+# not only the "looks non-empty" shape.
+# ---------------------------------------------------------------------------
+DS4_REPO="$TMP/ds4-repo"
+build_repo "$DS4_REPO" main 1
+mkdir -p "$DS4_REPO/.shell-team/reviews"
+printf 'not markdown' > "$DS4_REPO/.shell-team/reviews/notes.txt"
+chmod 0600 "$DS4_REPO/.shell-team/reviews"
+out="$(cd "$DS4_REPO" && bash "$RETRO_INPUTS" --base main)"
+chmod 0700 "$DS4_REPO/.shell-team/reviews"
+printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: unavailable — detail: .*not traversable' \
+  || fail "case: DS-4 a directory with only non-matching files and not traversable blocks the empty promotion -> unavailable"
+pass "case: DS-4 a directory with only non-matching files and not traversable blocks the empty promotion -> unavailable"
+
+# ---------------------------------------------------------------------------
+# case: a shallow linked worktree with zero merges -> unavailable, never empty
+# The shallow marker lives in the COMMON git directory, not the worktree-
+# specific one `git rev-parse --git-dir` returns from inside a linked
+# worktree — this is exactly why AC5 names
+# `git rev-parse --is-shallow-repository` (worktree-correct) instead.
+# ---------------------------------------------------------------------------
+WT_MAIN="$TMP/wt-main"
+build_repo "$WT_MAIN" main 0
+git -C "$WT_MAIN" worktree add -q "$TMP/wt-linked" -b wt-branch
+: > "$WT_MAIN/.git/shallow"
+out="$(cd "$TMP/wt-linked" && bash "$RETRO_INPUTS" --base wt-branch)"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: shallow' \
+  || fail "case: a shallow linked worktree with zero merges -> unavailable, never empty"
+pass "case: a shallow linked worktree with zero merges -> unavailable, never empty"
+git -C "$WT_MAIN" worktree remove "$TMP/wt-linked" --force >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
 # case: adversarial merge subject cannot forge a ledger line
@@ -258,6 +371,24 @@ printf '%s\n' "$out" | grep -qE -- '^- input: pr-metadata — status: unavailabl
 pass "case: gh absent -> pr-metadata unavailable, exit 0"
 
 # ---------------------------------------------------------------------------
+# case: DS-7 gh unauthenticated blocks the read promotion -> unavailable
+# ---------------------------------------------------------------------------
+out="$(cd "$MAIN_REPO" && GH_STUB_AUTH=fail PATH="$GHBIN:$ORIG_PATH" bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: pr-metadata — status: unavailable — detail: gh is not authenticated' \
+  || fail "case: DS-7 gh unauthenticated blocks the read promotion -> unavailable"
+pass "case: DS-7 gh unauthenticated blocks the read promotion -> unavailable"
+
+# ---------------------------------------------------------------------------
+# case: DS-8 a failing gh pr list blocks the empty promotion -> unavailable
+# gh is authenticated (auth check succeeds) but the list command itself
+# fails — must not be read as "confirmed zero" (empty).
+# ---------------------------------------------------------------------------
+out="$(cd "$MAIN_REPO" && GH_STUB_PR=FAIL PATH="$GHBIN:$ORIG_PATH" bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: pr-metadata — status: unavailable — detail: gh pr list failed' \
+  || fail "case: DS-8 a failing gh pr list blocks the empty promotion -> unavailable"
+pass "case: DS-8 a failing gh pr list blocks the empty promotion -> unavailable"
+
+# ---------------------------------------------------------------------------
 # case: gh present -> the PR body field is never requested
 # ---------------------------------------------------------------------------
 log="$TMP/gh.log"
@@ -284,6 +415,28 @@ out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base main --lessons "$LESSONS_F
 printf '%s\n' "$out" | grep -qE -- '^- input: lessons — status: read — detail: .+' \
   || fail "case: lessons path supplied -> read"
 pass "case: lessons path supplied -> read"
+
+# ---------------------------------------------------------------------------
+# case: DS-5 an unreadable lessons file blocks the read promotion -> unavailable
+# ---------------------------------------------------------------------------
+LESSONS_UNREADABLE="$TMP/lessons-unreadable.md"
+printf 'a lesson line\n' > "$LESSONS_UNREADABLE"
+chmod 000 "$LESSONS_UNREADABLE"
+out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base main --lessons "$LESSONS_UNREADABLE")"
+chmod 600 "$LESSONS_UNREADABLE"
+printf '%s\n' "$out" | grep -qE -- '^- input: lessons — status: unavailable — detail: path supplied but not readable' \
+  || fail "case: DS-5 an unreadable lessons file blocks the read promotion -> unavailable"
+pass "case: DS-5 an unreadable lessons file blocks the read promotion -> unavailable"
+
+# ---------------------------------------------------------------------------
+# case: DS-6 a directory passed as --lessons blocks the empty promotion -> unavailable
+# ---------------------------------------------------------------------------
+LESSONS_DIR="$TMP/lessons-dir"
+mkdir -p "$LESSONS_DIR"
+out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base main --lessons "$LESSONS_DIR")"
+printf '%s\n' "$out" | grep -qE -- '^- input: lessons — status: unavailable — detail: path supplied but not a regular file' \
+  || fail "case: DS-6 a directory passed as --lessons blocks the empty promotion -> unavailable"
+pass "case: DS-6 a directory passed as --lessons blocks the empty promotion -> unavailable"
 
 # ---------------------------------------------------------------------------
 # case: both layouts and a TEAM_RUN_BASE override resolve every input path

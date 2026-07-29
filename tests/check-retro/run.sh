@@ -60,33 +60,92 @@ grep -qE "unlabelled Lesson 候補 bullet" <<< "$err" \
 pass "fail-closed: broken TMPDIR still catches fail-bare-lesson.md (exit $rc)"
 
 # T-1001: the "## Retro inputs" ledger — a closed enum, fail-closed on every
-# recognised violation shape (AC16). Each of the seven fixtures below isolates
+# recognised violation shape (AC18). Each of the ten fixtures below isolates
 # exactly one violation; "case:" labels below are asserted verbatim by the spec.
 assert_rc "case: a well-formed Retro inputs ledger passes" \
   0 "" "$FIX/pass-canonical.md"
-assert_rc "fail-inputs-missing-section -> 1" 1 "missing decorated section heading: ## Retro inputs" "$FIX/fail-inputs-missing-section.md"
-assert_rc "fail-inputs-unknown-status -> 1"  1 "unknown Retro inputs status"                        "$FIX/fail-inputs-unknown-status.md"
-assert_rc "fail-inputs-unknown-id -> 1"      1 "unknown Retro inputs id"                             "$FIX/fail-inputs-unknown-id.md"
-assert_rc "fail-inputs-missing-id -> 1"      1 "missing Retro inputs id: lessons"                    "$FIX/fail-inputs-missing-id.md"
-assert_rc "fail-inputs-duplicate-id -> 1"    1 "duplicated Retro inputs id"                          "$FIX/fail-inputs-duplicate-id.md"
-assert_rc "fail-inputs-empty-detail -> 1"    1 "empty Retro inputs detail"                           "$FIX/fail-inputs-empty-detail.md"
-assert_rc "fail-inputs-stray-line -> 1"      1 "unrecognised line inside ## Retro inputs"            "$FIX/fail-inputs-stray-line.md"
+assert_rc "fail-inputs-missing-section -> 1"     1 "missing decorated section heading: ## Retro inputs" "$FIX/fail-inputs-missing-section.md"
+assert_rc "fail-inputs-unknown-status -> 1"      1 "unknown Retro inputs status"                        "$FIX/fail-inputs-unknown-status.md"
+assert_rc "fail-inputs-unknown-id -> 1"          1 "unknown Retro inputs id"                             "$FIX/fail-inputs-unknown-id.md"
+assert_rc "fail-inputs-missing-id -> 1"          1 "missing Retro inputs id: lessons"                    "$FIX/fail-inputs-missing-id.md"
+assert_rc "fail-inputs-duplicate-id -> 1"        1 "duplicated Retro inputs id"                          "$FIX/fail-inputs-duplicate-id.md"
+assert_rc "fail-inputs-empty-detail -> 1"        1 "empty Retro inputs detail"                           "$FIX/fail-inputs-empty-detail.md"
+assert_rc "case: a whitespace-only detail is reported" \
+  1 "whitespace-only Retro inputs detail" "$FIX/fail-inputs-blank-detail.md"
+assert_rc "fail-inputs-stray-line -> 1"          1 "unrecognised line inside ## Retro inputs"            "$FIX/fail-inputs-stray-line.md"
+assert_rc "fail-inputs-duplicate-section -> 1"   1 "duplicated ## Retro inputs section heading"          "$FIX/fail-inputs-duplicate-section.md"
+assert_rc "fail-inputs-line-outside-section -> 1" 1 "ledger-shaped line outside the ## Retro inputs section" "$FIX/fail-inputs-line-outside-section.md"
 
-# T-1001 AC16: two further cases generated at run time (no committed fixture
-# needed — a purpose-built copy of pass-canonical.md is enough).
+# T-1001 v2 (AC17): "a tolerance claim is proved by a malformed input, never a
+# well-formed one." v1's CRLF criterion asked for a VALID CRLF file to pass,
+# which a CR-unaware region walk satisfied by never examining the file at all
+# — "accepted" and "unexamined" produced the same result. So this case starts
+# from a BROKEN ledger (one id present with no status at all, the other seven
+# ids missing entirely) and asserts it is STILL REPORTED after conversion to
+# CRLF — a checker that silently skipped the file would pass this file
+# clean, which is exactly the defect v1 shipped.
 TMP="$HERE/tmp"
 rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP"
 
-# case: a ledger with CRLF line endings still passes — every line of a clean
-# retro (headings included) gets a trailing \r, exercising the CRLF-tolerant
-# heading match (has_exact_line) and the ledger awk pass's own \r strip.
-crlf="$TMP/crlf.md"
-sed 's/$/\r/' "$FIX/pass-canonical.md" > "$crlf"
-bash "$RETRO" "$crlf" >/dev/null 2>&1 \
-  || fail "case: a ledger with CRLF line endings still passes"
-pass "case: a ledger with CRLF line endings still passes"
+malformed="$TMP/malformed.md"
+# shellcheck disable=SC2016  # backticks below are literal markdown code-span syntax, not a subshell.
+{
+  printf '# Retro 2026-01-01\n\n'
+  printf '## Retro inputs\n\n'
+  printf -- '- input: cycle-window\n'
+  printf '\n## サマリ\n\n`<summary>`\n\n'
+  printf '## Keep（続けたい良い動き）\n\n- `<x>`\n\n'
+  printf '## Problem（直面した課題 / 痛み）\n\n- `<x>`\n\n'
+  printf '## Try（次サイクルで試すこと）\n\n- `<x>`\n\n'
+  printf '## 罠の点検（Comprehension Debt / Cognitive Surrender）\n\n- `<x>`\n\n'
+  printf '## Lesson 候補（ユーザー判断で `tasks/lessons.md` にマージ）\n\n- `[common]` ok\n'
+} > "$malformed"
+bash "$RETRO" "$malformed" >/dev/null 2>&1 \
+  && fail "sanity: the malformed (LF) ledger fixture must itself fail before CRLF conversion is meaningful"
+
+crlf_malformed="$TMP/crlf-malformed.md"
+sed 's/$/\r/' "$malformed" > "$crlf_malformed"
+bash "$RETRO" "$crlf_malformed" >/dev/null 2>&1 \
+  && fail "case: a MALFORMED ledger in a CRLF file is still reported (not silently accepted)"
+pass "case: a MALFORMED ledger in a CRLF file is still reported (not silently accepted)"
+
+# T-1001 v2 (AC17): the agreement backstop of AC16 is proved to bite by a
+# mutation self-check — a COPY of the checker in a temporary directory, with
+# ONLY the region walk's (rule 4's) CR handling removed, must still report
+# the malformed CRLF ledger above. The real script (bin/check-retro.sh) is
+# never modified. `has_exact_line` (rule 2, the independent determination)
+# and rule 3's own CR strip are left untouched by this edit — only the
+# `sub(/\r$/, "", line)` that appears AFTER the "# Rule 4:" marker comment
+# is neutralized, isolating the mutation to the region walk exactly as the
+# spec names it.
+mutated="$TMP/check-retro-mutated.sh"
+cp "$REPO_ROOT/bin/check-retro.sh" "$mutated"
+sed -i.bak '/# Rule 4:/,$ s/sub(\/\\r\$\/, "", line)/# CR handling removed for mutation test/' "$mutated"
+rm -f "$mutated.bak"
+chmod +x "$mutated"
+# Sanity: the mutation must have actually landed (positive control — a no-op
+# sed that silently matched nothing would make this whole case vacuous).
+grep -qF -- 'CR handling removed for mutation test' "$mutated" \
+  || fail "case: with the region walk CR handling removed, a malformed CRLF ledger is STILL reported (agreement backstop) — mutation did not apply"
+bash "$mutated" "$crlf_malformed" >/dev/null 2>&1 \
+  && fail "case: with the region walk CR handling removed, a malformed CRLF ledger is STILL reported (agreement backstop)"
+pass "case: with the region walk CR handling removed, a malformed CRLF ledger is STILL reported (agreement backstop)"
+
+# T-1001 v2 (AC19): rule 3's region walk matches its Lesson-候補 heading by
+# PREFIX (grep -E, no end anchor), so it is CR-tolerant by construction and
+# was never the source of the CRLF blocker — confirmed by fixture rather than
+# assumed. A CRLF file with an otherwise-clean retro but an unlabelled Lesson
+# bullet must still be caught.
+rule3_crlf="$TMP/rule3-crlf.md"
+sed 's/$/\r/' "$FIX/fail-bare-lesson.md" > "$rule3_crlf"
+rc=0
+err="$(bash "$RETRO" "$rule3_crlf" 2>&1 >/dev/null)" || rc=$?
+[ "$rc" -eq 1 ] || fail "case: rule 3 still catches an unlabelled Lesson bullet in a CRLF file (expected exit 1, got $rc)"
+grep -qE "unlabelled Lesson 候補 bullet" <<< "$err" \
+  || fail "case: rule 3 still catches an unlabelled Lesson bullet in a CRLF file (wrong reason: $err)"
+pass "case: rule 3 still catches an unlabelled Lesson bullet in a CRLF file"
 
 # case: a detail that quotes the ledger grammar is not a second ledger line —
 # the detail text itself contains " — status: " / " — detail: " substrings

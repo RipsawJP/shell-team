@@ -17,15 +17,24 @@
 #      `` `[common]` `` or `` `[target-specific]` `` (backtick-wrapped, as the
 #      template and canonical retro write them). A lone `- (該当なし)`
 #      placeholder is allowed. Bare/unlabelled bullets are a violation.
-#   4. A `## Retro inputs` section (T-1001) is present and its ledger is a
-#      CLOSED enum, validated fail-closed: every canonical id (cycle-window,
+#   4. A `## Retro inputs` section (T-1001, inverted at v2) is present and its
+#      ledger is a CLOSED enum, validated fail-closed. This rule cannot report
+#      "could not evaluate" as "clean": it produces exactly three outcomes that
+#      never coincide — the section was located and its ledger validated; the
+#      section is absent; or the section's heading is present but its ledger
+#      region could not be read (the heading search and the region walk are
+#      two INDEPENDENT determinations, cross-checked, so a future regression in
+#      either one is caught as a disagreement rather than passing as clean).
+#      When the region was read: every canonical id (cycle-window,
 #      review-artifacts, provenance, specs, run-telemetry, previous-retro,
-#      lessons, pr-metadata) appears EXACTLY once, each with a status in
-#      {read, empty, unavailable} and a non-empty detail. An id outside the
-#      enum, a status outside the enum, a missing id, a duplicated id, an
-#      empty detail, or any other unrecognised non-blank line inside the
-#      section (indented sub-bullets carrying raw material are the only
-#      exemption) is a violation.
+#      lessons, pr-metadata) must appear EXACTLY once, each with a status in
+#      {read, empty, unavailable} and a detail that is non-empty AND not
+#      whitespace-only. An id outside the enum, a status outside the enum, a
+#      missing id, a duplicated id, an empty or whitespace-only detail, a
+#      duplicated section heading, a ledger-shaped line found outside the
+#      section, or any other unrecognised non-blank line inside the section
+#      (indented sub-bullets carrying raw material are the only exemption) is
+#      a violation.
 #
 # structure only: a retro whose ledger says 'read' is not thereby proven to have read anything.
 #
@@ -109,6 +118,12 @@ for FILE in "$@"; do
   has_exact_line "$TRAPS"   "$FILE" || emit "$FILE" "missing decorated section heading: $TRAPS"
   grep -qE  -- "^## Lesson 候補（" "$FILE" || emit "$FILE" "missing decorated section heading: ${LESSON_PREFIX}…）"
   has_exact_line "$RETRO_INPUTS" "$FILE" || emit "$FILE" "missing decorated section heading: $RETRO_INPUTS"
+  # Independent determination #1 for rule 4's agreement cross-check: found via
+  # has_exact_line, the SAME CRLF-tolerant mechanism used above — untouched by
+  # anything the rule-4 awk pass below does, so a regression confined to that
+  # awk (e.g. its own CR handling regressing) cannot silently agree with itself.
+  retro_inputs_heading_found=0
+  has_exact_line "$RETRO_INPUTS" "$FILE" && retro_inputs_heading_found=1
 
   # Rule 3: every top-level bullet in the Lesson 候補 section is labelled.
   # Extract the section body (between the Lesson heading and the next `## `)
@@ -140,75 +155,132 @@ for FILE in "$@"; do
   ' "$FILE")"
   violations=$((violations + lesson_violations))
 
-  # Rule 4: the "## Retro inputs" ledger (T-1001) — a CLOSED enum, validated
-  # fail-closed. Only top-level `- input: ` lines are ledger entries; blank
-  # lines and indented sub-bullets (raw material — a merge commit, a pull
-  # request) are ignored; any other non-blank line inside the section is an
-  # "unrecognised line" violation. Field extraction uses leftmost match() on
-  # the ` — status: ` / ` — detail: ` markers (never a naive split on every
+  # Rule 4: the "## Retro inputs" ledger (T-1001, inverted at v2) — a CLOSED
+  # enum, validated fail-closed with three outcomes that never coincide.
+  #
+  # Outcome determination: `retro_inputs_heading_found` (above) is ONE
+  # independent determination (bash-level, CRLF-tolerant `has_exact_line`).
+  # `region_entered` below is the SECOND, independent determination — the
+  # awk pass's own record of whether it ever walked into the section. The two
+  # are cross-checked at END: heading found but region never entered means
+  # "the section heading is present but its ledger region could not be read"
+  # — a violation in its own right, distinct from "absent" (heading not
+  # found at all, already handled by has_exact_line above) and distinct from
+  # "located and validated" (both agree the region was entered). This is what
+  # makes a future regression in EITHER determination alone show up as a
+  # disagreement instead of silently reading as clean (AC16/AC17).
+  #
+  # Only top-level `- input: ` lines inside the (first) entered region are
+  # ledger entries; blank lines and indented sub-bullets (raw material — a
+  # merge commit, a pull request) are ignored; any other non-blank line
+  # inside the section is an "unrecognised line" violation. A ledger-shaped
+  # `- input: ` line found OUTSIDE the walked region (before the heading, or
+  # after the section has closed) is its own violation — a region walk that
+  # stops early cannot leave entries silently unexamined. A second, duplicate
+  # `## Retro inputs` heading is its own violation rather than a silently
+  # unvalidated second region. Field extraction uses leftmost match() on the
+  # ` — status: ` / ` — detail: ` markers (never a naive split on every
   # ` — `), so a detail that itself quotes the ledger grammar (e.g.
   # describing a past ledger line) is never miscounted as a malformed split
-  # or a second ledger line.
+  # or a second ledger line. A detail of only whitespace is its own
+  # violation, distinct from a wholly empty one: "a detail is present" and
+  # "there are spaces there" are not the same determination.
   # shellcheck disable=SC2016  # backticks in the awk source are literal, not a subshell.
-  inputs_violations="$(awk -v file="$FILE" -v ids="$RETRO_INPUTS_IDS" -v statuses="$RETRO_INPUTS_STATUSES" '
+  inputs_violations="$(awk -v file="$FILE" -v ids="$RETRO_INPUTS_IDS" -v statuses="$RETRO_INPUTS_STATUSES" -v heading_found="$retro_inputs_heading_found" '
     BEGIN {
       nids = split(ids, idarr, " ")
       for (i = 1; i <= nids; i++) valid_id[idarr[i]] = 1
       nst = split(statuses, starr, " ")
       for (i = 1; i <= nst; i++) valid_status[starr[i]] = 1
+      heading_count = 0
+      region_entered = 0
+      in_s = 0
     }
-    /^## Retro inputs$/ && !seen { seen = 1; in_s = 1; next }
-    in_s && /^## / { in_s = 0 }
-    in_s {
+    {
       line = $0
       sub(/\r$/, "", line)
-      if (line == "") next
-      if (line ~ /^  +- /) next        # indented sub-bullet: raw material, not parsed
-      if (line !~ /^- input: /) {
-        printf "%s:unrecognised line inside ## Retro inputs: %s\n", file, line > "/dev/stderr"
-        n++
+
+      if (line == "## Retro inputs") {
+        heading_count++
+        if (in_s) {
+          in_s = 0                       # a second heading closes the currently-open region
+        } else if (!region_entered) {
+          in_s = 1
+          region_entered = 1
+        }
         next
       }
-      body = line
-      sub(/^- input: /, "", body)
-      if (!match(body, / — status: /)) {
-        printf "%s:malformed Retro inputs line (missing status field): %s\n", file, line > "/dev/stderr"
-        n++
-        next
-      }
-      id = substr(body, 1, RSTART - 1)
-      rest = substr(body, RSTART + RLENGTH)
-      if (!match(rest, / — detail: /)) {
-        printf "%s:malformed Retro inputs line (missing detail field): %s\n", file, line > "/dev/stderr"
-        n++
-        next
-      }
-      st = substr(rest, 1, RSTART - 1)
-      de = substr(rest, RSTART + RLENGTH)
-      if (!(id in valid_id)) {
-        printf "%s:unknown Retro inputs id: %s\n", file, line > "/dev/stderr"
-        n++
-      } else if (id in seen_id) {
-        printf "%s:duplicated Retro inputs id: %s\n", file, line > "/dev/stderr"
-        n++
+
+      if (in_s && line ~ /^## /) { in_s = 0 }
+
+      if (in_s) {
+        if (line == "") next
+        if (line ~ /^  +- /) next        # indented sub-bullet: raw material, not parsed
+        if (line !~ /^- input: /) {
+          printf "%s:unrecognised line inside ## Retro inputs: %s\n", file, line > "/dev/stderr"
+          n++
+          next
+        }
+        body = line
+        sub(/^- input: /, "", body)
+        if (!match(body, / — status: /)) {
+          printf "%s:malformed Retro inputs line (missing status field): %s\n", file, line > "/dev/stderr"
+          n++
+          next
+        }
+        id = substr(body, 1, RSTART - 1)
+        rest = substr(body, RSTART + RLENGTH)
+        if (!match(rest, / — detail: /)) {
+          printf "%s:malformed Retro inputs line (missing detail field): %s\n", file, line > "/dev/stderr"
+          n++
+          next
+        }
+        st = substr(rest, 1, RSTART - 1)
+        de = substr(rest, RSTART + RLENGTH)
+        if (!(id in valid_id)) {
+          printf "%s:unknown Retro inputs id: %s\n", file, line > "/dev/stderr"
+          n++
+        } else if (id in seen_id) {
+          printf "%s:duplicated Retro inputs id: %s\n", file, line > "/dev/stderr"
+          n++
+        } else {
+          seen_id[id] = 1
+        }
+        if (!(st in valid_status)) {
+          printf "%s:unknown Retro inputs status: %s\n", file, line > "/dev/stderr"
+          n++
+        }
+        trimmed = de
+        gsub(/^[ \t]+|[ \t]+$/, "", trimmed)
+        if (de == "") {
+          printf "%s:empty Retro inputs detail: %s\n", file, line > "/dev/stderr"
+          n++
+        } else if (trimmed == "") {
+          printf "%s:whitespace-only Retro inputs detail: %s\n", file, line > "/dev/stderr"
+          n++
+        }
       } else {
-        seen_id[id] = 1
-      }
-      if (!(st in valid_status)) {
-        printf "%s:unknown Retro inputs status: %s\n", file, line > "/dev/stderr"
-        n++
-      }
-      if (de == "") {
-        printf "%s:empty Retro inputs detail: %s\n", file, line > "/dev/stderr"
-        n++
+        if (line ~ /^- input: /) {
+          printf "%s:ledger-shaped line outside the ## Retro inputs section: %s\n", file, line > "/dev/stderr"
+          n++
+        }
       }
     }
     END {
-      if (seen) {
-        for (i = 1; i <= nids; i++) {
-          if (!(idarr[i] in seen_id)) {
-            printf "%s:missing Retro inputs id: %s\n", file, idarr[i] > "/dev/stderr"
-            n++
+      if (heading_count >= 2) {
+        printf "%s:duplicated ## Retro inputs section heading\n", file > "/dev/stderr"
+        n++
+      }
+      if (heading_found == 1) {
+        if (region_entered == 0) {
+          printf "%s:## Retro inputs section heading is present but its ledger region could not be read\n", file > "/dev/stderr"
+          n++
+        } else {
+          for (i = 1; i <= nids; i++) {
+            if (!(idarr[i] in seen_id)) {
+              printf "%s:missing Retro inputs id: %s\n", file, idarr[i] > "/dev/stderr"
+              n++
+            }
           }
         }
       }
