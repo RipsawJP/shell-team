@@ -243,7 +243,14 @@ probe_cycle_window() {
       return 0
     fi
   fi
-  [ "$fallback" -eq 1 ] && fb_note="; develop not found locally, fell back to HEAD"
+  # A boolean-AND-chained assignment (a test, the AND operator, then a bare
+  # name equals value) conditions the assignment on a preceding test — under
+  # errexit, if a LATER statement in the same context also happens to run,
+  # a false condition here is silently forgiven (the defect this task's own
+  # round-2 review hid); the `if` form has no such order dependency.
+  if [ "$fallback" -eq 1 ]; then
+    fb_note="; develop not found locally, fell back to HEAD"
+  fi
 
   if git rev-parse --verify --quiet "${resolved}^{commit}" >/dev/null 2>&1; then
     rc=0
@@ -309,16 +316,19 @@ probe_cycle_window() {
 
   local shown="$log_out" total_used="$total" capped=0
   if [ -n "$last_n" ] && [ "$total" -gt "$last_n" ]; then
-    # `--last-n 0` is a valid (if degenerate) integer per the arg-parse
-    # regex, and BSD/GNU `head -n 0` disagree on whether that is an error
-    # (BSD: "illegal line count", exit 1). Handle 0 directly rather than
-    # calling head with it, so a valid cap value can never crash this
-    # function under errexit and leave the ledger incomplete.
-    if [ "$last_n" -eq 0 ]; then
-      shown=""
-    else
-      shown="$(printf '%s\n' "$log_out" | head -n "$last_n")"
-    fi
+    # Never `| head` here: piping a merge log into a reader that can exit
+    # before it has consumed all the writer's output gives the writer a
+    # SIGPIPE once the data exceeds the pipe buffer (measured around 64 KB —
+    # bytes, not merge count, so a repository with long branch names reaches
+    # it with far fewer merges than a count-based estimate suggests); under
+    # pipefail the assignment then fails and errexit aborts the whole script
+    # before the ledger's emission pass. A here-string (`<<<`) has no live
+    # writer process to signal, so awk can read and cap the line count with
+    # no SIGPIPE exposure regardless of size. This also handles `--last-n 0`
+    # correctly with no special case: `NR<=0` is never true, so `shown` is
+    # naturally empty (BSD and GNU `head -n 0` disagree on whether that is
+    # even a valid invocation; awk has no such ambiguity).
+    shown="$(awk -v n="$last_n" 'NR <= n' <<< "$log_out")"
     total_used="$last_n"
     capped=1
   fi
@@ -331,9 +341,14 @@ probe_cycle_window() {
 
   # Every applicable qualifier is stated (not just the first) — a cap and a
   # shallow truncation are different facts and can be true at once (AC11).
+  # `if`, not a boolean-AND-chained assignment (AC8) — see the fallback note above for why.
   local qualifiers=""
-  [ "$shallow" -eq 1 ] && qualifiers="$qualifiers; shallow clone truncates history at the boundary"
-  [ "$capped" -eq 1 ]  && qualifiers="$qualifiers; capped at --last-n $last_n (a declared cap, not a truncation)"
+  if [ "$shallow" -eq 1 ]; then
+    qualifiers="$qualifiers; shallow clone truncates history at the boundary"
+  fi
+  if [ "$capped" -eq 1 ]; then
+    qualifiers="$qualifiers; capped at --last-n $last_n (a declared cap, not a truncation)"
+  fi
   qualifiers="$qualifiers$fb_note"
 
   promote_read cycle-window "$total_used merge commits from $resolved (first-parent)$qualifiers"
@@ -379,12 +394,25 @@ count_dir_entries() {
     for f in "${names[@]}"; do
       if [ -e "$f" ] || [ -L "$f" ]; then
         DIR_N_STATABLE=$((DIR_N_STATABLE + 1))
+        # AC8: not `[ -f "$f" ]` boolean-AND-chained straight into an
+        # assignment inside the case arm — a case arm's own exit status is
+        # its LAST command's, so a name that matches the suffix but fails
+        # the regular-file test (a directory called something ending in
+        # .md, or a broken symlink) makes the whole case statement return
+        # 1, and the bare call site in report_dir_input() below then dies
+        # under errexit — exit 1, zero ledger lines, on the default
+        # path. An `if` inside the `case` arm has no such propagation.
         case "$f" in
-          *"$suffix") [ -f "$f" ] && DIR_N_MATCH=$((DIR_N_MATCH + 1)) ;;
+          *"$suffix")
+            if [ -f "$f" ]; then
+              DIR_N_MATCH=$((DIR_N_MATCH + 1))
+            fi
+            ;;
         esac
       fi
     done
   fi
+  return 0
 }
 
 report_dir_input() {
