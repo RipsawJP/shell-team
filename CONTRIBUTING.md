@@ -51,6 +51,7 @@ The mechanics around opening, merging, and closing out a pull request:
 - **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.
 - **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.
 - **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.
+- **Publish the board edit as its own pull request.** `bin/close-out.sh` rewrites the board file and stops there — it runs no git command — and `develop` is protected, so the edit cannot go straight to it. Branch from `develop` at the merge commit, commit that one file with a message of the form `board: close out T-NNNN — merged via PR #N`, and open that branch as a second pull request.
 - **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.
 
 ## Confirming the CI check is green
@@ -84,21 +85,6 @@ and nothing else added to either supporting section:
 
 - **Lint the board before pushing**: `bash bin/check-handoff.sh "$(bash bin/team-paths.sh --get todo)"`, and `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base develop`, which compares the set of `T-NNN` heading ids against the base ref — it is the only check that notices an id deleted, overwritten with a different id, or duplicated, and it cannot see a rewrite that leaves the id in place.
 - **The status-flag vocabulary is not restated here**: it is listed in `templates/todo-template.md` and enforced by `bin/check-handoff.sh`.
-
-## Cutting a release
-
-The steps a release actually takes in this repository, and — since two of
-them have no in-tree precedent yet — a disclosure about which parts are
-measured and which are a standing decision:
-
-- **Bump the `version` field of `.claude-plugin/plugin.json`.** That manifest is the single source of the version — `.claude-plugin/marketplace.json` carries no version field, so there is nothing to change there.
-- **Bump the static version badge in both `README.md` and `README.ja.md` to match.** `bin/check-readme-version.sh` compares each badge against the manifest, but it checks only the files handed to it as arguments — the enforced set is decided by the invocation line in the workflow, not by the script.
-- **Add the release entry to `CHANGELOG.md` and `CHANGELOG.ja.md`.** The changelog is where release history lives and, by its own account, is written as part of this release process; nothing checks the two files against each other, so the parity is yours to keep.
-- **Nothing else is machine-checked.** `CHANGELOG.md` and `CHANGELOG.ja.md` parity, `marketplace.json`, git tags, and version numbers mentioned in prose have no check at all; the badge is the only enforced site.
-- **Promote `develop` to `main` through a pull request**, not a direct push, and merge it as a merge commit rather than a squash, once `check-handoff lint` has reported success.
-- **Tag the release on `main` with an annotated tag `vX.Y.Z`** after that merge lands.
-- The promotion and the tag are a **maintainer decision, not an observed practice**: at the time of writing, `develop` had never been promoted to `main`, and the single existing tag sits on a commit reachable from both branches, so it does not by itself evidence tagging after a merge.
-- **The install side is documented elsewhere**: [`docs/distribution.md`](docs/distribution.md) covers what an adopter does after a bump, and [`CHANGELOG.md`](CHANGELOG.md) carries the release history that [`README.md`](README.md) points at.
 
 ## What does not belong in this file
 
