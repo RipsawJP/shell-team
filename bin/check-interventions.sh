@@ -12,15 +12,24 @@
 # never the truth of its content.
 #
 #   1. usage       — a malformed invocation (unknown flag, missing/extra
-#                    argument, a `--task` value with no argument), or a
-#                    positional argument that is not an existing, readable
-#                    REGULAR file (`-f` + `-r`; directory/FIFO/unreadable
-#                    all classify here). Exit 2 (`usage`).
+#                    argument, a `--task` value with no argument, an
+#                    explicitly EMPTY `--task` value (`--task ""` / `--task=`),
+#                    or a REPEATED `--task` flag), or a positional argument
+#                    that is not an existing, readable REGULAR file (`-f` +
+#                    `-r`; directory/FIFO/unreadable all classify here).
+#                    Exit 2 (`usage`).
 #   2. structural  — the file carries EXACTLY ONE task-id-scoped marker pair
 #        <!-- BEGIN interventions: <id> --> ... <!-- END interventions: <id> -->
-#      (BEGIN strictly before END, matched via EXACT full-line comparison —
-#      never a substring search). The id is DERIVED from the BEGIN marker's
-#      own capture and is either `T-<digits>` or the reserved literal
+#      BEGIN and END are matched the SAME WAY — a generic any-id regex,
+#      EXACTLY ONE occurrence of each required — never a substring search, and
+#      never a literal string derived from the other marker's own capture (a
+#      well-formed END marker for a DIFFERENT id trailing after the true END
+#      line is invisible to a derived-literal compare, since it is simply a
+#      different string; T-1002 rework1 fix). Only once BEGIN and END are each
+#      confirmed unique is the END marker's own captured id compared against
+#      the BEGIN marker's own captured id — a mismatch is `structural`, same as
+#      an absent/duplicated/reversed pair. The id is DERIVED from each
+#      marker's own capture and is either `T-<digits>` or the reserved literal
 #      `no-task` (the id of the taskless file); anything else is not
 #      recognized as a marker at all. Absent / duplicated / reversed /
 #      BEGIN-END id mismatch => exit 2 (`structural`). When `--task <id>` is
@@ -61,6 +70,9 @@
 #   - intervention: unclassified
 # A routine gate response — a plain GO, an approval, or an answer to a question you asked — is not an intervention and gets no entry.
 #
+# Entry template: `<!-- BEGIN interventions: <id> -->` opens the region and `<!-- END interventions: <id> -->` closes it with the same `<id>`; each entry is a `- intervention: <class>` line followed by indented `date: <YYYY-MM-DD>`, `summary: <one line>` and `effect: <one line>` fields.
+# If the file currently holds the sentinel `no interventions occurred`, the first real entry REPLACES that line rather than being appended after it — the sentinel and an entry cannot coexist in either order (AC5).
+#
 # This checker judges STRUCTURE ONLY — it never judges whether an
 # intervention really happened, whether a class token was the right choice,
 # or whether the stated effect is the real effect. A file carrying the
@@ -88,13 +100,20 @@
 # `--task` follows bin/check-design-note.sh's precedent: without it the
 # checker is self-contained (the id comes only from the file's own BEGIN
 # marker, like bin/check-provenance.sh); with it, a BEGIN id that disagrees
-# is rejected as `structural` rather than silently accepted.
+# is rejected as `structural` rather than silently accepted. An explicitly
+# EMPTY `--task` value (`--task ""` / `--task=`) and a REPEATED `--task` flag
+# are each rejected as `usage` (exit 2) rather than silently defeating this
+# wrong-file protection (T-1002 rework1 fix) — an empty value used to leave
+# the flag indistinguishable from never having been given at all, and a
+# repeated flag used to let the LAST value silently win with no
+# duplicate-detection.
 #
 # Exit: 0 = conformant; 1 = schema violation (unrecognized class / malformed
 #       or incomplete entry / malformed date / wrapped field value / a
 #       sentinel-less empty region / a sentinel/entry coexistence); 2 =
-#       usage / structural error (bad args, unreadable file, missing/
-#       duplicated/reversed/mismatched markers, a `--task` disagreement).
+#       usage / structural error (bad args, an empty or repeated `--task`,
+#       unreadable file, missing/duplicated/reversed/mismatched markers, a
+#       `--task` disagreement).
 
 set -euo pipefail
 
@@ -155,15 +174,21 @@ print_help() {
 
 # --- argument parsing (single positional + optional --task; -- ends options) -
 TASK=""
+TASK_GIVEN=0
 FILE=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) print_help; exit 0 ;;
     --task)
       [ "$#" -ge 2 ] || fail_usage "--task requires a value"
-      TASK="$2"; shift 2 ;;
+      [ "$TASK_GIVEN" -eq 0 ] || fail_usage "--task given more than once"
+      [ -n "$2" ] || fail_usage "--task requires a non-empty value"
+      TASK="$2"; TASK_GIVEN=1; shift 2 ;;
     --task=*)
-      TASK="${1#--task=}"; shift ;;
+      [ "$TASK_GIVEN" -eq 0 ] || fail_usage "--task given more than once"
+      TASK="${1#--task=}"
+      [ -n "$TASK" ] || fail_usage "--task requires a non-empty value"
+      TASK_GIVEN=1; shift ;;
     --) shift; break ;;
     -*) fail_usage "unknown flag: $1" ;;
     *)  break ;;
@@ -211,23 +236,34 @@ done
 [ "$begin_count" -eq 1 ] \
   || fail_structural "expected exactly one '<!-- BEGIN interventions: <id> -->' marker (id = T-NNN or the reserved literal no-task; found $begin_count) in $FILE"
 
-# END is matched by an EXACT full-line literal compare against the id
-# captured from the (now unique) BEGIN marker — this simultaneously enforces
-# "exactly one END" AND "same id as BEGIN": a mismatched or missing same-id
-# END both surface as end_count!=1 below.
-END_MARK="<!-- END interventions: ${begin_id} -->"
+# END is matched the SAME WAY as BEGIN — a generic any-id regex, requiring
+# EXACTLY ONE occurrence — and ONLY THEN is its own captured id compared
+# against the id captured from the (now unique) BEGIN marker. This closes an
+# asymmetry the previous literal-derived-from-begin_id compare left open: a
+# well-formed END marker for a DIFFERENT id trailing after the true END line
+# is simply a different string from a literal derived from begin_id, so it
+# was never counted at all (T-1002 rework1, Codex round1 Major 2 fix —
+# reproduced: BEGIN T-900 / END T-900 / a trailing extraneous
+# "<!-- END interventions: T-901 -->" used to pass as conformant).
+# shellcheck disable=SC2016
+END_ANY_RE='^<!-- END interventions: (T-[0-9]+|no-task) -->$'
 end_count=0
 end_ln=0
+end_id=""
 i=1
 while [ "$i" -le "$NLINES" ]; do
-  if [ "${LINES[$i]}" = "$END_MARK" ]; then
+  line="${LINES[$i]}"
+  if [[ "$line" =~ $END_ANY_RE ]]; then
     end_count=$((end_count + 1))
     end_ln="$i"
+    end_id="${BASH_REMATCH[1]}"
   fi
   i=$((i + 1))
 done
 [ "$end_count" -eq 1 ] \
-  || fail_structural "expected exactly one '$END_MARK' marker matching the BEGIN id (found $end_count) in $FILE"
+  || fail_structural "expected exactly one '<!-- END interventions: <id> -->' marker (id = T-NNN or the reserved literal no-task; found $end_count) in $FILE"
+[ "$end_id" = "$begin_id" ] \
+  || fail_structural "BEGIN marker id ($begin_id) does not match END marker id ($end_id) in $FILE"
 
 [ "$begin_ln" -lt "$end_ln" ] \
   || fail_structural "BEGIN interventions marker (line $begin_ln) must precede its END marker (line $end_ln) in $FILE"

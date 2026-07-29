@@ -1563,6 +1563,41 @@ grep -qF 'interventions gate:AC1' "$TMP/livefile-mutation-ac15-interventions.out
 pass "livefile-mutation-ac15-interventions — extended DP-8/T-1002 regex catches an injected 'interventions gate:AC1' stateful sentinel (non-vacuous)"
 
 # =============================================================================
+# goalskill-producer-discipline-reference (T-1002 rework1, Codex round1
+# Blocker 2 fix lock) — skills/goal/SKILL.md must carry a reference-form
+# producer-discipline paragraph mirroring skills/run/SKILL.md's Interventions
+# producer discipline (T-1002) paragraph, so a /goal tick cannot silently
+# satisfy the interventions gate by leaving the sentinel in place with no
+# standing instruction ever prompting the orchestrator to notice a real
+# trigger during the tick. This is a REFERENCE, not a verbatim canonical-block
+# copy (AC17's registry pin stays at exactly two consumers,
+# bin/check-interventions.sh and skills/run/SKILL.md — a third consumer here
+# would break that pin), so this lock is a plain anchor grep against the live
+# file, not a check-prompt-sync registration.
+# =============================================================================
+printf -- '\n--- goalskill-producer-discipline-reference ---\n'
+GOAL_SKILL_MD="$REPO_ROOT/skills/goal/SKILL.md"
+GPDR_ANCHOR='Interventions producer discipline (T-1002, referenced not restated)'
+grep -qF -- "$GPDR_ANCHOR" "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing anchor '$GPDR_ANCHOR' in skills/goal/SKILL.md"
+grep -qF -- 'append the entry at that moment, before you act on the message' "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing the at-that-moment duty sentence in skills/goal/SKILL.md"
+grep -qF -- 'templates/prompt-blocks/interventions-classes.md' "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing the canonical-template cross-reference in skills/goal/SKILL.md"
+
+# Non-vacuity: a mutated copy with the anchor line removed must make the SAME
+# grep FAIL (rc=1) — proving the lock is not vacuously green.
+GPDR_MUT_FILE="$TMP/mutated-goal-SKILL-no-producer-discipline.md"
+grep -vF -- "$GPDR_ANCHOR" "$GOAL_SKILL_MD" > "$GPDR_MUT_FILE"
+set +e
+grep -qF -- "$GPDR_ANCHOR" "$GPDR_MUT_FILE"
+gpdr_mut_rc=$?
+set -e
+[[ "$gpdr_mut_rc" -eq 1 ]] \
+  || fail "goalskill-producer-discipline-reference: removing the anchor line from a mutated copy should make the anchor grep FAIL (rc=1), got rc=$gpdr_mut_rc — the lock would be vacuous"
+pass "goalskill-producer-discipline-reference — skills/goal/SKILL.md carries a reference-form Interventions producer discipline paragraph (anchor present, points at skills/run/SKILL.md's discipline paragraph and the canonical class template; non-vacuous — removing the anchor line trips the lock)"
+
+# =============================================================================
 # template-check-ignore
 # =============================================================================
 printf -- '\n--- template-check-ignore ---\n'

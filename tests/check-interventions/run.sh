@@ -352,7 +352,23 @@ run_checker "$C/badid.md"
 [ "$RC" -eq 2 ] || fail "unrecognized id: expected exit 2 (structural), got $RC: $ERR"
 grep -q 'structural' <<< "$ERR" || fail "unrecognized id: stderr must carry 'structural' token, got: $ERR"
 
-pass "absent / duplicated / reversed / id-mismatched / unrecognized-id markers all exit 2 with 'structural' token"
+# T-1002 rework1 (Codex round1 Major 2) regression lock: a WELL-FORMED marker
+# pair for the true id, followed by a TRAILING, well-formed END marker for a
+# DIFFERENT id, must still be caught. Before this fix, END was matched by a
+# literal string derived from the BEGIN id — a second END for a different id
+# is simply a different string, so it was never counted at all, and this
+# fixture was reported `conformant`. The extra END marker below is the
+# reviewer's exact reproduction.
+{
+  printf '<!-- BEGIN interventions: %s -->\n' "$TASK_ID"; printf '%s' "$BODY"
+  printf '<!-- END interventions: %s -->\n' "$TASK_ID"
+  printf '<!-- END interventions: T-901 -->\n'
+} > "$C/trailing-extra-end.md"
+run_checker "$C/trailing-extra-end.md"
+[ "$RC" -eq 2 ] || fail "trailing extraneous END marker (different id): expected exit 2 (structural), got $RC: $ERR"
+grep -q 'structural' <<< "$ERR" || fail "trailing extraneous END marker (different id): stderr must carry 'structural' token, got: $ERR"
+
+pass "absent / duplicated / reversed / id-mismatched / unrecognized-id markers, and a trailing extraneous well-formed END marker for a DIFFERENT id after the true pair, all exit 2 with 'structural' token"
 
 # ============================================================================
 case_start "case: usage errors — no argument, an extra argument, a directory, an unreadable file"
@@ -397,7 +413,28 @@ set -e
 [ "$UNKNOWNFLAG_RC" -eq 2 ] || fail "unknown flag: expected exit 2 (usage), got $UNKNOWNFLAG_RC: $UNKNOWNFLAG_OUT"
 grep -q 'usage' <<< "$UNKNOWNFLAG_OUT" || fail "unknown flag: stderr must carry 'usage' token, got: $UNKNOWNFLAG_OUT"
 
-pass "missing / extra / unknown-flag / directory / unreadable-file arguments all exit 2 with 'usage' token"
+# T-1002 rework1 (Codex round1 Major 1) regression lock: an explicitly EMPTY
+# --task value (both the space-separated and the =-attached forms) used to
+# leave TASK="" indistinguishable from --task never having been given at all
+# (the later `[ -n "$TASK" ]` guard silently treated the flag as absent),
+# silently defeating the wrong-file protection --task exists for.
+run_checker --task "" "$C/f.md"
+[ "$RC" -eq 2 ] || fail "empty --task value (space form): expected exit 2 (usage), got $RC: $ERR"
+grep -q 'usage' <<< "$ERR" || fail "empty --task value (space form): stderr must carry 'usage' token, got: $ERR"
+
+run_checker --task= "$C/f.md"
+[ "$RC" -eq 2 ] || fail "empty --task value (= form): expected exit 2 (usage), got $RC: $ERR"
+grep -q 'usage' <<< "$ERR" || fail "empty --task value (= form): stderr must carry 'usage' token, got: $ERR"
+
+# T-1002 rework1 (Codex round1 Major 1) regression lock: a REPEATED --task
+# flag used to let the LAST value silently win with no duplicate-detection —
+# a caller passing --task T-999 --task T-1002 would have T-999 silently
+# dropped rather than rejected.
+run_checker --task "T-999" --task "$TASK_ID" "$C/f.md"
+[ "$RC" -eq 2 ] || fail "repeated --task flag: expected exit 2 (usage), got $RC: $ERR"
+grep -q 'usage' <<< "$ERR" || fail "repeated --task flag: stderr must carry 'usage' token, got: $ERR"
+
+pass "missing / extra / unknown-flag / directory / unreadable-file / empty-\$--task-value / repeated-\$--task-flag arguments all exit 2 with 'usage' token"
 
 # ============================================================================
 case_start "case: a MALFORMED file with CRLF line endings is still reported"
