@@ -28,6 +28,38 @@
 # harness, no adversarial mutation of the plumbing layer — that is a
 # declined Non-goal, filed as its own issue.
 #
+# LOAD-BEARING STATUS OF EACH STATE (so a later reader does not mistake a
+# guardrail for a proven lock, or vice versa):
+#   - State 1 (.md directory): PROVEN. Reverting AC8's fix (both the
+#     case-arm `if` and the trailing `return 0`) reproduces exit 1 on this
+#     exact fixture.
+#   - State 2 (broken symlink): the SAME AC8 defect as state 1 applies here
+#     too, but this suite's fail-fast design means a single full run never
+#     reaches state 2 once state 1 already failed under a reverted fix —
+#     proving it requires an isolated run (skip/reorder state 1, or run
+#     state 2 alone against a mutated copy). Not re-provable by reading this
+#     file's own output alone; see the task's provenance record for the
+#     isolated reproduction.
+#   - State 3 (oversized merge log): PROVEN, conditionally — see the
+#     mechanical precondition assertion at that state below. The pipe-buffer
+#     threshold that makes this state fire is kernel-dependent, so the
+#     fixture is built with a wide margin above every measured abort point
+#     rather than just over some observed minimum, and the state asserts its
+#     own precondition (the log genuinely exceeds a declared lower bound)
+#     before ever checking the ledger invariant — a future accretion that
+#     shrinks this fixture below the threshold fails LOUDLY here rather than
+#     silently ceasing to be load-bearing.
+#   - States 4-8 (empty directory, non-traversable directory, shallow
+#     repository, linked worktree, unresolvable --base): GUARDRAILS. No
+#     defect specific to any of these was ever found in this script; they
+#     are enumerated because this task's review rounds actually produced
+#     them as repository states worth checking the invariant against, not
+#     because reverting some named fix is known to turn them red. Treat them
+#     as coverage, not as proof of anything.
+#   - State 9 (--last-n 0): PROVEN. This is the branch AC9's fix removed
+#     (the old special case for a zero cap); reverting AC9's fix reproduces
+#     exit 1 on this fixture.
+#
 # Temp roots live under $TMPDIR when set (sandboxed runs deny writes to a
 # nested .git/ inside this repo's own tree), falling back to $HERE/tmp on
 # plain CI runners — the same pattern tests/retro-inputs/run.sh uses.
@@ -119,11 +151,30 @@ assert_invariant "invariant holds: a broken symlink whose name ends in .md" \
 
 # ---------------------------------------------------------------------------
 # state: a merge log larger than the pipe buffer with --last-n
-# (measured trigger is bytes, ~64KB, not merge count -- long padded branch
-# names reach it with far fewer merges than a count-based estimate suggests)
+#
+# The measured trigger is BYTES, not merge count, and the exact boundary is
+# kernel-dependent -- measured directly on this machine: a 41KB / 108-line
+# log SURVIVED, a 72KB / 189-line log SURVIVED, a 90KB log ABORTED (exit
+# 141), and so did 110KB and 150KB. The real boundary sits somewhere between
+# ~72KB and ~90KB. A fixture built just over the LOWEST observed abort point
+# is not load-bearing on a machine with a larger pipe buffer, and this is
+# exactly the mistake an earlier round of this task made (pad=300 for 200
+# merges landed at ~77KB -- inside that ambiguous band, so it happened to
+# survive on this machine and the state passed for the wrong reason). This
+# fixture is therefore built with a wide margin ABOVE every measured abort
+# point (pad=1300 for 200 merges, ~271KB) rather than a value just over some
+# observed minimum, and the precondition itself -- that this fixture's merge
+# log genuinely clears a safely-above-the-boundary lower bound -- is
+# asserted MECHANICALLY below, before the ledger invariant is ever checked.
+# If a future edit narrows this margin (fewer merges, shorter padding), this
+# state fails LOUDLY instead of silently reverting to non-load-bearing.
 # ---------------------------------------------------------------------------
 D3="$TMP/state-big-log-repo"
-build_repo "$D3" main 200 300
+build_repo "$D3" main 200 1300
+D3_LOG_BYTES="$(git -C "$D3" log --merges --first-parent --pretty=format:'%H%x09%s' main | wc -c | tr -d ' ')"
+D3_MIN_BYTES=200000
+[ "$D3_LOG_BYTES" -gt "$D3_MIN_BYTES" ] \
+  || fail "state 3 precondition failed: merge log is only $D3_LOG_BYTES bytes (need > $D3_MIN_BYTES, safely above the measured ~72-90KB abort boundary) -- this state would not be load-bearing"
 assert_invariant "invariant holds: a merge log larger than the pipe buffer with --last-n" \
   "cd '$D3' && bash '$RETRO_INPUTS' --base main --last-n 5"
 
