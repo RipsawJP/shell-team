@@ -271,7 +271,7 @@ verifying that attachment is QA's and the reviewer's job.
   deliberately scoped to the two functions this revision edits: it is not a sweep
   of the file, and the class-wide sweep is a Non-goal. `&&` inside an `if`
   condition is untouched and remains correct.
-  - check: for fn in count_dir_entries compute_cycle_window; do b="$(awk -v n="$fn" 'index($0, n "() {") == 1 { i = 1; next } i && /^\}$/ { exit } i' bin/retro-inputs.sh)"; test -n "$b" || exit 1; if printf '%s\n' "$b" | grep -qE -- '&&[[:space:]]*[A-Za-z_][A-Za-z0-9_]*='; then exit 1; fi; done && b="$(awk 'index($0, "count_dir_entries() {") == 1 { i = 1; next } i && /^\}$/ { exit } i' bin/retro-inputs.sh)" && test -n "$b" && test "$(printf '%s\n' "$b" | grep -vE '^[[:space:]]*(#|$)' | tail -n 1 | sed 's/^[[:space:]]*//')" = "return 0"
+  - check: for fn in count_dir_entries probe_cycle_window; do b="$(awk -v n="$fn" 'index($0, n "() {") == 1 { i = 1; next } i && /^\}$/ { exit } i' bin/retro-inputs.sh)"; test -n "$b" || exit 1; if printf '%s\n' "$b" | grep -qE -- '&&[[:space:]]*[A-Za-z_][A-Za-z0-9_]*='; then exit 1; fi; done && b="$(awk 'index($0, "count_dir_entries() {") == 1 { i = 1; next } i && /^\}$/ { exit } i' bin/retro-inputs.sh)" && test -n "$b" && test "$(printf '%s\n' "$b" | grep -vE '^[[:space:]]*(#|$)' | tail -n 1 | sed 's/^[[:space:]]*//')" = "return 0"
 
 - [ ] **AC9** **The capped window is produced without a reader that can exit before
   its writer finishes.** Piping the full merge log into `head` makes the writer
@@ -785,10 +785,10 @@ revises.
 | `bin/discover-work.sh` defaults to `BASE="develop"`, exposes `--base BRANCH`, fail-softs on a missing `gh`, and sanitises untrusted titles | its argument parsing, `gh` readiness block, and `sanitize()` |
 | **(v2)** Rule 4's region walk matched `/^## Retro inputs$/` with no CR strip while rule 2's helper did strip a trailing CR, so a CRLF file's heading was found and its region never entered | the rule-4 awk program against `has_exact_line` |
 | **(v2)** The directory report guarded `-d` and `-r` and not traversability | `report_dir_input()` |
-| **(v2)** Shallow detection read `$(git rev-parse --git-dir)/shallow`, the worktree-specific directory in a linked worktree | `compute_cycle_window` |
+| **(v2)** Shallow detection read `$(git rev-parse --git-dir)/shallow`, the worktree-specific directory in a linked worktree | `probe_cycle_window` |
 | **(v3)** `count_dir_entries` ends its per-entry work with `[ -f "$f" ] && DIR_N_MATCH=…` inside a `case` branch, so the function's last executed command returns 1 for an entry that matches the suffix without being a regular file; the call site is bare, so `errexit` ends the script before any ledger line is printed | `bin/retro-inputs.sh`, `count_dir_entries` and its call site in `report_dir_input` |
-| **(v3)** The same `&&`-conditioned-assignment shape appears twice more, in the qualifier block, where it survives only because an assignment follows it — an order dependency, which is why one reproduction of the defect was initially hidden | `compute_cycle_window`'s qualifier block |
-| **(v3)** The capped window is built as `printf '%s\n' "$log_out" \| head -n "$last_n"`, so the writer takes a SIGPIPE once the log exceeds the pipe buffer and `pipefail` turns that into a failed assignment | `compute_cycle_window`, the cap branch |
+| **(v3)** The same `&&`-conditioned-assignment shape appears twice more, in the qualifier block, where it survives only because an assignment follows it — an order dependency, which is why one reproduction of the defect was initially hidden | `probe_cycle_window`'s qualifier block |
+| **(v3)** The capped window is built as `printf '%s\n' "$log_out" \| head -n "$last_n"`, so the writer takes a SIGPIPE once the log exceeds the pipe buffer and `pipefail` turns that into a failed assignment | `probe_cycle_window`, the cap branch |
 | **(v3)** `--last-n` has no default value and `agents/scrum-master.md` documents `default: no cap`, so the SIGPIPE path is opt-in while the enumeration path is not | the argument parser and the role's `## Loop` step 1 |
 | **(v3)** `tests/errexit-safe/run.sh` locks the `die`/`exit N` contract shape, not an abort before output | that suite's own header and assertions |
 
@@ -911,7 +911,7 @@ allow-list permits them only because earlier rounds already changed them.
 **The enumeration fix.** Replace the `&&`-conditioned assignment with an
 `if`/`fi`, and end `count_dir_entries` with a literal `return 0` so the function's
 status never depends on which entry happened to come last. Do the same to the two
-qualifier assignments in `compute_cycle_window`. Leave `&&` inside `if` conditions
+qualifier assignments in `probe_cycle_window`. Leave `&&` inside `if` conditions
 alone — it is correct there, and AC8's pattern only forbids an assignment as the
 right-hand side.
 
