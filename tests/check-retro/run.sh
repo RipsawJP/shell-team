@@ -59,5 +59,45 @@ grep -qE "unlabelled Lesson 候補 bullet" <<< "$err" \
   || fail "fail-closed under broken TMPDIR: malformed bullet must still be reported (got: $err)"
 pass "fail-closed: broken TMPDIR still catches fail-bare-lesson.md (exit $rc)"
 
+# T-1001: the "## Retro inputs" ledger — a closed enum, fail-closed on every
+# recognised violation shape (AC16). Each of the seven fixtures below isolates
+# exactly one violation; "case:" labels below are asserted verbatim by the spec.
+assert_rc "case: a well-formed Retro inputs ledger passes" \
+  0 "" "$FIX/pass-canonical.md"
+assert_rc "fail-inputs-missing-section -> 1" 1 "missing decorated section heading: ## Retro inputs" "$FIX/fail-inputs-missing-section.md"
+assert_rc "fail-inputs-unknown-status -> 1"  1 "unknown Retro inputs status"                        "$FIX/fail-inputs-unknown-status.md"
+assert_rc "fail-inputs-unknown-id -> 1"      1 "unknown Retro inputs id"                             "$FIX/fail-inputs-unknown-id.md"
+assert_rc "fail-inputs-missing-id -> 1"      1 "missing Retro inputs id: lessons"                    "$FIX/fail-inputs-missing-id.md"
+assert_rc "fail-inputs-duplicate-id -> 1"    1 "duplicated Retro inputs id"                          "$FIX/fail-inputs-duplicate-id.md"
+assert_rc "fail-inputs-empty-detail -> 1"    1 "empty Retro inputs detail"                           "$FIX/fail-inputs-empty-detail.md"
+assert_rc "fail-inputs-stray-line -> 1"      1 "unrecognised line inside ## Retro inputs"            "$FIX/fail-inputs-stray-line.md"
+
+# T-1001 AC16: two further cases generated at run time (no committed fixture
+# needed — a purpose-built copy of pass-canonical.md is enough).
+TMP="$HERE/tmp"
+rm -rf "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP"
+
+# case: a ledger with CRLF line endings still passes — every line of a clean
+# retro (headings included) gets a trailing \r, exercising the CRLF-tolerant
+# heading match (has_exact_line) and the ledger awk pass's own \r strip.
+crlf="$TMP/crlf.md"
+sed 's/$/\r/' "$FIX/pass-canonical.md" > "$crlf"
+bash "$RETRO" "$crlf" >/dev/null 2>&1 \
+  || fail "case: a ledger with CRLF line endings still passes"
+pass "case: a ledger with CRLF line endings still passes"
+
+# case: a detail that quotes the ledger grammar is not a second ledger line —
+# the detail text itself contains " — status: " / " — detail: " substrings
+# (quoting an older ledger line for illustration); leftmost match() must still
+# resolve the REAL separators first, so this remains one well-formed line.
+quoting="$TMP/quoting.md"
+cp "$FIX/pass-canonical.md" "$quoting"
+sed -i.bak 's/^- input: previous-retro .*$/- input: previous-retro — status: read — detail: 1 prior retro; an older note quoted "- input: cycle-window — status: empty — detail: none" for illustration/' "$quoting"
+rm -f "$quoting.bak"
+bash "$RETRO" "$quoting" >/dev/null 2>&1 \
+  || fail "case: a detail that quotes the ledger grammar is not a second ledger line"
+pass "case: a detail that quotes the ledger grammar is not a second ledger line"
 
 printf '\nAll check-retro assertions passed.\n'

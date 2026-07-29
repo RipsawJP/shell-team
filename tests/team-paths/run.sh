@@ -41,6 +41,7 @@ mkdir -p "$D"
 [ "$(get "$D" retros)"  = ".shell-team/retros" ]   || fail "default: retros path wrong"
 [ "$(get "$D" reviews)" = ".shell-team/reviews" ]  || fail "default: reviews path wrong"
 [ "$(get "$D" specs)"   = ".shell-team/specs" ]    || fail "default: specs path wrong"
+[ "$(get "$D" provenance)" = ".shell-team/provenance" ] || fail "default: provenance path wrong"
 pass "default mode resolves all paths under .shell-team/"
 
 # --- legacy mode: the plugin-unique contract file is the marker -------------
@@ -52,6 +53,7 @@ mkdir -p "$L/tasks/loops"
 [ "$(get "$L" runs)"  = "tasks/runs" ]     || fail "legacy: runs path wrong"
 # split-root lock: specs MUST remain at docs/specs in legacy mode.
 [ "$(get "$L" specs)" = "docs/specs" ]     || fail "legacy: split-root broken — specs must be docs/specs"
+[ "$(get "$L" provenance)" = "tasks/provenance" ] || fail "legacy: provenance path wrong"
 pass "legacy mode resolves tasks/ base with split-root specs=docs/specs"
 
 # --- a bare tasks/todo.md (no contract) is NOT misdetected as legacy --------

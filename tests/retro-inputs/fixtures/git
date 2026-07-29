@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# fixtures/git — a PATH-shadowing `git` stub for retro-inputs tests that
+# selectively fails one subcommand to simulate class 5 (a failing git
+# invocation, e.g. a `safe.directory` refusal or an unreadable object store),
+# while delegating everything else to the real git so the rest of the script
+# still resolves correctly (rev-parse, git-dir, etc.).
+#
+# Controls:
+#   GIT_STUB_REAL         path to the real git binary (required)
+#   GIT_STUB_FAIL_MERGES  "1" => any `git log --merges ...` invocation fails
+
+REAL="${GIT_STUB_REAL:?GIT_STUB_REAL not set}"
+
+if [ "${1:-}" = "log" ] && [ "${GIT_STUB_FAIL_MERGES:-0}" = "1" ]; then
+  for a in "$@"; do
+    if [ "$a" = "--merges" ]; then
+      printf 'stub: simulated git log failure\n' >&2
+      exit 128
+    fi
+  done
+fi
+
+exec "$REAL" "$@"

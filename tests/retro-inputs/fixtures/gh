@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# fixtures/gh — env-driven `gh` stub for retro-inputs tests.
+#
+# retro-inputs.sh calls `gh` with `--jq` and expects the already-formatted TSV
+# on stdout; this stub ignores --jq and just echoes canned TSV from env vars,
+# mirroring tests/discover-work/fixtures/gh's shape.
+#
+# Controls (all optional):
+#   GH_STUB_AUTH   "ok" (default) => `gh auth status` exits 0; anything else => exit 1
+#   GH_STUB_PR     canned TSV for `gh pr list`    ("FAIL" => exit 1)
+#   GH_STUB_LOG    if set, every invocation's argv is appended here
+
+[ -n "${GH_STUB_LOG:-}" ] && printf '%s\n' "$*" >> "$GH_STUB_LOG"
+
+cmd="${1:-}"
+case "$cmd" in
+  auth)
+    [ "${GH_STUB_AUTH:-ok}" = "ok" ] && exit 0 || exit 1
+    ;;
+  pr)
+    # Hard guard: retro-inputs.sh must never request PR bodies.
+    for a in "$@"; do
+      case "$a" in
+        *body*) printf 'stub: PR body must not be requested\n' >&2; exit 3 ;;
+      esac
+    done
+    [ "${GH_STUB_PR:-}" = "FAIL" ] && exit 1
+    [ -n "${GH_STUB_PR:-}" ] && printf '%s\n' "$GH_STUB_PR"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac

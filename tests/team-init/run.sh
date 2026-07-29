@@ -49,6 +49,7 @@ for f in \
   .shell-team/retros/.gitkeep \
   .shell-team/reviews/.gitkeep \
   .shell-team/specs/.gitkeep \
+  .shell-team/provenance/.gitkeep \
   .shell-team/AGENTS.md \
   .shell-team/test-recipe.md \
   .shell-team/.gitignore

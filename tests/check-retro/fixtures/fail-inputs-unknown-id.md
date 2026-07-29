@@ -3,7 +3,6 @@
 ## Retro inputs
 
 - input: cycle-window — status: read — detail: 3 merge commits from develop (first-parent)
-  - abc123 Merge pull request #1 from example/branch
 - input: review-artifacts — status: read — detail: 2 review artifacts in .shell-team/reviews
 - input: provenance — status: empty — detail: 0 provenance files in .shell-team/provenance
 - input: specs — status: read — detail: 2 spec files in .shell-team/specs
@@ -11,6 +10,7 @@
 - input: previous-retro — status: empty — detail: 0 prior retro files in .shell-team/retros
 - input: lessons — status: unavailable — detail: no path supplied via --lessons
 - input: pr-metadata — status: unavailable — detail: gh CLI not found
+- input: not-a-real-id — status: read — detail: this id is not in the closed enum
 
 ## サマリ
 
@@ -36,7 +36,6 @@
 
 ## Lesson 候補（ユーザー判断で `tasks/lessons.md` にマージ）
 
-> agent はここに候補を提示するだけ。
 - `[common]` a generic lesson
 - `[target-specific]` a repo-specific lesson
 

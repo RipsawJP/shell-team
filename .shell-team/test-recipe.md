@@ -125,3 +125,15 @@ that file's order.
   hand-off: transcribing a real match into a NEW file reproduces the same
   finding on the new file, which is easy to miss since the file you just
   wrote is not the file the original finding named.
+- T-1001: a fixture suite that needs a real throwaway `git init` repository
+  (not a mocked `git`) must NOT create it under `$HERE/tmp` inside this
+  repo's own working tree — the sandbox denies writes to a NESTED `.git/`
+  (e.g. copying `hooks/*.sample` during `git init` fails with "Operation not
+  permitted"), even though the same sandbox allows normal file writes under
+  `$HERE`. Use a `${TMPDIR:+...}` / fallback-to-`$HERE/tmp` temp root instead
+  (the exact pattern `tests/close-out/run.sh` already uses) so the suite runs
+  the same way in the sandbox and in plain CI. A shallow repository can be
+  SIMULATED for a fixture by creating a dummy (even empty) `.git/shallow`
+  file inside a normally-built repo — this is existence-only and needs no
+  real `git clone --depth`, which sandbox policy has denied in this
+  repository before.

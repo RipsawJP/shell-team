@@ -7,8 +7,28 @@
 > **Required structure** (the linter equivalent — anything that breaks these
 > rules should be treated as a bug in the agent prompt):
 >
-> 1. Top-level heading is exactly `# Retro <YYYY-MM-DD>`.
-> 2. The five H2 sections appear in that order, verbatim:
+> 1. A `## Retro inputs` ledger appears first (T-1001), declaring the material
+>    the rest of the retro rests on. Produced by `bin/retro-inputs.sh` and
+>    pasted verbatim — do not hand-write it. Its canonical ids and statuses
+>    (single source: `templates/prompt-blocks/retro-inputs.md`):
+>    - input: cycle-window
+>    - input: review-artifacts
+>    - input: provenance
+>    - input: specs
+>    - input: run-telemetry
+>    - input: previous-retro
+>    - input: lessons
+>    - input: pr-metadata
+>    - status: read
+>    - status: empty
+>    - status: unavailable
+>    empty means the input was consulted and held nothing; unavailable means it could not be consulted at all. Never report one as the other.
+>    `check-retro.sh` validates this section against a closed enum and fails
+>    closed — see "What this mechanism does not deliver" in
+>    `docs/specs/T-1001-retro-input-acquisition.md`: it confirms the ledger is
+>    well-formed, never that a `read` status is true.
+> 2. Top-level heading is exactly `# Retro <YYYY-MM-DD>`.
+> 3. The five H2 sections appear in that order, verbatim:
 >    `## Keep（続けたい良い動き）` / `## Problem（直面した課題 / 痛み）` /
 >    `## Try（次サイクルで試すこと）` /
 >    `## 罠の点検（Comprehension Debt / Cognitive Surrender）` /
@@ -19,12 +39,12 @@
 >    AI-attest reflection on the Comprehension Debt / Cognitive Surrender
 >    traps (see `docs/loop-engineering/loop-traps.md`). `check-retro.sh`
 >    enforces it precisely because it is the reflection most tempting to skip.
-> 3. Every bullet under `## Lesson 候補` starts with `[common]` or
+> 4. Every bullet under `## Lesson 候補` starts with `[common]` or
 >    `[target-specific]`. No bare bullets allowed.
-> 4. Every bullet under Keep / Problem / Try cites a source (PR number,
+> 5. Every bullet under Keep / Problem / Try cites a source (PR number,
 >    `tasks/reviews/T-XXX.md`, `tasks/lessons.md` line range, etc.) so the
 >    observation can be traced.
-> 5. The agent never edits `tasks/lessons.md`. Lesson candidates are
+> 6. The agent never edits `tasks/lessons.md`. Lesson candidates are
 >    proposed here for the human to merge.
 >
 > Delete this blockquote when the file is filled in.
@@ -36,6 +56,22 @@
 **対象サイクル**: 直近 `<N>` 個のマージ済み PR
 **対象 PR**: `#<a>`, `#<b>`, `#<c>`, ...
 **生成元**: scrum-master agent v0 (manual trigger)
+
+## Retro inputs
+
+`bin/retro-inputs.sh` prints this heading and its ledger lines together —
+paste its output here verbatim, unedited, right after this heading. Example
+shape (a well-formed ledger: all eight canonical ids, exactly once, each one
+of `read` / `empty` / `unavailable`):
+
+- input: cycle-window — status: read — detail: `<N merge commits from <ref> (first-parent)>`
+- input: review-artifacts — status: read — detail: `<N review artifacts in <dir>>`
+- input: provenance — status: read — detail: `<N provenance files in <dir>>`
+- input: specs — status: read — detail: `<N spec files in <dir>>`
+- input: run-telemetry — status: empty — detail: `<0 run telemetry files in <dir>>`
+- input: previous-retro — status: read — detail: `<N prior retro files in <dir>>`
+- input: lessons — status: unavailable — detail: `<no path supplied via --lessons>`
+- input: pr-metadata — status: unavailable — detail: `<gh not installed>`
 
 ## サマリ
 
