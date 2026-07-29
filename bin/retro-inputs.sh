@@ -221,7 +221,16 @@ compute_cycle_window() {
 
   local shown="$log_out" total_used="$total" capped=0
   if [ -n "$last_n" ] && [ "$total" -gt "$last_n" ]; then
-    shown="$(printf '%s\n' "$log_out" | head -n "$last_n")"
+    # `--last-n 0` is a valid (if degenerate) integer per the arg-parse
+    # regex, and BSD/GNU `head -n 0` disagree on whether that is an error
+    # (BSD: "illegal line count", exit 1). Handle 0 directly rather than
+    # calling head with it, so a valid cap value can never crash this
+    # function under errexit and leave the ledger incomplete.
+    if [ "$last_n" -eq 0 ]; then
+      shown=""
+    else
+      shown="$(printf '%s\n' "$log_out" | head -n "$last_n")"
+    fi
     total_used="$last_n"
     capped=1
   fi

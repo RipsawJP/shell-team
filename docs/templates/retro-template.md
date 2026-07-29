@@ -57,12 +57,16 @@
 **対象 PR**: `#<a>`, `#<b>`, `#<c>`, ...
 **生成元**: scrum-master agent v0 (manual trigger)
 
-## Retro inputs
+`bin/retro-inputs.sh` prints the `## Retro inputs` heading below and its
+ledger lines together — paste its output here verbatim, unedited, right after
+that heading. Example shape shown below (a well-formed ledger: all eight
+canonical ids, exactly once, each one of `read` / `empty` / `unavailable`).
+This paragraph and everything above it stays OUTSIDE the `## Retro inputs`
+section on purpose: `bin/check-retro.sh` validates that section as a closed
+ledger and fails on any non-ledger prose inside it, so an explanation of the
+mechanism cannot itself live inside the mechanism it explains.
 
-`bin/retro-inputs.sh` prints this heading and its ledger lines together —
-paste its output here verbatim, unedited, right after this heading. Example
-shape (a well-formed ledger: all eight canonical ids, exactly once, each one
-of `read` / `empty` / `unavailable`):
+## Retro inputs
 
 - input: cycle-window — status: read — detail: `<N merge commits from <ref> (first-parent)>`
 - input: review-artifacts — status: read — detail: `<N review artifacts in <dir>>`

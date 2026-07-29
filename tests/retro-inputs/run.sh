@@ -132,6 +132,24 @@ printf '%s\n' "$out" | grep -qF -- 'shallow' \
 pass "case: --last-n caps the window and the cap is declared, distinct from a shallow truncation"
 
 # ---------------------------------------------------------------------------
+# case: --last-n 0 is a degenerate but valid cap and must not crash
+# retro-inputs.sh — exercised against a repo with >=1 merge commit (MAIN_REPO
+# has 2), so the capping branch is actually reached; a merge-free repo would
+# never touch this code path and would not be evidence of anything.
+# BSD `head -n 0` exits non-zero ("illegal line count"), which used to abort
+# the script under errexit before the cap value ever reached emit_ledger — a
+# 0 must read as a declared cap (status read, digit 0), never as a crash.
+# ---------------------------------------------------------------------------
+rc=0
+out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base main --last-n 0)" || rc=$?
+[ "$rc" -eq 0 ] || fail "case: --last-n 0 is a degenerate but valid cap and must not crash (exit code $rc)"
+printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: read — detail: 0 merge commits from main .*capped at --last-n 0' \
+  || fail "case: --last-n 0 is a degenerate but valid cap and must not crash (cap not declared)"
+[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 8 ] \
+  || fail "case: --last-n 0 is a degenerate but valid cap and must not crash (ledger incomplete)"
+pass "case: --last-n 0 is a degenerate but valid cap and must not crash"
+
+# ---------------------------------------------------------------------------
 # case: --base names a ref that does not exist locally -> unavailable (retro-inputs.sh --base no-such-ref-t1001)
 # ---------------------------------------------------------------------------
 out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base no-such-ref-t1001)"
