@@ -137,3 +137,30 @@ that file's order.
   file inside a normally-built repo — this is existence-only and needs no
   real `git clone --depth`, which sandbox policy has denied in this
   repository before.
+
+- T-1001: a criterion or fixture that asserts **tolerance** — that some input
+  shape is accepted — must be proved against BROKEN input of that shape, never
+  against valid input. A passing valid input cannot distinguish "accepted" from
+  "never inspected", so the two failure modes look identical from the outside.
+  This bit twice in one task. A dependency criterion asserted `! grep <tool>
+  <script>` with no existence precondition, and `grep` on a missing path also
+  exits non-zero, so the criterion was satisfied by the script not existing yet.
+  A CRLF-tolerance criterion asserted that a well-formed CRLF ledger passes, and
+  the very defect it should have caught — a section-heading match that did not
+  strip the carriage return, so the rule never ran — satisfied it by not reading
+  the file at all. The shape that works: assert the file exists and that a
+  positive pattern matches it FIRST, then assert the negative; and prove
+  tolerance by converting a KNOWN-BAD input to the tolerated form and requiring
+  that it is still reported.
+- T-1001: a fixture whose load-bearing property depends on a threshold must
+  assert its own precondition, and must sit far enough from the threshold that a
+  kernel or platform difference cannot silently move it to the wrong side. The
+  invariants suite's pipe-buffer state produced roughly 77KB of merge log while
+  this machine's abort boundary sits between 72KB and 90KB, so reverting the fix
+  it was meant to lock left it green — a fixture whose name promised more than
+  its assertion delivered. Widened to about 271KB and given a mechanical check
+  of its own measured byte count against a declared floor, so shrinking it later
+  fails loudly with the number named instead of quietly reverting to
+  non-load-bearing. Measure the threshold rather than estimating from a proxy:
+  the trigger is bytes written to the pipe, not the merge count, and a
+  count-based estimate is wrong by whatever the subject length happens to be.
