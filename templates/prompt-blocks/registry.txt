@@ -37,6 +37,7 @@ contain verdict-labels.md                 agents/qa-verifier.md skills/run/SKILL
 contain board-line-format.md              agents/pm-spec.md templates/todo-template.md bin/check-handoff.sh
 contain operating-paths-core.md           agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/ui-designer.md agents/triage-orchestrator.md agents/codex-reviewer.md skills/run/SKILL.md skills/goal/SKILL.md
 contain retro-inputs.md                   bin/retro-inputs.sh bin/check-retro.sh agents/scrum-master.md docs/templates/retro-template.md
+contain interventions-classes.md          bin/check-interventions.sh skills/run/SKILL.md
 marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
 marker  playbook-engineer.md               agents/engineer.md
 marker  playbook-qa-verifier.md            agents/qa-verifier.md

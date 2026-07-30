@@ -20,7 +20,7 @@
 #
 # Derived paths (all ROOT-relative):
 #   TEAM_RUN_BASE  TEAM_TODO  TEAM_LOOPS_DIR  TEAM_RUNS_DIR  TEAM_RETROS_DIR
-#   TEAM_REVIEWS_DIR  TEAM_SPECS_DIR  TEAM_PROVENANCE_DIR
+#   TEAM_REVIEWS_DIR  TEAM_SPECS_DIR  TEAM_PROVENANCE_DIR  TEAM_INTERVENTIONS_DIR
 #
 # `docs/specs` is the ONE path the legacy layout keeps OUTSIDE the base dir
 # (historically specs lived under docs/, everything else under tasks/). That
@@ -32,7 +32,8 @@
 # Usage:
 #   team-paths.sh [--root DIR] --export   # `export VAR=...` lines, safe for eval
 #   team-paths.sh [--root DIR] --get KEY  # one path; KEY ∈ base|todo|loops|runs|
-#                                         #   retros|reviews|specs|provenance
+#                                         #   retros|reviews|specs|provenance|
+#                                         #   interventions
 #   team-paths.sh [--root DIR] --print    # human-readable table + which rule fired
 #   team-paths.sh --help
 #
@@ -61,7 +62,7 @@ Precedence (highest first), against ROOT (default: current directory):
 
 Modes:
   --export        Print `export VAR=...` lines (eval-safe) for all TEAM_* vars.
-  --get KEY       Print one path. KEY ∈ base|todo|loops|runs|retros|reviews|specs|provenance.
+  --get KEY       Print one path. KEY ∈ base|todo|loops|runs|retros|reviews|specs|provenance|interventions.
   --print         Print a human-readable table and which rule fired.
 
 Options:
@@ -157,6 +158,7 @@ RUNS="$BASE/runs"
 RETROS="$BASE/retros"
 REVIEWS="$BASE/reviews"
 PROVENANCE="$BASE/provenance"
+INTERVENTIONS="$BASE/interventions"
 
 case "$MODE" in
   export)
@@ -170,30 +172,33 @@ case "$MODE" in
     printf 'export TEAM_REVIEWS_DIR=%q\n' "$REVIEWS"
     printf 'export TEAM_SPECS_DIR=%q\n'   "$SPECS"
     printf 'export TEAM_PROVENANCE_DIR=%q\n' "$PROVENANCE"
+    printf 'export TEAM_INTERVENTIONS_DIR=%q\n' "$INTERVENTIONS"
     ;;
   get)
     case "$GET_KEY" in
-      base)       printf '%s\n' "$BASE" ;;
-      todo)       printf '%s\n' "$TODO" ;;
-      loops)      printf '%s\n' "$LOOPS" ;;
-      runs)       printf '%s\n' "$RUNS" ;;
-      retros)     printf '%s\n' "$RETROS" ;;
-      reviews)    printf '%s\n' "$REVIEWS" ;;
-      specs)      printf '%s\n' "$SPECS" ;;
-      provenance) printf '%s\n' "$PROVENANCE" ;;
-      *) die "unknown key: $GET_KEY (base|todo|loops|runs|retros|reviews|specs|provenance)" ;;
+      base)          printf '%s\n' "$BASE" ;;
+      todo)          printf '%s\n' "$TODO" ;;
+      loops)         printf '%s\n' "$LOOPS" ;;
+      runs)          printf '%s\n' "$RUNS" ;;
+      retros)        printf '%s\n' "$RETROS" ;;
+      reviews)       printf '%s\n' "$REVIEWS" ;;
+      specs)         printf '%s\n' "$SPECS" ;;
+      provenance)    printf '%s\n' "$PROVENANCE" ;;
+      interventions) printf '%s\n' "$INTERVENTIONS" ;;
+      *) die "unknown key: $GET_KEY (base|todo|loops|runs|retros|reviews|specs|provenance|interventions)" ;;
     esac
     ;;
   print)
     printf 'shell-team paths (rule: %s, root: %s)\n' "$RULE" "$ROOT"
-    printf '  base       %s\n' "$BASE"
-    printf '  todo       %s\n' "$TODO"
-    printf '  loops      %s\n' "$LOOPS"
-    printf '  runs       %s\n' "$RUNS"
-    printf '  retros     %s\n' "$RETROS"
-    printf '  reviews    %s\n' "$REVIEWS"
-    printf '  specs      %s\n' "$SPECS"
-    printf '  provenance %s\n' "$PROVENANCE"
+    printf '  %-13s %s\n' "base"          "$BASE"
+    printf '  %-13s %s\n' "todo"          "$TODO"
+    printf '  %-13s %s\n' "loops"         "$LOOPS"
+    printf '  %-13s %s\n' "runs"          "$RUNS"
+    printf '  %-13s %s\n' "retros"        "$RETROS"
+    printf '  %-13s %s\n' "reviews"       "$REVIEWS"
+    printf '  %-13s %s\n' "specs"         "$SPECS"
+    printf '  %-13s %s\n' "provenance"    "$PROVENANCE"
+    printf '  %-13s %s\n' "interventions" "$INTERVENTIONS"
     ;;
 esac
 exit 0

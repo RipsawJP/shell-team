@@ -164,3 +164,9 @@ that file's order.
   non-load-bearing. Measure the threshold rather than estimating from a proxy:
   the trigger is bytes written to the pipe, not the merge count, and a
   count-based estimate is wrong by whatever the subject length happens to be.
+
+- T-1002: `bash tests/check-interventions/run.sh` is `bin/check-interventions.sh`'s
+  fixture suite — run it the same way as `tests/check-provenance/run.sh`
+  (no new prerequisite: pure bash + coreutils, same explicit
+  `"${TMPDIR:-/tmp}/...XXXXXX"` mktemp-template convention, fixtures built
+  inline per case, no static `fixtures/` directory).

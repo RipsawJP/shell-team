@@ -42,6 +42,7 @@ mkdir -p "$D"
 [ "$(get "$D" reviews)" = ".shell-team/reviews" ]  || fail "default: reviews path wrong"
 [ "$(get "$D" specs)"   = ".shell-team/specs" ]    || fail "default: specs path wrong"
 [ "$(get "$D" provenance)" = ".shell-team/provenance" ] || fail "default: provenance path wrong"
+[ "$(get "$D" interventions)" = ".shell-team/interventions" ] || fail "default: interventions path wrong"
 pass "default mode resolves all paths under .shell-team/"
 
 # --- legacy mode: the plugin-unique contract file is the marker -------------
@@ -54,6 +55,7 @@ mkdir -p "$L/tasks/loops"
 # split-root lock: specs MUST remain at docs/specs in legacy mode.
 [ "$(get "$L" specs)" = "docs/specs" ]     || fail "legacy: split-root broken — specs must be docs/specs"
 [ "$(get "$L" provenance)" = "tasks/provenance" ] || fail "legacy: provenance path wrong"
+[ "$(get "$L" interventions)" = "tasks/interventions" ] || fail "legacy: interventions path wrong"
 pass "legacy mode resolves tasks/ base with split-root specs=docs/specs"
 
 # --- a bare tasks/todo.md (no contract) is NOT misdetected as legacy --------
@@ -142,6 +144,24 @@ print_default="$(env -u TEAM_RUN_BASE bash "$PATHS" --root "$D" --print)"
 grep -q "rule: default" <<< "$print_default" \
   || fail "--print should report the default rule for a fresh root"
 pass "--print reports which precedence rule fired"
+
+# --- total-key set is exactly nine, in both directions (T-1002 AC15) --------
+# A tenth key added without updating this list fails it; a key silently
+# dropped from --export/--print (which count independently) fails it too.
+for k in base todo loops runs retros reviews specs provenance interventions; do
+  bash "$PATHS" --root "$D" --get "$k" >/dev/null \
+    || fail "total-key set is exactly nine: key '$k' should resolve"
+done
+set +e
+bash "$PATHS" --root "$D" --get lessons >/dev/null 2>&1
+rc_unlisted=$?
+set -e
+[ "$rc_unlisted" -eq 2 ] || fail "total-key set is exactly nine: an unlisted key should exit 2, got $rc_unlisted"
+export_count="$(bash "$PATHS" --root "$D" --export | grep -c -- '^export TEAM_')"
+[ "$export_count" -eq 9 ] || fail "total-key set is exactly nine: --export should print exactly 9 lines, got $export_count"
+print_count="$(bash "$PATHS" --root "$D" --print | grep -cE -- '^[[:space:]]+[a-z]+[[:space:]]+[^[:space:]]+$')"
+[ "$print_count" -eq 9 ] || fail "total-key set is exactly nine: --print should show exactly 9 rows, got $print_count"
+pass "total-key set is exactly nine: every key resolves, an unlisted key exits 2, --export/--print each carry exactly nine entries"
 
 # --- bad usage exits 2 ------------------------------------------------------
 set +e
