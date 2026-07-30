@@ -52,7 +52,7 @@ Do not add conversational gates on top of it:
   what you are about to touch, then proceed.
 - Do stop before a merge that changes what runs — in this repository that means
   anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,
-  `CLAUDE.md`, or the workflow.
+  `.shell-team/loops/`, `CLAUDE.md`, or the workflow.
 - A merge of records only — a retro, a board close-out, a provenance record —
   needs no stop: nothing takes effect and one command reverts it.
 - Do stop before force-pushing, and before anything that destroys work git
@@ -79,7 +79,7 @@ Do not add conversational gates on top of it:
 
 好みに関わらずコストに見合う停止が 2 つあります:
 
-- **実行されるものを変えるマージ** — このリポジトリでは `bin/`、`agents/`、`skills/`、`templates/prompt-blocks/`、`CLAUDE.md`、ワークフローの配下です。**記録だけのマージ**（retro・board のクローズアウト・provenance レコード）は、上の例が停止を求めないのと同じ理由で停止不要です。
+- **実行されるものを変えるマージ** — このリポジトリでは `bin/`、`agents/`、`skills/`、`templates/prompt-blocks/`、`.shell-team/loops/`、`CLAUDE.md`、ワークフローの配下です。**記録だけのマージ**（retro・board のクローズアウト・provenance レコード）は、上の例が停止を求めないのと同じ理由で停止不要です。
 - **git が取り消せないもの** — force-push、untracked ファイルの削除、唯一のコピーを上書きする操作。ある手順が「先に退避したから安全」な場合、**退避が実際に成功したことを破壊の前に検証する**べきで、成功を仮定してはいけません
 
 この最初の停止点は、マージが実行されるものを変えるかどうかで発火します。どのブランチへ入れるかでもありません。「マージ」という言葉でもありません。記録だけのマージには何かが有効になる瞬間がなく、保証人は人間であるその瞬間自体が存在しないので、そこで止めても確認のコストだけを払って何も買えません。

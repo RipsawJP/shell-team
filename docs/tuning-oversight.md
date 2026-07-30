@@ -63,7 +63,7 @@ Do not add conversational gates on top of it:
   what you are about to touch, then proceed.
 - Do stop before a merge that changes what runs — in this repository that means
   anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,
-  `CLAUDE.md`, or the workflow.
+  `.shell-team/loops/`, `CLAUDE.md`, or the workflow.
 - A merge of records only — a retro, a board close-out, a provenance record —
   needs no stop: nothing takes effect and one command reverts it.
 - Do stop before force-pushing, and before anything that destroys work git
@@ -90,7 +90,7 @@ For a team that wants to be consulted earlier:
 
 Two stops earn their cost regardless of preference:
 
-- **A merge that changes what runs** — anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`, `CLAUDE.md`, or the workflow, in this repository's own terms. A merge of records only — a retro, a board close-out, a provenance record — needs no stop, for the same reason the example above does not ask for one.
+- **A merge that changes what runs** — anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`, `.shell-team/loops/`, `CLAUDE.md`, or the workflow, in this repository's own terms. A merge of records only — a retro, a board close-out, a provenance record — needs no stop, for the same reason the example above does not ask for one.
 - **Anything git cannot undo** — force-pushing, deleting untracked files,
   overwriting a file whose only copy is the one being replaced. When a step is
   safe only because something was preserved first, that preservation should be
