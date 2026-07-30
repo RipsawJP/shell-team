@@ -329,11 +329,14 @@ Five standing rules apply to every criterion below:
   #23 owns are untouched.** Every changed path is on the list below, the diff is
   non-empty (the anti-vacuity control), and nothing under `templates/`, `agents/`,
   `skills/` or `docs/` is touched — which is how "no prompt-block regeneration, no
-  pointer swap, no corpus" is proved rather than promised. **This criterion is
+  pointer swap, no corpus" is proved rather than promised. (`tests/errexit-safe/run.sh`
+  entered the list at the ratified v1→v2 re-freeze: its `NOT_APPLY` registry pins a
+  `gen-playbook-blocks.sh` warning line by `file:line:content`, and this task's edit
+  shifts that line, so the pin update is a mechanically-required companion edit.) **This criterion is
   merge-point-scoped: it is tied to `d691a6f` and is expected to go stale once
   later work lands on `develop`.** Do not widen its base-ref resolution or
   re-derive it per rework round.
-  - check: L="$(git diff --name-only d691a6f)"; test -n "$L" && test "$(printf '%s\n' "$L" | grep -vcE '^(bin/team-paths\.sh|bin/gen-playbook-blocks\.sh|bin/playbook-promote\.sh|bin/retro-inputs\.sh|tests/team-paths/run\.sh|tests/gen-playbook-blocks/run\.sh|tests/playbook-promote/run\.sh|tests/team-init/run\.sh|\.github/workflows/check-handoff\.yml|\.shell-team/test-recipe\.md|\.shell-team/todo\.md|\.shell-team/specs/T-1006-lessons-resolver-key\.md|\.shell-team/provenance/T-1006\.md|\.shell-team/reviews/T-1006\.md|\.shell-team/interventions/T-1006\.md)$')" -eq 0 && test "$(git diff --name-only d691a6f -- templates/ agents/ skills/ docs/ | wc -l | tr -d ' ')" -eq 0
+  - check: L="$(git diff --name-only d691a6f)"; test -n "$L" && test "$(printf '%s\n' "$L" | grep -vcE '^(bin/team-paths\.sh|bin/gen-playbook-blocks\.sh|bin/playbook-promote\.sh|bin/retro-inputs\.sh|tests/team-paths/run\.sh|tests/gen-playbook-blocks/run\.sh|tests/playbook-promote/run\.sh|tests/team-init/run\.sh|tests/errexit-safe/run\.sh|\.github/workflows/check-handoff\.yml|\.shell-team/test-recipe\.md|\.shell-team/todo\.md|\.shell-team/specs/T-1006-lessons-resolver-key\.md|\.shell-team/provenance/T-1006\.md|\.shell-team/reviews/T-1006\.md|\.shell-team/interventions/T-1006\.md)$')" -eq 0 && test "$(git diff --name-only d691a6f -- templates/ agents/ skills/ docs/ | wc -l | tr -d ' ')" -eq 0
 
 - [ ] **AC18** **The one known false statement this task does not fix is declared
   and traceable.** `agents/scrum-master.md` is byte-unchanged against the base ref,
