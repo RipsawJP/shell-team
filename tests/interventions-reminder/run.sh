@@ -87,9 +87,19 @@ mk_shim() {
 # assert_resolver_reachable <cwd> <shim-dir>: the anti-vacuity positive
 # control — without this, a silence case caused by the resolver being
 # unreachable is indistinguishable from a silence case caused by the board.
+# Also asserts the resolved path IS the shim copy, not merely "some
+# team-paths.sh somewhere on PATH": an ambient copy earlier on PATH (this
+# author's own dev machine keeps a stale plugin-cache copy on PATH, ahead of
+# nothing only because the shim is prepended) would otherwise let every case
+# below pass for the wrong reason — proving reachability without proving
+# WHICH binary answers is exactly the gap the rework that added this check
+# closed.
 assert_resolver_reachable() {
-  ( cd "$1" && PATH="$2:$PATH" command -v team-paths.sh >/dev/null ) \
+  local resolved
+  resolved="$( cd "$1" && PATH="$2:$PATH" command -v team-paths.sh )" \
     || fail "resolver not reachable as a bare name from $1 (shim: $2) — the anti-vacuity control failed"
+  [ "$resolved" = "$2/team-paths.sh" ] \
+    || fail "resolver resolved to '$resolved', not the shim copy '$2/team-paths.sh' — an ambient team-paths.sh earlier on PATH would defeat this suite's fixtures silently"
 }
 
 # run_hook <cwd> <path-value> <stdin-file> <out-file> <err-file>
@@ -180,7 +190,17 @@ printf 'name: legacy\n' > "$C/tasks/loops/shell-team.contract.yaml"
 # shellcheck disable=SC2016  # literal board-line content; backticks are not command substitution here.
 printf '%s\n' '## Active' '- [ ] **T-1004** the opt-in sample hook — `READY_FOR_ENG` — spec: docs/specs/T-1004-optin-hook-sample.md' > "$C/tasks/todo.md"
 assert_resolver_reachable "$C" "$C/shim"
-( cd "$C" && PATH="$C/shim:$PATH" test "$(team-paths.sh --get todo)" = tasks/todo.md ) \
+# `env PATH=… team-paths.sh …` inside the substitution, not a shell-level
+# `PATH=… test "$(team-paths.sh …)"` prefix assignment: a prefix assignment on
+# `test` itself would be applied to `test`'s own environment, but bash expands
+# `test`'s ARGUMENTS — including this nested command substitution — before
+# that prefix assignment takes effect, so `team-paths.sh` inside the
+# substitution would resolve against the shell's PRE-assignment PATH, not the
+# shim. `env` sets the child's environment explicitly, as its own argument, so
+# no such ordering gap exists. Locally this bug was a vacuous pass (a stale
+# plugin cache on the outer PATH answered correctly); in CI, with no plugin
+# cache, it was a hard `command not found` failure.
+( cd "$C" && test "$(env PATH="$C/shim:$PATH" team-paths.sh --get todo)" = tasks/todo.md ) \
   || fail "legacy layout: resolver did not report tasks/todo.md"
 rc=0; run_hook "$C" "$C/shim:$PATH" /dev/null "$C/out" "$C/err" || rc=$?
 [ "$rc" -eq 0 ] || fail "legacy layout: expected exit 0, got $rc"
