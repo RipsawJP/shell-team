@@ -41,14 +41,14 @@
 #
 #   --root        repo root the registry's consumer paths resolve against
 #                 (default: cwd)
-#   --lessons     path to the lessons file (default: <root>/tasks/lessons.md).
-#                 The injected tasks/lessons.md pointer text names whatever
-#                 path is actually read here — it reflects a non-default
-#                 --lessons value rather than always saying "tasks/lessons.md".
+#   --lessons     path to the lessons file (default: resolved against --root
+#                 via `bin/team-paths.sh --get lessons`). The injected
+#                 pointer text names whatever path is actually read here,
+#                 never a hardcoded literal.
 #   --blocks-dir  canonical blocks dir (default: <root>/templates/prompt-blocks)
 #
 # Exit: 0 = regenerated (possibly byte-identical to what was already there);
-#       1 = tasks/lessons.md fails bin/check-playbook.sh (nothing written);
+#       1 = the lessons file fails bin/check-playbook.sh (nothing written);
 #       2 = usage / resolver / registry / marker-shape error.
 
 set -euo pipefail
@@ -78,20 +78,33 @@ while [ "$#" -gt 0 ]; do
     --root)       [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --lessons)    [ "$#" -ge 2 ] || die "--lessons requires a value"; shift; LESSONS="$1"; shift ;;
     --blocks-dir) [ "$#" -ge 2 ] || die "--blocks-dir requires a value"; shift; BLOCKS_DIR="$1"; shift ;;
-    --help|-h)    sed -n '2,45p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)    sed -n '2,48p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            die "unknown argument: $1" ;;
   esac
 done
 [ -d "$ROOT" ] || die "root path is not a directory: $ROOT"
-# The tasks/lessons.md pointer text injected into every generated block
-# (see pass 2 below) names the ACTUAL file read here, not a hardcoded
-# literal — so a caller who passes a non-default --lessons PATH gets an
-# accurate pointer instead of a misleading "tasks/lessons.md" reference.
+# The pointer text injected into every generated block (see pass 2 below)
+# names the ACTUAL file read here, not a hardcoded literal — so a caller who
+# passes a non-default --lessons PATH gets an accurate pointer instead of a
+# misleading fixed-path reference.
 if [ -n "$LESSONS" ]; then
+  # --lessons short-circuits the resolver entirely (T-1006 DP-5): an
+  # explicit path must keep working in a repository whose $TEAM_RUN_BASE is
+  # invalid, so the resolver is never even invoked on this branch.
   POINTER_PATH="$LESSONS"
 else
-  LESSONS="$ROOT/tasks/lessons.md"
-  POINTER_PATH="tasks/lessons.md"
+  # T-1006: the default is derived from bin/team-paths.sh rather than
+  # hardcoded to the legacy layout. Capture-then-check (bin/team-init.sh's
+  # precedent) — a nonzero exit is fail-closed, and so is an EMPTY resolved
+  # path: unchecked, "$ROOT/" is a directory, for which `[ -r ]` below would
+  # be true, letting generation proceed against nothing.
+  resolved_lessons=""
+  if ! resolved_lessons="$(bash "$SCRIPT_DIR/team-paths.sh" --root "$ROOT" --get lessons 2>/dev/null)"; then
+    die "could not resolve the lessons path"
+  fi
+  [ -n "$resolved_lessons" ] || die "could not resolve the lessons path"
+  LESSONS="$ROOT/$resolved_lessons"
+  POINTER_PATH="$resolved_lessons"
 fi
 # T-047 fast-follow AC3: POINTER_PATH (the --lessons PATH value) is spliced
 # verbatim into every generated block's pointer text (see pass 2 below) —
@@ -190,7 +203,7 @@ fi
 # --- fail-closed preflight: the WHOLE lessons file must be schema-valid ------
 if ! preflight_out="$(bash "$SCRIPT_DIR/check-playbook.sh" "$LESSONS" 2>&1)"; then
   printf '%s\n' "$preflight_out" >&2 || true
-  fail "tasks/lessons.md fails schema validation — refusing to generate (nothing written, see bin/check-playbook.sh above)"
+  fail "$LESSONS fails schema validation — refusing to generate (nothing written, see bin/check-playbook.sh above)"
 fi
 
 ROLES="engineer qa-verifier tech-lead pm-spec"

@@ -178,3 +178,18 @@ that file's order.
   `bin/` fallback and would otherwise silently no-op through every case —
   the suite asserts `command -v team-paths.sh` under the modified `PATH`
   before every case that expects an emission, as the anti-vacuity control.
+- T-1006: `tests/gen-playbook-blocks/fixtures/root/` is committed WITHOUT the
+  legacy marker (`tasks/loops/shell-team.contract.yaml`), even though it
+  carries `tasks/lessons.md` — so `bin/team-paths.sh` classifies a bare
+  `--root` clone of it as the DEFAULT layout, not legacy, and now that
+  `bin/gen-playbook-blocks.sh` derives its lessons default from the resolver
+  (T-1006), a clone with no marker looks for `.shell-team/lessons.md` instead
+  of the fixture's actual `tasks/lessons.md`. `tests/gen-playbook-blocks/run.sh`'s
+  `clone_fixture()` creates the marker at runtime (never committed into the
+  fixture tree — every other suite in this repo already does the same), and a
+  sibling `clone_fixture_default_layout()` derives the opposite variant
+  (moves the corpus to `.shell-team/lessons.md`, no marker) for the
+  default-layout coverage cases. Before adding a NEW fixture-consuming case to
+  that suite, use one of these two helpers rather than a bare `cp -R
+  "$FIX" ...` — a bare clone silently drifts to whichever layout the fixture
+  tree happens to carry that day.

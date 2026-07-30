@@ -81,7 +81,9 @@
 #   --how-to-apply  where in the workflow this kicks in (full prose, never
 #                   injected)
 #   --date          entry date, default: today (pass explicitly in tests)
-#   --lessons       path to the lessons file (default: tasks/lessons.md)
+#   --lessons       path to the lessons file (default: resolved against the
+#                   current working directory via
+#                   `bin/team-paths.sh --get lessons`)
 #
 # Exit: 0 = entry appended; 1 = candidate fails schema validation (lessons
 #       file left untouched); 2 = usage / argument / file error.
@@ -223,7 +225,22 @@ if [ -z "$DATE" ]; then DATE="$(date +%F)"; fi
 is_valid_calendar_date "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" \
   || die "invalid --date '$DATE' is not a valid Gregorian calendar date"
 
-if [ -z "$LESSONS" ]; then LESSONS="tasks/lessons.md"; fi
+if [ -z "$LESSONS" ]; then
+  # T-1006: the default is derived from bin/team-paths.sh, resolved against
+  # the current working directory (no --root flag here — this script always
+  # resolved against cwd and must keep doing exactly that; DP-5/Non-goals).
+  # Capture-then-check (bin/team-init.sh's precedent) — a nonzero exit is
+  # fail-closed, and so is an EMPTY resolved path (see the same reasoning in
+  # bin/gen-playbook-blocks.sh). --lessons short-circuits this entirely, so
+  # an explicit path still works in a repository whose $TEAM_RUN_BASE is
+  # invalid.
+  resolved_lessons=""
+  if ! resolved_lessons="$(bash "$SCRIPT_DIR/team-paths.sh" --get lessons 2>/dev/null)"; then
+    die "could not resolve the lessons path"
+  fi
+  [ -n "$resolved_lessons" ] || die "could not resolve the lessons path"
+  LESSONS="$resolved_lessons"
+fi
 [ -r "$LESSONS" ] || die "cannot read lessons file: $LESSONS"
 
 # Every free-text value must be a single line with no embedded newline —
