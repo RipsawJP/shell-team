@@ -6,7 +6,7 @@
 
 ## 固定されているもの、あなたの領分のもの
 
-**固定 — ループの完了ゲート。** タスクが完了とみなされるのは、QA が `READY_FOR_REVIEW` に達し、**かつ**クロスプロバイダのレビューが `READY_FOR_MERGE` に達したときだけです。これは会話ではなく board の status flag が担保しているので、個人設定で緩むことはありません。マージが人間を待つのも同じ設計によります。
+**固定 — ループの完了ゲート。** タスクが完了とみなされるのは、QA が `READY_FOR_REVIEW` に達し、**かつ**クロスプロバイダのレビューが `READY_FOR_MERGE` に達したときだけです。これは会話ではなく board の status flag が担保しているので、個人設定で緩むことはありません。ループが自分でマージすることもありません — マージするのは人間であり、これも同じ設計によるものです。これは権限の話であって、確認の話ではありません。ループはあなたの代わりにマージできませんが、あるマージが会話上の停止に値するかどうかはこの後で扱う調整可能な層であり、そこを狭めても固定層はそのまま残ります。
 
 **あなたの領分 — その周りでメインセッションがすること全部。** 編集前に変更セットを提示するか、ブランチ名を確認するか、issue を立てる前に聞くか、それとも黙って進めて選んだ結果を伝えるか。
 
@@ -35,13 +35,14 @@ Claude Code は広いスコープから狭いスコープへ読み込み、**後
 
 ## 例 — 確認を減らす
 
-ループを回して、マージの判断だけしたい場合:
+ループを回して、コストに見合う場面でだけ確認してほしい場合:
 
 ```markdown
 # Local overrides
 
 The loop's own gate is sufficient oversight here: a task is done only when QA
-and the cross-provider review are both green, and merge waits for me.
+and the cross-provider review are both green, and the loop never merges on its
+own.
 
 Do not add conversational gates on top of it:
 
@@ -49,9 +50,16 @@ Do not add conversational gates on top of it:
   asked for. Follow the repo's convention and tell me what you chose.
 - Do not stop to have a multi-file change set approved before starting. State
   what you are about to touch, then proceed.
-- Do stop before merging, before force-pushing, and before anything that
-  destroys work git cannot restore.
+- Do stop before a merge that changes what runs — in this repository that means
+  anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,
+  `.shell-team/loops/`, `CLAUDE.md`, or the workflow.
+- A merge of records only — a retro, a board close-out, a provenance record —
+  needs no stop: nothing takes effect and one command reverts it.
+- Do stop before force-pushing, and before anything that destroys work git
+  cannot restore.
 ```
+
+上のパス一覧はこのリポジトリでの当てはめであって、基準そのものではありません — このブロックを貼り付ける前に、自分のリポジトリで実行される面に置き換えてください。
 
 ## 例 — 確認を増やす
 
@@ -71,8 +79,14 @@ Do not add conversational gates on top of it:
 
 好みに関わらずコストに見合う停止が 2 つあります:
 
-- **マージ** — ループがそこを中心に設計されているため
+- **実行されるものを変えるマージ** — このリポジトリでは `bin/`、`agents/`、`skills/`、`templates/prompt-blocks/`、`.shell-team/loops/`、`CLAUDE.md`、ワークフローの配下です。**記録だけのマージ**（retro・board のクローズアウト・provenance レコード）は、上の例が停止を求めないのと同じ理由で停止不要です。
 - **git が取り消せないもの** — force-push、untracked ファイルの削除、唯一のコピーを上書きする操作。ある手順が「先に退避したから安全」な場合、**退避が実際に成功したことを破壊の前に検証する**べきで、成功を仮定してはいけません
+
+この最初の停止点は、マージが実行されるものを変えるかどうかで発火します。どのブランチへ入れるかでもありません。「マージ」という言葉でもありません。記録だけのマージには何かが有効になる瞬間がなく、保証人は人間であるその瞬間自体が存在しないので、そこで止めても確認のコストだけを払って何も買えません。
+
+これを名指しすることは、運用者が自分に課している規律であって、ループが強制するルールではありません。個人設定がどこかで停止を求めること自体は止められませんが、実効果が生じるちょうどその点にだけこれを保つことが、責任を運用者が置くと決めた場所に留めます。どの瞬間に聞くのが安全に感じるかで説明責任が漂うのを防ぐためです。
+
+**罠: 拡張子は signal ではありません。** 成果物が prompt content であるこのリポジトリでは、「ドキュメントに過ぎない」は安全な判定になりません — 基準は内容が実行されるかどうかであって、ファイルの呼び名ではありません。`templates/prompt-blocks/playbook-*.md` は `.md` で、生成された成果物で、ドキュメントのように読めますが、出荷される `agents/*.md` にスプライスされます。`bin/check-prompt-sync.sh` がそのスプライスを強制しているので、これは信じるしかない警告ではなく検証できる機構です。
 
 ## 限界
 
