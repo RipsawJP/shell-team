@@ -101,3 +101,53 @@ regardless belongs in CI, as this repository's own checks do, or in a hook.
 public repository is the wrong place for one to arrive by default. If you want
 enforcement rather than instruction, write the hook in your own checkout, where
 you can read it before it runs.
+
+## The one sample hook, and why it ships inert
+
+This project still ships no active hook: nothing in `.claude-plugin/plugin.json`
+registers one, and nothing lands on a hook load path when you install the
+plugin. What ships is an inert, readable sample you install yourself —
+`docs/interventions-reminder-hook.sample.sh` — which is exactly what the
+Limits paragraph above already told you to do if you wanted enforcement rather
+than instruction.
+
+### What it does
+
+On every `UserPromptSubmit` event, the sample checks whether the current
+repository's board carries an in-flight task and, if so, prints a one-line
+reminder to classify the moment and record it in the task's interventions file
+before acting on the message — the mechanical version of an instruction that
+otherwise lives only as prose. It never reads your message, and it degrades to
+a silent no-op on every failure path; read the script's own header comment for
+the full contract before you decide whether to install it.
+
+### Install it yourself, and read it first
+
+Copy the sample into your own hooks directory, read the script before you register it, then add an entry like this to your Claude Code settings:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/interventions-reminder.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### The capture-fidelity asymmetry, stated honestly
+
+In the shipped default, the at-the-moment property of trigger-1 capture is
+instruction-strength, carried by a standing instruction in
+`skills/run/SKILL.md` that is followed while it is fresh. With the sample
+installed, that same property is mechanically prompted at every prompt
+submission instead. Neither state proves that every intervention was
+recorded: `bin/check-interventions.sh` proves a record exists and is
+well-formed, never that every intervention was recorded.
