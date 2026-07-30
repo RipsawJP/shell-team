@@ -63,6 +63,7 @@
 #
 # Usage:
 #   playbook-promote.sh --title TEXT --category CAT --applies-to CSV \
+#     --scope loop|maintainer [--bound-in PATH] \
 #     --status active|superseded --source TEXT --rule TEXT --why TEXT \
 #     --how-to-apply TEXT [--date YYYY-MM-DD] [--lessons PATH]
 #
@@ -72,6 +73,17 @@
 #   --category      one token — see bin/check-playbook.sh's known taxonomy
 #   --applies-to    comma list from {engineer, qa-verifier, tech-lead,
 #                   pm-spec, all}
+#   --scope         loop | maintainer (required, no default — T-1007). Only a
+#                   loop entry is ever emitted by bin/gen-playbook-blocks.sh
+#                   into templates/prompt-blocks/; a maintainer entry never
+#                   ships to an adopter.
+#   --bound-in      repository-relative path (required when --scope is
+#                   maintainer, forbidden when --scope is loop — T-1007).
+#                   Passed through verbatim into the entry; the Scope x
+#                   Bound-in combination rule is NOT re-implemented here —
+#                   it is caught by the same fail-closed schema
+#                   re-validation every other field gets below, so there is
+#                   one authority for the schema.
 #   --status        active | superseded
 #   --source        task/issue/PR reference, external citation, or n/a
 #   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.
@@ -142,16 +154,18 @@ is_valid_calendar_date() {  # $1 = year, $2 = month, $3 = day
   [ "$d" -ge 1 ] && [ "$d" -le "$days_in_month" ]
 }
 
-TITLE="" CATEGORY="" APPLIES="" STATUS="" SOURCE="" RULE="" WHY="" HOWTO="" DATE="" LESSONS=""
+TITLE="" CATEGORY="" APPLIES="" SCOPE="" BOUND_IN="" STATUS="" SOURCE="" RULE="" WHY="" HOWTO="" DATE="" LESSONS=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --title|--category|--applies-to|--status|--source|--rule|--why|--how-to-apply|--date|--lessons)
+    --title|--category|--applies-to|--scope|--bound-in|--status|--source|--rule|--why|--how-to-apply|--date|--lessons)
       [ "$#" -ge 2 ] || die "missing value for $1"
       case "$1" in
         --title)        TITLE="$2" ;;
         --category)     CATEGORY="$2" ;;
         --applies-to)   APPLIES="$2" ;;
+        --scope)        SCOPE="$2" ;;
+        --bound-in)     BOUND_IN="$2" ;;
         --status)       STATUS="$2" ;;
         --source)       SOURCE="$2" ;;
         --rule)         RULE="$2" ;;
@@ -163,7 +177,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --help|-h)
-      sed -n '2,45p' "$script_path" | sed 's/^# \{0,1\}//'
+      sed -n '2,101p' "$script_path" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) die "unknown argument: $1" ;;
@@ -178,6 +192,8 @@ done
 TITLE="$(trim "$TITLE")"
 CATEGORY="$(trim "$CATEGORY")"
 APPLIES="$(trim "$APPLIES")"
+SCOPE="$(trim "$SCOPE")"
+BOUND_IN="$(trim "$BOUND_IN")"
 STATUS="$(trim "$STATUS")"
 SOURCE="$(trim "$SOURCE")"
 RULE="$(trim "$RULE")"
@@ -185,7 +201,13 @@ WHY="$(trim "$WHY")"
 HOWTO="$(trim "$HOWTO")"
 
 # --- validation (fail-closed, before any write) ------------------------------
+# T-1007 DP-e: --scope joins the required-field loop, no default (a default
+# would silently classify — the defect at the root of #23). --bound-in is
+# NOT in this loop: it is optional at the CLI level, and the Scope x
+# Bound-in combination rule (mandatory on maintainer, forbidden on loop) is
+# caught below by the schema re-validation, never duplicated here.
 for pair in "title:$TITLE" "category:$CATEGORY" "applies-to:$APPLIES" \
+            "scope:$SCOPE" \
             "status:$STATUS" "source:$SOURCE" "rule:$RULE" "why:$WHY" \
             "how-to-apply:$HOWTO"; do
   name="${pair%%:*}"
@@ -250,7 +272,8 @@ fi
 # enums — are all re-verified below via bin/check-playbook.sh itself, so they
 # are not duplicated here.)
 for pair in "title:$TITLE" "rule:$RULE" "why:$WHY" "how-to-apply:$HOWTO" \
-            "category:$CATEGORY" "applies-to:$APPLIES" "status:$STATUS" "source:$SOURCE"; do
+            "category:$CATEGORY" "applies-to:$APPLIES" "scope:$SCOPE" \
+            "bound-in:$BOUND_IN" "status:$STATUS" "source:$SOURCE"; do
   name="${pair%%:*}"
   val="${pair#*:}"
   if [[ "$val" == *$'\n'* ]]; then
@@ -267,6 +290,16 @@ trap 'rm -f "$ENTRY_FILE" "$CANDIDATE_FILE"' EXIT
   printf '## %s — %s\n' "$DATE" "$TITLE"
   printf -- '- **Category**: %s\n' "$CATEGORY"
   printf -- '- **Applies-to**: %s\n' "$APPLIES"
+  # T-1007 DP-e: Scope immediately after Applies-to, Bound-in immediately
+  # after Scope when supplied — a formatting contract for a deterministic
+  # promotion diff (bin/check-playbook.sh matches field bullets per line and
+  # does not care about order). --bound-in is only emitted when the caller
+  # supplied a non-empty value; the Scope x Bound-in combination rule itself
+  # is enforced by the re-validation below, not here.
+  printf -- '- **Scope**: %s\n' "$SCOPE"
+  if [ -n "$BOUND_IN" ]; then
+    printf -- '- **Bound-in**: %s\n' "$BOUND_IN"
+  fi
   printf -- '- **Status**: %s\n' "$STATUS"
   printf -- '- **Source**: %s\n' "$SOURCE"
   printf -- '- **Rule**: %s\n' "$RULE"

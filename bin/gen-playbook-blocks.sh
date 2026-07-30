@@ -4,8 +4,11 @@
 # (T-045, issue #116).
 #
 # For each IN role (engineer, qa-verifier, tech-lead, pm-spec):
-#   1. Scan the lessons file for `Status: active` entries whose `Applies-to`
-#      includes that role (or `all`, which means all four IN roles at once).
+#   1. Scan the lessons file for `Status: active`, `Scope: loop` entries whose
+#      `Applies-to` includes that role (or `all`, which means all four IN
+#      roles at once). Scope decides WHETHER an entry ships at all (T-1007);
+#      Applies-to decides WHERE it ships. A `Scope: maintainer` entry never
+#      reaches a generated block, whatever its Applies-to says.
 #   2. Emit ONE line per qualifying entry, in file order: the entry's `Rule`
 #      field verbatim, plus a date+heading pointer back into the lessons
 #      file. `Why` / `How to apply` are NEVER transcribed (D2 in
@@ -273,13 +276,19 @@ ENTRIES_FILE="$(mktemp "${TMPDIR:-/tmp}/gen-playbook-entries.XXXXXX")"
 # (cleanup trap for this file is set below, once CONTENT_FILES also exists)
 
 {
-  date=""; remainder=""; applies=""; status=""; rule=""; have_entry=0
+  date=""; remainder=""; applies=""; scope=""; status=""; rule=""; have_entry=0
   in_fence=0
   fence_char=""
   fence_len=0
+  # T-1007 hazard 1: emit_record()'s printf and the pass-2 `read -r` below
+  # are two halves of one \x1f-delimited record contract — a field added to
+  # one and not the other shifts every field after it, silently, into a
+  # generated prompt. `scope` is inserted at a fixed position (after
+  # `applies`, before `status`, mirroring the real file's field order) in
+  # BOTH halves.
   emit_record() {
     [ "$have_entry" -eq 1 ] || return 0
-    printf '%s%s%s%s%s%s%s%s%s\n' "$date" "$FS" "$remainder" "$FS" "$applies" "$FS" "$status" "$FS" "$rule"
+    printf '%s%s%s%s%s%s%s%s%s%s%s\n' "$date" "$FS" "$remainder" "$FS" "$applies" "$FS" "$scope" "$FS" "$status" "$FS" "$rule"
   }
   while IFS= read -r rawline || [ -n "$rawline" ]; do
     line="${rawline%$'\r'}"
@@ -314,7 +323,7 @@ ENTRIES_FILE="$(mktemp "${TMPDIR:-/tmp}/gen-playbook-entries.XXXXXX")"
       if [[ "$line" =~ ^\#\#\ ([0-9]{4}-[0-9]{2}-[0-9]{2})\ —\ (.+)$ ]]; then
         emit_record
         date="${BASH_REMATCH[1]}"; remainder="${BASH_REMATCH[2]}"
-        applies=""; status=""; rule=""; have_entry=1
+        applies=""; scope=""; status=""; rule=""; have_entry=1
       elif is_allowlisted_heading "$line"; then
         emit_record
         have_entry=0
@@ -329,6 +338,8 @@ ENTRIES_FILE="$(mktemp "${TMPDIR:-/tmp}/gen-playbook-entries.XXXXXX")"
     [ "$have_entry" -eq 1 ] || continue
     if [[ "$line" =~ ^-\ \*\*Applies-to\*\*:\ (.*)$ ]]; then
       applies="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^-\ \*\*Scope\*\*:\ (.*)$ ]]; then
+      scope="${BASH_REMATCH[1]}"
     elif [[ "$line" =~ ^-\ \*\*Status\*\*:\ (.*)$ ]]; then
       status="${BASH_REMATCH[1]}"
     elif [[ "$line" =~ ^-\ \*\*Rule\*\*:\ (.*)$ ]]; then
@@ -429,8 +440,14 @@ for role in "${ROLES_ARR[@]}"; do
     printf '\n'
     line_count=2
     any=0
-    while IFS="$FS" read -r e_date e_remainder e_applies e_status e_rule; do
+    while IFS="$FS" read -r e_date e_remainder e_applies e_scope e_status e_rule; do
       [ "$(trim "$e_status")" = "active" ] || continue
+      # T-1007: Scope decides WHETHER an entry ships; Applies-to decides
+      # WHERE. Only a Scope: loop entry ever reaches a generated block — a
+      # maintainer entry never does, whatever its Applies-to says (the
+      # preflight bin/check-playbook.sh call above already guarantees Scope
+      # is present and one of the two known tokens).
+      [ "$(trim "$e_scope")" = "loop" ] || continue
       role_in_applies "$e_applies" "$role" || continue
       # $e_remainder no longer carries the "— " separator itself (the
       # canonical heading regex above now consumes the em-dash as a literal

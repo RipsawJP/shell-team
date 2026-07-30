@@ -742,3 +742,38 @@ extends), `:592-605` (the catch-all that forces the ordering),
 `bin/playbook-promote.sh:285-295` (the fail-closed re-validation DP-e leans on),
 `tests/check-playbook/run.sh:745-763` (the T-108 unknown-bullet cases whose shape
 AC2 mirrors), and T-1006's board entry for what a stale cross-suite pin costs.
+
+## Notes from engineer
+
+Two interactions the pre-implementation freeze-verification could not have
+caught (both root-caused, both fixed within the engineer's normal editing
+authority, neither required a re-freeze — see `.shell-team/provenance/T-1007.md`
+for the full decision/reason/grounding):
+
+- **AC10 x the Fixture contract's own "document both new fields in all three
+  corpora" requirement collide.** AC10's `check:` line asserts, via a
+  whole-file `grep -cF -- '- **Bound-in**: ' | -eq 0`, that no `Bound-in`
+  bullet has been emitted yet after a `--scope loop` promotion — but the same
+  spec's Fixture contract requires every corpus's `## Format` fenced example
+  to document `Bound-in`, and a fenced `- **Bound-in**: <placeholder>` line
+  satisfies that same substring (grep does not distinguish real content from
+  fenced documentation). This is invisible during pre-implementation freeze
+  verification because AC10 didn't exist as a passable command until the
+  fixture corpora carried `Scope`/`Bound-in` fences at all. Resolved by
+  wording `tests/playbook-promote/fixtures/lessons-base.md`'s fenced
+  `Bound-in` line without the colon-space substring the count checks for
+  (`- **Bound-in** (required when ... ): <path>` rather than
+  `- **Bound-in**: <path>`) — the other two corpora, which have no such
+  whole-file count assertion, keep the direct shape.
+- **AC17's runtime-dependency scan x a pre-existing comment collide.**
+  `bin/check-playbook.sh`'s header already said "no jq/yq/python" (present at
+  base ref `72b6e8b`, unrelated to this task) — a declaration of absence that
+  happens to contain the exact tokens AC17's dependency scan greps for. Before
+  this task, AC17 failed earlier at its own file-count assertion (0 of the
+  required 3 `bin/` files had changed), so this collision was never reached
+  during freeze verification. Reworded the comment to state the same "no
+  runtime dependency" fact without naming the banned interpreters.
+
+Neither finding changes any acceptance criterion's meaning or check line —
+both are fixture/comment wording adjustments made to satisfy the criteria as
+written.

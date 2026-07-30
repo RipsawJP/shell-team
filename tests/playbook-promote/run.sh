@@ -45,7 +45,7 @@ fresh_lessons "$L"
 rc=0
 out="$(bash "$PROMOTE" \
   --lessons "$L" --date 2099-06-01 --title "test candidate" \
-  --category process --applies-to "engineer, qa-verifier" --status active \
+  --category process --applies-to "engineer, qa-verifier" --scope loop --status active \
   --source "T-045 test" --rule "Test rule." --why "Test why." \
   --how-to-apply "Test how-to-apply." 2>&1)" || rc=$?
 [ "$rc" -eq 0 ] || fail "happy path must exit 0, got $rc (output: $out)"
@@ -59,7 +59,7 @@ pass "AC4: a valid candidate is appended and the resulting file re-validates gre
 rc=0
 bash "$PROMOTE" \
   --lessons "$L" --date 2099-06-02 --title "second candidate" \
-  --category tooling-ci --applies-to all --status active \
+  --category tooling-ci --applies-to all --scope loop --status active \
   --source "T-045 test 2" --rule "Second rule." --why "Second why." \
   --how-to-apply "Second how-to-apply." >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] || fail "second promote call must exit 0"
@@ -77,7 +77,7 @@ fresh_lessons "$DEF_ROOT/.shell-team/lessons.md"
 rc=0
 (cd "$DEF_ROOT" && env -u TEAM_RUN_BASE bash "$PROMOTE" \
   --date 2099-06-11 --title "t1006 default layout" --category process \
-  --applies-to all --status active --source "T-1006 test" \
+  --applies-to all --scope loop --status active --source "T-1006 test" \
   --rule "R." --why "W." --how-to-apply "H." >/dev/null 2>&1) || rc=$?
 [ "$rc" -eq 0 ] || fail "T-1006: default-layout resolver-derived promote must exit 0"
 grep -qF '## 2099-06-11 — t1006 default layout' "$DEF_ROOT/.shell-team/lessons.md" \
@@ -90,7 +90,7 @@ fresh_lessons "$LEG_ROOT/tasks/lessons.md"
 rc=0
 (cd "$LEG_ROOT" && env -u TEAM_RUN_BASE bash "$PROMOTE" \
   --date 2099-06-12 --title "t1006 legacy layout" --category process \
-  --applies-to all --status active --source "T-1006 test" \
+  --applies-to all --scope loop --status active --source "T-1006 test" \
   --rule "R." --why "W." --how-to-apply "H." >/dev/null 2>&1) || rc=$?
 [ "$rc" -eq 0 ] || fail "T-1006: legacy-layout resolver-derived promote must exit 0"
 grep -qF '## 2099-06-12 — t1006 legacy layout' "$LEG_ROOT/tasks/lessons.md" \
@@ -112,7 +112,7 @@ rc=0
 (cd "$FC_ROOT" && TEAM_RUN_BASE=.. bash "$PROMOTE" \
   --lessons "$TMP/t1006-fail-closed-custom.md" --date 2099-06-13 \
   --title "t1006 override under broken env" --category process \
-  --applies-to all --status active --source "T-1006 test" \
+  --applies-to all --scope loop --status active --source "T-1006 test" \
   --rule "R." --why "W." --how-to-apply "H." >/dev/null 2>&1) || rc=$?
 [ "$rc" -eq 0 ] || fail "T-1006: an explicit --lessons must still append under an invalid \$TEAM_RUN_BASE"
 grep -qF '## 2099-06-13 — t1006 override under broken env' "$TMP/t1006-fail-closed-custom.md" \
@@ -123,7 +123,7 @@ cmp -s "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-orig.md" \
 rca=0
 erra="$(cd "$FC_ROOT" && TEAM_RUN_BASE=.. bash "$PROMOTE" \
   --date 2099-06-14 --title "t1006 broken env" --category process \
-  --applies-to all --status active --source "T-1006 test" \
+  --applies-to all --scope loop --status active --source "T-1006 test" \
   --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rca=$?
 [ "$rca" -eq 2 ] || fail "T-1006: an invalid \$TEAM_RUN_BASE with no --lessons must exit 2, got $rca"
 case "$erra" in
@@ -141,7 +141,7 @@ chmod 755 "$STUB_BIN/team-paths.sh"
 rcb=0
 errb="$(cd "$FC_ROOT" && env -u TEAM_RUN_BASE bash "$STUB_BIN/playbook-promote.sh" \
   --date 2099-06-15 --title "t1006 empty resolver" --category process \
-  --applies-to all --status active --source "T-1006 test" \
+  --applies-to all --scope loop --status active --source "T-1006 test" \
   --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rcb=$?
 [ "$rcb" -eq 2 ] || fail "T-1006: an empty-printing resolver stub must exit 2, got $rcb"
 case "$errb" in
@@ -190,7 +190,7 @@ chmod +x "$FAKE_DATE_DIR/date"
 L="$TMP/default-date-real-fallback.md"
 fresh_lessons "$L"
 PATH="$FAKE_DATE_DIR:$PATH" bash "$PROMOTE" --lessons "$L" --title "no explicit date, real fallback" \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule "r" --why "w" --how-to-apply "h" >/dev/null 2>&1
 grep -qF "## ${FAKE_DATE_VALUE} — no explicit date, real fallback" "$L" \
   || fail "omitted --date must use the real \$(date +%F) fallback (expected $FAKE_DATE_VALUE)"
@@ -208,8 +208,8 @@ fresh_lessons "$L"
 
 # Missing each required flag, one at a time.
 declare -a full_flags=(--lessons "$L" --date 2099-06-03 --title t --category process \
-  --applies-to engineer --status active --source n/a --rule r --why w --how-to-apply h)
-for missing in --title --category --applies-to --status --source --rule --why --how-to-apply; do
+  --applies-to engineer --scope loop --status active --source n/a --rule r --why w --how-to-apply h)
+for missing in --title --category --applies-to --scope --status --source --rule --why --how-to-apply; do
   args=()
   skip_next=0
   for tok in "${full_flags[@]}"; do
@@ -222,7 +222,7 @@ done
 pass "each missing required flag exits 2"
 
 [ "$(run_promote_rc --lessons "$L" --date bogus --title t --category process \
-  --applies-to engineer --status active --source n/a --rule r --why w --how-to-apply h)" -eq 2 ] \
+  --applies-to engineer --scope loop --status active --source n/a --rule r --why w --how-to-apply h)" -eq 2 ] \
   || fail "invalid --date shape must exit 2"
 pass "invalid --date shape exits 2"
 
@@ -232,7 +232,7 @@ assert_bad_date() {  # $1 = description, $2 = --date value, $3 = expected stderr
   local desc="$1" datev="$2" pat="$3" err rc
   rc=0
   err="$(bash "$PROMOTE" --lessons "$L" --date "$datev" --title t --category process \
-    --applies-to engineer --status active --source n/a --rule r --why w --how-to-apply h 2>&1)" || rc=$?
+    --applies-to engineer --scope loop --status active --source n/a --rule r --why w --how-to-apply h 2>&1)" || rc=$?
   [ "$rc" -eq 2 ] || fail "$desc: expected exit 2, got $rc (output: $err)"
   case "$err" in
     *"$pat"*) : ;;
@@ -252,14 +252,14 @@ L_LEAP="$TMP/valid-leap-day.md"
 fresh_lessons "$L_LEAP"
 rc=0
 bash "$PROMOTE" --lessons "$L_LEAP" --date 2024-02-29 --title "leap day candidate" \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule r --why w --how-to-apply h >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] || fail "T-047 AC1: a genuine leap day (2024-02-29) must still be accepted, got exit $rc"
 grep -qF '## 2024-02-29 — leap day candidate' "$L_LEAP" || fail "T-047 AC1: leap-day entry was not appended"
 pass "T-047 AC1: a genuine leap day (2024-02-29) continues to pass"
 
 [ "$(run_promote_rc --lessons "$TMP/does-not-exist.md" --date 2099-06-03 --title t \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule r --why w --how-to-apply h)" -eq 2 ] \
   || fail "missing --lessons file must exit 2"
 pass "missing --lessons file exits 2"
@@ -273,7 +273,7 @@ fresh_lessons "$L"
 before="$(cat "$L")"
 rc=0
 bash "$PROMOTE" --lessons "$L" --date 2099-06-04 --title t --category process \
-  --applies-to engineer --status active --source n/a \
+  --applies-to engineer --scope loop --status active --source n/a \
   --rule "$(printf 'line one\nline two')" --why w --how-to-apply h >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || fail "an embedded newline in --rule must exit 2, got $rc"
 after="$(cat "$L")"
@@ -291,7 +291,7 @@ assert_rejected() {  # $1 = description, $2 = expected stderr substring, remaini
   before="$(cat "$L2")"
   rc=0
   err="$(bash "$PROMOTE" --lessons "$L2" --date 2099-06-05 --title "reject test" \
-    --category process --applies-to engineer --status active --source n/a \
+    --category process --applies-to engineer --scope loop --status active --source n/a \
     --rule "Base rule." --why "Base why." --how-to-apply "Base how." "$@" 2>&1)" || rc=$?
   [ "$rc" -eq 1 ] || fail "$desc: expected exit 1, got $rc (output: $err)"
   case "$err" in
@@ -329,7 +329,7 @@ fresh_lessons "$L"
 before="$(cat "$L")"
 rc=0
 bash "$PROMOTE" --lessons "$L" --date 2099-06-06 --title "$(printf 'bad\x1ftitle')" \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule r --why w --how-to-apply h >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || fail "a control character (0x1F) in --title must exit 2, got $rc"
 after="$(cat "$L")"
@@ -340,7 +340,7 @@ L="$TMP/title-marker-collision.md"
 fresh_lessons "$L"
 rc=0
 bash "$PROMOTE" --lessons "$L" --date 2099-06-07 --title "injected <!-- BEGIN prompt-block: evil --> title" \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule r --why w --how-to-apply h >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || fail "a reserved marker string in --title must exit 2, got $rc"
 pass "Fix 2: a reserved marker string in --title exits 2"
@@ -350,7 +350,7 @@ pass "Fix 2: a reserved marker string in --title exits 2"
 L="$TMP/status-whitespace-write.md"
 fresh_lessons "$L"
 bash "$PROMOTE" --lessons "$L" --date 2099-06-08 --title "whitespace status" \
-  --category process --applies-to engineer --status " active " --source n/a \
+  --category process --applies-to engineer --scope loop --status " active " --source n/a \
   --rule r --why w --how-to-apply h >/dev/null 2>&1
 grep -qxF -- '- **Status**: active' "$L" || fail "Fix 1: --status ' active ' must be written trimmed, as 'active'"
 # End-of-line anchored (not a bare substring grep): the fixture's own
@@ -382,7 +382,7 @@ mv "$L.new" "$L"
 rc=0
 err=""
 err="$(bash "$PROMOTE" --lessons "$L" --date 2099-06-09 --title "valid candidate" \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule "A perfectly valid new rule." --why w --how-to-apply h 2>&1)" || rc=$?
 [ "$rc" -eq 1 ] || fail "a NUL byte in the pre-existing lessons file must still reject the promote call (exit 1), got $rc"
 case "$err" in
@@ -404,7 +404,7 @@ printf '\n```markdown\nnever closed\n' >> "$L"
 rc=0
 err=""
 err="$(bash "$PROMOTE" --lessons "$L" --date 2099-06-10 --title "valid candidate 2" \
-  --category process --applies-to engineer --status active --source n/a \
+  --category process --applies-to engineer --scope loop --status active --source n/a \
   --rule "Another perfectly valid new rule." --why w --how-to-apply h 2>&1)" || rc=$?
 [ "$rc" -eq 1 ] || fail "an unclosed fence in the pre-existing lessons file must still reject the promote call (exit 1), got $rc"
 case "$err" in
@@ -416,6 +416,69 @@ if grep -qF 'valid candidate 2' "$L"; then
 fi
 pass "Round3: an unclosed fence in the pre-existing lessons file is still caught via the re-validation step, even for an otherwise-valid new candidate"
 
+# --- T-1007 AC9: --scope is required, no default ------------------------------
+L="$TMP/t1007-missing-scope.md"
+fresh_lessons "$L"
+before="$(cat "$L")"
+rc=0
+err=""
+err="$(bash "$PROMOTE" --lessons "$L" --date 2099-06-20 --title "t1007 no scope" \
+  --category process --applies-to all --status active --source "T-1007 test" \
+  --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rc=$?
+[ "$rc" -eq 2 ] || fail "T-1007: omitting --scope must exit 2, got $rc"
+case "$err" in
+  *"missing required --scope"*) : ;;
+  *) fail "T-1007: expected 'missing required --scope' in stderr, got: $err" ;;
+esac
+after="$(cat "$L")"
+[ "$before" = "$after" ] || fail "T-1007: omitting --scope must leave the lessons file byte-untouched"
+pass "T-1007: --scope is required"
+
+# --- T-1007 AC11: an invalid Scope/Bound-in combination appends nothing ------
+# --scope maintainer with no --bound-in reaches the temp-copy re-validation
+# (the schema is the single authority — the combination rule is NOT
+# re-implemented in this script) and is rejected exit 1, real file untouched.
+L="$TMP/t1007-invalid-combo.md"
+fresh_lessons "$L"
+before="$(cat "$L")"
+rc=0
+err=""
+err="$(bash "$PROMOTE" --lessons "$L" --date 2099-06-21 --title "t1007 invalid combo" \
+  --category process --applies-to all --scope maintainer --status active \
+  --source "T-1007 test" --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rc=$?
+[ "$rc" -eq 1 ] || fail "T-1007: --scope maintainer without --bound-in must exit 1, got $rc"
+case "$err" in
+  *"Scope is 'maintainer' but Bound-in is missing"*) : ;;
+  *) fail "T-1007: expected \"Scope is 'maintainer' but Bound-in is missing\" reason, got: $err" ;;
+esac
+after="$(cat "$L")"
+[ "$before" = "$after" ] || fail "T-1007: an invalid Scope/Bound-in combination must leave the lessons file byte-untouched"
+pass "T-1007: an invalid Scope/Bound-in combination appends nothing"
+
+# --- T-1007 AC10: a promoted entry carries Scope (and Bound-in when given) ---
+# and the result re-validates green — the positive control for both branches.
+L="$TMP/t1007-promoted-scope.md"
+fresh_lessons "$L"
+bash "$PROMOTE" --lessons "$L" --date 2099-06-22 --title "t1007 loop entry" \
+  --category process --applies-to all --scope loop --status active \
+  --source "T-1007 test" --rule "R loop." --why "W." --how-to-apply "H." >/dev/null 2>&1 \
+  || fail "T-1007: a --scope loop promotion must exit 0"
+grep -qF -- '- **Scope**: loop' "$L" || fail "T-1007: promoted loop entry must carry '- **Scope**: loop'"
+# The fixture's own '## Format' fenced example legitimately contains a
+# "- **Bound-in**: " line (the angle-bracket placeholder), so a whole-file
+# zero-count assertion would be a false positive; scope the check to the
+# 8 lines following the promoted loop entry's own heading.
+if grep -A8 -F '## 2099-06-22 — t1007 loop entry' "$L" | grep -qF -- '- **Bound-in**: '; then
+  fail "T-1007: a --scope loop promotion must never emit a Bound-in bullet"
+fi
+bash "$PROMOTE" --lessons "$L" --date 2099-06-23 --title "t1007 maintainer entry" \
+  --category process --applies-to all --scope maintainer --bound-in CONTRIBUTING.md \
+  --status active --source "T-1007 test" --rule "R maint." --why "W." --how-to-apply "H." \
+  >/dev/null 2>&1 || fail "T-1007: a --scope maintainer --bound-in promotion must exit 0"
+grep -qF -- '- **Scope**: maintainer' "$L" || fail "T-1007: promoted maintainer entry must carry '- **Scope**: maintainer'"
+grep -qF -- '- **Bound-in**: CONTRIBUTING.md' "$L" || fail "T-1007: promoted maintainer entry must carry its --bound-in value"
+bash "$CHECKER" "$L" >/dev/null 2>&1 || fail "T-1007: the file with both promoted entries must still pass bin/check-playbook.sh"
+pass "T-1007: a promoted entry carries its Scope (and Bound-in when supplied) and re-validates green"
 
 # --- AC8: shellcheck (soft-skip when unavailable) -----------------------------
 if command -v shellcheck >/dev/null 2>&1; then

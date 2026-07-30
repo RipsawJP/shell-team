@@ -193,3 +193,35 @@ that file's order.
   that suite, use one of these two helpers rather than a bare `cp -R
   "$FIX" ...` — a bare clone silently drifts to whichever layout the fixture
   tree happens to carry that day.
+- T-1007: every entry in all three of `bin/check-playbook.sh`'s ledger
+  fixture corpora — `tests/check-playbook/fixtures/valid-base.md`,
+  `tests/gen-playbook-blocks/fixtures/root/tasks/lessons.md`, and
+  `tests/playbook-promote/fixtures/lessons-base.md` — now carries a required
+  `- **Scope**: loop | maintainer` bullet, and a `Scope: maintainer` entry
+  additionally requires `- **Bound-in**: <repository-relative path>`
+  (forbidden on `Scope: loop`). A fixture entry with no `Scope` bullet at all
+  is not merely incomplete: `bin/check-playbook.sh` now rejects it fail-closed
+  (`missing required field: Scope`), which turns the ENTIRE consuming suite
+  red, not just the one assertion that happened to touch the malformed entry
+  — because most ad-hoc printf-built entries in `tests/check-playbook/run.sh`
+  and `tests/gen-playbook-blocks/run.sh` are fed straight through the real
+  checker/generator as fixtures-in-fixtures. Before adding a new synthetic
+  entry to either suite (a fence-content probe, a Superseded-by probe, a
+  bulk/threshold probe, ...), add `- **Scope**: loop` to it as a matter of
+  course, the same way `- **Category**: process` already is. The three
+  corpora's own `## Format` fenced examples document both new fields; the
+  `Scope` line there uses the angle-bracket placeholder `<loop | maintainer>`
+  (never a bare `loop`/`maintainer` token) precisely so a `sed` targeting a
+  real entry's `Scope` value cannot also mutate the documentation — but
+  `Bound-in`'s placeholder line does NOT get the same free pass everywhere:
+  `tests/playbook-promote/fixtures/lessons-base.md`'s own `## Format` fence
+  intentionally spells it `- **Bound-in** (required when Scope is
+  maintainer, forbidden when Scope is loop): <repository-relative path>`
+  (no colon immediately after `**Bound-in**`) rather than the
+  `- **Bound-in**: <...>` shape the other two corpora use, because
+  `bin/playbook-promote.sh`'s own suite greps for the exact substring
+  `- **Bound-in**: ` (with the colon) to assert "no Bound-in bullet has been
+  emitted yet" after a `--scope loop` promotion — a literal fenced-example
+  bullet in that shape would satisfy the same substring and produce a false
+  positive, since `grep -F` matches anywhere in the file, fenced content
+  included.
