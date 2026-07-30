@@ -155,6 +155,14 @@ is_valid_calendar_date() {  # $1 = year, $2 = month, $3 = day
 }
 
 TITLE="" CATEGORY="" APPLIES="" SCOPE="" BOUND_IN="" STATUS="" SOURCE="" RULE="" WHY="" HOWTO="" DATE="" LESSONS=""
+# T-1007 rework1 (Codex round1 Major): tracks whether --bound-in was
+# EXPLICITLY supplied on the command line, independent of $BOUND_IN's
+# (possibly blank/whitespace) value — "flag absent" and "flag present with a
+# blank value" must stay distinguishable all the way to entry construction
+# below, or a blank-but-supplied --bound-in gets silently converted to "no
+# Bound-in bullet at all" before bin/check-playbook.sh's re-validation ever
+# sees it (the exact bug this flag closes).
+BOUND_IN_SEEN=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -165,7 +173,7 @@ while [ "$#" -gt 0 ]; do
         --category)     CATEGORY="$2" ;;
         --applies-to)   APPLIES="$2" ;;
         --scope)        SCOPE="$2" ;;
-        --bound-in)     BOUND_IN="$2" ;;
+        --bound-in)     BOUND_IN="$2"; BOUND_IN_SEEN=1 ;;
         --status)       STATUS="$2" ;;
         --source)       SOURCE="$2" ;;
         --rule)         RULE="$2" ;;
@@ -293,11 +301,26 @@ trap 'rm -f "$ENTRY_FILE" "$CANDIDATE_FILE"' EXIT
   # T-1007 DP-e: Scope immediately after Applies-to, Bound-in immediately
   # after Scope when supplied — a formatting contract for a deterministic
   # promotion diff (bin/check-playbook.sh matches field bullets per line and
-  # does not care about order). --bound-in is only emitted when the caller
-  # supplied a non-empty value; the Scope x Bound-in combination rule itself
-  # is enforced by the re-validation below, not here.
+  # does not care about order).
+  #
+  # T-1007 rework1 (Codex round1 Major): the bullet is emitted whenever
+  # --bound-in was EXPLICITLY SUPPLIED ($BOUND_IN_SEEN), even when its
+  # (trimmed) value is blank — NOT gated on "$BOUND_IN" being non-empty. The
+  # frozen spec states --bound-in "is passed through to the emitted entry"
+  # unconditionally (Goal, DP-e) and that the Scope x Bound-in combination
+  # rule is the re-validation's job alone, never re-implemented here. Gating
+  # on non-emptiness pre-filtered that signal: a caller who explicitly passed
+  # `--bound-in ""` (or hit an empty-variable bug intending a real binding)
+  # got a silent, schema-valid `loop`-scoped entry with no bullet at all and
+  # no trace in the diff that a value was ever supplied — the checker never
+  # got a chance to apply DP-a's forbidden-on-loop / mandatory-on-maintainer
+  # rule to it. Now the blank bullet reaches the candidate file, and the
+  # existing fail-closed re-validation below is what rejects it (blank on
+  # maintainer -> the mandatory-value check fires; presence on loop, blank or
+  # not -> the forbidden-presence check fires) — one authority for the
+  # schema, exactly as DP-e requires.
   printf -- '- **Scope**: %s\n' "$SCOPE"
-  if [ -n "$BOUND_IN" ]; then
+  if [ "$BOUND_IN_SEEN" -eq 1 ]; then
     printf -- '- **Bound-in**: %s\n' "$BOUND_IN"
   fi
   printf -- '- **Status**: %s\n' "$STATUS"

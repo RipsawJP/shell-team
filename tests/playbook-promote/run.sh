@@ -480,6 +480,30 @@ grep -qF -- '- **Bound-in**: CONTRIBUTING.md' "$L" || fail "T-1007: promoted mai
 bash "$CHECKER" "$L" >/dev/null 2>&1 || fail "T-1007: the file with both promoted entries must still pass bin/check-playbook.sh"
 pass "T-1007: a promoted entry carries its Scope (and Bound-in when supplied) and re-validates green"
 
+# --- T-1007 rework1 (Codex round1 Major): an explicitly-supplied but BLANK --
+# --bound-in must NOT be silently dropped before the candidate reaches the
+# re-validation. `--scope loop --bound-in ""` must still emit a `Bound-in`
+# bullet (blank or not, presence is what DP-a's loop rule tests), so the
+# existing fail-closed re-validation rejects it — exit 1 (the checker's own
+# authority), never promote's own exit 2 — and the lessons file is left
+# byte-untouched, exactly like every other rejected candidate.
+L="$TMP/t1007-blank-bound-in.md"
+fresh_lessons "$L"
+before="$(cat "$L")"
+rc=0
+err=""
+err="$(bash "$PROMOTE" --lessons "$L" --date 2099-06-24 --title "t1007 blank bound-in" \
+  --category process --applies-to all --scope loop --bound-in "" \
+  --status active --source "T-1007 test" --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rc=$?
+[ "$rc" -eq 1 ] || fail "T-1007: --scope loop --bound-in '' must exit 1 (the re-validation's code), got $rc"
+case "$err" in
+  *"Scope is 'loop' but Bound-in is present"*) : ;;
+  *) fail "T-1007: blank --bound-in on loop: expected \"Scope is 'loop' but Bound-in is present\" reason, got: $err" ;;
+esac
+after="$(cat "$L")"
+[ "$before" = "$after" ] || fail "T-1007: an explicitly-blank --bound-in must leave the lessons file byte-untouched"
+pass "T-1007: an explicitly-blank --bound-in is not silently dropped and is rejected by the re-validation"
+
 # --- AC8: shellcheck (soft-skip when unavailable) -----------------------------
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$PROMOTE" "$HERE/run.sh" || fail "AC8: scripts must be shellcheck clean"
