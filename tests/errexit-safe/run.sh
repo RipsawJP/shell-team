@@ -310,7 +310,7 @@ check-contract.sh:37:  printf '%s:%s: %s\n' "$FILE" "$1" "$2" >&2
 check-board-headings.sh:308:    printf '%s: note: no resolvable base (first commit and no --base/--base-file/env default) — skipping the deletion/replacement (structural) check; the duplicate check still runs\n' "$BOARD" >&2
 check-board-headings.sh:318:  printf '%s: %s: %s\n' "$BOARD" "$1" "$2" >&2
 close-out.sh:258:  printf 'close-out: note: project_status generated block not refreshed (file or markers absent) — see gen-project-status.sh\n' >&2
-gen-playbook-blocks.sh:436:        "$role" "$line_count" "$LINE_WARN_THRESHOLD" >&2
+gen-playbook-blocks.sh:449:        "$role" "$line_count" "$LINE_WARN_THRESHOLD" >&2
 EOF
 sort -u "$NOT_APPLY_FILE" -o "$NOT_APPLY_FILE"
 
