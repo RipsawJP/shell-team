@@ -192,12 +192,12 @@ or would pass vacuously (meaning preserved), and only then freezes.
 - [ ] **AC2** **Zero activation footprint.** `.claude-plugin/plugin.json` has no
   `hooks` key and the whole `.claude-plugin/` directory is byte-unchanged against
   the base ref; no directory named `hooks` exists anywhere in the repository; and
-  the diff adds nothing under `agents/`, `skills/` or `commands/`. Positive
+  the diff adds no new file under `agents/`, `skills/` or `commands/`. Positive
   controls: the manifest is readable and names the plugin, and the overall diff is
   non-empty. **Merge-point-scoped**: the diff halves resolve `develop` and are
   expected to go stale once this task lands there; do not widen the base-ref
   resolution or re-derive them per rework round.
-  - check: P=.claude-plugin/plugin.json && grep -qF -- '"name": "shell-team"' "$P" && ! grep -q -- '"hooks"' "$P" && git diff --quiet develop -- .claude-plugin/ && test -z "$(find . -path ./.git -prune -o -type d -name hooks -print)" && d="$(git diff --name-only develop)" && test -n "$d" && test -z "$(printf '%s\n' "$d" | grep -E -- '^(agents|skills|commands)/')"
+  - check: P=.claude-plugin/plugin.json && grep -qF -- '"name": "shell-team"' "$P" && ! grep -q -- '"hooks"' "$P" && git diff --quiet develop -- .claude-plugin/ && test -z "$(find . -path ./.git -prune -o -type d -name hooks -print)" && d="$(git diff --name-only develop)" && test -n "$d" && test -z "$(git diff --name-only --diff-filter=A develop -- agents/ skills/ commands/)"
 
 - [ ] **AC3** **The emitted JSON and the reminder are single-sourced from this
   spec and identical in the sample and its suite.** The exact one-line payload
