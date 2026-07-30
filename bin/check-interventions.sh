@@ -73,6 +73,8 @@
 # Entry template: `<!-- BEGIN interventions: <id> -->` opens the region and `<!-- END interventions: <id> -->` closes it with the same `<id>`; each entry is a `- intervention: <class>` line followed by indented `date: <YYYY-MM-DD>`, `summary: <one line>` and `effect: <one line>` fields.
 # If the file currently holds the sentinel `no interventions occurred`, the first real entry REPLACES that line rather than being appended after it — the sentinel and an entry cannot coexist in either order (AC5).
 #
+# Every append to an interventions file is committed immediately, as its own commit, at the moment of recording — at every recording point, not only at the Implement-to-Validate seam.
+#
 # This checker judges STRUCTURE ONLY — it never judges whether an
 # intervention really happened, whether a class token was the right choice,
 # or whether the stated effect is the real effect. A file carrying the

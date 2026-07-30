@@ -1597,6 +1597,28 @@ set -e
   || fail "goalskill-producer-discipline-reference: removing the anchor line from a mutated copy should make the anchor grep FAIL (rc=1), got rc=$gpdr_mut_rc — the lock would be vacuous"
 pass "goalskill-producer-discipline-reference — skills/goal/SKILL.md carries a reference-form Interventions producer discipline paragraph (anchor present, points at skills/run/SKILL.md's discipline paragraph and the canonical class template; non-vacuous — removing the anchor line trips the lock)"
 
+# --- durability-duty extension (T-1002 rework2, Codex round2 Blocker fix) ---
+# The universal durability rule ("commit every append immediately, at every
+# recording point, not only at the Implement-to-Validate seam") must also be
+# referenced here, or an autonomous /goal tick could satisfy the interventions
+# gate at the Completion-gate seam while a later same-tick STOP/abort leaves an
+# entry uncommitted with nothing telling the orchestrator to commit it.
+GPDR_DURABILITY_ANCHOR='every append to an interventions file is committed immediately, as its own commit, at the moment of recording, at every one of this tick'
+grep -qF -- "$GPDR_DURABILITY_ANCHOR" "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing the T-1002 rework2 durability-duty sentence in skills/goal/SKILL.md"
+
+# Non-vacuity: a mutated copy with the durability sentence's own line removed
+# must make the SAME grep FAIL (rc=1) — proving this extension is not vacuous.
+GPDR_DUR_MUT_FILE="$TMP/mutated-goal-SKILL-no-durability-duty.md"
+grep -vF -- "$GPDR_DURABILITY_ANCHOR" "$GOAL_SKILL_MD" > "$GPDR_DUR_MUT_FILE"
+set +e
+grep -qF -- "$GPDR_DURABILITY_ANCHOR" "$GPDR_DUR_MUT_FILE"
+gpdr_dur_mut_rc=$?
+set -e
+[[ "$gpdr_dur_mut_rc" -eq 1 ]] \
+  || fail "goalskill-producer-discipline-reference: removing the durability-duty line from a mutated copy should make the durability grep FAIL (rc=1), got rc=$gpdr_dur_mut_rc — the T-1002 rework2 lock extension would be vacuous"
+pass "goalskill-producer-discipline-reference (T-1002 rework2) — skills/goal/SKILL.md's reference-form paragraph also carries the universal durability duty (anchor present; non-vacuous — removing it trips the lock)"
+
 # =============================================================================
 # template-check-ignore
 # =============================================================================
