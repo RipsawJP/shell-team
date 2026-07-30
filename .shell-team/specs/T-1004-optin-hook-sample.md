@@ -726,3 +726,66 @@ idiom); `.shell-team/test-recipe.md` (append the procedure you establish).
 `.shell-team/interventions/T-1004.md` (the T-1002 gate at the Implement-to-Validate
 seam — the orchestrator is the producer, not you), and the review record. All three
 are inside AC18's allow-list already.
+
+## Notes from engineer
+
+**AC2 and AC16 are in direct, structural conflict — a frozen-intent defect, not
+an implementation gap.** All 18 `check:` lines were run live against the
+completed implementation (staged): 17 pass; AC2 is the sole failure, every
+time, deterministically, for a reason that has nothing to do with how the
+sample or its suite were written.
+
+AC2's check line asserts `test -z "$(printf '%s\n' "$d" | grep -E --
+'^(agents|skills|commands)/')"` against `d="$(git diff --name-only develop)"`
+— i.e. the tracked diff must contain **zero** paths under `agents/`, `skills/`,
+or `commands/`. AC16, in the same frozen Acceptance criteria section, requires
+editing `agents/scrum-master.md`'s citation sentence (one clause, for issue
+#44) — and the Measured inventory table lists that file as an "edited" file
+for this exact task. AC17's protected-invariants list does **not** include
+`agents/scrum-master.md` (only `agents/engineer.md` and `agents/qa-verifier.md`
+are named there), confirming the spec's own intent was that this file could be
+touched. There is no implementation that satisfies both AC2 and AC16
+simultaneously: any edit to `agents/scrum-master.md` — mandatory, frozen,
+correctly scoped to one clause — makes `agents/scrum-master.md` appear in
+`git diff --name-only develop`, which AC2's negated grep then rejects.
+
+I verified this is not a staging artifact: before `git add`, AC1 and AC2 both
+failed (AC1 because an untracked file has no git-index mode; AC2 because
+`agents/scrum-master.md` was already a tracked, modified file, visible in the
+diff regardless of staging the new sample). After staging, AC1 passes; AC2
+still fails, for the reason above, deterministically. I also confirmed there
+is no way to satisfy issue #44 (AC16) through a different file — AC16
+explicitly names `agents/scrum-master.md`'s own citation sentence as the
+target.
+
+Per this role's standing rule that the intent block (Goal / Non-goals /
+Acceptance criteria / Input space, `<!-- BEGIN/END intent-block: T-1004 -->`)
+is pm-spec's property and the engineer edits not one byte of it — even when a
+rework requires changing the frozen region itself, that goes through pm-spec
+plus human ratification (a re-freeze) — I have not touched AC2's check line.
+
+**Proposed narrow fix, for pm-spec's consideration at re-freeze:** either (a)
+add an explicit exclusion for the one file AC16 mandates, e.g. change the
+tail of AC2's check to
+`grep -E -- '^(agents|skills|commands)/' | grep -v -- '^agents/scrum-master\.md$'`,
+or (b) narrow AC2's scope from "no diff under agents/, skills/, commands/" to
+"no **new file** added under agents/, skills/, commands/" via
+`git diff --name-only --diff-filter=A develop`, which would still catch a
+plugin-shipped active hook arriving as a new agent/skill/command file (AC2's
+actual stated concern — see the Goal paragraph "no file lands on any plugin
+load path" and Non-goals "A plugin-shipped active hook is not this task under
+any review finding") while permitting the AC16-mandated edit to an existing
+file. Option (b) more precisely matches AC2's own stated purpose (detecting a
+new hook-shipping mechanism, not forbidding any touch whatsoever to an
+existing, unrelated agent file) and is my recommendation, but the choice and
+the re-freeze are pm-spec's and the human's to make, not mine.
+
+All other work in this task — the sample, its 12-case fixture suite, the two
+`docs/tuning-oversight*.md` sections, the registry binding, the scrum-master.md
+clause itself, CI wiring, the test recipe entry, and provenance — is complete
+and independently verified (AC1, AC3–AC18: 17/18 pass; four spec-directed
+mutations plus one self-chosen mutation all fired the expected criterion red
+and were restored to green; `check-intent.sh` reports `aligned` v1 unchanged;
+`check-prompt-sync.sh` and `check-pii-shapes.sh --base develop` are clean; the
+full CI shellcheck argument list is clean; every suite named in
+`.github/workflows/check-handoff.yml` passes locally).

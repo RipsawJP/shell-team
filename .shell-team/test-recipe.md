@@ -170,3 +170,11 @@ that file's order.
   (no new prerequisite: pure bash + coreutils, same explicit
   `"${TMPDIR:-/tmp}/...XXXXXX"` mktemp-template convention, fixtures built
   inline per case, no static `fixtures/` directory).
+- T-1004: `bash tests/interventions-reminder/run.sh` is
+  `docs/interventions-reminder-hook.sample.sh`'s fixture suite. The one
+  non-obvious environment requirement: the suite must make `team-paths.sh`
+  reachable as a bare name on `PATH` (a `cp`'d-plus-`chmod 755` copy in a
+  throwaway shim dir per fixture cwd), because the sample deliberately has no
+  `bin/` fallback and would otherwise silently no-op through every case —
+  the suite asserts `command -v team-paths.sh` under the modified `PATH`
+  before every case that expects an emission, as the anti-vacuity control.
