@@ -31,8 +31,30 @@ trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP"
 
 clone_fixture() {  # $1 = destination
+  # T-1006 DP-6: the fixture tree carries tasks/lessons.md but NO
+  # tasks/loops/shell-team.contract.yaml, so bin/team-paths.sh classifies it as
+  # the DEFAULT layout (base=.shell-team) rather than legacy. The legacy
+  # marker is created here, at runtime, rather than committed into the
+  # fixture -- every other suite in this repo does the same (see
+  # .shell-team/test-recipe.md's T-1006 entry) -- so every bare `--root`
+  # invocation below keeps resolving to tasks/lessons.md exactly as it did
+  # before the consumer was wired to the resolver.
   rm -rf "$1"
   cp -R "$FIX" "$1"
+  mkdir -p "$1/tasks/loops"
+  : > "$1/tasks/loops/shell-team.contract.yaml"
+}
+
+# clone_fixture_default_layout $1 = destination
+# T-1006 AC3: the same fixture, but on the DEFAULT layout -- no legacy marker,
+# and the corpus moved to .shell-team/lessons.md (the resolver's canonical
+# default-layout path). Derived at runtime, same reasoning as clone_fixture().
+clone_fixture_default_layout() {  # $1 = destination
+  rm -rf "$1"
+  cp -R "$FIX" "$1"
+  mkdir -p "$1/.shell-team"
+  mv "$1/tasks/lessons.md" "$1/.shell-team/lessons.md"
+  rmdir "$1/tasks"
 }
 
 run_gen() {  # $1 = root; prints exit code
@@ -81,6 +103,65 @@ pass "AC7: superseded entries are excluded and Why/How-to-apply are never transc
 grep -qF 'tasks/lessons.md, 2026-01-01 — Engineer-only active entry' "$ENG" \
   || fail "AC3: injected line must carry a tasks/lessons.md date+heading pointer"
 pass "AC3: injected lines carry a tasks/lessons.md date+heading pointer"
+
+# --- T-1006 AC3/AC21: the default layout resolves the lessons path via -----
+# bin/team-paths.sh -- no legacy marker, corpus at .shell-team/lessons.md.
+C="$TMP/t1006-default-layout"
+clone_fixture_default_layout "$C"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1006: the default-layout fixture must regenerate successfully"
+grep -qF '.shell-team/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md" \
+  || fail "T-1006: the default-layout pointer must name .shell-team/lessons.md"
+if grep -qF 'tasks/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md"; then
+  fail "T-1006: the default-layout pointer must not fall back to the legacy tasks/lessons.md literal"
+fi
+pass "T-1006: the default layout resolves the lessons path via bin/team-paths.sh"
+
+# --- T-1006 AC4/AC21: the legacy layout still resolves tasks/lessons.md ----
+# via bin/team-paths.sh -- the no-adopter-file-moves guarantee.
+C="$TMP/t1006-legacy-layout"
+clone_fixture "$C"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1006: the legacy-layout fixture must regenerate successfully"
+grep -qF 'tasks/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md" \
+  || fail "T-1006: the legacy-layout pointer must name tasks/lessons.md"
+if grep -qF '.shell-team/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md"; then
+  fail "T-1006: the legacy-layout pointer must not resolve to .shell-team/lessons.md"
+fi
+pass "T-1006: the legacy layout resolves tasks/lessons.md via bin/team-paths.sh"
+
+# --- T-1006 AC6/AC21: a resolver failure is fail-closed (nothing written) --
+# Two probes: (a) an invalid $TEAM_RUN_BASE with no --lessons; (b) a sibling
+# team-paths.sh stubbed to exit 0 printing nothing (the empty-path hole).
+C="$TMP/t1006-fail-closed"
+clone_fixture_default_layout "$C"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1006: fail-closed setup: initial generation must succeed"
+[ -f "$C/templates/prompt-blocks/playbook-engineer.md" ] \
+  || fail "T-1006: fail-closed setup: anti-vacuity control — the block must exist before it is removed"
+rm -f "$C/templates/prompt-blocks/playbook-engineer.md"
+rca=0
+erra="$(TEAM_RUN_BASE=.. bash "$GEN" --root "$C" 2>&1)" || rca=$?
+[ "$rca" -eq 2 ] || fail "T-1006: an invalid \$TEAM_RUN_BASE with no --lessons must exit 2, got $rca"
+case "$erra" in
+  *"could not resolve the lessons path"*) : ;;
+  *) fail "T-1006: invalid \$TEAM_RUN_BASE: expected 'could not resolve the lessons path', got: $erra" ;;
+esac
+[ ! -e "$C/templates/prompt-blocks/playbook-engineer.md" ] \
+  || fail "T-1006: an invalid \$TEAM_RUN_BASE must not generate anything"
+
+STUB_BIN="$TMP/t1006-stub-bin"
+rm -rf "$STUB_BIN"
+cp -R "$REPO_ROOT/bin" "$STUB_BIN"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_BIN/team-paths.sh"
+chmod 755 "$STUB_BIN/team-paths.sh"
+rcb=0
+errb="$(env -u TEAM_RUN_BASE bash "$STUB_BIN/gen-playbook-blocks.sh" --root "$C" 2>&1)" || rcb=$?
+[ "$rcb" -eq 2 ] || fail "T-1006: an empty-printing resolver stub must exit 2, got $rcb"
+case "$errb" in
+  *"could not resolve the lessons path"*) : ;;
+  *) fail "T-1006: empty resolver stub: expected 'could not resolve the lessons path', got: $errb" ;;
+esac
+[ ! -e "$C/templates/prompt-blocks/playbook-engineer.md" ] \
+  || fail "T-1006: an empty-printing resolver stub must not generate anything"
+pass "T-1006: a resolver failure is fail-closed (nothing written)"
 
 # --- Fix 1 (T-045 rework, Major): a trailing-space Status entry is still ----
 # included, not silently dropped. bin/check-playbook.sh trims Status before

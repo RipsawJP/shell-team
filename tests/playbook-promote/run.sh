@@ -68,6 +68,90 @@ grep -qF '## 2099-06-02 — second candidate' "$L" || fail "append-only: second 
 bash "$CHECKER" "$L" >/dev/null 2>&1 || fail "append-only: file must still pass bin/check-playbook.sh after two promotions"
 pass "AC4: repeated calls append distinct entries (append-only, never overwrite)"
 
+# --- T-1006 AC9/AC21: the resolver-derived default is used when --lessons ---
+# is omitted, on both layouts, resolved against the CURRENT WORKING DIRECTORY
+# (no --root flag on this script).
+DEF_ROOT="$TMP/t1006-default-layout"
+mkdir -p "$DEF_ROOT/.shell-team"
+fresh_lessons "$DEF_ROOT/.shell-team/lessons.md"
+rc=0
+(cd "$DEF_ROOT" && env -u TEAM_RUN_BASE bash "$PROMOTE" \
+  --date 2099-06-11 --title "t1006 default layout" --category process \
+  --applies-to all --status active --source "T-1006 test" \
+  --rule "R." --why "W." --how-to-apply "H." >/dev/null 2>&1) || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1006: default-layout resolver-derived promote must exit 0"
+grep -qF '## 2099-06-11 — t1006 default layout' "$DEF_ROOT/.shell-team/lessons.md" \
+  || fail "T-1006: default-layout entry must land in .shell-team/lessons.md"
+
+LEG_ROOT="$TMP/t1006-legacy-layout"
+mkdir -p "$LEG_ROOT/tasks/loops"
+: > "$LEG_ROOT/tasks/loops/shell-team.contract.yaml"
+fresh_lessons "$LEG_ROOT/tasks/lessons.md"
+rc=0
+(cd "$LEG_ROOT" && env -u TEAM_RUN_BASE bash "$PROMOTE" \
+  --date 2099-06-12 --title "t1006 legacy layout" --category process \
+  --applies-to all --status active --source "T-1006 test" \
+  --rule "R." --why "W." --how-to-apply "H." >/dev/null 2>&1) || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1006: legacy-layout resolver-derived promote must exit 0"
+grep -qF '## 2099-06-12 — t1006 legacy layout' "$LEG_ROOT/tasks/lessons.md" \
+  || fail "T-1006: legacy-layout entry must land in tasks/lessons.md"
+pass "T-1006: the resolver-derived default is used when --lessons is omitted"
+
+# --- T-1006 AC10/AC21: a resolver failure is fail-closed (nothing appended) -
+# Positive control: an explicit --lessons still appends under the same
+# invalid environment. Then two failure probes: invalid $TEAM_RUN_BASE with
+# no --lessons, and a sibling team-paths.sh stubbed to exit 0 printing
+# nothing (the empty-path hole) — both must exit 2, leave the resolved
+# default byte-untouched, and share the message.
+FC_ROOT="$TMP/t1006-fail-closed"
+mkdir -p "$FC_ROOT/.shell-team"
+fresh_lessons "$FC_ROOT/.shell-team/lessons.md"
+cp "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-orig.md"
+cp "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-custom.md"
+rc=0
+(cd "$FC_ROOT" && TEAM_RUN_BASE=.. bash "$PROMOTE" \
+  --lessons "$TMP/t1006-fail-closed-custom.md" --date 2099-06-13 \
+  --title "t1006 override under broken env" --category process \
+  --applies-to all --status active --source "T-1006 test" \
+  --rule "R." --why "W." --how-to-apply "H." >/dev/null 2>&1) || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1006: an explicit --lessons must still append under an invalid \$TEAM_RUN_BASE"
+grep -qF '## 2099-06-13 — t1006 override under broken env' "$TMP/t1006-fail-closed-custom.md" \
+  || fail "T-1006: the explicit --lessons override must have appended"
+cmp -s "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-orig.md" \
+  || fail "T-1006: the resolved default must stay byte-untouched while --lessons overrides"
+
+rca=0
+erra="$(cd "$FC_ROOT" && TEAM_RUN_BASE=.. bash "$PROMOTE" \
+  --date 2099-06-14 --title "t1006 broken env" --category process \
+  --applies-to all --status active --source "T-1006 test" \
+  --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rca=$?
+[ "$rca" -eq 2 ] || fail "T-1006: an invalid \$TEAM_RUN_BASE with no --lessons must exit 2, got $rca"
+case "$erra" in
+  *"could not resolve the lessons path"*) : ;;
+  *) fail "T-1006: invalid \$TEAM_RUN_BASE: expected 'could not resolve the lessons path', got: $erra" ;;
+esac
+cmp -s "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-orig.md" \
+  || fail "T-1006: an invalid \$TEAM_RUN_BASE must leave the resolved default byte-untouched"
+
+STUB_BIN="$TMP/t1006-stub-bin"
+rm -rf "$STUB_BIN"
+cp -R "$REPO_ROOT/bin" "$STUB_BIN"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_BIN/team-paths.sh"
+chmod 755 "$STUB_BIN/team-paths.sh"
+rcb=0
+errb="$(cd "$FC_ROOT" && env -u TEAM_RUN_BASE bash "$STUB_BIN/playbook-promote.sh" \
+  --date 2099-06-15 --title "t1006 empty resolver" --category process \
+  --applies-to all --status active --source "T-1006 test" \
+  --rule "R." --why "W." --how-to-apply "H." 2>&1)" || rcb=$?
+[ "$rcb" -eq 2 ] || fail "T-1006: an empty-printing resolver stub must exit 2, got $rcb"
+case "$errb" in
+  *"could not resolve the lessons path"*) : ;;
+  *) fail "T-1006: empty resolver stub: expected 'could not resolve the lessons path', got: $errb" ;;
+esac
+cmp -s "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-orig.md" \
+  || fail "T-1006: an empty-printing resolver stub must leave the resolved default byte-untouched"
+pass "T-1006: a resolver failure is fail-closed (nothing appended)"
+
 # --- default --date is today when omitted (the SOLE date coverage path) -----
 # T-054 (#135) fast-follow: this is now the only test exercising the
 # omitted-`--date` default — the earlier test-only env-var override hook in

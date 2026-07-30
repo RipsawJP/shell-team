@@ -7,9 +7,14 @@
 # for this project) plus a `tasks/lessons.md` read (a file that does not exist
 # here), and whether an input was actually consulted was a sentence a human
 # might forget to write. This script derives the cycle window from `git`
-# alone, resolves every artefact path through `bin/team-paths.sh`, and reports
-# each of the nine canonical inputs below as exactly one of three statuses.
-# `gh` is demoted to optional pr-metadata enrichment.
+# alone and resolves every directory-backed artefact path through
+# `bin/team-paths.sh`, and reports each of the nine canonical inputs below as
+# exactly one of three statuses. `gh` is demoted to optional pr-metadata
+# enrichment. The lessons log is the one input this script does NOT resolve
+# itself, by choice (T-1006 DP-1(b)): a resolver key exists
+# (`bin/team-paths.sh --get lessons`), but wiring this script to it would drag
+# in the DS-5/DS-6 promotion semantics this task's retro side owns — so the
+# path is read only when a caller supplies it via `--lessons PATH`.
 #
 # v2 design (see spec's "What v1 of this task got wrong, and why v2 exists"):
 # v1 defended each status with its own hand-written guard, and three
@@ -125,9 +130,11 @@ Options:
                   Also caps the pr-metadata enrichment when gh is available.
                   A cap is a declared, ordinary outcome, distinct from a
                   shallow-clone truncation -- both are stated when both apply.
-  --lessons PATH  Path to the lessons log. OPTIONAL: there is no resolver key
-                  for it (issues #23/#24), so it is read only when this flag
-                  is given; without it, the lessons line is unavailable.
+  --lessons PATH  Path to the lessons log. OPTIONAL: a resolver key exists
+                  (bin/team-paths.sh --get lessons), but this script asks for
+                  the path explicitly, by choice (T-1006 DP-1(b)) -- it is
+                  read only when this flag is given; without it, the lessons
+                  line is unavailable.
   --help, -h      Show this help and exit.
 EOF
 }
@@ -450,14 +457,16 @@ report_dir_input previous-retro   "${TEAM_RETROS_DIR:-}"     ".md"    "prior ret
 report_dir_input interventions    "${TEAM_INTERVENTIONS_DIR:-}" ".md" "intervention records"
 
 # ---------------------------------------------------------------------------
-# lessons (DS-5 read / DS-6 empty) — OPTIONAL: there is no resolver key for
-# it (issues #23/#24), so it is read only when --lessons PATH is supplied
-# (DP-4). Its absence is a recorded status, never a failure.
+# lessons (DS-5 read / DS-6 empty) — OPTIONAL: a resolver key exists
+# (bin/team-paths.sh --get lessons; T-1006), but this script asks for the
+# path explicitly, by choice (DP-1(b) in that task's spec) -- it is read
+# only when --lessons PATH is supplied (DP-4). Its absence is a recorded
+# status, never a failure.
 # ---------------------------------------------------------------------------
 probe_lessons() {
   local path="$1"
   if [ -z "$path" ]; then
-    note lessons "no path supplied via --lessons (no resolver key exists yet; see issue #24)"
+    note lessons "no path supplied via --lessons (a resolver key exists -- team-paths.sh --get lessons -- but this script asks for the path explicitly, by choice)"
     return 0
   fi
   if [ ! -f "$path" ]; then

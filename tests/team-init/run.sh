@@ -92,6 +92,13 @@ bash "$CHECK_HANDOFF" "$T1/.shell-team/todo.md" >/dev/null 2>&1 \
   || fail "AC1: generated todo.md does not pass check-handoff"
 pass "AC1: generated todo.md passes check-handoff"
 
+# T-1006 AC15: adding a `lessons` resolver key must not turn into a scaffolded
+# file — the corpus stays opt-in. Positive control: the board scaffolded at
+# all (asserted above); this asserts no file named lessons.md anywhere in it.
+[ "$(find "$T1" -name 'lessons.md' | wc -l | tr -d ' ')" -eq 0 ] \
+  || fail "T-1006: team-init scaffolds no lessons file"
+pass "T-1006: team-init scaffolds no lessons file"
+
 bash "$CHECK_CONTRACT" "$T1/.shell-team/loops/shell-team.contract.yaml" >/dev/null 2>&1 \
   || fail "AC1: generated contract does not pass check-contract"
 pass "AC1: generated shell-team.contract.yaml passes check-contract"

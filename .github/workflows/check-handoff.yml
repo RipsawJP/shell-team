@@ -135,6 +135,7 @@ jobs:
           test "$(bash bin/team-paths.sh --get base)"  = ".shell-team"
           test "$(bash bin/team-paths.sh --get todo)"  = ".shell-team/todo.md"
           test "$(bash bin/team-paths.sh --get specs)" = ".shell-team/specs"
+          test "$(bash bin/team-paths.sh --get lessons)" = ".shell-team/lessons.md"
 
       - name: Run install fixture suite
         run: bash tests/install/run.sh
