@@ -162,7 +162,7 @@ Do not add conversational gates on top of it:
   what you are about to touch, then proceed.
 - Do stop before a merge that changes what runs — in this repository that means
   anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,
-  `CLAUDE.md`, or the workflow.
+  `.shell-team/loops/`, `CLAUDE.md`, or the workflow.
 - A merge of records only — a retro, a board close-out, a provenance record —
   needs no stop: nothing takes effect and one command reverts it.
 - Do stop before force-pushing, and before anything that destroys work git
@@ -185,7 +185,7 @@ or would pass vacuously (meaning preserved), and only then freezes.
   (count 0), and the canonical block's five bullet lines quoted above are present
   verbatim in both. The two unchanged bullets are the same-file positive controls
   for the negated half.
-  - check: for f in docs/tuning-oversight.md docs/tuning-oversight.ja.md; do test "$(grep -cF -- '- Do stop before merging, before force-pushing, and before anything that' "$f")" -eq 0 || exit 1; grep -qF -- '- Do not ask before creating a branch or filing an issue for work I have already' "$f" || exit 1; grep -qF -- '- Do stop before a merge that changes what runs — in this repository that means' "$f" || exit 1; grep -qF -- '  anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,' "$f" || exit 1; grep -qF -- '- A merge of records only — a retro, a board close-out, a provenance record —' "$f" || exit 1; grep -qF -- '  needs no stop: nothing takes effect and one command reverts it.' "$f" || exit 1; grep -qF -- '- Do stop before force-pushing, and before anything that destroys work git' "$f" || exit 1; done
+  - check: for f in docs/tuning-oversight.md docs/tuning-oversight.ja.md; do test "$(grep -cF -- '- Do stop before merging, before force-pushing, and before anything that' "$f")" -eq 0 || exit 1; grep -qF -- '- Do not ask before creating a branch or filing an issue for work I have already' "$f" || exit 1; grep -qF -- '- Do stop before a merge that changes what runs — in this repository that means' "$f" || exit 1; grep -qF -- '  anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,' "$f" || exit 1; grep -qF -- '  `.shell-team/loops/`, `CLAUDE.md`, or the workflow.' "$f" || exit 1; grep -qF -- '- A merge of records only — a retro, a board close-out, a provenance record —' "$f" || exit 1; grep -qF -- '  needs no stop: nothing takes effect and one command reverts it.' "$f" || exit 1; grep -qF -- '- Do stop before force-pushing, and before anything that destroys work git' "$f" || exit 1; done
 
 - [ ] **AC2** **No unconditional merge framing survives anywhere in the
   "fewer interruptions" section** — not in the block's preamble, and not in the
