@@ -2,7 +2,7 @@
 # invariants.sh — ONE bounded regression lock for the
 # abort-before-emission class (T-1001 v3 AC10), and nothing more.
 #
-# In every state below, retro-inputs.sh prints "## Retro inputs" and eight complete ledger lines and exits 0 or 2; any other exit status (including 1 and 141) and any output with fewer than eight ledger lines is a violation.
+# In every state below, retro-inputs.sh prints "## Retro inputs" and nine complete ledger lines and exits 0 or 2; any other exit status (including 1 and 141) and any output with fewer than nine ledger lines is a violation.
 #
 # The nine states are a CLOSED list — the ones this task's own review rounds
 # actually produced — pinned at exactly nine in both directions so the list
@@ -86,7 +86,7 @@ mkdir -p "$TMP"
 # assert_invariant <description> -- <cmd...>
 # Runs the given command (typically `bash "$RETRO_INPUTS" ...` in a subshell
 # with a cwd already set via `cd dir &&`), and asserts the single output
-# invariant: exit 0 or 2, "## Retro inputs" heading present, exactly 8
+# invariant: exit 0 or 2, "## Retro inputs" heading present, exactly 9
 # top-level `- input: ` lines.
 assert_invariant() {
   local desc="$1" out rc
@@ -100,7 +100,7 @@ assert_invariant() {
     || fail "$desc: missing the '## Retro inputs' heading (got: $out)"
   local n
   n="$(printf '%s\n' "$out" | grep -c -- '^- input: ')"
-  [ "$n" -eq 8 ] || fail "$desc: expected 8 complete ledger lines, got $n (out: $out)"
+  [ "$n" -eq 9 ] || fail "$desc: expected 9 complete ledger lines, got $n (out: $out)"
   pass "$desc"
 }
 
