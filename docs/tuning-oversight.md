@@ -9,10 +9,7 @@ part is fixed, which part is yours, and where to put your answer.
 
 ## What is fixed, and what is yours
 
-**Fixed — the loop's completion gate.** A task is done only when QA reaches
-`READY_FOR_REVIEW` *and* the cross-provider review reaches `READY_FOR_MERGE`.
-That is carried by status flags in the board, not by conversation, so no
-personal setting relaxes it. Merging waits for a human by the same design.
+**Fixed — the loop's completion gate.** A task is done only when QA reaches `READY_FOR_REVIEW` *and* the cross-provider review reaches `READY_FOR_MERGE`. That is carried by status flags in the board, not by conversation, so no personal setting relaxes it. The loop never merges on its own — merging is a human action, by the same design. That is a claim about authority, not about interruption: the loop cannot merge for you, but whether a given merge earns a conversational stop is the tunable layer covered below, and narrowing it there leaves this fixed layer exactly where it was.
 
 **Yours — everything the main session does around that.** Whether it proposes a
 change set before editing, confirms a branch name, asks before filing an issue,
@@ -49,13 +46,14 @@ request.
 
 ## Example — fewer interruptions
 
-For someone who wants the loop to run and only wants the merge decision:
+For someone who wants the loop to run, and to be asked only where a stop earns its cost:
 
 ```markdown
 # Local overrides
 
 The loop's own gate is sufficient oversight here: a task is done only when QA
-and the cross-provider review are both green, and merge waits for me.
+and the cross-provider review are both green, and the loop never merges on its
+own.
 
 Do not add conversational gates on top of it:
 
@@ -63,9 +61,16 @@ Do not add conversational gates on top of it:
   asked for. Follow the repo's convention and tell me what you chose.
 - Do not stop to have a multi-file change set approved before starting. State
   what you are about to touch, then proceed.
-- Do stop before merging, before force-pushing, and before anything that
-  destroys work git cannot restore.
+- Do stop before a merge that changes what runs — in this repository that means
+  anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`,
+  `CLAUDE.md`, or the workflow.
+- A merge of records only — a retro, a board close-out, a provenance record —
+  needs no stop: nothing takes effect and one command reverts it.
+- Do stop before force-pushing, and before anything that destroys work git
+  cannot restore.
 ```
+
+That path list is this repository's own instantiation of the criterion, not the criterion itself — substitute the surfaces that execute in your own repository before you paste this block.
 
 ## Example — more checkpoints
 
@@ -85,11 +90,17 @@ For a team that wants to be consulted earlier:
 
 Two stops earn their cost regardless of preference:
 
-- **Merging**, because it is the point the loop is built around.
+- **A merge that changes what runs** — anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`, `CLAUDE.md`, or the workflow, in this repository's own terms. A merge of records only — a retro, a board close-out, a provenance record — needs no stop, for the same reason the example above does not ask for one.
 - **Anything git cannot undo** — force-pushing, deleting untracked files,
   overwriting a file whose only copy is the one being replaced. When a step is
   safe only because something was preserved first, that preservation should be
   verified before the destructive part runs, not assumed.
+
+The first stop fires on whether the merge changes what runs — not on which branch you are merging into, and not on the word "merge". A records-only merge has no point where the human is the guarantor, because nothing there takes effect, so a stop costs an interruption and buys nothing.
+
+Naming it is a discipline the operator imposes on themselves, not a rule the loop enforces: nothing stops a personal setting from asking for a stop anywhere, but keeping this one exactly at the point of real effect keeps responsibility where the operator decided it belongs, instead of letting accountability drift toward whichever moment felt safest to ask about.
+
+**The trap: file extension is not the signal.** In a repository whose product is prompt content, "it's only docs" is not a safe test — the criterion is whether the content executes, not what the file is called. `templates/prompt-blocks/playbook-*.md` files are `.md`, they are generated artefacts, they read like documentation, and they are spliced into `agents/*.md`, which ship; `bin/check-prompt-sync.sh` enforces that splice, so this is a mechanism you can verify rather than a warning to take on faith.
 
 ## Limits
 
