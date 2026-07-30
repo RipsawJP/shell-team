@@ -8,7 +8,7 @@
 # here), and whether an input was actually consulted was a sentence a human
 # might forget to write. This script derives the cycle window from `git`
 # alone, resolves every artefact path through `bin/team-paths.sh`, and reports
-# each of the eight canonical inputs below as exactly one of three statuses.
+# each of the nine canonical inputs below as exactly one of three statuses.
 # `gh` is demoted to optional pr-metadata enrichment.
 #
 # v2 design (see spec's "What v1 of this task got wrong, and why v2 exists"):
@@ -33,6 +33,7 @@
 #   - input: previous-retro
 #   - input: lessons
 #   - input: pr-metadata
+#   - input: interventions
 #   - status: read
 #   - status: empty
 #   - status: unavailable
@@ -45,7 +46,7 @@
 # determination impossible.
 #   DS-1 cycle-window/read: determination = the merge-commit count for the resolved ref is known, having confirmed the ref resolves, whether the repository is shallow (git rev-parse --is-shallow-repository answered), and that git log --merges succeeded. Precondition: git responds; the ref resolves; the shallow question is answerable; git log succeeds. If any precondition fails, unavailable stands -- no promotion is attempted.
 #   DS-2 cycle-window/empty: determination = the merge-commit count is confirmed zero AND the repository is confirmed NOT shallow, so "zero" cannot mean "truncated before any merge". Precondition: same as DS-1, evaluated with shallow=false and total=0. A shallow repository with zero merges in the boundary fails this precondition and unavailable stands.
-#   DS-3 directory-input/read (review-artifacts, provenance, specs, run-telemetry, previous-retro): determination = the directory's entries were fully enumerated -- every name a glob returned could also be stat'ed -- and at least one matches the expected suffix. Precondition: the directory exists, is readable, and every returned name is stat'able (search/traverse permission). A readable-but-not-traversable directory fails this precondition and unavailable stands, never empty.
+#   DS-3 directory-input/read (review-artifacts, provenance, specs, run-telemetry, previous-retro, interventions): determination = the directory's entries were fully enumerated -- every name a glob returned could also be stat'ed -- and at least one matches the expected suffix. Precondition: the directory exists, is readable, and every returned name is stat'able (search/traverse permission). A readable-but-not-traversable directory fails this precondition and unavailable stands, never empty.
 #   DS-4 directory-input/empty: determination = the directory's entries were fully enumerated and confirmed to contain zero matches. Precondition: the same enumeration-completeness test as DS-3, evaluated to zero matches. An incomplete enumeration (readable, not traversable) fails this precondition and unavailable stands, never a false empty.
 #   DS-5 lessons/read: determination = the supplied --lessons path is a readable regular file whose non-blank line count is known. Precondition: a path was supplied, it exists, is a regular file, and is readable. An unreadable path fails this precondition and unavailable stands.
 #   DS-6 lessons/empty: determination = the supplied --lessons path's non-blank line count is confirmed to be zero. Precondition: same countable-regular-file precondition as DS-5, evaluated to a zero count. A path that is not a countable regular file (e.g. a directory) fails this precondition and unavailable stands.
@@ -174,7 +175,7 @@ sanitize() {
 # that can move a status away from unavailable); emission happens once, at
 # the very end, over the canonical id list.
 # ---------------------------------------------------------------------------
-IDS="cycle-window review-artifacts provenance specs run-telemetry previous-retro lessons pr-metadata"
+IDS="cycle-window review-artifacts provenance specs run-telemetry previous-retro lessons pr-metadata interventions"
 
 for id in $IDS; do
   var="ST_${id//-/_}"; printf -v "$var" '%s' "unavailable"
@@ -446,6 +447,7 @@ report_dir_input provenance       "${TEAM_PROVENANCE_DIR:-}" ".md"    "provenanc
 report_dir_input specs            "${TEAM_SPECS_DIR:-}"      ".md"    "spec files"
 report_dir_input run-telemetry    "${TEAM_RUNS_DIR:-}"       ".jsonl" "run telemetry files"
 report_dir_input previous-retro   "${TEAM_RETROS_DIR:-}"     ".md"    "prior retro files"
+report_dir_input interventions    "${TEAM_INTERVENTIONS_DIR:-}" ".md" "intervention records"
 
 # ---------------------------------------------------------------------------
 # lessons (DS-5 read / DS-6 empty) — OPTIONAL: there is no resolver key for

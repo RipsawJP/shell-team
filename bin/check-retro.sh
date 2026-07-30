@@ -27,7 +27,7 @@
 #      either one is caught as a disagreement rather than passing as clean).
 #      When the region was read: every canonical id (cycle-window,
 #      review-artifacts, provenance, specs, run-telemetry, previous-retro,
-#      lessons, pr-metadata) must appear EXACTLY once, each with a status in
+#      lessons, pr-metadata, interventions) must appear EXACTLY once, each with a status in
 #      {read, empty, unavailable} and a detail that is non-empty AND not
 #      whitespace-only. An id outside the enum, a status outside the enum, a
 #      missing id, a duplicated id, an empty or whitespace-only detail, a
@@ -73,12 +73,13 @@ LESSON_PREFIX='## Lesson 候補（'
 #   - input: previous-retro
 #   - input: lessons
 #   - input: pr-metadata
+#   - input: interventions
 #   - status: read
 #   - status: empty
 #   - status: unavailable
 #   empty means the input was consulted and held nothing; unavailable means it could not be consulted at all. Never report one as the other.
 RETRO_INPUTS='## Retro inputs'
-RETRO_INPUTS_IDS="cycle-window review-artifacts provenance specs run-telemetry previous-retro lessons pr-metadata"
+RETRO_INPUTS_IDS="cycle-window review-artifacts provenance specs run-telemetry previous-retro lessons pr-metadata interventions"
 RETRO_INPUTS_STATUSES="read empty unavailable"
 
 violations=0

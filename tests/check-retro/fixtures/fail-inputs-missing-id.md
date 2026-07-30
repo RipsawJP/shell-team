@@ -9,6 +9,7 @@
 - input: run-telemetry — status: unavailable — detail: directory not found: .shell-team/runs
 - input: previous-retro — status: empty — detail: 0 prior retro files in .shell-team/retros
 - input: pr-metadata — status: unavailable — detail: gh CLI not found
+- input: interventions — status: unavailable — detail: directory not found: .shell-team/interventions
 
 ## サマリ
 

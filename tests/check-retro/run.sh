@@ -59,31 +59,76 @@ grep -qE "unlabelled Lesson 候補 bullet" <<< "$err" \
   || fail "fail-closed under broken TMPDIR: malformed bullet must still be reported (got: $err)"
 pass "fail-closed: broken TMPDIR still catches fail-bare-lesson.md (exit $rc)"
 
-# T-1001: the "## Retro inputs" ledger — a closed enum, fail-closed on every
-# recognised violation shape (AC18). Each of the ten fixtures below isolates
-# exactly one violation; "case:" labels below are asserted verbatim by the spec.
-assert_rc "case: a well-formed Retro inputs ledger passes" \
-  0 "" "$FIX/pass-canonical.md"
-assert_rc "fail-inputs-missing-section -> 1"     1 "missing decorated section heading: ## Retro inputs" "$FIX/fail-inputs-missing-section.md"
-assert_rc "fail-inputs-unknown-status -> 1"      1 "unknown Retro inputs status"                        "$FIX/fail-inputs-unknown-status.md"
-assert_rc "fail-inputs-unknown-id -> 1"          1 "unknown Retro inputs id"                             "$FIX/fail-inputs-unknown-id.md"
-assert_rc "fail-inputs-missing-id -> 1"          1 "missing Retro inputs id: lessons"                    "$FIX/fail-inputs-missing-id.md"
-assert_rc "fail-inputs-duplicate-id -> 1"        1 "duplicated Retro inputs id"                          "$FIX/fail-inputs-duplicate-id.md"
-assert_rc "fail-inputs-empty-detail -> 1"        1 "empty Retro inputs detail"                           "$FIX/fail-inputs-empty-detail.md"
-assert_rc "case: a whitespace-only detail is reported" \
-  1 "whitespace-only Retro inputs detail" "$FIX/fail-inputs-blank-detail.md"
-assert_rc "fail-inputs-stray-line -> 1"          1 "unrecognised line inside ## Retro inputs"            "$FIX/fail-inputs-stray-line.md"
-assert_rc "fail-inputs-duplicate-section -> 1"   1 "duplicated ## Retro inputs section heading"          "$FIX/fail-inputs-duplicate-section.md"
-assert_rc "fail-inputs-line-outside-section -> 1" 1 "ledger-shaped line outside the ## Retro inputs section" "$FIX/fail-inputs-line-outside-section.md"
+# T-1001/T-1003: the "## Retro inputs" ledger — a closed enum, fail-closed on
+# every recognised violation shape (AC18). Each ledger fixture below is
+# asserted against its DECLARED number of violation lines, via assert_violations
+# used at every one of the eleven fixture call sites — a fixture edited
+# incompletely (e.g. an added `missing Retro inputs id: interventions` line
+# left uncounted) now fails the count instead of passing on the first matching
+# stderr pattern alone. "case:" labels below are asserted verbatim by the spec.
+#
+# case: each ledger fixture emits its declared number of violations (fail-inputs-duplicate-section legitimately emits two)
+#
+# assert_violations <desc> <expected_rc> <expected_violation_count> <stderr_grep|""> <file...>
+# — the expected COUNT is a positive assertion distinct from assert_rc's single
+# pattern match: a superseded prose claim that each fixture isolates a lone
+# violation is FALSE for fail-inputs-duplicate-section.md, which legitimately
+# emits two (the duplicated heading itself, and the second region's now-
+# stranded ledger line, which becomes a line-outside-the-section violation
+# once the first region has already closed) — so this suite declares a
+# per-fixture count rather than a universal "exactly one".
+assert_violations() {
+  local desc="$1" exp_rc="$2" exp_count="$3" pat="$4"; shift 4
+  local err rc n
+  set +e
+  err="$(bash "$RETRO" "$@" 2>&1 >/dev/null)"
+  rc=$?
+  set -e
+  [ "$rc" -eq "$exp_rc" ] || fail "$desc: expected exit $exp_rc, got $rc (stderr: $err)"
+  [ -z "$pat" ] || grep -qE "$pat" <<< "$err" || fail "$desc: stderr missing /$pat/ (got: $err)"
+  n=0
+  [ -z "$err" ] || n="$(printf '%s\n' "$err" | grep -c '.')"
+  [ "$n" -eq "$exp_count" ] || fail "$desc: expected $exp_count violation line(s), got $n (stderr: $err)"
+  pass "$desc (exit $rc, $exp_count violation(s))"
+}
+
+assert_violations "case: a well-formed Retro inputs ledger passes" \
+  0 0 "" "$FIX/pass-canonical.md"
+assert_violations "fail-inputs-missing-section -> 1"     1 1 "missing decorated section heading: ## Retro inputs" "$FIX/fail-inputs-missing-section.md"
+assert_violations "fail-inputs-unknown-status -> 1"      1 1 "unknown Retro inputs status"                        "$FIX/fail-inputs-unknown-status.md"
+assert_violations "fail-inputs-unknown-id -> 1"          1 1 "unknown Retro inputs id"                             "$FIX/fail-inputs-unknown-id.md"
+assert_violations "fail-inputs-missing-id -> 1"          1 1 "missing Retro inputs id: lessons"                    "$FIX/fail-inputs-missing-id.md"
+assert_violations "fail-inputs-duplicate-id -> 1"        1 1 "duplicated Retro inputs id"                          "$FIX/fail-inputs-duplicate-id.md"
+assert_violations "fail-inputs-empty-detail -> 1"        1 1 "empty Retro inputs detail"                           "$FIX/fail-inputs-empty-detail.md"
+assert_violations "case: a whitespace-only detail is reported" \
+  1 1 "whitespace-only Retro inputs detail" "$FIX/fail-inputs-blank-detail.md"
+assert_violations "fail-inputs-stray-line -> 1"          1 1 "unrecognised line inside ## Retro inputs"            "$FIX/fail-inputs-stray-line.md"
+assert_violations "fail-inputs-duplicate-section -> 2"   1 2 "duplicated ## Retro inputs section heading"          "$FIX/fail-inputs-duplicate-section.md"
+assert_violations "fail-inputs-line-outside-section -> 1" 1 1 "ledger-shaped line outside the ## Retro inputs section" "$FIX/fail-inputs-line-outside-section.md"
+
+# case: removing the interventions line from a COPY of pass-canonical.md adds exactly one violation
+COPY_TMP="$HERE/tmp-mutation-copy"
+rm -rf "$COPY_TMP"
+trap 'rm -rf "$COPY_TMP"' EXIT
+mkdir -p "$COPY_TMP"
+no_interventions="$COPY_TMP/pass-canonical-no-interventions.md"
+cp "$FIX/pass-canonical.md" "$no_interventions"
+sed -i.bak '/^- input: interventions /d' "$no_interventions"
+rm -f "$no_interventions.bak"
+grep -qF -- '- input: interventions ' "$no_interventions" \
+  && fail "case: removing the interventions line from a COPY of pass-canonical.md adds exactly one violation (mutation did not apply)"
+assert_violations "case: removing the interventions line from a COPY of pass-canonical.md adds exactly one violation" \
+  1 1 "missing Retro inputs id: interventions" "$no_interventions"
+rm -rf "$COPY_TMP"
 
 # T-1001 v2 (AC17): "a tolerance claim is proved by a malformed input, never a
 # well-formed one." v1's CRLF criterion asked for a VALID CRLF file to pass,
 # which a CR-unaware region walk satisfied by never examining the file at all
 # — "accepted" and "unexamined" produced the same result. So this case starts
-# from a BROKEN ledger (one id present with no status at all, the other seven
-# ids missing entirely) and asserts it is STILL REPORTED after conversion to
-# CRLF — a checker that silently skipped the file would pass this file
-# clean, which is exactly the defect v1 shipped.
+# from a BROKEN ledger (one id present with no status at all, the other eight ids missing entirely)
+# and asserts it is STILL REPORTED after conversion to CRLF — a checker that
+# silently skipped the file would pass this file clean, which is exactly the
+# defect v1 shipped.
 TMP="$HERE/tmp"
 rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT

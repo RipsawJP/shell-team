@@ -10,6 +10,7 @@
 - input: previous-retro — status: empty — detail: 0 prior retro files in .shell-team/retros
 - input: lessons — status: unavailable — detail: no path supplied via --lessons
 - input: pr-metadata — status: unavailable — detail: gh CLI not found
+- input: interventions — status: unavailable — detail: directory not found: .shell-team/interventions
 
 ## サマリ
 

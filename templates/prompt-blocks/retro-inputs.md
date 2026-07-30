@@ -6,6 +6,7 @@
 - input: previous-retro
 - input: lessons
 - input: pr-metadata
+- input: interventions
 - status: read
 - status: empty
 - status: unavailable

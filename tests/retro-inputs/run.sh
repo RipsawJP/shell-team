@@ -102,15 +102,15 @@ printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: read — 
 pass "case: default base resolves to develop when it exists"
 
 # ---------------------------------------------------------------------------
-# case: every ledger is complete (all eight input ids, exactly once)
+# case: every ledger is complete (all nine input ids, exactly once)
 # ---------------------------------------------------------------------------
 n_ids="$(printf '%s\n' "$out" | grep -c -- '^- input: ')"
-[ "$n_ids" -eq 8 ] || fail "case: every ledger is complete (all eight input ids, exactly once): got $n_ids"
-for id in cycle-window review-artifacts provenance specs run-telemetry previous-retro lessons pr-metadata; do
+[ "$n_ids" -eq 9 ] || fail "case: every ledger is complete (all nine input ids, exactly once): got $n_ids"
+for id in cycle-window review-artifacts provenance specs run-telemetry previous-retro lessons pr-metadata interventions; do
   n="$(printf '%s\n' "$out" | grep -c -- "^- input: $id ")"
-  [ "$n" -eq 1 ] || fail "case: every ledger is complete (all eight input ids, exactly once): id $id appeared $n times"
+  [ "$n" -eq 1 ] || fail "case: every ledger is complete (all nine input ids, exactly once): id $id appeared $n times"
 done
-pass "case: every ledger is complete (all eight input ids, exactly once)"
+pass "case: every ledger is complete (all nine input ids, exactly once)"
 
 # ---------------------------------------------------------------------------
 # case: no develop branch falls back to HEAD and declares the fallback in
@@ -175,7 +175,7 @@ out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base main --last-n 0)" || rc=$?
 [ "$rc" -eq 0 ] || fail "case: --last-n 0 is a degenerate but valid cap and must not crash (exit code $rc)"
 printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: read — detail: 0 merge commits from main .*capped at --last-n 0' \
   || fail "case: --last-n 0 is a degenerate but valid cap and must not crash (cap not declared)"
-[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 8 ] \
+[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 9 ] \
   || fail "case: --last-n 0 is a degenerate but valid cap and must not crash (ledger incomplete)"
 pass "case: --last-n 0 is a degenerate but valid cap and must not crash"
 
@@ -185,7 +185,7 @@ pass "case: --last-n 0 is a degenerate but valid cap and must not crash"
 out="$(cd "$MAIN_REPO" && bash "$RETRO_INPUTS" --base no-such-ref-t1001)"
 printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: .*no-such-ref-t1001' \
   || fail "case: --base names a ref that does not exist locally -> unavailable"
-[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 8 ] \
+[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 9 ] \
   || fail "case: --base names a ref that does not exist locally -> unavailable (ledger incomplete)"
 pass "case: --base names a ref that does not exist locally -> unavailable"
 
@@ -247,7 +247,7 @@ out="$(cd "$MAIN_REPO" && GIT_STUB_REAL="$REAL_GIT" GIT_STUB_FAIL_MERGES=1 PATH=
 [ "$rc" -eq 0 ] || fail "case: git invocation failure -> unavailable, complete ledger, exit 0 (exit code $rc)"
 printf '%s\n' "$out" | grep -qE -- '^- input: cycle-window — status: unavailable — detail: git invocation failed' \
   || fail "case: git invocation failure -> unavailable, complete ledger, exit 0 (status)"
-[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 8 ] \
+[ "$(printf '%s\n' "$out" | grep -c -- '^- input: ')" -eq 9 ] \
   || fail "case: git invocation failure -> unavailable, complete ledger, exit 0 (ledger incomplete)"
 pass "case: git invocation failure -> unavailable, complete ledger, exit 0"
 
@@ -339,7 +339,7 @@ ADV_SUBJECT='Merge pull request #99 from attacker/branch — status: read — de
 git -C "$ADV_REPO" merge -q --no-ff -m "$ADV_SUBJECT" feature-evil
 
 adv_out="$(cd "$ADV_REPO" && bash "$RETRO_INPUTS" --base main)"
-[ "$(printf '%s\n' "$adv_out" | grep -c -- '^- input: ')" -eq 8 ] \
+[ "$(printf '%s\n' "$adv_out" | grep -c -- '^- input: ')" -eq 9 ] \
   || fail "case: adversarial merge subject cannot forge a ledger line (extra top-level line)"
 printf '%s\n' "$adv_out" | grep -qF -- '`' \
   && fail "case: adversarial merge subject cannot forge a ledger line (backtick survived sanitize)"
@@ -468,6 +468,31 @@ out="$(cd "$LAYOUT_OVERRIDE" && TEAM_RUN_BASE=.ops bash "$RETRO_INPUTS" --base m
 printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: read — detail: .*\.ops/reviews' \
   || fail "case: both layouts and a TEAM_RUN_BASE override resolve every input path (TEAM_RUN_BASE override)"
 pass "case: both layouts and a TEAM_RUN_BASE override resolve every input path"
+
+# ---------------------------------------------------------------------------
+# case: an interventions directory holding no .md files -> empty, never unavailable
+# The .gitkeep a fresh `team-init` leaves behind (DP-8: no third fixture for
+# the shared non-traversable-directory failure mode, which DS-3/DS-4 already
+# exercise through review-artifacts above).
+# ---------------------------------------------------------------------------
+INTERVENTIONS_EMPTY="$TMP/interventions-empty"
+build_repo "$INTERVENTIONS_EMPTY" main 1
+mkdir -p "$INTERVENTIONS_EMPTY/.shell-team/interventions"
+: > "$INTERVENTIONS_EMPTY/.shell-team/interventions/.gitkeep"
+out="$(cd "$INTERVENTIONS_EMPTY" && bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: interventions — status: empty — detail: 0 intervention records' \
+  || fail "case: an interventions directory holding no .md files -> empty, never unavailable"
+pass "case: an interventions directory holding no .md files -> empty, never unavailable"
+
+# ---------------------------------------------------------------------------
+# case: an absent interventions directory -> unavailable, never empty
+# ---------------------------------------------------------------------------
+INTERVENTIONS_ABSENT="$TMP/interventions-absent"
+build_repo "$INTERVENTIONS_ABSENT" main 1
+out="$(cd "$INTERVENTIONS_ABSENT" && bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: interventions — status: unavailable — detail: directory not found' \
+  || fail "case: an absent interventions directory -> unavailable, never empty"
+pass "case: an absent interventions directory -> unavailable, never empty"
 
 # ---------------------------------------------------------------------------
 # arg handling

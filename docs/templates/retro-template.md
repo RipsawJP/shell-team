@@ -19,6 +19,7 @@
 >    - input: previous-retro
 >    - input: lessons
 >    - input: pr-metadata
+>    - input: interventions
 >    - status: read
 >    - status: empty
 >    - status: unavailable
@@ -59,7 +60,7 @@
 
 `bin/retro-inputs.sh` prints the `## Retro inputs` heading below and its
 ledger lines together — paste its output here verbatim, unedited, right after
-that heading. Example shape shown below (a well-formed ledger: all eight
+that heading. Example shape shown below (a well-formed ledger: all nine
 canonical ids, exactly once, each one of `read` / `empty` / `unavailable`).
 This paragraph and everything above it stays OUTSIDE the `## Retro inputs`
 section on purpose: `bin/check-retro.sh` validates that section as a closed
@@ -76,6 +77,7 @@ mechanism cannot itself live inside the mechanism it explains.
 - input: previous-retro — status: read — detail: `<N prior retro files in <dir>>`
 - input: lessons — status: unavailable — detail: `<no path supplied via --lessons>`
 - input: pr-metadata — status: unavailable — detail: `<gh not installed>`
+- input: interventions — status: read — detail: `<N intervention records in <dir>>`
 
 ## サマリ
 
