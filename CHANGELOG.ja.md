@@ -4,6 +4,13 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v1.1.0**
+  - **出荷される prompt コンテンツが英語になり、注入 prompt が約 30% 小さくなった。** 生成される役割別 prompt block の背後にある構造化 lessons corpus を英語で再著述して移植し（74 エントリ・各エントリを記録済みの 4 分岐ルーティングルールで triage・公開 disposition ledger 付き）、4 つの役割別 block と consumer エージェントをすべて再生成した。adopter のエージェント prompt にメンテナの作業言語が注入されることはもう無い。CI が corpus の provenance を証明する: corpus は fail-closed でスキーマ検証され、出荷 block は pull request ごとに scratch root で再生成されコミット済みファイルと diff 比較される。
+  - **retro 検証が言語中立になった。** retro checker は特定言語の装飾見出しの全行一致をやめ、5 つのセクションを言語中立マーカー（`<!-- retro-section: keep|problem|try|traps|lessons -->`）でアンカーする——見出しテキストはどの言語でも自由で、どの言語かを宣言するものは何も無い: 操作者の言語は設定されるのではなく、単に制約されなくなった。retro テンプレートは英語で出荷され、マーカー契約より前に書かれた retro の移行手順を文書化している（5 本のマーカー行の挿入のみ・既存の散文は無変更）——マーカー未挿入の retro は移行まで fail-closed で弾かれる。列挙された machine-token リスト（status flag・verdict ラベル・マーカー語彙・その他 grep される契約文字列）は、散文への信頼ではなく専用テストスイートで assert されるようになった。
+  - **lessons ledger が Scope 型付きになり、出荷境界が機械強制になった。** すべての corpus エントリは fail-closed な `Scope`（`loop` / `maintainer`）を持ち、`maintainer` エントリはルールの拘束先の明示（形状検証付き）を義務付けられ、supersession は方向付き（loop エントリが maintainer ルールを黙って上書きすることはできない）で、生成される prompt block が `loop` エントリのみから作られることが両方向で証明される。
+  - **lessons ファイルはハードコードではなく resolver 経由になった。** パス resolver に `lessons` キーが追加され、すべての consumer は legacy レイアウトを仮定する代わりに resolver に問い合わせる。
+  - **残存 merge gate は「merge」という語ではなく帰結で発火する。** 人間の pledge のために停止すべき場面を教える例が、base ブランチでもキーワード一致でもなく「その merge が実行されるものを変えるか」で gate するようになり、それを不可逆操作に対する別個の停止と分離した。
+  - **エージェントと contributor が誘導される 2 つの文書がツリーと矛盾しなくなった。** workflow 文書の規約節を adopter に真である形で再接地し（ブランチ命名形式の主張を排し・操作パスをレイアウトリテラルではなく resolver 形式で記述）、出荷 corpus エントリの CI に関する誤った現在形の主張をその場で修正した。
 - **v1.0.0**
   - **`shell-team` へのリブランドと、最初の安定・公開準備リリース。** プラグイン・namespace・フラッグシップコマンドを改名——`claude-dev-team` → `shell-team`／`team-run` → `run`（`/shell-team:run` で起動）——し、リポジトリごとの footprint ディレクトリを `.team-run/` → `.shell-team/` へ移動。他のコマンド名（`team-init`・`goal`・`review`・`loop-triage`・`review-response`）は不変。
   - **単一の配布線。** v0.2 / v0.3 の並行配布を廃止: `shell-team` を `main` 上の単一リリース線として配布し、pin・切り替え・backport の対象となる別系統はない。
