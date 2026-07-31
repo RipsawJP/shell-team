@@ -1,6 +1,6 @@
 # Per-cycle artifacts stop being tied to the project's language
 
-**Status**: READY_FOR_REVIEW
+**Status**: READY_FOR_MERGE
 **Owner**: pm-spec
 **Task ID**: T-1010
 **Source**: GitHub issue #20 — "Operator language and project language are the same setting today, and they should not be"
