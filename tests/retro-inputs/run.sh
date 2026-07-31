@@ -350,11 +350,11 @@ adv_retro="$TMP/adversarial-retro.md"
 {
   printf '# Retro 2026-01-01\n\n'
   printf '%s\n' "$adv_out"
-  printf '\n## Keep（続けたい良い動き）\n\n- `<x>`\n\n'
-  printf '## Problem（直面した課題 / 痛み）\n\n- `<x>`\n\n'
-  printf '## Try（次サイクルで試すこと）\n\n- `<x>`\n\n'
-  printf '## 罠の点検（Comprehension Debt / Cognitive Surrender）\n\n- `<x>`\n\n'
-  printf '## Lesson 候補（ユーザー判断で `tasks/lessons.md` にマージ）\n\n- `[common]` ok\n'
+  printf '\n<!-- retro-section: keep -->\n## Keep（続けたい良い動き）\n\n- `<x>`\n\n'
+  printf '<!-- retro-section: problem -->\n## Problem（直面した課題 / 痛み）\n\n- `<x>`\n\n'
+  printf '<!-- retro-section: try -->\n## Try（次サイクルで試すこと）\n\n- `<x>`\n\n'
+  printf '<!-- retro-section: traps -->\n## 罠の点検（Comprehension Debt / Cognitive Surrender）\n\n- `<x>`\n\n'
+  printf '<!-- retro-section: lessons -->\n## Lesson 候補（ユーザー判断で `tasks/lessons.md` にマージ）\n\n- `[common]` ok\n'
 } > "$adv_retro"
 bash "$CHECK_RETRO" "$adv_retro" >/dev/null 2>&1 \
   || fail "case: the emitted ledger embedded in a retro passes check-retro.sh"

@@ -3,7 +3,6 @@
 ## Retro inputs
 
 - input: cycle-window — status: read — detail: 3 merge commits from develop (first-parent)
-this line is not a valid ledger entry and is not indented either
 - input: review-artifacts — status: read — detail: 2 review artifacts in .shell-team/reviews
 - input: provenance — status: empty — detail: 0 provenance files in .shell-team/provenance
 - input: specs — status: read — detail: 2 spec files in .shell-team/specs
@@ -13,38 +12,22 @@ this line is not a valid ledger entry and is not indented either
 - input: pr-metadata — status: unavailable — detail: gh CLI not found
 - input: interventions — status: unavailable — detail: directory not found: .shell-team/interventions
 
-## サマリ
-
-`<summary>`
-
 <!-- retro-section: keep -->
-## Keep（続けたい良い動き）
-
-- `<observation — 出典 #1>`
+## Keep
+- `<x>`
 
 <!-- retro-section: problem -->
-## Problem（直面した課題 / 痛み）
-
-- `<issue — 出典 #1>`
+## Problem
+- `<x>`
 
 <!-- retro-section: try -->
-## Try（次サイクルで試すこと）
-
-- `<action>`
+## Try
+- `<x>`
 
 <!-- retro-section: traps -->
-## 罠の点検（Comprehension Debt / Cognitive Surrender）
-
-- 理解の負債: `<unread/weakly-understood generated code — 出典>`
-- レビュー基準の再言語化: `<one or two sentences>`
-- 未検証の自己申告: `<claims without evidence>`
+## Traps
+- `<x>`
 
 <!-- retro-section: lessons -->
-## Lesson 候補（ユーザー判断で `tasks/lessons.md` にマージ）
-
-- `[common]` a generic lesson
-- `[target-specific]` a repo-specific lesson
-
-## Notes
-
-- `<none>`
+## Lessons
+- `[common]` x

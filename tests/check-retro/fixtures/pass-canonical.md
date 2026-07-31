@@ -13,31 +13,36 @@
 - input: pr-metadata — status: unavailable — detail: gh CLI not found
 - input: interventions — status: unavailable — detail: directory not found: .shell-team/interventions
 
-## サマリ
+## Summary
 
 `<summary>`
 
-## Keep（続けたい良い動き）
+<!-- retro-section: keep -->
+## Keep (what worked)
 
-- `<observation — 出典 #1>`
+- `<observation — source #1>`
 
-## Problem（直面した課題 / 痛み）
+<!-- retro-section: problem -->
+## Problem (what hurt)
 
-- `<issue — 出典 #1>`
+- `<issue — source #1>`
 
-## Try（次サイクルで試すこと）
+<!-- retro-section: try -->
+## Try (next experiments)
 
 - `<action>`
 
-## 罠の点検（Comprehension Debt / Cognitive Surrender）
+<!-- retro-section: traps -->
+## Loop-trap check (Comprehension Debt / Cognitive Surrender)
 
-- 理解の負債: `<unread/weakly-understood generated code — 出典>`
-- レビュー基準の再言語化: `<one or two sentences>`
-- 未検証の自己申告: `<claims without evidence>`
+- Comprehension debt: `<unread/weakly-understood generated code — source>`
+- Review criteria re-stated: `<one or two sentences>`
+- Unverified self-report: `<claims without evidence>`
 
-## Lesson 候補（ユーザー判断で `tasks/lessons.md` にマージ）
+<!-- retro-section: lessons -->
+## Lesson candidates
 
-> agent はここに候補を提示するだけ。
+> The agent only proposes candidates here.
 - `[common]` a generic lesson
 - `[target-specific]` a repo-specific lesson
 

@@ -114,6 +114,18 @@ Human-facing documentation (`README.md`, `docs/`) may additionally carry a
 preference: a second copy of an agent-facing file doubles the maintenance
 surface without adding a reader, and the stale copy is the one that misleads.
 
+A third class exists alongside those two: **per-cycle artifacts** — files the
+loop *generates while it runs* (a retro, for example), rather than files an
+adopter is shipped or an agent is configured from. These are written in
+**the operator's language**, and no config file or environment variable
+declares which one — see `docs/templates/retro-template.md` and
+`templates/prompt-blocks/retro-sections.md` for the mechanism that makes a
+checker validate one of these without matching a single word of any natural
+language. The language boundary sits at
+**promotion into the shipped corpus**: a lesson is *authored* in English at
+the point it is promoted into `tasks/lessons.md`, never produced by
+translating an artifact after the fact.
+
 Some agent definitions still carry Japanese prose inherited from the lessons
 corpus their prompt blocks are generated from. That is a known inconsistency,
 not a precedent for new files.

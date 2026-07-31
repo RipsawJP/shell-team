@@ -70,6 +70,15 @@ hand-off headings/keys. These are grepped by `check-handoff.sh`, `goal-state.sh`
 (no-progress signature), and `check-acs.sh`, so translating them would break the
 pipeline. Prose follows the conversation language; the contract tokens do not.
 
+**Per-cycle artifacts** (retros written by `scrum-master`) follow the same
+zero-config rule: there is no separate language setting for them either.
+`bin/check-retro.sh` validates a retro's *structure* only, anchored on
+language-neutral `<!-- retro-section: keep|problem|try|traps|lessons -->`
+markers — the heading text beside each marker is free, so a retro in
+Japanese, English, or anything else passes the same structural check. See
+`docs/templates/retro-template.md` for the shipped (English) skeleton and its
+migration note for retros written before the marker contract existed.
+
 **Known limitation**: the mirror is guaranteed only on the **SKILL-driven path**
 (`/shell-team:run`, `/goal`), where the orchestrator injects the directive. Invoking an
 agent **directly / standalone** (`@engineer`, etc.) is **not guaranteed** to
