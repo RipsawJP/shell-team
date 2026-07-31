@@ -95,7 +95,8 @@ codex exec --ephemeral --json "Play devil's advocate on <file>. What could break
 
 ## 規約
 
-- **ブランチ**: `feat/T-XXX-<slug>` — engineer はタスクの feature ブランチ上で直接作業する（worktree は並列実装で orchestrator が opt-in した時のみ）
-- **仕様**: `docs/specs/T-XXX-<slug>.md`、slug はタイトルの kebab-case
-- **レビュー成果物**: `tasks/reviews/T-XXX.md`（curated verdict + severity ledger）と Codex 生トレース `tasks/reviews/T-XXX-codex-*.{txt,jsonl}`
+- **ブランチ**: engineer はタスクの feature ブランチ上で直接作業する（worktree は並列実装で orchestrator が opt-in した時のみ）— この repository の命名規則は `CONTRIBUTING.md` を参照
+- **仕様**: `<specs dir>/T-XXX-<slug>.md`、slug はタイトルの kebab-case、`<specs dir>` は `bin/team-paths.sh --get specs`
+- **レビュー成果物**: `<reviews dir>/T-XXX.md`（curated verdict + severity ledger）と Codex 生トレース `<reviews dir>/T-XXX-codex-*.{txt,jsonl}`、`<reviews dir>` は `bin/team-paths.sh --get reviews`
+- **PR 本文の diff 統計**（file/line counts）: PR 作成時に `git diff --stat <base>...HEAD` を実行して取得し、マージ直前に再測定する — QA の hand-off スナップショットから転記しない。レビュー記録と disposition のコミットが QA の後に乗るため、数字が黙って古くなる（retro で実際に観測された）
 - **機能タスクの一部として `.claude/agents/*` を決して編集しない** — それはチーム設定作業であり、専用のタスク ID を通す
