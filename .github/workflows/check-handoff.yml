@@ -127,6 +127,32 @@ jobs:
       - name: Run playbook-promote fixture suite
         run: bash tests/playbook-promote/run.sh
 
+      - name: Dogfood check-playbook — the real repository corpus at the resolved lessons path is schema-valid
+        run: |
+          set -e
+          L="$(bash bin/team-paths.sh --get lessons)"
+          test -r "$L"
+          bash bin/check-playbook.sh "$L"
+
+      - name: Dogfood gen-playbook-blocks — regenerating into a scratch copy reproduces every shipped block and consumer
+        run: |
+          set -e
+          L="$(bash bin/team-paths.sh --get lessons)"
+          test -r "$L"
+          files="$(awk '$1 == "marker" && $2 ~ /^playbook-/ { for (i = 3; i <= NF; i++) print $i; print "templates/prompt-blocks/" $2 }' templates/prompt-blocks/registry.txt | sort -u)"
+          scratch="$(mktemp -d "${TMPDIR:-/tmp}/gen-playbook-dogfood.XXXXXX")"
+          for f in $files; do
+            mkdir -p "$scratch/$(dirname "$f")"
+            cp "$f" "$scratch/$f"
+          done
+          mkdir -p "$scratch/templates/prompt-blocks"
+          cp templates/prompt-blocks/registry.txt "$scratch/templates/prompt-blocks/registry.txt"
+          bash bin/gen-playbook-blocks.sh --root "$scratch" --lessons "$L"
+          for f in $files; do
+            cmp -s "$f" "$scratch/$f"
+          done
+          rm -rf "$scratch"
+
       - name: Run team-paths fixture suite
         run: bash tests/team-paths/run.sh
 

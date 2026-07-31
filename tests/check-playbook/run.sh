@@ -3,7 +3,8 @@
 # (docs/specs/T-045-ace-playbook.md):
 #   AC1  required-field / known-enum / structural (single-line, no control
 #        chars, no marker-collision) validation, fail-closed
-#   AC5  the real repo's tasks/lessons.md passes (dogfood)
+#   AC5  the real repo's corpus at the resolved lessons path passes (dogfood,
+#        T-1008 — see the labelled case near the end of this file)
 #   AC6  unknown Applies-to role tokens are rejected
 #   AC8  shellcheck clean (soft-skip when unavailable)
 #
@@ -147,8 +148,8 @@ pass "Fix 1: a trailing-space Status value (trims to a known enum) still validat
 # --- Fix 2 (T-045 rework, Major): control chars / marker-collision in the ----
 # ENTRY HEADING'S TITLE are rejected too, not just in `- **Field**:` bullets —
 # bin/gen-playbook-blocks.sh reads the title back out (as `remainder`) to
-# build its tasks/lessons.md pointer, using the same 0x1F delimiter its
-# fields use, so an unchecked title could desync its field-splitting.
+# build its pointer back into the lessons file, using the same 0x1F delimiter
+# its fields use, so an unchecked title could desync its field-splitting.
 C="$TMP/title-control-char.md"
 printf -- '## 2026-02-01 — title with a \x0c control char\n' > "$TMP/title-cc-line.txt"
 awk -v newline_file="$TMP/title-cc-line.txt" '
@@ -200,7 +201,7 @@ pass "Round2 Major1: a heading using a plain hyphen (not the em-dash) separator 
 # The allow-listed `## Format` heading itself must NOT be flagged (it is
 # already present, unmutated, in $BASE — this just asserts the base fixture
 # stays green, i.e. the allow-list actually works for the real shape this
-# repo's own tasks/lessons.md uses).
+# repo's own corpus, at the resolved lessons path, uses).
 [ "$(run_checker "$BASE")" -eq 0 ] || fail "Round2 Major1: the allow-listed '## Format' heading must not itself be flagged"
 pass "Round2 Major1: the allow-listed '## Format' section heading is accepted, not flagged"
 
@@ -849,6 +850,13 @@ C="$TMP/t1007-maintainer-superseded-by-loop.md"
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "T-1007: a maintainer entry superseded by a loop entry must validate green"
 pass "T-1007: a maintainer entry superseded by a loop entry is accepted"
+
+# --- T-1008: the real repository corpus at the resolved lessons path passes -
+# (dogfood) — the assertion this file's header comment has advertised since
+# T-045 (a false claim before this task; it now actually runs).
+REAL_LESSONS="$(cd "$REPO_ROOT" && bash bin/team-paths.sh --get lessons)"
+[ "$(run_checker "$REPO_ROOT/$REAL_LESSONS")" -eq 0 ] || fail "T-1008: the real repository corpus at the resolved lessons path must validate green"
+pass "T-1008: the real repository corpus at the resolved lessons path passes (dogfood)"
 
 # --- AC8: shellcheck (soft-skip when unavailable) -----------------------------
 if command -v shellcheck >/dev/null 2>&1; then

@@ -225,3 +225,17 @@ that file's order.
   bullet in that shape would satisfy the same substring and produce a false
   positive, since `grep -F` matches anywhere in the file, fenced content
   included.
+- T-1008: any edit to `bin/gen-playbook-blocks.sh` above its line-count
+  warning (`LINE_WARN_THRESHOLD`) shifts the exact line `tests/errexit-safe/
+  run.sh`'s `NOT_APPLY` registry pins by `file:line:content` — re-measure the
+  line number with the grep in that suite's own registry-building logic
+  (never trust a previously-written-down number, including one recorded in a
+  spec) and confirm the quoted source text is byte-identical before updating
+  only the line-number token. This is the same class of hazard T-1006 and
+  T-1007 each hit once on the identical pin. Separately: a `check:` command
+  that scans the whole working tree (for example `check-pii-shapes.sh
+  --all`, or any acceptance-criteria checker invocation that runs a suite
+  covering the entire repository) can take tens of seconds — long enough to
+  look hung through a tool with a short default timeout. Run it in the
+  background, or raise the timeout, rather than treating the wait itself as
+  a failure signal.
