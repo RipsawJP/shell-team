@@ -69,6 +69,14 @@ status flag（`READY_FOR_ARCH` … `READY_FOR_MERGE`、`BLOCKED`、`REWORK`）�
 シグネチャ）・`check-acs.sh` によって grep されるため、翻訳するとパイプラインが
 壊れます。散文は会話言語に従いますが、契約トークンは従いません。
 
+**サイクルごとに生成される成果物**（`scrum-master` が書く retro）も同じゼロコンフィグ規則に
+従います: これらにも別建ての言語設定はありません。`bin/check-retro.sh` は retro の*構造*だけを
+検証し、`<!-- retro-section: keep|problem|try|traps|lessons -->` という言語に依存しない
+マーカーに基づきます — マーカーの隣の見出しテキストは自由なので、日本語でも英語でも他の
+どんな言語で書かれた retro でも同じ構造チェックを通ります。出荷される（英語の）雛形は
+`docs/templates/retro-template.md` を、マーカー契約以前に書かれた retro の移行手順は
+そのファイルの移行注記を参照してください。
+
 **既知の制約**: ミラーが保証されるのは **SKILL 駆動の経路**（`/shell-team:run`・`/goal`）
 だけで、そこではオーケストレータがディレクティブを注入します。エージェントを
 **直接 / スタンドアロン**で起動する（`@engineer` 等）と、ミラーは**保証されません** —
