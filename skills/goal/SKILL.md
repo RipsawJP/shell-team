@@ -49,7 +49,8 @@ later ticks — the state file already exists.
 1. **Implement/verify attempt** — invoke `engineer` for one implement+test pass
    over the target task's spec (prepend the Operating-paths line to its prompt,
    as `/shell-team:run` does). It updates the board to `READY_FOR_QA`.
-   - **Preserve the implementation across the seam (T-073)**: the engineer commits its implementation and tests before it sets `READY_FOR_QA`; as a second-layer guard, confirm there is no uncommitted implementation diff before invoking `qa-verifier` in the completion gate (`git status --short` shows nothing to commit).
+   - **Preserve the implementation across the seam (T-073)**: the engineer commits its implementation and tests before it sets `READY_FOR_QA`; as a second-layer guard, confirm there is no uncommitted implementation diff before invoking `qa-verifier` in the completion gate (`git status --short` shows nothing to commit). When you (the orchestrator) edit the task's interventions file at this same seam under the producer discipline below, commit that edit immediately — the same way the engineer commits its own work — before this check runs: this check is over the whole working tree, so an uncommitted interventions append at that exact moment would otherwise make it non-empty for a reason this guard's own prose does not name (T-1002 rework1 fix, mirroring `skills/run/SKILL.md`'s same fix).
+   - **Interventions producer discipline (T-1002, referenced not restated)**: the same producer discipline `skills/run/SKILL.md`'s Implement phase carries applies to every tick here too — when a user message during an active tick interrupts, corrects, or stops the work (trigger 1), append the entry at that moment, before you act on the message; self-check `assumption-contradicted` (trigger 3) and `work-deferred`/`work-abandoned` (trigger 5) at this tick's own checkpoints — the Implement/verify attempt boundary above, the Completion-gate branch below, and any `STOP:` this tick reaches. The entry grammar (the marker pair and the field quad) is not restated here — see `skills/run/SKILL.md`'s own producer-discipline paragraph and `templates/prompt-blocks/interventions-classes.md`'s canonical template. The same durability duty applies identically here too (T-1002 rework2): every append to an interventions file is committed immediately, as its own commit, at the moment of recording, at every one of this tick's own checkpoints — never deferred to the next tick or to the Completion gate above to notice.
 
 2. **Completion gate (layered, each verifier independent)** — run in order, and
    **do not carry one verifier's conclusion into the next** (a QA false-positive
@@ -75,6 +76,7 @@ later ticks — the state file already exists.
      check-acs / check-intent — no separate retry cap is needed on the goal
      side (unlike the shell-team seam gate, which fails closed and escalates
      to the human immediately rather than bounding retries).
+   - also run `check-interventions.sh --task <task-id> "$(team-paths.sh --get interventions)/<task-id>.md"` (on `PATH` when the plugin is loaded; else `bin/check-interventions.sh`) alongside `check-acs.sh` as a further deterministic layer — the gate is not green unless it reports `conformant` (exit 0). Unlike the provenance file, this record is the **orchestrator's own** (T-1002 DP-3: interventions arrive in the main conversation, which only you see) — a missing file (usage exit 2) or a non-conformant file (schema exit 1 / structural exit 2) is a non-green outcome for this tick that you resolve yourself (write or fix the interventions file) before the next tick, rather than routing back to `engineer`. If this interventions layer is the ONLY layer that failed this tick (check-acs / check-intent / check-provenance were already green), repair the interventions file yourself and re-run `check-interventions.sh` again in the SAME tick, before this tick reaches the Bound gate below (step 3) — do not re-invoke `engineer` for this repair, since interventions are outside its remit (T-1002 DP-3); a record-only gap here therefore never consumes a fresh implement pass, never forces a wasted loop-guard iteration, and never on its own fabricates a `STOP:no_progress` (T-1002 rework1 fix, Codex round1 Major 4).
    - if so, invoke `qa-verifier` — judges the non-scriptable ACs (PASS/FAIL).
    - if QA PASS, invoke `codex-reviewer` — cross-provider verdict
      (APPROVE / REQUEST_CHANGES).
@@ -83,14 +85,16 @@ later ticks — the state file already exists.
      actually produce the claimed output); `codex-reviewer` verifies
      formulaically/statically (boundary conditions, arithmetic, structural
      edge cases) — an orthogonal detection surface, not a duplicate of QA's.
-   The gate is **green** only when all applicable layers pass — five when an
-   intent block exists, otherwise four — check-acs PASS + check-intent.sh
+   The gate is **green** only when all applicable layers pass — six when an
+   intent block exists, otherwise five — check-acs PASS + check-intent.sh
    aligned (when the spec carries an intent block) +
-   check-provenance.sh conformant + QA PASS + Codex APPROVE.
+   check-provenance.sh conformant + check-interventions.sh conformant + QA
+   PASS + Codex APPROVE.
    - **Per-tick failure-class tracking (T-058)**: on every non-green tick,
      classify each gate finding by root-cause class slug — check-acs /
      `check-intent.sh` (a non-`aligned` result) /
-     `check-provenance.sh (a non-conformant result)` / `qa-verifier` findings
+     `check-provenance.sh (a non-conformant result)` /
+     `check-interventions.sh (a non-conformant result)` / `qa-verifier` findings
      all as phase `validate`, `codex-reviewer` findings as phase `review` — and keep
      the per-tick list (round = the iteration number
      this tick gets from `goal-state.sh bump` in step 3) in your working
@@ -104,7 +108,7 @@ later ticks — the state file already exists.
    STATE="$(team-paths.sh --get runs)/goal-<task-id>.state"
    ITER="$(goal-state.sh bump "$STATE")"
    ELAPSED="$(goal-state.sh elapsed-min "$STATE")"
-   SIG="$(printf '%s' "<combined check-acs (normalized: check-acs: PASS or check-acs: FAIL <ids>) + check-intent (translated) + check-provenance (translated) + QA/Codex verdict labels only — never the raw check-acs stdout or free-form prose>" | goal-state.sh signature)"
+   SIG="$(printf '%s' "<combined check-acs (normalized: check-acs: PASS or check-acs: FAIL <ids>) + check-intent (translated) + check-provenance (translated) + check-interventions (translated) + QA/Codex verdict labels only — never the raw check-acs stdout or free-form prose>" | goal-state.sh signature)"
    PREV="$(goal-state.sh prev-sig "$STATE")"
    loop-guard.sh "$(team-paths.sh --get loops)/goal.contract.yaml" \
      --iteration "$ITER" --elapsed-min "$ELAPSED" \
@@ -191,6 +195,27 @@ later ticks — the state file already exists.
      → `AC900003;FAIL`, versus `...AC900004` → `AC900004;FAIL` (different),
      versus `check-provenance: PASS` → `PASS` (different from both, and from
      check-intent's sentinels).
+   - **`check-interventions.sh` (translated)** must also be translated into
+     the signature vocabulary before you concatenate it — same reason as
+     `check-intent.sh`/`check-provenance.sh` (`goal-state.sh`'s regex only
+     recognizes `PASS`/`FAIL`/`APPROVE`/`REQUEST_CHANGES`/`AC[0-9]+`, so a raw
+     `conformant`/`schema`/`usage`/`structural` word would be silently dropped
+     and two ticks with different interventions outcomes would collapse onto
+     one signature). When the interventions gate ran this tick, append one of
+     these to the combined text:
+     - `conformant` (exit 0) → `check-interventions: PASS`.
+     - `schema` (exit 1, an unrecognized class token or a malformed/incomplete
+       entry) → `check-interventions: FAIL AC900005` — a **reserved sentinel**
+       AC id (never a real spec AC; distinct from every prior reserved id).
+     - `usage` / `structural` (exit 2, a missing/unreadable interventions
+       file, broken markers, or a `--task` disagreement) →
+       `check-interventions: FAIL AC900006` — a second reserved sentinel.
+     This keeps `goal-state.sh` itself untouched while making conformant /
+     schema / usage-structural each produce a distinct signature — verified:
+     `printf '%s' "check-interventions: FAIL AC900005" | goal-state.sh
+     signature` → `AC900005;FAIL`, versus `...AC900006` → `AC900006;FAIL`
+     (different), versus `check-interventions: PASS` → `PASS` (different from
+     both, and from every other reserved sentinel).
    - **`--elapsed-min` is required**: `loop-guard.sh` defaults `ELAPSED_MIN=0` and
      the contract's `max_wallclock_min` is inert without it. `goal-state.sh
      elapsed-min` derives it from the persisted start time — always pass it.

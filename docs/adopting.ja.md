@@ -38,6 +38,28 @@
 そして下記の運用ルールを自分の `CLAUDE.md` にコピーするかは、あなたの判断です。
 プラグインがそれらの編集を勝手に行うことはありません。
 
+base dir を git に載せない場合、その方法 2 つは効く範囲が違います。repo 自身の
+`.gitignore` に `.shell-team/` を書く方法はその repo だけに効き、取り消しも容易
+です。global excludes（`git config --global core.excludesFile`）に入れる方法は
+マシン上の *すべての* repo で base dir を隠します——後から「この repo では
+ボードを追跡したい」と決めた repo も含めてです。しかもその症状は間接的で、単に
+ボードが `git status` に現れなくなるだけです。1 つの repo だけ復帰させるには、
+その repo の root `.gitignore` に `!.shell-team/` を追記してください。repo 側の
+パターンが global ファイルより優先されます。このリポジトリ自身もまさにその理由で
+その行を持っており、`.shell-team/` を global に無視している操作者の環境でも自分の
+base dir は追跡されたままになります。
+
+global ファイルにはもう 1 つ影響があります。あるパスが無視されるかを git に
+問い合わせるもの——`git check-ignore` や、それを土台にしたチェック——もその
+ファイルを読みます。したがってそうしたチェックは、global excludes の無い CI では
+通るのに手元では落ちる、という形で食い違い得ます。無視挙動に関する assertion では
+操作者の設定を継承せず、`git -c core.excludesFile=/dev/null …` のように明示的に
+pin してください。
+
+セッションがどれくらい確認で止まるかも同じくあなたの判断で、出荷物ではなく
+作業コピーごとに設定します。詳細は
+[tuning-oversight.ja.md](tuning-oversight.ja.md) を参照してください。
+
 ## `AGENTS.md` — クロスツール向けポインタ doc
 
 `team-init` は **`<base>/AGENTS.md`** もスキャフォールドします。これは、任意の

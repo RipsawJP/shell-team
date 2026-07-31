@@ -113,7 +113,7 @@ $(team-paths.sh --get runs)/review-response-<ts>.md
 
 **Collision rule: never-overwrite.** If that file already exists, append a numeric suffix (`-2`, `-3`, …) and use the first free slot.
 
-This record is what `scrum-master` reads at retro time: when a finding that was auto-adopted (or wrongly escalated) later causes a problem, the retro names the exact rule that mis-fired and proposes a `tasks/lessons.md` entry to tighten it — closing the self-improvement loop. The gate is transparent by design, never a black box.
+This record is what `scrum-master` reads at retro time: when a finding that was auto-adopted (or wrongly escalated) later causes a problem, the retro names the exact rule that mis-fired and proposes an entry for the lessons log (resolved via `team-paths.sh --get lessons`) to tighten it — closing the self-improvement loop. The gate is transparent by design, never a black box.
 
 ## Telemetry (best-effort)
 

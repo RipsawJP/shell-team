@@ -1320,11 +1320,18 @@ pass "agentmd-block-verbatim-mutation — 2 free-text sites x 3 demonstrated inj
 # pattern).
 # =============================================================================
 # shellcheck disable=SC2016  # deliberately literal ERE source, not a shell expansion.
-NEW_AC3='(^|[[:space:]])([^[:space:]]*/)?(bash|sh|source|\.)[[:space:]]+bin/check-provenance\.sh'
+# T-1002 DP-8: both regexes below are EXTENDED (not replaced) to also name
+# check-interventions.sh / an 'interventions gate:ACn' sentinel — the same
+# `adopter-environment-coercion` class T-1001 closed for check-provenance.sh
+# would otherwise reappear undetected through the new checker's name. OLD_*
+# stay byte-frozen (T-077 literal, provenance-only) as the non-vacuity
+# counterfactual: a revert of this extension must make the new oldmiss cases
+# below go red.
+NEW_AC3='(^|[[:space:]])([^[:space:]]*/)?(bash|sh|source|\.)[[:space:]]+bin/check-(provenance|interventions)\.sh'
 # shellcheck disable=SC2016
 OLD_AC3='(^|[[:space:]])(bash|sh|source|\.) +bin/check-provenance\.sh'
 # shellcheck disable=SC2016
-NEW_AC15='provenance[-[:space:]]+gate:AC[0-9]|route[-[:space:]]+back[-[:space:]]+through[-[:space:]]+loop[-[:space:]]+guard'
+NEW_AC15='(provenance|interventions)[-[:space:]]+gate:AC[0-9]|route[-[:space:]]+back[-[:space:]]+through[-[:space:]]+loop[-[:space:]]+guard'
 # shellcheck disable=SC2016
 OLD_AC15='provenance-gate:AC[0-9]|route-back through loop-guard\.sh'
 
@@ -1486,6 +1493,131 @@ set -e
 grep -qF 'provenance gate:AC3' "$TMP/livefile-mutation-ac15.out" \
   || fail "livefile-mutation-ac15: matched line does not contain the injected probe: $(cat "$TMP/livefile-mutation-ac15.out")"
 pass "livefile-mutation-ac15 — DP-8 extended regex catches a stateful sentinel injected into a mutated copy of skills/run/SKILL.md (non-vacuous: proves the livefile-stateful-trace lock actually detects regressions)"
+
+# =============================================================================
+# oldmiss (AC3, interventions) / oldmiss (AC15, interventions) — T-1002: the
+# FROZEN T-077 literal regexes (provenance-only) must MISS an injected
+# check-interventions.sh probe / 'interventions gate:AC1' probe, proving the
+# DP-8 extension genuinely widens the lock rather than merely renaming a
+# variable — reverting the extension makes these two cases red.
+# =============================================================================
+printf -- '\n--- oldmiss (AC3, interventions) ---\n'
+OLDMISS_INTV_AC3_FILE="$TMP/oldmiss-intv-ac3-probe.txt"
+printf 'regression probe: bash bin/check-interventions.sh\n' > "$OLDMISS_INTV_AC3_FILE"
+set +e
+grep -nE "$OLD_AC3" "$OLDMISS_INTV_AC3_FILE" > "$TMP/oldmiss-intv-ac3.out"
+oldmiss_intv_ac3_rc=$?
+set -e
+[[ "$oldmiss_intv_ac3_rc" -ne 0 ]] \
+  || fail "oldmiss (AC3, interventions): expected the FROZEN OLD (T-077 literal) AC3 regex to MISS an injected 'bash bin/check-interventions.sh' probe, but it matched: $(cat "$TMP/oldmiss-intv-ac3.out")"
+pass "oldmiss (AC3, interventions) — the frozen OLD (T-077 literal) broken-invocation regex misses the check-interventions.sh probe; reverting the T-1002 extension would make this suite red"
+
+printf -- '\n--- oldmiss (AC15, interventions) ---\n'
+OLDMISS_INTV_AC15_FILE="$TMP/oldmiss-intv-ac15-probe.txt"
+printf 'regression probe: interventions gate:AC1\n' > "$OLDMISS_INTV_AC15_FILE"
+set +e
+grep -nE "$OLD_AC15" "$OLDMISS_INTV_AC15_FILE" > "$TMP/oldmiss-intv-ac15.out"
+oldmiss_intv_ac15_rc=$?
+set -e
+[[ "$oldmiss_intv_ac15_rc" -ne 0 ]] \
+  || fail "oldmiss (AC15, interventions): expected the FROZEN OLD (T-077 literal) AC15 regex to MISS an injected 'interventions gate:AC1' probe, but it matched: $(cat "$TMP/oldmiss-intv-ac15.out")"
+pass "oldmiss (AC15, interventions) — the frozen OLD (T-077 literal) stateful-trace regex misses the 'interventions gate:AC1' probe; reverting the T-1002 extension would make this suite red"
+
+# =============================================================================
+# livefile-mutation-ac3-interventions (T-1002, DP-8, non-vacuous
+# counterfactual) — a mutated $TMP copy of a live consumer file, with an
+# injected 'bash bin/check-interventions.sh' broken-invocation line, MUST be
+# caught by the extended NEW_AC3 regex.
+# =============================================================================
+printf -- '\n--- livefile-mutation-ac3-interventions ---\n'
+MUT_AC3_INTV_FILE="$TMP/mutated-qa-verifier-interventions.md"
+cp "$REPO_ROOT/agents/qa-verifier.md" "$MUT_AC3_INTV_FILE"
+printf 'regression probe: bash bin/check-interventions.sh\n' >> "$MUT_AC3_INTV_FILE"
+set +e
+grep -nE "$NEW_AC3" "$MUT_AC3_INTV_FILE" > "$TMP/livefile-mutation-ac3-interventions.out"
+livefile_mutation_ac3_interventions_rc=$?
+set -e
+[[ "$livefile_mutation_ac3_interventions_rc" -eq 0 ]] \
+  || fail "livefile-mutation-ac3-interventions: expected the extended regex to MATCH the injected 'bash bin/check-interventions.sh' broken-invocation line, got no match (rc=$livefile_mutation_ac3_interventions_rc) — the T-1002 lock extension would be vacuous"
+grep -qF 'bash bin/check-interventions.sh' "$TMP/livefile-mutation-ac3-interventions.out" \
+  || fail "livefile-mutation-ac3-interventions: matched line does not contain the injected probe: $(cat "$TMP/livefile-mutation-ac3-interventions.out")"
+pass "livefile-mutation-ac3-interventions — extended DP-7/T-1002 regex catches an injected check-interventions.sh broken invocation (non-vacuous)"
+
+# =============================================================================
+# livefile-mutation-ac15-interventions (T-1002, DP-8, non-vacuous
+# counterfactual) — a mutated $TMP copy of skills/run/SKILL.md, with an
+# injected 'interventions gate:AC1' stateful-trace sentinel, MUST be caught.
+# =============================================================================
+printf -- '\n--- livefile-mutation-ac15-interventions ---\n'
+MUT_AC15_INTV_FILE="$TMP/mutated-run-SKILL-interventions.md"
+cp "$REPO_ROOT/skills/run/SKILL.md" "$MUT_AC15_INTV_FILE"
+printf 'regression probe: interventions gate:AC1\n' >> "$MUT_AC15_INTV_FILE"
+set +e
+grep -nE "$NEW_AC15" "$MUT_AC15_INTV_FILE" > "$TMP/livefile-mutation-ac15-interventions.out"
+livefile_mutation_ac15_interventions_rc=$?
+set -e
+[[ "$livefile_mutation_ac15_interventions_rc" -eq 0 ]] \
+  || fail "livefile-mutation-ac15-interventions: expected the extended regex to MATCH the injected 'interventions gate:AC1' stateful sentinel, got no match (rc=$livefile_mutation_ac15_interventions_rc) — the T-1002 lock extension would be vacuous"
+grep -qF 'interventions gate:AC1' "$TMP/livefile-mutation-ac15-interventions.out" \
+  || fail "livefile-mutation-ac15-interventions: matched line does not contain the injected probe: $(cat "$TMP/livefile-mutation-ac15-interventions.out")"
+pass "livefile-mutation-ac15-interventions — extended DP-8/T-1002 regex catches an injected 'interventions gate:AC1' stateful sentinel (non-vacuous)"
+
+# =============================================================================
+# goalskill-producer-discipline-reference (T-1002 rework1, Codex round1
+# Blocker 2 fix lock) — skills/goal/SKILL.md must carry a reference-form
+# producer-discipline paragraph mirroring skills/run/SKILL.md's Interventions
+# producer discipline (T-1002) paragraph, so a /goal tick cannot silently
+# satisfy the interventions gate by leaving the sentinel in place with no
+# standing instruction ever prompting the orchestrator to notice a real
+# trigger during the tick. This is a REFERENCE, not a verbatim canonical-block
+# copy (AC17's registry pin stays at exactly two consumers,
+# bin/check-interventions.sh and skills/run/SKILL.md — a third consumer here
+# would break that pin), so this lock is a plain anchor grep against the live
+# file, not a check-prompt-sync registration.
+# =============================================================================
+printf -- '\n--- goalskill-producer-discipline-reference ---\n'
+GOAL_SKILL_MD="$REPO_ROOT/skills/goal/SKILL.md"
+GPDR_ANCHOR='Interventions producer discipline (T-1002, referenced not restated)'
+grep -qF -- "$GPDR_ANCHOR" "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing anchor '$GPDR_ANCHOR' in skills/goal/SKILL.md"
+grep -qF -- 'append the entry at that moment, before you act on the message' "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing the at-that-moment duty sentence in skills/goal/SKILL.md"
+grep -qF -- 'templates/prompt-blocks/interventions-classes.md' "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing the canonical-template cross-reference in skills/goal/SKILL.md"
+
+# Non-vacuity: a mutated copy with the anchor line removed must make the SAME
+# grep FAIL (rc=1) — proving the lock is not vacuously green.
+GPDR_MUT_FILE="$TMP/mutated-goal-SKILL-no-producer-discipline.md"
+grep -vF -- "$GPDR_ANCHOR" "$GOAL_SKILL_MD" > "$GPDR_MUT_FILE"
+set +e
+grep -qF -- "$GPDR_ANCHOR" "$GPDR_MUT_FILE"
+gpdr_mut_rc=$?
+set -e
+[[ "$gpdr_mut_rc" -eq 1 ]] \
+  || fail "goalskill-producer-discipline-reference: removing the anchor line from a mutated copy should make the anchor grep FAIL (rc=1), got rc=$gpdr_mut_rc — the lock would be vacuous"
+pass "goalskill-producer-discipline-reference — skills/goal/SKILL.md carries a reference-form Interventions producer discipline paragraph (anchor present, points at skills/run/SKILL.md's discipline paragraph and the canonical class template; non-vacuous — removing the anchor line trips the lock)"
+
+# --- durability-duty extension (T-1002 rework2, Codex round2 Blocker fix) ---
+# The universal durability rule ("commit every append immediately, at every
+# recording point, not only at the Implement-to-Validate seam") must also be
+# referenced here, or an autonomous /goal tick could satisfy the interventions
+# gate at the Completion-gate seam while a later same-tick STOP/abort leaves an
+# entry uncommitted with nothing telling the orchestrator to commit it.
+GPDR_DURABILITY_ANCHOR='every append to an interventions file is committed immediately, as its own commit, at the moment of recording, at every one of this tick'
+grep -qF -- "$GPDR_DURABILITY_ANCHOR" "$GOAL_SKILL_MD" \
+  || fail "goalskill-producer-discipline-reference: missing the T-1002 rework2 durability-duty sentence in skills/goal/SKILL.md"
+
+# Non-vacuity: a mutated copy with the durability sentence's own line removed
+# must make the SAME grep FAIL (rc=1) — proving this extension is not vacuous.
+GPDR_DUR_MUT_FILE="$TMP/mutated-goal-SKILL-no-durability-duty.md"
+grep -vF -- "$GPDR_DURABILITY_ANCHOR" "$GOAL_SKILL_MD" > "$GPDR_DUR_MUT_FILE"
+set +e
+grep -qF -- "$GPDR_DURABILITY_ANCHOR" "$GPDR_DUR_MUT_FILE"
+gpdr_dur_mut_rc=$?
+set -e
+[[ "$gpdr_dur_mut_rc" -eq 1 ]] \
+  || fail "goalskill-producer-discipline-reference: removing the durability-duty line from a mutated copy should make the durability grep FAIL (rc=1), got rc=$gpdr_dur_mut_rc — the T-1002 rework2 lock extension would be vacuous"
+pass "goalskill-producer-discipline-reference (T-1002 rework2) — skills/goal/SKILL.md's reference-form paragraph also carries the universal durability duty (anchor present; non-vacuous — removing it trips the lock)"
 
 # =============================================================================
 # template-check-ignore

@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-1.0.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-1.1.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -57,7 +57,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 **`.shell-team/` を git に載せるかを最初に決めてください。** プラグインはルートの `.gitignore` を編集しないため、base dir は repo 内で *untracked* として現れます（無視されるのは中の run テレメトリのみ。自己完結した `<base>/.gitignore` による）。どちらの選択も想定されており、プラグインが代わりに決めることはありません：
 
 - **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）
-- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる
+- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。ただし global 側はマシン全体に効くため、後から「この repo ではボードを追跡したい」と決めた repo でも base dir が隠れる。その 1 repo だけ復帰させるには root の `.gitignore` に `!.shell-team/` を書く（repo 側のパターンが global ファイルより優先される）。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
 
 詳細・更新・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
@@ -144,9 +144,8 @@ build sha と uptime を返す /healthz を shell-team で追加して
 │   ├── essays/                      # プロジェクトの背景にある個人的な essay
 │   ├── workflow.md                  # フェーズ図 + ハンドオフ契約
 │   ├── distribution.md              # install / update / dogfood
-│   ├── history.md                   # プロジェクトの進化の記録
-│   └── specs/                       # タスクごとに 1 つの .md
-└── tasks/                           # per-repo データ（todo, specs, loops, runs, retros, reviews）
+│   └── history.md                   # プロジェクトの進化の記録
+└── .shell-team/                     # このリポ自身の per-repo データ（board, specs, loops, retros, reviews）
 ```
 
 ## フェーズフロー
@@ -181,7 +180,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 - **read-only オーケストレーター**：`tech-lead` は計画のみ。実行はメインセッションが Routing Map に従って行う。
 - **最小権限**：PM は read + spec 書き込みのみ、QA は read + bash のみ、Reviewer はコードを変更できない。
 - **真実源はファイルのみ**：`tasks/todo.md` ＋ status flag がエージェント間の単一の真実源。
-- **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身はそれより前から存在し、legacy な `tasks/` + `docs/specs/` レイアウトを使う——resolver は今もこれを検出・対応する——ゆえに本ドキュメント群の `tasks/…` パスはこのリポの legacy レイアウトを指す。[docs/adopting.md](docs/adopting.md) 参照。
+- **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身も同じ既定レイアウトで動くので、自分の board・specs・retros も `.shell-team/` 配下にある。resolver は、base dir 集約より前にチームを導入したリポのために legacy な `tasks/` + `docs/specs/` レイアウトも今なお検出・対応する——本ドキュメント群が `tasks/…` / `docs/specs/…` と書いている箇所は、その legacy レイアウトでの同じ artifact を指す。[docs/adopting.md](docs/adopting.md) 参照。
 - **Engineer は既定で non-worktree**：編集は現在の feature ブランチに直接着地する。並列実装時のみ orchestrator が起動時に `isolation: worktree` を opt-in。
 - **別プロバイダレビューは必須**：Codex CLI が使えない場合は Claude にフォールバックせず `BLOCKED` を返す。
 

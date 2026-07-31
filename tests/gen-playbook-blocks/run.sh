@@ -31,8 +31,30 @@ trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP"
 
 clone_fixture() {  # $1 = destination
+  # T-1006 DP-6: the fixture tree carries tasks/lessons.md but NO
+  # tasks/loops/shell-team.contract.yaml, so bin/team-paths.sh classifies it as
+  # the DEFAULT layout (base=.shell-team) rather than legacy. The legacy
+  # marker is created here, at runtime, rather than committed into the
+  # fixture -- every other suite in this repo does the same (see
+  # .shell-team/test-recipe.md's T-1006 entry) -- so every bare `--root`
+  # invocation below keeps resolving to tasks/lessons.md exactly as it did
+  # before the consumer was wired to the resolver.
   rm -rf "$1"
   cp -R "$FIX" "$1"
+  mkdir -p "$1/tasks/loops"
+  : > "$1/tasks/loops/shell-team.contract.yaml"
+}
+
+# clone_fixture_default_layout $1 = destination
+# T-1006 AC3: the same fixture, but on the DEFAULT layout -- no legacy marker,
+# and the corpus moved to .shell-team/lessons.md (the resolver's canonical
+# default-layout path). Derived at runtime, same reasoning as clone_fixture().
+clone_fixture_default_layout() {  # $1 = destination
+  rm -rf "$1"
+  cp -R "$FIX" "$1"
+  mkdir -p "$1/.shell-team"
+  mv "$1/tasks/lessons.md" "$1/.shell-team/lessons.md"
+  rmdir "$1/tasks"
 }
 
 run_gen() {  # $1 = root; prints exit code
@@ -81,6 +103,65 @@ pass "AC7: superseded entries are excluded and Why/How-to-apply are never transc
 grep -qF 'tasks/lessons.md, 2026-01-01 — Engineer-only active entry' "$ENG" \
   || fail "AC3: injected line must carry a tasks/lessons.md date+heading pointer"
 pass "AC3: injected lines carry a tasks/lessons.md date+heading pointer"
+
+# --- T-1006 AC3/AC21: the default layout resolves the lessons path via -----
+# bin/team-paths.sh -- no legacy marker, corpus at .shell-team/lessons.md.
+C="$TMP/t1006-default-layout"
+clone_fixture_default_layout "$C"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1006: the default-layout fixture must regenerate successfully"
+grep -qF '.shell-team/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md" \
+  || fail "T-1006: the default-layout pointer must name .shell-team/lessons.md"
+if grep -qF 'tasks/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md"; then
+  fail "T-1006: the default-layout pointer must not fall back to the legacy tasks/lessons.md literal"
+fi
+pass "T-1006: the default layout resolves the lessons path via bin/team-paths.sh"
+
+# --- T-1006 AC4/AC21: the legacy layout still resolves tasks/lessons.md ----
+# via bin/team-paths.sh -- the no-adopter-file-moves guarantee.
+C="$TMP/t1006-legacy-layout"
+clone_fixture "$C"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1006: the legacy-layout fixture must regenerate successfully"
+grep -qF 'tasks/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md" \
+  || fail "T-1006: the legacy-layout pointer must name tasks/lessons.md"
+if grep -qF '.shell-team/lessons.md, 2026-01-01' "$C/templates/prompt-blocks/playbook-engineer.md"; then
+  fail "T-1006: the legacy-layout pointer must not resolve to .shell-team/lessons.md"
+fi
+pass "T-1006: the legacy layout resolves tasks/lessons.md via bin/team-paths.sh"
+
+# --- T-1006 AC6/AC21: a resolver failure is fail-closed (nothing written) --
+# Two probes: (a) an invalid $TEAM_RUN_BASE with no --lessons; (b) a sibling
+# team-paths.sh stubbed to exit 0 printing nothing (the empty-path hole).
+C="$TMP/t1006-fail-closed"
+clone_fixture_default_layout "$C"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1006: fail-closed setup: initial generation must succeed"
+[ -f "$C/templates/prompt-blocks/playbook-engineer.md" ] \
+  || fail "T-1006: fail-closed setup: anti-vacuity control — the block must exist before it is removed"
+rm -f "$C/templates/prompt-blocks/playbook-engineer.md"
+rca=0
+erra="$(TEAM_RUN_BASE=.. bash "$GEN" --root "$C" 2>&1)" || rca=$?
+[ "$rca" -eq 2 ] || fail "T-1006: an invalid \$TEAM_RUN_BASE with no --lessons must exit 2, got $rca"
+case "$erra" in
+  *"could not resolve the lessons path"*) : ;;
+  *) fail "T-1006: invalid \$TEAM_RUN_BASE: expected 'could not resolve the lessons path', got: $erra" ;;
+esac
+[ ! -e "$C/templates/prompt-blocks/playbook-engineer.md" ] \
+  || fail "T-1006: an invalid \$TEAM_RUN_BASE must not generate anything"
+
+STUB_BIN="$TMP/t1006-stub-bin"
+rm -rf "$STUB_BIN"
+cp -R "$REPO_ROOT/bin" "$STUB_BIN"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_BIN/team-paths.sh"
+chmod 755 "$STUB_BIN/team-paths.sh"
+rcb=0
+errb="$(env -u TEAM_RUN_BASE bash "$STUB_BIN/gen-playbook-blocks.sh" --root "$C" 2>&1)" || rcb=$?
+[ "$rcb" -eq 2 ] || fail "T-1006: an empty-printing resolver stub must exit 2, got $rcb"
+case "$errb" in
+  *"could not resolve the lessons path"*) : ;;
+  *) fail "T-1006: empty resolver stub: expected 'could not resolve the lessons path', got: $errb" ;;
+esac
+[ ! -e "$C/templates/prompt-blocks/playbook-engineer.md" ] \
+  || fail "T-1006: an empty-printing resolver stub must not generate anything"
+pass "T-1006: a resolver failure is fail-closed (nothing written)"
 
 # --- Fix 1 (T-045 rework, Major): a trailing-space Status entry is still ----
 # included, not silently dropped. bin/check-playbook.sh trims Status before
@@ -469,6 +550,7 @@ clone_fixture "$C"
     printf '\n## 2027-01-%02d — Synthetic bulk entry %d\n' "$((n % 28 + 1))" "$n"
     printf -- '- **Category**: process\n'
     printf -- '- **Applies-to**: engineer\n'
+    printf -- '- **Scope**: loop\n'
     printf -- '- **Status**: active\n'
     printf -- '- **Source**: n/a\n'
     printf -- '- **Rule**: Synthetic bulk rule number %d.\n' "$n"
@@ -486,6 +568,58 @@ case "$out" in
   *) fail "expected a non-fatal line-count threshold warning in stderr, got: $out" ;;
 esac
 pass "a role's block exceeding the line-count threshold prints a non-fatal warning (exit 0)"
+
+# =============================================================================
+# T-1007: Scope-typed ledger — the shipping boundary is by Scope, not
+# Applies-to (docs/specs/T-1007-scope-typed-ledger.md). The shipped fixture
+# ($FIX/tasks/lessons.md) now carries a Scope: maintainer, Applies-to: all
+# entry ("Maintainer-scoped all-roles entry") alongside four Scope: loop
+# entries — Applies-to: all is load-bearing: it proves the exclusion below is
+# by Scope, not by role.
+# =============================================================================
+
+# --- T-1007 AC6: maintainer-scoped entries never reach a generated block ----
+C="$TMP/t1007-maintainer-excluded"
+clone_fixture "$C"
+grep -qF 'T1007-LOOP-SENTINEL' "$C/tasks/lessons.md" \
+  || fail "T-1007: fixture setup: the loop sentinel must be present in the corpus"
+grep -qF 'T1007-MAINTAINER-SENTINEL' "$C/tasks/lessons.md" \
+  || fail "T-1007: fixture setup: the maintainer sentinel must be present in the corpus"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1007: the mixed-scope fixture must generate successfully"
+for f in "$C/templates/prompt-blocks/playbook-engineer.md" \
+         "$C/templates/prompt-blocks/playbook-qa-verifier.md" \
+         "$C/templates/prompt-blocks/playbook-tech-lead.md" \
+         "$C/templates/prompt-blocks/playbook-pm-spec.md"; do
+  grep -qF 'T1007-LOOP-SENTINEL' "$f" \
+    || fail "T-1007: the loop-scoped entry must reach $(basename "$f")"
+  if grep -qF 'T1007-MAINTAINER-SENTINEL' "$f"; then
+    fail "T-1007: a maintainer-scoped entry (Applies-to: all) must never reach $(basename "$f")"
+  fi
+done
+pass "T-1007: maintainer-scoped entries never reach a generated block"
+
+# --- T-1007 AC8: an all-maintainer corpus yields the no-entries fallback -----
+C="$TMP/t1007-all-maintainer"
+clone_fixture "$C"
+{
+  printf '# Lessons\n\n'
+  printf '## 2027-02-01 — Only a maintainer entry\n'
+  printf -- '- **Category**: process\n- **Applies-to**: all\n- **Scope**: maintainer\n'
+  printf -- '- **Bound-in**: CONTRIBUTING.md\n- **Status**: active\n- **Source**: n/a\n'
+  printf -- '- **Rule**: T1007_ALL_MAINTAINER_SENTINEL.\n- **Why**: w\n- **How to apply**: h\n'
+} > "$C/tasks/lessons.md"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1007: an all-maintainer corpus must still generate successfully"
+for f in "$C/templates/prompt-blocks/playbook-engineer.md" \
+         "$C/templates/prompt-blocks/playbook-qa-verifier.md" \
+         "$C/templates/prompt-blocks/playbook-tech-lead.md" \
+         "$C/templates/prompt-blocks/playbook-pm-spec.md"; do
+  grep -qF '(no active entries currently apply to this role)' "$f" \
+    || fail "T-1007: an all-maintainer corpus must yield the no-entries fallback in $(basename "$f")"
+  if grep -qF 'T1007_ALL_MAINTAINER_SENTINEL' "$f"; then
+    fail "T-1007: the sole maintainer entry must never reach $(basename "$f")"
+  fi
+done
+pass "T-1007: an all-maintainer corpus yields the no-entries fallback"
 
 # --- AC8: shellcheck (soft-skip when unavailable) -----------------------------
 if command -v shellcheck >/dev/null 2>&1; then

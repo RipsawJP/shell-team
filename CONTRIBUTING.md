@@ -35,14 +35,65 @@ is the loop doing its job, not a verdict on the contribution.
 
 ## About CI on your pull request
 
-Some checks in this repository test the shipped scripts (shellcheck, the fixture
-suites under `tests/`) and some test the repository's **own working
-conventions** — the board, the task specs, the generated prompt blocks. The
-second kind can fail for reasons that have nothing to do with your change.
+Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.
+
+Two CI steps a reader might expect do not exist: nothing lints the board this repository runs on — the lint target is the shipped template, `templates/todo-template.md` — and nothing evaluates a task spec against its acceptance criteria, since the spec-layer checkers appear in CI only as fixture suites. The board and the specs are still read in full by the PII shape check whenever a change touches them, and the generated prompt blocks are genuinely verified: `bin/check-prompt-sync.sh` runs against this tree on every pull request.
 
 If a check fails in a way that looks unrelated to what you touched, **say so in
 the pull request rather than trying to satisfy it.** Sorting that out is the
 maintainer's side of the work, not yours.
+
+## The pull-request flow
+
+The mechanics around opening, merging, and closing out a pull request:
+
+- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line: do not branch from it.
+- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.
+- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.
+- **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.
+- **Publish the board edit as its own pull request.** `bin/close-out.sh` rewrites the board file and stops there — it runs no git command — and `develop` is protected, so the edit cannot go straight to it. Branch from `develop` at the merge commit, commit that one file with a message of the form `board: close out T-NNNN — merged via PR #N`, and open that branch as a second pull request.
+- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.
+
+## Confirming the CI check is green
+
+How to read the one required check, rather than a mergeability field that
+looks similar but answers a different question:
+
+- **There is one workflow and one job.** `.github/workflows/check-handoff.yml` — its job display name, and the check name to look for on a pull request, is `check-handoff lint`.
+- **Confirm the reported conclusion of that check on the pull-request head commit.** A mergeability field such as `mergeable_state: clean` is not evidence: it describes whether the branches can be combined, and it can read clean before any check has reported a conclusion at all.
+- **Run the suites locally before pushing.** There is no single "run everything" entry point; the workflow file is the authoritative list of every suite and dogfood step, in the order it runs them, and `.shell-team/test-recipe.md` records how to run one.
+- **Two CI steps apply even to a documentation-only pull request.** `bin/check-pii-shapes.sh` uses the base branch only to enumerate the paths a change touches and then scans the full committed content of each of them, not the added lines alone — so a shape a file already carried surfaces on a change that touched a different part of that file, unless that path is on the short, test-locked known-shapes list inside the checker. `bin/check-commit-identity.sh` inspects the non-merge commits from the merge base to the head, and never a merge commit.
+- **What CI does not do.** It lints the shipped board template, not the board in this repository, and although the spec-layer checkers (`bin/check-acs.sh`, `bin/check-intent.sh`, `bin/check-provenance.sh`) have fixture suites in CI, no step runs them against the specs here. Run those yourself.
+
+## The board line format
+
+The task board's `## Active` section follows a strict, machine-checked shape.
+
+- **The `## Active` section is machine-linted.** `bin/check-handoff.sh` validates every top-level `- [ ]` line in it against a fixed shape and rejects an unrecognised status flag; both separators in that shape are a space-padded U+2014 EM DASH.
+- **Nothing may come between the status flag and the spec pointer.** A parenthetical — a date, a review round, a pull-request number — placed after the flag breaks the match; the closing backtick of the flag must be followed directly by the spec pointer.
+- **Notes go in indented sub-bullets under the entry.** The linter skips indented lines, the `_(none)_` placeholder, and any top-level line that is not `- [ ]`, which is why the `- [x]` entries under `## Done` are never inspected.
+
+A worked example — the entry itself, one indented sub-bullet note under it,
+and nothing else added to either supporting section:
+
+```markdown
+## Active
+
+- [ ] **T-1042** Add a caching layer to the spec-lookup helper — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1042-spec-lookup-cache.md
+  - note: a supporting detail from whichever agent last touched this entry.
+```
+
+- **Lint the board before pushing**: `bash bin/check-handoff.sh "$(bash bin/team-paths.sh --get todo)"`, and `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base develop`, which compares the set of `T-NNN` heading ids against the base ref — it is the only check that notices an id deleted, overwritten with a different id, or duplicated, and it cannot see a rewrite that leaves the id in place.
+- **The status-flag vocabulary is not restated here**: it is listed in `templates/todo-template.md` and enforced by `bin/check-handoff.sh`.
+
+## What does not belong in this file
+
+This document describes conventions a contributor can re-derive from a
+fresh clone. Three classes stay out of it on purpose:
+
+- **Nothing specific to one machine or one operator.** No absolute paths into a home directory, no account-to-remote mapping, no credential or token configuration, no per-host execution environment quirks, no tooling only one maintainer has installed. A convention that cannot be re-derived from a fresh clone is not a convention of this repository.
+- **No personal oversight preferences.** How often a session stops to ask is a working preference, kept in the gitignored `CLAUDE.local.md`; [`docs/tuning-oversight.md`](docs/tuning-oversight.md) documents that mechanism and this file does not restate it.
+- **No branch-protection configuration.** Both `develop` and `main` are protected, and `check-handoff lint` must report success before a merge; the specific rule set lives in the GitHub settings for this repository and is not readable from a clone, so it is not asserted here.
 
 ## Where the behavior is documented
 

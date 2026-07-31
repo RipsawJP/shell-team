@@ -37,6 +37,28 @@ self-contained `<base>/.gitignore`. Whether to also git-ignore the whole base
 dir — and whether to copy the operating rules below into your own `CLAUDE.md` —
 is your call; the plugin will not make those edits for you.
 
+If you keep the base dir out of git, the two ways of doing that differ in scope.
+A `.shell-team/` line in the repo's own `.gitignore` applies to that repo and is
+trivially reversed. Putting it in your global excludes (`git config --global
+core.excludesFile`) hides the base dir in *every* repo on the machine —
+including one where you later decide the board should be tracked, and there the
+symptom is indirect: the board simply never appears in `git status`. To
+re-include it in a single repo, add `!.shell-team/` to that repo's root
+`.gitignore`; repo-level patterns outrank the global file. This repository
+carries that line for exactly that reason, so its own base dir stays tracked
+even for an operator who ignores `.shell-team/` globally.
+
+That global file has a second consequence. Anything that asks git whether a
+path is ignored — `git check-ignore`, and checks built on it — reads it too, so
+such a check can fail on your machine while passing in CI, where no global
+excludes exist. Pin it explicitly (`git -c core.excludesFile=/dev/null …`) in
+any assertion about ignore behavior rather than inheriting whatever the operator
+has configured.
+
+How often the session stops to check with you is your call too, and it is set
+per-checkout rather than shipped: see
+[tuning-oversight.md](tuning-oversight.md).
+
 ## `AGENTS.md` — a cross-tool pointer doc
 
 `team-init` also scaffolds **`<base>/AGENTS.md`**: a portable doc that tells any

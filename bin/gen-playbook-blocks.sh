@@ -4,8 +4,11 @@
 # (T-045, issue #116).
 #
 # For each IN role (engineer, qa-verifier, tech-lead, pm-spec):
-#   1. Scan the lessons file for `Status: active` entries whose `Applies-to`
-#      includes that role (or `all`, which means all four IN roles at once).
+#   1. Scan the lessons file for `Status: active`, `Scope: loop` entries whose
+#      `Applies-to` includes that role (or `all`, which means all four IN
+#      roles at once). Scope decides WHETHER an entry ships at all (T-1007);
+#      Applies-to decides WHERE it ships. A `Scope: maintainer` entry never
+#      reaches a generated block, whatever its Applies-to says.
 #   2. Emit ONE line per qualifying entry, in file order: the entry's `Rule`
 #      field verbatim, plus a date+heading pointer back into the lessons
 #      file. `Why` / `How to apply` are NEVER transcribed (D2 in
@@ -22,9 +25,11 @@
 #
 # bin/check-prompt-sync.sh (unchanged — T-039/T-040's check-only design) then
 # verifies canonical block and consumer stay in sync; running THIS script
-# again after a tasks/lessons.md edit is how you refresh that sync (CI adds a
-# freshness dogfood step: regenerate into a temp copy and diff against the
-# committed files).
+# again after a lessons-corpus edit is how you refresh that sync. CI's step
+# named "Dogfood gen-playbook-blocks — regenerating into a scratch copy reproduces every shipped block and consumer" (T-1008)
+# is exactly that freshness check, run for real: it regenerates into a
+# scratch copy and diffs against the committed files, so this claim and the
+# workflow cannot drift apart silently.
 #
 # Fail-closed re-validation (D3): before generating anything, this script
 # runs bin/check-playbook.sh over the lessons file. A schema violation in ANY
@@ -41,14 +46,14 @@
 #
 #   --root        repo root the registry's consumer paths resolve against
 #                 (default: cwd)
-#   --lessons     path to the lessons file (default: <root>/tasks/lessons.md).
-#                 The injected tasks/lessons.md pointer text names whatever
-#                 path is actually read here — it reflects a non-default
-#                 --lessons value rather than always saying "tasks/lessons.md".
+#   --lessons     path to the lessons file (default: resolved against --root
+#                 via `bin/team-paths.sh --get lessons`). The injected
+#                 pointer text names whatever path is actually read here,
+#                 never a hardcoded literal.
 #   --blocks-dir  canonical blocks dir (default: <root>/templates/prompt-blocks)
 #
 # Exit: 0 = regenerated (possibly byte-identical to what was already there);
-#       1 = tasks/lessons.md fails bin/check-playbook.sh (nothing written);
+#       1 = the lessons file fails bin/check-playbook.sh (nothing written);
 #       2 = usage / resolver / registry / marker-shape error.
 
 set -euo pipefail
@@ -78,20 +83,33 @@ while [ "$#" -gt 0 ]; do
     --root)       [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --lessons)    [ "$#" -ge 2 ] || die "--lessons requires a value"; shift; LESSONS="$1"; shift ;;
     --blocks-dir) [ "$#" -ge 2 ] || die "--blocks-dir requires a value"; shift; BLOCKS_DIR="$1"; shift ;;
-    --help|-h)    sed -n '2,45p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)    sed -n '2,48p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            die "unknown argument: $1" ;;
   esac
 done
 [ -d "$ROOT" ] || die "root path is not a directory: $ROOT"
-# The tasks/lessons.md pointer text injected into every generated block
-# (see pass 2 below) names the ACTUAL file read here, not a hardcoded
-# literal — so a caller who passes a non-default --lessons PATH gets an
-# accurate pointer instead of a misleading "tasks/lessons.md" reference.
+# The pointer text injected into every generated block (see pass 2 below)
+# names the ACTUAL file read here, not a hardcoded literal — so a caller who
+# passes a non-default --lessons PATH gets an accurate pointer instead of a
+# misleading fixed-path reference.
 if [ -n "$LESSONS" ]; then
+  # --lessons short-circuits the resolver entirely (T-1006 DP-5): an
+  # explicit path must keep working in a repository whose $TEAM_RUN_BASE is
+  # invalid, so the resolver is never even invoked on this branch.
   POINTER_PATH="$LESSONS"
 else
-  LESSONS="$ROOT/tasks/lessons.md"
-  POINTER_PATH="tasks/lessons.md"
+  # T-1006: the default is derived from bin/team-paths.sh rather than
+  # hardcoded to the legacy layout. Capture-then-check (bin/team-init.sh's
+  # precedent) — a nonzero exit is fail-closed, and so is an EMPTY resolved
+  # path: unchecked, "$ROOT/" is a directory, for which `[ -r ]` below would
+  # be true, letting generation proceed against nothing.
+  resolved_lessons=""
+  if ! resolved_lessons="$(bash "$SCRIPT_DIR/team-paths.sh" --root "$ROOT" --get lessons 2>/dev/null)"; then
+    die "could not resolve the lessons path"
+  fi
+  [ -n "$resolved_lessons" ] || die "could not resolve the lessons path"
+  LESSONS="$ROOT/$resolved_lessons"
+  POINTER_PATH="$resolved_lessons"
 fi
 # T-047 fast-follow AC3: POINTER_PATH (the --lessons PATH value) is spliced
 # verbatim into every generated block's pointer text (see pass 2 below) —
@@ -190,7 +208,7 @@ fi
 # --- fail-closed preflight: the WHOLE lessons file must be schema-valid ------
 if ! preflight_out="$(bash "$SCRIPT_DIR/check-playbook.sh" "$LESSONS" 2>&1)"; then
   printf '%s\n' "$preflight_out" >&2 || true
-  fail "tasks/lessons.md fails schema validation — refusing to generate (nothing written, see bin/check-playbook.sh above)"
+  fail "$LESSONS fails schema validation — refusing to generate (nothing written, see bin/check-playbook.sh above)"
 fi
 
 ROLES="engineer qa-verifier tech-lead pm-spec"
@@ -260,13 +278,19 @@ ENTRIES_FILE="$(mktemp "${TMPDIR:-/tmp}/gen-playbook-entries.XXXXXX")"
 # (cleanup trap for this file is set below, once CONTENT_FILES also exists)
 
 {
-  date=""; remainder=""; applies=""; status=""; rule=""; have_entry=0
+  date=""; remainder=""; applies=""; scope=""; status=""; rule=""; have_entry=0
   in_fence=0
   fence_char=""
   fence_len=0
+  # T-1007 hazard 1: emit_record()'s printf and the pass-2 `read -r` below
+  # are two halves of one \x1f-delimited record contract — a field added to
+  # one and not the other shifts every field after it, silently, into a
+  # generated prompt. `scope` is inserted at a fixed position (after
+  # `applies`, before `status`, mirroring the real file's field order) in
+  # BOTH halves.
   emit_record() {
     [ "$have_entry" -eq 1 ] || return 0
-    printf '%s%s%s%s%s%s%s%s%s\n' "$date" "$FS" "$remainder" "$FS" "$applies" "$FS" "$status" "$FS" "$rule"
+    printf '%s%s%s%s%s%s%s%s%s%s%s\n' "$date" "$FS" "$remainder" "$FS" "$applies" "$FS" "$scope" "$FS" "$status" "$FS" "$rule"
   }
   while IFS= read -r rawline || [ -n "$rawline" ]; do
     line="${rawline%$'\r'}"
@@ -301,7 +325,7 @@ ENTRIES_FILE="$(mktemp "${TMPDIR:-/tmp}/gen-playbook-entries.XXXXXX")"
       if [[ "$line" =~ ^\#\#\ ([0-9]{4}-[0-9]{2}-[0-9]{2})\ —\ (.+)$ ]]; then
         emit_record
         date="${BASH_REMATCH[1]}"; remainder="${BASH_REMATCH[2]}"
-        applies=""; status=""; rule=""; have_entry=1
+        applies=""; scope=""; status=""; rule=""; have_entry=1
       elif is_allowlisted_heading "$line"; then
         emit_record
         have_entry=0
@@ -316,6 +340,8 @@ ENTRIES_FILE="$(mktemp "${TMPDIR:-/tmp}/gen-playbook-entries.XXXXXX")"
     [ "$have_entry" -eq 1 ] || continue
     if [[ "$line" =~ ^-\ \*\*Applies-to\*\*:\ (.*)$ ]]; then
       applies="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^-\ \*\*Scope\*\*:\ (.*)$ ]]; then
+      scope="${BASH_REMATCH[1]}"
     elif [[ "$line" =~ ^-\ \*\*Status\*\*:\ (.*)$ ]]; then
       status="${BASH_REMATCH[1]}"
     elif [[ "$line" =~ ^-\ \*\*Rule\*\*:\ (.*)$ ]]; then
@@ -416,8 +442,14 @@ for role in "${ROLES_ARR[@]}"; do
     printf '\n'
     line_count=2
     any=0
-    while IFS="$FS" read -r e_date e_remainder e_applies e_status e_rule; do
+    while IFS="$FS" read -r e_date e_remainder e_applies e_scope e_status e_rule; do
       [ "$(trim "$e_status")" = "active" ] || continue
+      # T-1007: Scope decides WHETHER an entry ships; Applies-to decides
+      # WHERE. Only a Scope: loop entry ever reaches a generated block — a
+      # maintainer entry never does, whatever its Applies-to says (the
+      # preflight bin/check-playbook.sh call above already guarantees Scope
+      # is present and one of the two known tokens).
+      [ "$(trim "$e_scope")" = "loop" ] || continue
       role_in_applies "$e_applies" "$role" || continue
       # $e_remainder no longer carries the "— " separator itself (the
       # canonical heading regex above now consumes the em-dash as a literal

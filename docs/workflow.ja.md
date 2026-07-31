@@ -69,6 +69,14 @@ status flag（`READY_FOR_ARCH` … `READY_FOR_MERGE`、`BLOCKED`、`REWORK`）�
 シグネチャ）・`check-acs.sh` によって grep されるため、翻訳するとパイプラインが
 壊れます。散文は会話言語に従いますが、契約トークンは従いません。
 
+**サイクルごとに生成される成果物**（`scrum-master` が書く retro）も同じゼロコンフィグ規則に
+従います: これらにも別建ての言語設定はありません。`bin/check-retro.sh` は retro の*構造*だけを
+検証し、`<!-- retro-section: keep|problem|try|traps|lessons -->` という言語に依存しない
+マーカーに基づきます — マーカーの隣の見出しテキストは自由なので、日本語でも英語でも他の
+どんな言語で書かれた retro でも同じ構造チェックを通ります。出荷される（英語の）雛形は
+`docs/templates/retro-template.md` を、マーカー契約以前に書かれた retro の移行手順は
+そのファイルの移行注記を参照してください。
+
 **既知の制約**: ミラーが保証されるのは **SKILL 駆動の経路**（`/shell-team:run`・`/goal`）
 だけで、そこではオーケストレータがディレクティブを注入します。エージェントを
 **直接 / スタンドアロン**で起動する（`@engineer` 等）と、ミラーは**保証されません** —
@@ -95,7 +103,8 @@ codex exec --ephemeral --json "Play devil's advocate on <file>. What could break
 
 ## 規約
 
-- **ブランチ**: `feat/T-XXX-<slug>` — engineer はタスクの feature ブランチ上で直接作業する（worktree は並列実装で orchestrator が opt-in した時のみ）
-- **仕様**: `docs/specs/T-XXX-<slug>.md`、slug はタイトルの kebab-case
-- **レビュー成果物**: `tasks/reviews/T-XXX.md`（curated verdict + severity ledger）と Codex 生トレース `tasks/reviews/T-XXX-codex-*.{txt,jsonl}`
+- **ブランチ**: engineer はタスクの feature ブランチ上で直接作業する（worktree は並列実装で orchestrator が opt-in した時のみ）— この repository の命名規則は `CONTRIBUTING.md` を参照
+- **仕様**: `<specs dir>/T-XXX-<slug>.md`、slug はタイトルの kebab-case、`<specs dir>` は `team-paths.sh --get specs`（プラグインが読み込まれていれば `PATH` 上にある。そうでなければ `bin/team-paths.sh`）
+- **レビュー成果物**: `<reviews dir>/T-XXX.md`（curated verdict + severity ledger）と Codex 生トレース `<reviews dir>/T-XXX-codex-*.{txt,jsonl}`、`<reviews dir>` は `team-paths.sh --get reviews`（プラグインが読み込まれていれば `PATH` 上にある。そうでなければ `bin/team-paths.sh`）
+- **PR 本文の diff 統計**（file/line counts）: PR 作成時に `git diff --stat <base>...HEAD` を実行して取得し、マージ直前に再測定する — QA の hand-off スナップショットから転記しない。レビュー記録と disposition のコミットが QA の後に乗るため、数字が黙って古くなる（retro で実際に観測された）
 - **機能タスクの一部として `.claude/agents/*` を決して編集しない** — それはチーム設定作業であり、専用のタスク ID を通す

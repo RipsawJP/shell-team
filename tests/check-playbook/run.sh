@@ -3,7 +3,8 @@
 # (docs/specs/T-045-ace-playbook.md):
 #   AC1  required-field / known-enum / structural (single-line, no control
 #        chars, no marker-collision) validation, fail-closed
-#   AC5  the real repo's tasks/lessons.md passes (dogfood)
+#   AC5  the real repo's corpus at the resolved lessons path passes (dogfood,
+#        T-1008 — see the labelled case near the end of this file)
 #   AC6  unknown Applies-to role tokens are rejected
 #   AC8  shellcheck clean (soft-skip when unavailable)
 #
@@ -147,8 +148,8 @@ pass "Fix 1: a trailing-space Status value (trims to a known enum) still validat
 # --- Fix 2 (T-045 rework, Major): control chars / marker-collision in the ----
 # ENTRY HEADING'S TITLE are rejected too, not just in `- **Field**:` bullets —
 # bin/gen-playbook-blocks.sh reads the title back out (as `remainder`) to
-# build its tasks/lessons.md pointer, using the same 0x1F delimiter its
-# fields use, so an unchecked title could desync its field-splitting.
+# build its pointer back into the lessons file, using the same 0x1F delimiter
+# its fields use, so an unchecked title could desync its field-splitting.
 C="$TMP/title-control-char.md"
 printf -- '## 2026-02-01 — title with a \x0c control char\n' > "$TMP/title-cc-line.txt"
 awk -v newline_file="$TMP/title-cc-line.txt" '
@@ -200,7 +201,7 @@ pass "Round2 Major1: a heading using a plain hyphen (not the em-dash) separator 
 # The allow-listed `## Format` heading itself must NOT be flagged (it is
 # already present, unmutated, in $BASE — this just asserts the base fixture
 # stays green, i.e. the allow-list actually works for the real shape this
-# repo's own tasks/lessons.md uses).
+# repo's own corpus, at the resolved lessons path, uses).
 [ "$(run_checker "$BASE")" -eq 0 ] || fail "Round2 Major1: the allow-listed '## Format' heading must not itself be flagged"
 pass "Round2 Major1: the allow-listed '## Format' section heading is accepted, not flagged"
 
@@ -231,7 +232,7 @@ C="$TMP/fence-unclosed-backtick.md"
   cat "$BASE"
   printf '\n```markdown\nnever closed\n'
   printf '\n## 2026-04-01 — Entry after an unclosed fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: should never validate.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 1 ] || fail "(a) an unclosed backtick fence must exit 1"
@@ -247,7 +248,7 @@ C="$TMP/fence-unclosed-tilde.md"
   cat "$BASE"
   printf '\n~~~markdown\nnever closed\n'
   printf '\n## 2026-04-02 — Entry after an unclosed tilde fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: should never validate.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 1 ] || fail "(b) an unclosed tilde fence must exit 1"
@@ -268,7 +269,7 @@ C="$TMP/fence-tilde-fake-entry.md"
   cat "$BASE"
   printf '\n~~~markdown\n'
   printf '## 2099-01-01 — Fake heading inside tilde fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: FAKE_RULE_SHOULD_NOT_BE_INJECTED.\n- **Why**: w\n- **How to apply**: h\n'
   printf '~~~\n'
 } > "$C"
@@ -287,7 +288,7 @@ C="$TMP/fence-short-close-attempt.md"
   printf 'still inside the fence (the 3-backtick line above did not close it)\n'
   printf '````\n'                                      # closes with 4 — matches
   printf '\n## 2026-04-03 — Entry after a properly-closed 4-backtick fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "(d) a properly-closed longer fence (with a too-short close attempt inside) must validate green"
@@ -304,7 +305,7 @@ C="$TMP/fence-wrong-char-close-attempt.md"
   printf 'still inside the fence (the tilde line above did not close it)\n'
   printf '```\n'                                       # closes with backticks — matches
   printf '\n## 2026-04-04 — Entry after a properly-closed backtick fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "(e) a properly-closed fence (with a wrong-character close attempt inside) must validate green"
@@ -332,11 +333,11 @@ C="$TMP/fence-trailing-content-then-real-close.md"
   # shellcheck disable=SC2016  # literal backticks (fence markers), not command substitution
   printf '\n```markdown\n```payload-not-a-real-close\n'
   printf '## 2099-01-01 — Fake entry via trailing-content pseudo-close\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: FAKE_RULE_SHOULD_NOT_BE_INJECTED.\n- **Why**: w\n- **How to apply**: h\n'
   printf '```\n'
   printf '\n## 2026-05-01 — Real entry after properly-closed fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "(f) a properly-closed fence (with a trailing-content pseudo-close inside, correctly ignored) must validate green"
@@ -350,11 +351,11 @@ C="$TMP/fence-indented-open.md"
   cat "$BASE"
   printf '\n   ```markdown\n'
   printf '## 2099-01-01 — Injected from indented fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: INDENTED_FENCE_INJECTION_SHOULD_NOT_APPEAR.\n- **Why**: w\n- **How to apply**: h\n'
   printf '   ```\n'
   printf '\n## 2026-05-02 — Real entry after an indented fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "(g) a 1-3-space-indented fence (with a column-0 fake entry inside) must validate green"
@@ -367,7 +368,7 @@ C="$TMP/fence-indented-close.md"
   # shellcheck disable=SC2016  # literal backticks (fence markers), not command substitution
   printf '\n```markdown\nfiller content\n  ```\n'
   printf '\n## 2026-05-03 — Real entry after an indent-closed fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "(h) a 2-space-indented closing fence must correctly close (real entry after it must validate)"
@@ -414,7 +415,7 @@ C="$TMP/fence-ambiguous-inside.md"
   # shellcheck disable=SC2016  # literal backticks (fence markers), not command substitution
   printf '\n```markdown\n    ```\nstill inside the fence (the indented run above did not close it)\n```\n'
   printf '\n## 2026-05-04 — Real entry after a fence with 4+-space content inside\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "(k) a 4+-space-indented fence-run line inside an open fence must be treated as content (must not close it)"
@@ -477,11 +478,11 @@ C="$TMP/fence-tab-indented.md"
   cat "$BASE"
   printf '\n\t```markdown\n'
   printf '## 2099-01-01 — Injected from tab-indented fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: TAB_FENCE_INJECTION_SHOULD_NOT_APPEAR.\n- **Why**: w\n- **How to apply**: h\n'
   printf '\t```\n'
   printf '\n## 2026-05-05 — Real entry after a tab-indented fence\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: real entry after the fence.\n- **Why**: w\n- **How to apply**: h\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 0 ] || fail "T-047 AC5: a tab-indented fence open/close pair must validate green (recognized as a fence)"
@@ -697,7 +698,7 @@ C="$TMP/t108-chain.md"
 {
   cat "$BASE"
   printf '\n## 2026-06-01 — Fourth entry (chains to a superseded entry)\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: superseded\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: superseded\n'
   printf -- '- **Source**: n/a\n- **Rule**: r\n- **Why**: w\n- **How to apply**: h\n'
   printf -- '- **Superseded-by**: 2026-01-02 — Second entry (superseded)\n'
 } > "$C"
@@ -713,7 +714,7 @@ C="$TMP/t108-self-reference.md"
 {
   cat "$BASE"
   printf '\n## 2026-06-02 — Fifth entry (points at itself)\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: superseded\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: superseded\n'
   printf -- '- **Source**: n/a\n- **Rule**: r\n- **Why**: w\n- **How to apply**: h\n'
   printf -- '- **Superseded-by**: 2026-06-02 — Fifth entry (points at itself)\n'
 } > "$C"
@@ -729,10 +730,10 @@ C="$TMP/t108-duplicate-key.md"
 {
   cat "$BASE"
   printf '\n## 2026-06-03 — Duplicate title\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: r1\n- **Why**: w1\n- **How to apply**: h1\n'
   printf '\n## 2026-06-03 — Duplicate title\n'
-  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Status**: active\n'
+  printf -- '- **Category**: process\n- **Applies-to**: engineer\n- **Scope**: loop\n- **Status**: active\n'
   printf -- '- **Source**: n/a\n- **Rule**: r2\n- **Why**: w2\n- **How to apply**: h2\n'
 } > "$C"
 [ "$(run_checker "$C")" -eq 1 ] || fail "T-108 AC6: two entries sharing the same (date, title) key must exit 1"
@@ -761,6 +762,101 @@ pass "T-108 AC8: a case-different field bullet ('Superseded-By', capital B) is r
 [ "$(run_checker "$BASE")" -eq 0 ] \
   || fail "T-108 AC8: an 'Extended by' bullet must be recognized (not an unknown-field violation)"
 pass "T-108 AC8: an 'Extended by' bullet is recognized as a known field name (present in \$BASE, stays green)"
+
+
+# =============================================================================
+# T-1007: Scope / Bound-in schema (docs/specs/T-1007-scope-typed-ledger.md).
+# $BASE now carries a fourth, Scope: maintainer entry ("Fourth entry
+# (maintainer-scoped)") with a Bound-in: CONTRIBUTING.md pointer, alongside
+# the first three Scope: loop entries — every pre-existing assertion above
+# stays green (fixture contract: annotate + append, never remove).
+# =============================================================================
+
+# --- T-1007 AC1: a missing Scope field is rejected --------------------------
+C="$TMP/t1007-missing-scope.md"
+grep -v -- '- \*\*Scope\*\*: ' "$BASE" > "$C"
+[ "$(run_checker "$C")" -eq 1 ] || fail "T-1007: a lessons file with every Scope bullet removed must exit 1"
+case "$(run_checker_stderr "$C")" in
+  *"missing required field: Scope"*) : ;;
+  *) fail "T-1007: missing Scope: expected reason in stderr" ;;
+esac
+pass "T-1007: a missing Scope field is rejected"
+
+# --- T-1007 AC1: an unknown Scope value is rejected --------------------------
+C="$TMP/t1007-unknown-scope.md"
+sed 's/- \*\*Scope\*\*: loop/- **Scope**: all/' "$BASE" > "$C"
+[ "$(run_checker "$C")" -eq 1 ] || fail "T-1007: an unknown Scope value ('all') must exit 1"
+case "$(run_checker_stderr "$C")" in
+  *"unknown Scope value"*) : ;;
+  *) fail "T-1007: unknown Scope value: expected reason in stderr" ;;
+esac
+pass "T-1007: an unknown Scope value is rejected"
+
+# --- T-1007 AC3: Bound-in is required on a maintainer entry ------------------
+C="$TMP/t1007-maintainer-no-bound-in.md"
+grep -v -- '- \*\*Bound-in\*\*: ' "$BASE" > "$C"
+[ "$(run_checker "$C")" -eq 1 ] || fail "T-1007: a maintainer entry with no Bound-in bullet must exit 1"
+case "$(run_checker_stderr "$C")" in
+  *"Scope is 'maintainer' but Bound-in is missing"*) : ;;
+  *) fail "T-1007: maintainer with no Bound-in: expected reason in stderr" ;;
+esac
+pass "T-1007: Bound-in is required on a maintainer entry"
+
+# --- T-1007 AC3: Bound-in is forbidden on a loop entry -----------------------
+C="$TMP/t1007-loop-with-bound-in.md"
+sed 's/^- \*\*Applies-to\*\*: engineer$/- **Applies-to**: engineer\n- **Bound-in**: CONTRIBUTING.md/' "$BASE" > "$C"
+[ "$(run_checker "$C")" -eq 1 ] || fail "T-1007: a loop entry carrying a Bound-in bullet must exit 1"
+case "$(run_checker_stderr "$C")" in
+  *"Scope is 'loop' but Bound-in is present"*) : ;;
+  *) fail "T-1007: loop with Bound-in: expected reason in stderr" ;;
+esac
+pass "T-1007: Bound-in is forbidden on a loop entry"
+
+# --- T-1007 AC5 (DP-b): a loop entry superseded by a maintainer entry -------
+# is rejected fail-closed; the reverse direction (a local lesson that
+# generalises naming its universal replacement — #23's one-file requirement)
+# stays legal.
+C="$TMP/t1007-loop-superseded-by-maintainer.md"
+{
+  printf -- '## 2026-07-01 — Retired loop entry\n'
+  printf -- '- **Category**: process\n- **Applies-to**: all\n- **Scope**: loop\n'
+  printf -- '- **Status**: superseded\n- **Source**: n/a\n- **Rule**: r1\n- **Why**: w1\n- **How to apply**: h1\n'
+  printf -- '- **Superseded-by**: 2026-07-02 — Active maintainer entry\n\n'
+  printf -- '## 2026-07-02 — Active maintainer entry\n'
+  printf -- '- **Category**: process\n- **Applies-to**: all\n- **Scope**: maintainer\n'
+  printf -- '- **Bound-in**: CONTRIBUTING.md\n- **Status**: active\n- **Source**: n/a\n'
+  printf -- '- **Rule**: r2\n- **Why**: w2\n- **How to apply**: h2\n'
+} > "$C"
+[ "$(run_checker "$C")" -eq 1 ] || fail "T-1007: a loop entry superseded by a maintainer entry must exit 1"
+case "$(run_checker_stderr "$C")" in
+  *"Superseded-by crosses Scope"*) : ;;
+  *) fail "T-1007: loop superseded by maintainer: expected reason in stderr" ;;
+esac
+pass "T-1007: a loop entry superseded by a maintainer entry is rejected"
+
+# --- T-1007 AC5 (DP-b): a maintainer entry superseded by a loop entry -------
+# is accepted — issue #23's one-file design requires exactly this direction
+# ("a local lesson that generalises" naming its universal replacement).
+C="$TMP/t1007-maintainer-superseded-by-loop.md"
+{
+  printf -- '## 2026-07-03 — Retired maintainer entry\n'
+  printf -- '- **Category**: process\n- **Applies-to**: all\n- **Scope**: maintainer\n'
+  printf -- '- **Bound-in**: CONTRIBUTING.md\n- **Status**: superseded\n- **Source**: n/a\n'
+  printf -- '- **Rule**: r1\n- **Why**: w1\n- **How to apply**: h1\n'
+  printf -- '- **Superseded-by**: 2026-07-04 — Active loop entry\n\n'
+  printf -- '## 2026-07-04 — Active loop entry\n'
+  printf -- '- **Category**: process\n- **Applies-to**: all\n- **Scope**: loop\n'
+  printf -- '- **Status**: active\n- **Source**: n/a\n- **Rule**: r2\n- **Why**: w2\n- **How to apply**: h2\n'
+} > "$C"
+[ "$(run_checker "$C")" -eq 0 ] || fail "T-1007: a maintainer entry superseded by a loop entry must validate green"
+pass "T-1007: a maintainer entry superseded by a loop entry is accepted"
+
+# --- T-1008: the real repository corpus at the resolved lessons path passes -
+# (dogfood) — the assertion this file's header comment has advertised since
+# T-045 (a false claim before this task; it now actually runs).
+REAL_LESSONS="$(cd "$REPO_ROOT" && bash bin/team-paths.sh --get lessons)"
+[ "$(run_checker "$REPO_ROOT/$REAL_LESSONS")" -eq 0 ] || fail "T-1008: the real repository corpus at the resolved lessons path must validate green"
+pass "T-1008: the real repository corpus at the resolved lessons path passes (dogfood)"
 
 # --- AC8: shellcheck (soft-skip when unavailable) -----------------------------
 if command -v shellcheck >/dev/null 2>&1; then

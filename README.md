@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-1.0.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-1.1.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -57,7 +57,7 @@ Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir w
 **Decide once whether `.shell-team/` belongs in git.** Because the plugin never edits your root `.gitignore`, the base dir shows up as *untracked* in your repo — only the per-run telemetry inside it is ignored, via a self-contained `<base>/.gitignore`. Both choices are supported, and the plugin will not make the call for you:
 
 - **Track it** — the board, specs, and review artifacts become versioned project records (that is how this repo dogfoods itself).
-- **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore`, or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in.
+- **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore` (scoped to that repo, trivially reversed), or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in. The global route is machine-wide, so it also hides the base dir in a repo where you later *do* want the board tracked; `!.shell-team/` in that repo's root `.gitignore` brings it back, because repo-level patterns outrank the global file. This repo carries that line for exactly that reason. [docs/adopting.md](docs/adopting.md) covers one further consequence, for tooling that asks git whether a path is ignored.
 
 Full details, updates, and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
 
@@ -144,9 +144,8 @@ It also works standalone, one agent or skill at a time, when you want to be expl
 │   ├── essays/                      # personal essays behind the project
 │   ├── workflow.md                  # phase diagram + hand-off contract
 │   ├── distribution.md              # install / update / dogfood
-│   ├── history.md                   # how the project evolved
-│   └── specs/                       # one .md per task
-└── tasks/                           # per-repo data (todo, specs, loops, runs, retros, reviews)
+│   └── history.md                   # how the project evolved
+└── .shell-team/                     # this repo's own per-repo data (board, specs, loops, retros, reviews)
 ```
 
 ## Phase flow
@@ -181,7 +180,7 @@ See [docs/history.md](docs/history.md) for how this operating discipline evolved
 - **Read-only Orchestrator**: `tech-lead` only plans — the main session executes the map.
 - **Tight tool permissions**: PM is read+spec-write only, QA is read+bash only, Reviewer can't mutate code.
 - **Files are the only shared state**: the board (`todo.md`) + status flags are the single source of truth between agents.
-- **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo itself predates that and uses the legacy `tasks/` + `docs/specs/` layout — which the resolver still detects and supports — so the `tasks/…` paths throughout these docs are this repo's legacy layout. See [docs/adopting.md](docs/adopting.md).
+- **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo runs on that same default layout, so its own board, specs, and retros live under `.shell-team/` too. The resolver still detects and supports the earlier `tasks/` + `docs/specs/` layout for repos that adopted the team before the base dir was consolidated — where these docs write `tasks/…` or `docs/specs/…`, they name the same artifacts in that legacy layout. See [docs/adopting.md](docs/adopting.md).
 - **Engineer is non-worktree by default**: its edits land directly on the current feature branch; the orchestrator opts into `isolation: worktree` at invocation only for parallel implementations.
 - **Cross-provider review is mandatory**: if Codex CLI is unavailable, the review returns `BLOCKED` rather than falling back to Claude.
 
