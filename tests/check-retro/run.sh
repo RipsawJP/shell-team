@@ -160,6 +160,45 @@ if bash "$RETRO" "$d/f.md" >/dev/null 2>&1; then rc=0; else rc=$?; fi
 [ "$rc" -eq 1 ] || fail "AC13: a CRLF file missing the traps marker must still exit 1, got $rc"
 pass "AC13: CRLF tolerance is proved against a broken (marker-missing) input"
 
+# --- Codex round 1 Major regression: rule 4's ledger-region-closing check ---
+# must validate a marker-shaped line against the SAME canonical-id enum rule
+# 2/3 use, not merely its prefix — an unknown id or a near-miss spelling of a
+# canonical id, placed inside the ledger, must never silently close the
+# region before the unrecognised-line check ever examines it.
+d="$MUT_TMP/ledger-unknown-marker"
+mkdir -p "$d"
+sed '/^- input: interventions /a\
+<!-- retro-section: typo -->
+' "$FIX/pass-canonical.md" > "$d/f.md"
+grep -q 'retro-section: typo' "$d/f.md" || fail "Codex-major (unknown id): mutation did not apply"
+if out=$(bash "$RETRO" "$d/f.md" 2>&1 >/dev/null); then rc=0; else rc=$?; fi
+[ "$rc" -eq 1 ] || fail "Codex-major (unknown id): an unknown-id marker-shaped line inside the ledger must exit 1, got $rc"
+grep -qF -- 'unrecognised line inside ## Retro inputs' <<< "$out" \
+  || fail "Codex-major (unknown id): must be reported by rule 4's own reason, got: $out"
+pass "Codex-major regression: an unknown-id marker-shaped line inside the ledger is caught by rule 4, not silently closes the region"
+
+d="$MUT_TMP/ledger-malformed-canonical-marker"
+mkdir -p "$d"
+sed '/^- input: interventions /a\
+<!--retro-section:lessons-->
+' "$FIX/pass-canonical.md" > "$d/f.md"
+grep -q '<!--retro-section:lessons-->' "$d/f.md" || fail "Codex-major (malformed canonical id): mutation did not apply"
+if out=$(bash "$RETRO" "$d/f.md" 2>&1 >/dev/null); then rc=0; else rc=$?; fi
+[ "$rc" -eq 1 ] || fail "Codex-major (malformed canonical id): a near-miss spelling of a canonical id inside the ledger must exit 1, got $rc"
+grep -qF -- 'unrecognised line inside ## Retro inputs' <<< "$out" \
+  || fail "Codex-major (malformed canonical id): must be reported by rule 4's own reason, got: $out"
+pass "Codex-major regression: a near-miss (space-less) spelling of a canonical marker inside the ledger is caught by rule 4, not silently closes the region"
+
+d="$MUT_TMP/ledger-unknown-marker-crlf"
+mkdir -p "$d"
+sed '/^- input: interventions /a\
+<!-- retro-section: unknown -->
+' "$FIX/pass-canonical.md" | sed 's/$/\r/' > "$d/f.md"
+grep -q 'retro-section: unknown' "$d/f.md" || fail "Codex-major (CRLF variant): mutation did not apply"
+if bash "$RETRO" "$d/f.md" >/dev/null 2>&1; then rc=0; else rc=$?; fi
+[ "$rc" -eq 1 ] || fail "Codex-major (CRLF variant): an unknown-id marker-shaped line inside a CRLF ledger must still exit 1, got $rc"
+pass "Codex-major regression: the CRLF variant of an unknown-id marker inside the ledger is still caught"
+
 rm -rf "$MUT_TMP"
 
 # T-1001/T-1003: the "## Retro inputs" ledger — a closed enum, fail-closed on
@@ -204,6 +243,11 @@ assert_violations "case: a whitespace-only detail is reported" \
 assert_violations "fail-inputs-stray-line -> 1"          1 1 "unrecognised line inside ## Retro inputs"            "$FIX/fail-inputs-stray-line.md"
 assert_violations "fail-inputs-duplicate-section -> 2"   1 2 "duplicated ## Retro inputs section heading"          "$FIX/fail-inputs-duplicate-section.md"
 assert_violations "fail-inputs-line-outside-section -> 1" 1 1 "ledger-shaped line outside the ## Retro inputs section" "$FIX/fail-inputs-line-outside-section.md"
+# Codex round 1 Major (T-1010): an unknown-id, marker-SHAPED line placed
+# inside a complete ## Retro inputs ledger must not silently close the
+# region before rule 4's own unrecognised-line check ever sees it. It must
+# be reported by that SAME rule 4 reason, never treated as a section marker.
+assert_violations "fail-inputs-unknown-marker -> 1 (Codex round 1 Major regression)" 1 1 "unrecognised line inside ## Retro inputs" "$FIX/fail-inputs-unknown-marker.md"
 
 # case: removing the interventions line from a COPY of pass-canonical.md adds exactly one violation
 COPY_TMP="$HERE/tmp-mutation-copy"

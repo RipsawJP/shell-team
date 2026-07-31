@@ -282,12 +282,14 @@ for FILE in "$@"; do
   # violation, distinct from a wholly empty one: "a detail is present" and
   # "there are spaces there" are not the same determination.
   # shellcheck disable=SC2016  # backticks in the awk source are literal, not a subshell.
-  inputs_violations="$(awk -v file="$FILE" -v ids="$RETRO_INPUTS_IDS" -v statuses="$RETRO_INPUTS_STATUSES" -v heading_found="$retro_inputs_heading_found" '
+  inputs_violations="$(awk -v file="$FILE" -v ids="$RETRO_INPUTS_IDS" -v statuses="$RETRO_INPUTS_STATUSES" -v heading_found="$retro_inputs_heading_found" -v section_ids="$RETRO_SECTION_IDS" '
     BEGIN {
       nids = split(ids, idarr, " ")
       for (i = 1; i <= nids; i++) valid_id[idarr[i]] = 1
       nst = split(statuses, starr, " ")
       for (i = 1; i <= nst; i++) valid_status[starr[i]] = 1
+      n_section_ids = split(section_ids, section_idarr, " ")
+      for (i = 1; i <= n_section_ids; i++) valid_section_id[section_idarr[i]] = 1
       heading_count = 0
       region_entered = 0
       in_s = 0
@@ -311,8 +313,23 @@ for FILE in "$@"; do
       # open region exactly the way the next `## ` heading always did — a
       # marker line always immediately precedes the NEXT H2, so for this
       # rule it counts as the start of the next section too, even though it
-      # is not itself a `## ` line.
-      if (in_s && (line ~ /^## / || line ~ /^<!-- retro-section: /)) { in_s = 0 }
+      # is not itself a `## ` line. Codex round-1 Major: this must check the
+      # SAME two conditions rule 2/3s own marker detection requires — the
+      # line, trailing-whitespace-trimmed, matches the full canonical marker
+      # form AND its parsed id is one of the five validated ids — or an
+      # unknown-id / malformed marker-shaped line (a typo, a near-miss
+      # spelling) would silently close the region before ever reaching the
+      # unrecognised-line check below, escaping rule 4s fail-closed contract.
+      is_canonical_marker = 0
+      trimmed_marker = line
+      sub(/[ \t]+$/, "", trimmed_marker)
+      if (trimmed_marker ~ /^<!-- retro-section: [A-Za-z0-9_-]+ -->$/) {
+        marker_id = trimmed_marker
+        sub(/^<!-- retro-section: /, "", marker_id)
+        sub(/ -->$/, "", marker_id)
+        if (marker_id in valid_section_id) is_canonical_marker = 1
+      }
+      if (in_s && (line ~ /^## / || is_canonical_marker)) { in_s = 0 }
 
       if (in_s) {
         if (line == "") next
