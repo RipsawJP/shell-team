@@ -123,8 +123,8 @@ declares which one — see `docs/templates/retro-template.md` and
 checker validate one of these without matching a single word of any natural
 language. The language boundary sits at
 **promotion into the shipped corpus**: a lesson is *authored* in English at
-the point it is promoted into `tasks/lessons.md`, never produced by
-translating an artifact after the fact.
+the point it is promoted into the lessons corpus (`bin/team-paths.sh --get
+lessons`), never produced by translating an artifact after the fact.
 
 Some agent definitions still carry Japanese prose inherited from the lessons
 corpus their prompt blocks are generated from. That is a known inconsistency,
