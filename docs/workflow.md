@@ -97,8 +97,8 @@ codex exec --ephemeral --json "Play devil's advocate on <file>. What could break
 
 ## Conventions
 
-- **Branches**: `feat/T-XXX-<slug>` — the engineer works directly on the task's feature branch (worktrees only when the orchestrator opts in for parallel implementations)
-- **Specs**: `docs/specs/T-XXX-<slug>.md`, slug = kebab-case of the title
-- **Review artifacts**: `tasks/reviews/T-XXX.md` (curated verdict + severity ledger) plus the raw Codex traces `tasks/reviews/T-XXX-codex-*.{txt,jsonl}`
+- **Branches**: the engineer works directly on the task's feature branch (worktrees only when the orchestrator opts in for parallel implementations) — see `CONTRIBUTING.md` for this repository's naming convention
+- **Specs**: `<specs dir>/T-XXX-<slug>.md`, slug = kebab-case of the title, where `<specs dir>` is `team-paths.sh --get specs` (on `PATH` when the plugin is loaded; else `bin/team-paths.sh`)
+- **Review artifacts**: `<reviews dir>/T-XXX.md` (curated verdict + severity ledger) plus the raw Codex traces `<reviews dir>/T-XXX-codex-*.{txt,jsonl}`, where `<reviews dir>` is `team-paths.sh --get reviews` (on `PATH` when the plugin is loaded; else `bin/team-paths.sh`)
 - **PR body diff stats** (file/line counts): take them from a fresh `git diff --stat <base>...HEAD` run at PR-creation time and re-measure just before merge — never transcribe them from the QA hand-off snapshot, because review-record and disposition commits land after QA and silently stale the numbers (observed in practice during a retro)
 - **Never edit `.claude/agents/*` as part of a feature task** — that's team-config work and goes through its own task ID
