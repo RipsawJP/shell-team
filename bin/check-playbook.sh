@@ -9,6 +9,17 @@
 #   - **Applies-to**:   <comma list from {engineer, qa-verifier, tech-lead,
 #                        pm-spec, all}> ("all" means those four IN roles, at
 #                        once — not a token for a role outside that set)
+#   - **Scope**:        loop | maintainer (T-1007 — required, closed enum, no
+#                        default). Only a `loop` entry is ever emitted into
+#                        templates/prompt-blocks/ by bin/gen-playbook-blocks.sh;
+#                        a `maintainer` entry never ships to an adopter.
+#   - **Bound-in**:     <repository-relative path> (T-1007 — required when
+#                        Scope is maintainer, tested on the trimmed VALUE;
+#                        FORBIDDEN when Scope is loop, tested on field
+#                        PRESENCE. Shape-only: non-empty after trim, not
+#                        absolute, not `~`-prefixed. Never touches the
+#                        filesystem — see docs/specs/T-1007-scope-typed-ledger.md
+#                        DP-a/DP-d.)
 #   - **Status**:       active | superseded
 #   - **Source**:       <non-empty free text — task/issue/PR ref, external
 #                        citation, or "n/a">
@@ -132,8 +143,8 @@
 # in every in-memory check, which is exactly the kind of validator/reality gap
 # a fail-closed schema check must not have. See `has_nul_byte()` below.
 #
-# Reads only. Pure bash + coreutils — no jq/yq/python. Prints
-# `<file>: <entry heading>: <reason>` per violation to stderr.
+# Reads only. Pure bash + coreutils; no external interpreter is invoked.
+# Prints `<file>: <entry heading>: <reason>` per violation to stderr.
 #
 # Usage:  check-playbook.sh <lessons.md> [<lessons.md>...]
 # Exit:   0 = all entries valid, 1 = violation(s), 2 = usage / unreadable file.
@@ -148,6 +159,10 @@ fi
 KNOWN_CATEGORIES="process tooling-ci security-pii prompt-injection path-resolution sandbox-constraints verification-discipline"
 KNOWN_ROLES="engineer qa-verifier tech-lead pm-spec all"
 KNOWN_STATUS="active superseded"
+# T-1007 DP-c: exactly two tokens, no default. #23's routing table has four
+# outcomes; the other two (operator-global, drop) never enter this repository
+# and so never need a token here.
+KNOWN_SCOPES="loop maintainer"
 
 # T-108: the full allow-list of `- **<Name>**:` field bullets an entry may
 # carry. Category..How-to-apply are the pre-existing T-045 fields;
@@ -162,8 +177,10 @@ KNOWN_STATUS="active superseded"
 # this array's only remaining job is to name the full allow-list in that
 # catch-all's violation message. Kept as an array (not a space list, unlike
 # the KNOWN_* above) because two of these names ("How to apply",
-# "Extended by") contain a space themselves.
-KNOWN_FIELD_NAMES=(Category Applies-to Status Source Rule Why "How to apply" Superseded-by "Extended by")
+# "Extended by") contain a space themselves. T-1007 adds Scope and Bound-in
+# (see the header comment and DP-a/DP-c/DP-d in
+# docs/specs/T-1007-scope-typed-ledger.md).
+KNOWN_FIELD_NAMES=(Category Applies-to Scope Bound-in Status Source Rule Why "How to apply" Superseded-by "Extended by")
 
 token_known() {  # $1 = space-separated known set, $2 = candidate token
   local known="$1" tok="$2" t
@@ -338,9 +355,11 @@ for FILE in "$@"; do
   entry_label=""
   seen_category=0; seen_applies=0; seen_status=0; seen_source=0
   seen_rule=0; seen_why=0; seen_howto=0; seen_superseded_by=0
+  seen_scope=0; seen_bound_in=0
   val_category=""; val_applies=""; val_status=""; val_source=""
   val_rule=""; val_why=""; val_howto=""; val_title=""
   val_key=""; val_superseded_by=""
+  val_scope=""; val_bound_in=""
   prev_field=""
 
   # T-108 DP-1: per-entry records accumulated here by finalize_entry() (pass
@@ -362,13 +381,18 @@ for FILE in "$@"; do
   # wants the OPPOSITE union ("must be absent"), and only true absence, not
   # value emptiness, can decide that. Presence is tracked independently of
   # the trimmed value for exactly this reason.
-  ENTRY_KEYS=(); ENTRY_STATUSES=(); ENTRY_SUPERSEDED=(); ENTRY_SUPERSEDED_SEEN=(); ENTRY_LABELS=()
+  # T-1007: ENTRY_SCOPES is a sixth parallel array (trimmed Scope value,
+  # index-aligned with the five above via the same unconditional push in
+  # finalize_entry()) — DP-b's pass-2 directional-supersession check reads it
+  # the same way pass 2 already reads ENTRY_STATUSES.
+  ENTRY_KEYS=(); ENTRY_STATUSES=(); ENTRY_SUPERSEDED=(); ENTRY_SUPERSEDED_SEEN=(); ENTRY_LABELS=(); ENTRY_SCOPES=()
 
   finalize_entry() {
     [ "$in_entry" -eq 1 ] || return 0
 
     [ "$seen_category" -eq 1 ] || emit "$entry_label" "missing required field: Category"
     [ "$seen_applies"  -eq 1 ] || emit "$entry_label" "missing required field: Applies-to"
+    [ "$seen_scope"    -eq 1 ] || emit "$entry_label" "missing required field: Scope"
     [ "$seen_status"   -eq 1 ] || emit "$entry_label" "missing required field: Status"
     [ "$seen_source"   -eq 1 ] || emit "$entry_label" "missing required field: Source"
     [ "$seen_rule"     -eq 1 ] || emit "$entry_label" "missing required field: Rule"
@@ -379,6 +403,46 @@ for FILE in "$@"; do
       local c; c="$(trim "$val_category")"
       token_known "$KNOWN_CATEGORIES" "$c" \
         || emit "$entry_label" "unknown Category value: '$val_category'"
+    fi
+
+    # T-1007 DP-c: Scope's enum is closed at exactly loop|maintainer, no
+    # default. An empty/whitespace-only value trims to a token that matches
+    # neither, so it falls into the same "unknown Scope value" branch as a
+    # genuinely out-of-enum token (e.g. "all") — same pattern Category/Status
+    # already use above for their own blank-value case.
+    local entry_scope=""
+    if [ "$seen_scope" -eq 1 ]; then
+      entry_scope="$(trim "$val_scope")"
+      token_known "$KNOWN_SCOPES" "$entry_scope" \
+        || emit "$entry_label" "unknown Scope value: '$val_scope'"
+
+      # T-1007 DP-a: Bound-in is mandatory on maintainer (value-tested — an
+      # absent bullet and a blank one are the SAME violation) and forbidden
+      # on loop (presence-tested — a blank bullet is still a bullet). This
+      # mirrors the existing active x Superseded-by asymmetry above/below:
+      # the T-108 round-1 Major that established value-vs-presence as two
+      # deliberately different tests for two deliberately different rules.
+      if [ "$entry_scope" = "maintainer" ]; then
+        local bv; bv="$(trim "$val_bound_in")"
+        [ -n "$bv" ] || emit "$entry_label" "Scope is 'maintainer' but Bound-in is missing"
+      elif [ "$entry_scope" = "loop" ]; then
+        [ "$seen_bound_in" -eq 0 ] || emit "$entry_label" "Scope is 'loop' but Bound-in is present"
+      fi
+    fi
+
+    # T-1007 DP-d: Bound-in is validated by shape only — non-empty after
+    # trim (the maintainer-mandatory check above already covers that half),
+    # not absolute, not `~`-prefixed — and never against the filesystem, so
+    # the verdict never depends on the working directory the checker was
+    # invoked from. Runs whenever the bullet is present, independent of
+    # Scope's own validity, so a shape violation is never masked by an
+    # unrelated Scope problem.
+    if [ "$seen_bound_in" -eq 1 ]; then
+      local biv; biv="$(trim "$val_bound_in")"
+      case "$biv" in
+        /*|'~'*)
+          emit "$entry_label" "Bound-in must be a repository-relative path: '$val_bound_in'" ;;
+      esac
     fi
 
     if [ "$seen_status" -eq 1 ]; then
@@ -432,6 +496,10 @@ for FILE in "$@"; do
     ENTRY_STATUSES+=("$(trim "$val_status")")
     ENTRY_SUPERSEDED+=("$(trim "$val_superseded_by")")
     ENTRY_SUPERSEDED_SEEN+=("$seen_superseded_by")
+    # T-1007: pushed unconditionally, same as the five arrays above — every
+    # entry gets a slot regardless of whether its own Scope is present/valid,
+    # so a later entry's scope can never be misread off an earlier entry's.
+    ENTRY_SCOPES+=("$entry_scope")
     ENTRY_LABELS+=("$entry_label")
   }
 
@@ -483,8 +551,10 @@ for FILE in "$@"; do
         entry_label="$line"
         seen_category=0; seen_applies=0; seen_status=0; seen_source=0
         seen_rule=0; seen_why=0; seen_howto=0; seen_superseded_by=0
+        seen_scope=0; seen_bound_in=0
         val_category=""; val_applies=""; val_status=""; val_source=""
         val_rule=""; val_why=""; val_howto=""; val_superseded_by=""
+        val_scope=""; val_bound_in=""
         # T-108: the entry KEY as bin/gen-playbook-blocks.sh's own pointer
         # text would spell it — "YYYY-MM-DD — <title>" — is what a
         # Superseded-by value must equal (trim-then-equality, DP-3/AC3), and
@@ -556,6 +626,16 @@ for FILE in "$@"; do
     elif [[ "$line" =~ ^-\ \*\*Applies-to\*\*:\ (.*)$ ]]; then
       fieldval="${BASH_REMATCH[1]}"; val_applies="$fieldval"; seen_applies=1; prev_field="Applies-to"
       check_structural "$entry_label" "Applies-to" "$fieldval"
+    elif [[ "$line" =~ ^-\ \*\*Scope\*\*:\ (.*)$ ]]; then
+      # T-1007: enum + Scope x Bound-in combination rules are resolved once
+      # per entry in finalize_entry() (the full value must be captured
+      # first); this arm only records field presence and runs the same
+      # structural safety-net every other field value gets.
+      fieldval="${BASH_REMATCH[1]}"; val_scope="$fieldval"; seen_scope=1; prev_field="Scope"
+      check_structural "$entry_label" "Scope" "$fieldval"
+    elif [[ "$line" =~ ^-\ \*\*Bound-in\*\*:\ (.*)$ ]]; then
+      fieldval="${BASH_REMATCH[1]}"; val_bound_in="$fieldval"; seen_bound_in=1; prev_field="Bound-in"
+      check_structural "$entry_label" "Bound-in" "$fieldval"
     elif [[ "$line" =~ ^-\ \*\*Status\*\*:\ (.*)$ ]]; then
       fieldval="${BASH_REMATCH[1]}"; val_status="$fieldval"; seen_status=1; prev_field="Status"
       check_structural "$entry_label" "Status" "$fieldval"
@@ -635,6 +715,7 @@ for FILE in "$@"; do
     e_sup="${ENTRY_SUPERSEDED[$i]}"
     e_sup_seen="${ENTRY_SUPERSEDED_SEEN[$i]}"
     e_label="${ENTRY_LABELS[$i]}"
+    e_scope="${ENTRY_SCOPES[$i]}"
 
     # AC1: a superseded entry with no (or whitespace-only) Superseded-by.
     # Testing the trimmed VALUE (not presence) is deliberate here: "the
@@ -670,11 +751,13 @@ for FILE in "$@"; do
         # so far, so file order never matters here).
         found=0
         target_status=""
+        target_scope=""
         j=0
         while [ "$j" -lt "$n_entries" ]; do
           if [ "${ENTRY_KEYS[$j]}" = "$e_sup" ]; then
             found=1
             target_status="${ENTRY_STATUSES[$j]}"
+            target_scope="${ENTRY_SCOPES[$j]}"
             break
           fi
           j=$((j + 1))
@@ -683,6 +766,15 @@ for FILE in "$@"; do
           emit "$e_label" "Superseded-by points to a key that does not exist in this file (equality match, not containment): '$e_sup'"
         elif [ "$target_status" != "active" ]; then
           emit "$e_label" "Superseded-by points to an entry whose Status is not 'active' (chained/duplicate supersession is not allowed): '$e_sup'"
+        elif [ "$e_scope" = "loop" ] && [ "$target_scope" = "maintainer" ]; then
+          # T-1007 DP-b: directional, not symmetric. A shipped ('loop') rule
+          # may only be retired in favour of another shipped rule — the
+          # reference graph stays healthy while a rule silently disappears
+          # from every adopter's prompt with nothing replacing it in the
+          # shipped set. The other three combinations (loop->loop,
+          # maintainer->maintainer, maintainer->loop) are legal; only this
+          # one direction is a violation.
+          emit "$e_label" "Superseded-by crosses Scope: a 'loop' entry may not be superseded by a 'maintainer' entry ('$e_sup')"
         fi
       fi
     fi

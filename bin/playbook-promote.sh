@@ -63,6 +63,7 @@
 #
 # Usage:
 #   playbook-promote.sh --title TEXT --category CAT --applies-to CSV \
+#     --scope loop|maintainer [--bound-in PATH] \
 #     --status active|superseded --source TEXT --rule TEXT --why TEXT \
 #     --how-to-apply TEXT [--date YYYY-MM-DD] [--lessons PATH]
 #
@@ -72,6 +73,17 @@
 #   --category      one token — see bin/check-playbook.sh's known taxonomy
 #   --applies-to    comma list from {engineer, qa-verifier, tech-lead,
 #                   pm-spec, all}
+#   --scope         loop | maintainer (required, no default — T-1007). Only a
+#                   loop entry is ever emitted by bin/gen-playbook-blocks.sh
+#                   into templates/prompt-blocks/; a maintainer entry never
+#                   ships to an adopter.
+#   --bound-in      repository-relative path (required when --scope is
+#                   maintainer, forbidden when --scope is loop — T-1007).
+#                   Passed through verbatim into the entry; the Scope x
+#                   Bound-in combination rule is NOT re-implemented here —
+#                   it is caught by the same fail-closed schema
+#                   re-validation every other field gets below, so there is
+#                   one authority for the schema.
 #   --status        active | superseded
 #   --source        task/issue/PR reference, external citation, or n/a
 #   A lesson records the pattern and the reason it recurs, never the identifying details of the incident. Source points at an artifact in this repository, or is n/a.
@@ -142,16 +154,26 @@ is_valid_calendar_date() {  # $1 = year, $2 = month, $3 = day
   [ "$d" -ge 1 ] && [ "$d" -le "$days_in_month" ]
 }
 
-TITLE="" CATEGORY="" APPLIES="" STATUS="" SOURCE="" RULE="" WHY="" HOWTO="" DATE="" LESSONS=""
+TITLE="" CATEGORY="" APPLIES="" SCOPE="" BOUND_IN="" STATUS="" SOURCE="" RULE="" WHY="" HOWTO="" DATE="" LESSONS=""
+# T-1007 rework1 (Codex round1 Major): tracks whether --bound-in was
+# EXPLICITLY supplied on the command line, independent of $BOUND_IN's
+# (possibly blank/whitespace) value — "flag absent" and "flag present with a
+# blank value" must stay distinguishable all the way to entry construction
+# below, or a blank-but-supplied --bound-in gets silently converted to "no
+# Bound-in bullet at all" before bin/check-playbook.sh's re-validation ever
+# sees it (the exact bug this flag closes).
+BOUND_IN_SEEN=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --title|--category|--applies-to|--status|--source|--rule|--why|--how-to-apply|--date|--lessons)
+    --title|--category|--applies-to|--scope|--bound-in|--status|--source|--rule|--why|--how-to-apply|--date|--lessons)
       [ "$#" -ge 2 ] || die "missing value for $1"
       case "$1" in
         --title)        TITLE="$2" ;;
         --category)     CATEGORY="$2" ;;
         --applies-to)   APPLIES="$2" ;;
+        --scope)        SCOPE="$2" ;;
+        --bound-in)     BOUND_IN="$2"; BOUND_IN_SEEN=1 ;;
         --status)       STATUS="$2" ;;
         --source)       SOURCE="$2" ;;
         --rule)         RULE="$2" ;;
@@ -163,7 +185,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --help|-h)
-      sed -n '2,45p' "$script_path" | sed 's/^# \{0,1\}//'
+      sed -n '2,101p' "$script_path" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) die "unknown argument: $1" ;;
@@ -178,6 +200,8 @@ done
 TITLE="$(trim "$TITLE")"
 CATEGORY="$(trim "$CATEGORY")"
 APPLIES="$(trim "$APPLIES")"
+SCOPE="$(trim "$SCOPE")"
+BOUND_IN="$(trim "$BOUND_IN")"
 STATUS="$(trim "$STATUS")"
 SOURCE="$(trim "$SOURCE")"
 RULE="$(trim "$RULE")"
@@ -185,7 +209,13 @@ WHY="$(trim "$WHY")"
 HOWTO="$(trim "$HOWTO")"
 
 # --- validation (fail-closed, before any write) ------------------------------
+# T-1007 DP-e: --scope joins the required-field loop, no default (a default
+# would silently classify — the defect at the root of #23). --bound-in is
+# NOT in this loop: it is optional at the CLI level, and the Scope x
+# Bound-in combination rule (mandatory on maintainer, forbidden on loop) is
+# caught below by the schema re-validation, never duplicated here.
 for pair in "title:$TITLE" "category:$CATEGORY" "applies-to:$APPLIES" \
+            "scope:$SCOPE" \
             "status:$STATUS" "source:$SOURCE" "rule:$RULE" "why:$WHY" \
             "how-to-apply:$HOWTO"; do
   name="${pair%%:*}"
@@ -250,7 +280,8 @@ fi
 # enums — are all re-verified below via bin/check-playbook.sh itself, so they
 # are not duplicated here.)
 for pair in "title:$TITLE" "rule:$RULE" "why:$WHY" "how-to-apply:$HOWTO" \
-            "category:$CATEGORY" "applies-to:$APPLIES" "status:$STATUS" "source:$SOURCE"; do
+            "category:$CATEGORY" "applies-to:$APPLIES" "scope:$SCOPE" \
+            "bound-in:$BOUND_IN" "status:$STATUS" "source:$SOURCE"; do
   name="${pair%%:*}"
   val="${pair#*:}"
   if [[ "$val" == *$'\n'* ]]; then
@@ -267,6 +298,31 @@ trap 'rm -f "$ENTRY_FILE" "$CANDIDATE_FILE"' EXIT
   printf '## %s — %s\n' "$DATE" "$TITLE"
   printf -- '- **Category**: %s\n' "$CATEGORY"
   printf -- '- **Applies-to**: %s\n' "$APPLIES"
+  # T-1007 DP-e: Scope immediately after Applies-to, Bound-in immediately
+  # after Scope when supplied — a formatting contract for a deterministic
+  # promotion diff (bin/check-playbook.sh matches field bullets per line and
+  # does not care about order).
+  #
+  # T-1007 rework1 (Codex round1 Major): the bullet is emitted whenever
+  # --bound-in was EXPLICITLY SUPPLIED ($BOUND_IN_SEEN), even when its
+  # (trimmed) value is blank — NOT gated on "$BOUND_IN" being non-empty. The
+  # frozen spec states --bound-in "is passed through to the emitted entry"
+  # unconditionally (Goal, DP-e) and that the Scope x Bound-in combination
+  # rule is the re-validation's job alone, never re-implemented here. Gating
+  # on non-emptiness pre-filtered that signal: a caller who explicitly passed
+  # `--bound-in ""` (or hit an empty-variable bug intending a real binding)
+  # got a silent, schema-valid `loop`-scoped entry with no bullet at all and
+  # no trace in the diff that a value was ever supplied — the checker never
+  # got a chance to apply DP-a's forbidden-on-loop / mandatory-on-maintainer
+  # rule to it. Now the blank bullet reaches the candidate file, and the
+  # existing fail-closed re-validation below is what rejects it (blank on
+  # maintainer -> the mandatory-value check fires; presence on loop, blank or
+  # not -> the forbidden-presence check fires) — one authority for the
+  # schema, exactly as DP-e requires.
+  printf -- '- **Scope**: %s\n' "$SCOPE"
+  if [ "$BOUND_IN_SEEN" -eq 1 ]; then
+    printf -- '- **Bound-in**: %s\n' "$BOUND_IN"
+  fi
   printf -- '- **Status**: %s\n' "$STATUS"
   printf -- '- **Source**: %s\n' "$SOURCE"
   printf -- '- **Rule**: %s\n' "$RULE"

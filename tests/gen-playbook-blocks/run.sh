@@ -550,6 +550,7 @@ clone_fixture "$C"
     printf '\n## 2027-01-%02d — Synthetic bulk entry %d\n' "$((n % 28 + 1))" "$n"
     printf -- '- **Category**: process\n'
     printf -- '- **Applies-to**: engineer\n'
+    printf -- '- **Scope**: loop\n'
     printf -- '- **Status**: active\n'
     printf -- '- **Source**: n/a\n'
     printf -- '- **Rule**: Synthetic bulk rule number %d.\n' "$n"
@@ -567,6 +568,58 @@ case "$out" in
   *) fail "expected a non-fatal line-count threshold warning in stderr, got: $out" ;;
 esac
 pass "a role's block exceeding the line-count threshold prints a non-fatal warning (exit 0)"
+
+# =============================================================================
+# T-1007: Scope-typed ledger — the shipping boundary is by Scope, not
+# Applies-to (docs/specs/T-1007-scope-typed-ledger.md). The shipped fixture
+# ($FIX/tasks/lessons.md) now carries a Scope: maintainer, Applies-to: all
+# entry ("Maintainer-scoped all-roles entry") alongside four Scope: loop
+# entries — Applies-to: all is load-bearing: it proves the exclusion below is
+# by Scope, not by role.
+# =============================================================================
+
+# --- T-1007 AC6: maintainer-scoped entries never reach a generated block ----
+C="$TMP/t1007-maintainer-excluded"
+clone_fixture "$C"
+grep -qF 'T1007-LOOP-SENTINEL' "$C/tasks/lessons.md" \
+  || fail "T-1007: fixture setup: the loop sentinel must be present in the corpus"
+grep -qF 'T1007-MAINTAINER-SENTINEL' "$C/tasks/lessons.md" \
+  || fail "T-1007: fixture setup: the maintainer sentinel must be present in the corpus"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1007: the mixed-scope fixture must generate successfully"
+for f in "$C/templates/prompt-blocks/playbook-engineer.md" \
+         "$C/templates/prompt-blocks/playbook-qa-verifier.md" \
+         "$C/templates/prompt-blocks/playbook-tech-lead.md" \
+         "$C/templates/prompt-blocks/playbook-pm-spec.md"; do
+  grep -qF 'T1007-LOOP-SENTINEL' "$f" \
+    || fail "T-1007: the loop-scoped entry must reach $(basename "$f")"
+  if grep -qF 'T1007-MAINTAINER-SENTINEL' "$f"; then
+    fail "T-1007: a maintainer-scoped entry (Applies-to: all) must never reach $(basename "$f")"
+  fi
+done
+pass "T-1007: maintainer-scoped entries never reach a generated block"
+
+# --- T-1007 AC8: an all-maintainer corpus yields the no-entries fallback -----
+C="$TMP/t1007-all-maintainer"
+clone_fixture "$C"
+{
+  printf '# Lessons\n\n'
+  printf '## 2027-02-01 — Only a maintainer entry\n'
+  printf -- '- **Category**: process\n- **Applies-to**: all\n- **Scope**: maintainer\n'
+  printf -- '- **Bound-in**: CONTRIBUTING.md\n- **Status**: active\n- **Source**: n/a\n'
+  printf -- '- **Rule**: T1007_ALL_MAINTAINER_SENTINEL.\n- **Why**: w\n- **How to apply**: h\n'
+} > "$C/tasks/lessons.md"
+[ "$(run_gen "$C")" -eq 0 ] || fail "T-1007: an all-maintainer corpus must still generate successfully"
+for f in "$C/templates/prompt-blocks/playbook-engineer.md" \
+         "$C/templates/prompt-blocks/playbook-qa-verifier.md" \
+         "$C/templates/prompt-blocks/playbook-tech-lead.md" \
+         "$C/templates/prompt-blocks/playbook-pm-spec.md"; do
+  grep -qF '(no active entries currently apply to this role)' "$f" \
+    || fail "T-1007: an all-maintainer corpus must yield the no-entries fallback in $(basename "$f")"
+  if grep -qF 'T1007_ALL_MAINTAINER_SENTINEL' "$f"; then
+    fail "T-1007: the sole maintainer entry must never reach $(basename "$f")"
+  fi
+done
+pass "T-1007: an all-maintainer corpus yields the no-entries fallback"
 
 # --- AC8: shellcheck (soft-skip when unavailable) -----------------------------
 if command -v shellcheck >/dev/null 2>&1; then
