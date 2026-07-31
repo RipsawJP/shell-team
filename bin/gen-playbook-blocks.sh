@@ -25,9 +25,11 @@
 #
 # bin/check-prompt-sync.sh (unchanged — T-039/T-040's check-only design) then
 # verifies canonical block and consumer stay in sync; running THIS script
-# again after a tasks/lessons.md edit is how you refresh that sync (CI adds a
-# freshness dogfood step: regenerate into a temp copy and diff against the
-# committed files).
+# again after a lessons-corpus edit is how you refresh that sync. CI's step
+# named "Dogfood gen-playbook-blocks — regenerating into a scratch copy reproduces every shipped block and consumer" (T-1008)
+# is exactly that freshness check, run for real: it regenerates into a
+# scratch copy and diffs against the committed files, so this claim and the
+# workflow cannot drift apart silently.
 #
 # Fail-closed re-validation (D3): before generating anything, this script
 # runs bin/check-playbook.sh over the lessons file. A schema violation in ANY
