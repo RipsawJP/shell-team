@@ -1051,3 +1051,42 @@ step must cover; `tests/codex-skeleton-hygiene/run.sh:1330-1336,1419-1431` for
 the two live-file regexes and their fail-closed grep discipline;
 `bin/retro-inputs.sh:133-136,460-469` for the exact corrected wording #57's fix
 should mirror.
+
+## Notes from engineer
+
+**Discovered spec/fixture interaction: AC8 mechanically forecloses any candidate
+promotion this round.** AC8 requires the sorted multiset of the 79-row import
+table's retained (`loop`/`maintainer`) destinations to be byte-identical to
+the sorted multiset of every heading in the corpus — a two-directional
+equality, not a subset relation. I verified this with a minimal fixture before
+relying on it: a corpus carrying one heading beyond what the import table
+destines fails `cmp -s` immediately. Promoting any of the nine retro
+candidates through `bin/playbook-promote.sh` would add exactly such an extra
+heading (dated with the retro's own date, which no import-table row destines),
+so it would break AC8 regardless of how well-justified the candidate's content
+is. Given this, all nine candidates received a non-retaining disposition this
+round (see `docs/loop-engineering/lessons-import-disposition.md`'s candidate
+table and `.shell-team/provenance/T-1008.md`'s first decision for the full
+reasoning) — none of the Goal's "adopted subset ... enters through the
+promoter" language is exercised this round, since the mechanically-honest
+adopted subset turned out to be empty. This does not change any acceptance
+criterion's meaning (all 27 are satisfied as written) and needs no re-freeze;
+it is recorded here so a future task extending the candidate table (or
+promoting one of these nine directly, outside this ledger's own book-keeping)
+understands why zero were promoted this round rather than assuming an
+oversight.
+
+**Discovered spec/fixture interaction: a literal `|` in a translated title
+corrupts a ledger row.** Two source entries' original titles contained a
+literal pipe character inside a quoted code fragment. Using either title
+verbatim as a ledger destination cell would split that table row into more
+fields than `awk -F'|'` expects, breaking AC7's row-shape invariant. Both
+titles were reworded during translation to preserve the same meaning without
+the pipe character; see `.shell-team/provenance/T-1008.md`'s third decision.
+
+**Triage summary** (against the corrected 79-entry measurement): 68 entries
+scoped `loop`, 6 scoped `maintainer`, 1 dropped (a task-numbering convention
+this repository has replaced), 4 excluded as `operator-global` (facts about
+the agent's own sandbox/tool-call harness, matching the Notes-for-engineer
+triage guidance's own "a sandbox quirk" example) — 74 entries total in the
+shipped corpus, matching AC7/AC8's pinned counts.
