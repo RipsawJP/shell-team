@@ -11,7 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1014** The board-flag rail derives its stops from real telemetry — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1014-flag-rail-data-path.md
+
+## Done
+
+- [x] **T-1014** The board-flag rail derives its stops from real telemetry — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1014-flag-rail-data-path.md
+  - closed: 2026-08-01, PR #85 → develop, closes #83 — rail lighting visually signed off by the maintainer at the merge gate (AC21 convention); #84 filed as the docs fast-follow
   - source: GitHub issue #83, in full. An issue **was** filed rather than going straight to a spec: T-1012's Non-goals did not predict this item (it is a defect found at that task's merge gate, not a declared fast-follow), it is a distinct bug in a shipped surface rather than a remaining part of issue #77, and #77 must stay open for Part 3 (T-1013) — so folding this into #77 would have made "is #77 done" unanswerable. Base `develop` at `76e64a4`, branch `feature/83-flag-rail-data-path`; the PR references `Closes #83`.
   - why it exists: the rail reads `flagEvents = events.filter(e => !!e.flag)` and **nothing sets `flag`** — `adaptRow()` never derives it, and T-1011's emission instructions never put a `READY_FOR_*` token into any event field. So `flagEvents` is empty for every run that has ever been recorded: the rail can never light and always shows its empty-state caption, and the `bNowFlag` chip is always hidden. Both halves of the data path are missing, which is why this task touches a producer and a consumer in one commit.
   - how it was found, which is itself canon: every static AC T-1012 wrote was green, both QA rounds were environmentally unverified on pixels (no browser reachable in the sandbox), and the cross-provider review raised three Blockers, none of them this. The **maintainer**, performing T-1012's AC29 visual check at the merge gate, saw the empty caption on the full-fidelity fixture. Recorded in `.shell-team/interventions/T-1012.md` entry 2. The design consequence: every static anchor this task adds is one that is **red at the base ref**, and the behavioural proof runs in the existing node harness rather than only in a browser.
@@ -33,8 +37,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - codex-reviewer round 1 (2026-08-01): **APPROVE** → `READY_FOR_MERGE`. No Blocker/Major. The primary pass's sole P2 (the flag-label convention written only on the `handoff` bullet while D1 derives uniformly — the same asymmetry QA disclosed independently) was re-evaluated by the adversarial pass and withdrawn by Codex itself to Minor documentation-completeness (no functional defect; the five derivation branches are verbatim-identical and `rail-uniform-kind` proves the behavior). Three adversarial observations on pre-existing harness coverage waived as out-of-diff. Reviewer independently re-ran check-acs (19/19), the rail assertions, both hygiene suites, and two mutations QA had not covered (derivation-call removal; classList no-op). Verdict appended to `.shell-team/reviews/T-1014.md`.
   - fast-follow disposition (2026-08-01): SKILL.md `human`-bullet one-liner (file-an-issue intent) — filed as issue #84 (skill prose, deliberately not bundled into T-1013's README/docs scope; sequencing is the next planning's call). The three adversarial harness observations — waived: pre-existing coverage outside this task's diff, per the reviewer's own ledger.
   - AC21 disposition (recorded before the merge pledge): pixels remain environmentally-unverified in the sandbox (two QA rounds, same wall); the maintainer's merge-gate visual check — this time confirming the rail actually lights, advances, flashes on rework and un-reaches on rewind — doubles as the sign-off, same convention as T-1012.
-
-## Done
 
 - [x] **T-1012** A run's telemetry renders as a self-contained replay page — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1012-loop-replay-generator.md
   - closed: 2026-08-01, PR #82 → develop — issue #77 stays open (Part 3 = T-1013, rail data path = #83); AC29 visual check performed by the maintainer at the merge gate — it caught #83
