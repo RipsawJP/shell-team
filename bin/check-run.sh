@@ -187,10 +187,19 @@ lint_line() {
   fi
 
   # Unbalanced (unescaped) double-quotes => a truncated string let a stray `}`
-  # slip past the object-shape check above. Drop escaped \" first, then the
-  # real string delimiters must come in pairs.
+  # slip past the object-shape check above. Whether a `"` is a real string
+  # delimiter or an escaped quote depends on how many consecutive backslashes
+  # immediately precede it (even => real delimiter, odd => escaped) — so
+  # escaped BACKSLASH pairs (`\\`) must be stripped FIRST, before escaped
+  # quotes (`\"`), the standard order (Codex round-1 Major #2). Stripping
+  # `\"` first (the pre-T-1011 order) mis-reads a value ending in an escaped
+  # backslash — e.g. `..."label":"…\\"` (a literal trailing backslash,
+  # correctly produced by log-run.sh's own `jesc`) — as an escaped quote,
+  # consuming the line's real closing delimiter and flipping the parity: a
+  # VALID row was reported `unbalanced double-quotes (truncated string?)`.
   local unq quotes
-  unq="${line//\\\"/}"
+  unq="${line//\\\\/}"
+  unq="${unq//\\\"/}"
   quotes="${unq//[!\"]/}"
   if (( ${#quotes} % 2 != 0 )); then
     emit "$lineno" "unbalanced double-quotes (truncated string?)"

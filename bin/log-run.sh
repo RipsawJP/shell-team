@@ -114,6 +114,14 @@ EVENT="" FROM="" TO="" LABEL=""
 SEEN=()
 seen() {
   local want="$1" f
+  # Guard the empty-array case before expanding "${SEEN[@]}" (the repo's
+  # existing idiom, e.g. bin/rollup-runs.sh's "${#LINES[@]} -gt 0" check):
+  # under macOS default /bin/bash 3.2, expanding "${arr[@]}" on a genuinely
+  # empty array raises "unbound variable" under `set -u`, even though the
+  # array itself was declared — a zero-flag invocation (`log-run.sh
+  # <loop_id>` alone) would otherwise crash exit 1 instead of the documented
+  # usage exit 2 (Codex round-1 Major #1).
+  [[ "${#SEEN[@]}" -gt 0 ]] || return 1
   for f in "${SEEN[@]}"; do [[ "$f" == "$want" ]] && return 0; done
   return 1
 }

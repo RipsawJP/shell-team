@@ -150,6 +150,32 @@ bash "$CHECK" "$TMP/shell-team.jsonl" >/dev/null 2>&1 || fail "log-run escaped-f
 grep -q '\\"hi\\"' "$TMP/shell-team.jsonl" || fail "log-run did not escape embedded quotes (content not preserved)"
 printf 'PASS: log-run escapes embedded quotes/backslashes and stays check-run-clean\n'
 
+# A free-form field ending in a trailing backslash (jesc renders it as a
+# valid `\\` escape) must not be misread as an escaped closing quote, on
+# EITHER shape — the escaped-backslash-pairs-before-escaped-quotes parity
+# fix (Codex round-1 Major #2, pre-existing bug this task's expanded
+# free-form-field surface made worth fixing in this round).
+set +e
+bash "$LOG" shell-team --run-id r-test --seq 6 --span engineer --phase implement \
+  --iteration 1 --attempt 1 --status error --error $'ends in a backslash \\' >/dev/null 2>&1
+tb_span_rc=$?
+set -e
+[[ "$tb_span_rc" -eq 0 ]] || fail "log-run span --error trailing-backslash invocation expected exit 0, got $tb_span_rc"
+bash "$CHECK" "$TMP/shell-team.jsonl" >/dev/null 2>&1 \
+  || fail "log-run span --error trailing-backslash row failed check-run lint (Major #2 regression)"
+printf 'PASS: log-run span --error ending in a trailing backslash stays check-run-clean\n'
+
+# --line direct forms: a trailing-backslash value passes on both shapes; a
+# genuinely truncated/unbalanced line still fails (the fix must not weaken
+# real truncation detection).
+assert_line "--line span row, label-shaped field ending in a trailing backslash -> 0" 0 \
+  '{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","span":"engineer","phase":"implement","iteration":1,"attempt":1,"status":"error","model":null,"tokens":null,"tool_uses":null,"duration_ms":null,"verdict":null,"usd":null,"error":"ends in \\","parent_span_id":null}'
+assert_line "--line event row, label ending in a trailing backslash -> 0" 0 \
+  '{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","kind":"event","event":"human","from":null,"to":null,"label":"ends in \\"}'
+assert_line "--line genuinely truncated string (real unbalanced quotes) still -> 1" 1 \
+  '{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","kind":"event","event":"human","from":null,"to":null,"label":"truncated}' \
+  "unbalanced double-quotes"
+
 # log-run fail-closed: non-numeric --tokens writes nothing and exits 2.
 before2="$(wc -l < "$TMP/shell-team.jsonl")"
 set +e
@@ -183,6 +209,22 @@ ev_keys="$(grep -oE '"[a-z_]+":' "$EVENTS_DIR/evloop.jsonl" | tr -d '":' | tr '\
 grep -qF -- '"kind":"event"' "$EVENTS_DIR/evloop.jsonl" || fail "log-run --event row missing kind:event"
 bash "$CHECK" "$EVENTS_DIR/evloop.jsonl" >/dev/null 2>&1 || fail "log-run --event row failed check-run lint"
 printf 'PASS: log-run --event handoff appends the frozen 9-key row, check-run-clean\n'
+
+# --- writer: a zero-flag invocation (<loop_id> only, no flags at all) is the
+# documented usage-error exit 2, not a bash-3.2 unbound-variable crash (exit
+# 1) from expanding "${SEEN[@]}" on a genuinely empty array (Codex round-1
+# Major #1) — verified under BOTH the PATH bash and /bin/bash explicitly. ---
+set +e
+zf_err_path="$(RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop 2>&1 >/dev/null)"
+zf_rc_path=$?
+zf_err_binbash="$(RUNS_DIR="$EVENTS_DIR" /bin/bash "$LOG" evloop 2>&1 >/dev/null)"
+zf_rc_binbash=$?
+set -e
+[[ "$zf_rc_path" -eq 2 ]] || fail "log-run <loop_id> (no flags) under PATH bash expected exit 2, got $zf_rc_path (stderr: $zf_err_path)"
+[[ "$zf_rc_binbash" -eq 2 ]] || fail "log-run <loop_id> (no flags) under /bin/bash expected exit 2, got $zf_rc_binbash (stderr: $zf_err_binbash)"
+printf '%s' "$zf_err_path" | grep -qF -- 'unbound variable' && fail "log-run <loop_id> (no flags) leaked a bash-3.2 unbound-variable crash under PATH bash"
+printf '%s' "$zf_err_binbash" | grep -qF -- 'unbound variable' && fail "log-run <loop_id> (no flags) leaked a bash-3.2 unbound-variable crash under /bin/bash"
+printf 'PASS: log-run <loop_id> with zero flags exits 2 (usage error) under both PATH bash and /bin/bash, no unbound-variable crash\n'
 
 # --- writer: --event and --span are mutually exclusive (frozen message) ---
 set +e
@@ -243,6 +285,18 @@ grep -qF -- '"from":null,"to":null,"label":null' "$EVENTS_DIR/relloop.jsonl" \
   || fail "log-run --event release did not render nullable fields as explicit null"
 bash "$CHECK" "$EVENTS_DIR/relloop.jsonl" >/dev/null 2>&1 || fail "log-run --event release row failed check-run lint"
 printf 'PASS: log-run --event release nullable fields render as JSON null, check-run-clean\n'
+
+# --- writer: an event --label ending in a trailing backslash round-trips
+# clean (Codex round-1 Major #2 — event rows have three free-form fields
+# vs. the span side's one, so this shape's exposure is real). ---
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" tbloop --run-id R1 --seq 1 --event human --label $'ends in a backslash \\' >/dev/null 2>&1
+tb_event_rc=$?
+set -e
+[[ "$tb_event_rc" -eq 0 ]] || fail "log-run event --label trailing-backslash invocation expected exit 0, got $tb_event_rc"
+bash "$CHECK" "$EVENTS_DIR/tbloop.jsonl" >/dev/null 2>&1 \
+  || fail "log-run event --label trailing-backslash row failed check-run lint (Major #2 regression)"
+printf 'PASS: log-run event --label ending in a trailing backslash stays check-run-clean\n'
 
 # --- checker: the committed mixed/unknown-id fixtures (AC11/AC12) ---
 assert_check "valid-events.jsonl -> 0"          0 "$FIX/valid-events.jsonl"
