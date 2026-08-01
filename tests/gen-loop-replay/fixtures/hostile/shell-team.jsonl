@@ -1,0 +1,5 @@
+{"loop_id":"shell-team","run_id":"20260801T000000Z-hostile","seq":1,"ts":"2026-08-01T08:49:31Z","kind":"event","event":"handoff","from":"human","to":"orchestrator","label":"probe one: </script> tag, an & ampersand, and an <!-- html comment opener"}
+{"loop_id":"shell-team","run_id":"20260801T000000Z-hostile","seq":2,"ts":"2026-08-01T08:49:31Z","kind":"event","event":"rework","from":"orchestrator","to":"engineer","label":"probe two: a */ block-comment terminator, one \\ backslash, one \" double quote"}
+{"loop_id":"shell-team","run_id":"20260801T000000Z-hostile","seq":3,"ts":"2026-08-01T08:49:31Z","kind":"event","event":"gate","from":"qa-verifier","to":null,"label":"probe three: a ${DOLLAR_BRACE} shell-lookalike, a ` backtick, verdict REQUEST_CHANGES"}
+{"loop_id":"shell-team","run_id":"20260801T000000Z-hostile","seq":4,"ts":"2026-08-01T08:49:31Z","kind":"event","event":"human","from":null,"to":null,"label":"human note with a raw & and REQUEST_CHANGES verdict quoted"}
+{"loop_id":"shell-team","run_id":"20260801T000000Z-hostile","seq":5,"ts":"2026-08-01T08:49:31Z","kind":"event","event":"release","from":"orchestrator","to":null,"label":"release note, plain"}

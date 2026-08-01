@@ -91,6 +91,16 @@ for t in handoff rework gate human release; do
 done
 assert_token bin/check-run.sh '"kind":"event"'
 
+# --- rendered UI machine tokens (T-1012): the flag rail and verdict chips in
+# templates/loop-replay.html carry a SUBSET of the status flags (the five
+# forward-progress phases; BLOCKED/REWORK are exception states not drawn on
+# the rail) and all four verdict labels, verbatim. Scoped to exactly this set
+# rather than folded into the loops above, so this group's own requirement
+# stays what AC24 (T-1012) actually checks.
+for t in READY_FOR_ARCH READY_FOR_ENG READY_FOR_QA READY_FOR_REVIEW READY_FOR_MERGE PASS FAIL APPROVE REQUEST_CHANGES; do
+  assert_token templates/loop-replay.html "$t"
+done
+
 # --- lesson labels: bin/check-retro.sh + agents/scrum-master.md only.
 for t in '[common]' '[target-specific]'; do
   assert_token bin/check-retro.sh "$t"
