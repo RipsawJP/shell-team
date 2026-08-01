@@ -42,7 +42,7 @@ signature's assumption that repeated failure shapes mean a stall.
 | bound (runaway STOP) | `bin/loop-guard.sh` + `goal.contract.yaml` | iteration / wall-clock / no-progress |
 | completion (per-tick judge) | `check-acs.sh` → `check-intent.sh` (only when the spec carries a frozen intent block) → `check-provenance.sh` → `qa-verifier` → `codex-reviewer` | deterministic → deterministic (conditional) → deterministic → judgement → cross-provider, each independent |
 | cross-tick state | `bin/goal-state.sh` + `<runs>/goal-<task>.state` | loop start time, iteration, prev failure signature |
-| telemetry | `bin/log-run.sh` | one span per sub-agent call (`loop_id=goal`) |
+| telemetry | `bin/log-run.sh` | one span per sub-agent call (`loop_id=goal`); event rows come from `/shell-team:run`, not from the goal loop itself; `bin/gen-loop-replay.sh` reads either kind back as a replay page |
 
 The completion signal is **layered**, not a single small model — deterministic
 `check-acs` first (free, no false "looks done"), then `check-intent` (only when
