@@ -1,0 +1,6 @@
+{"loop_id":"shell-team","run_id":"RUN-EV","seq":1,"ts":"2026-08-01T00:00:01Z","span":"tech-lead","phase":"plan","iteration":0,"attempt":0,"status":"success","model":null,"tokens":100,"tool_uses":1,"duration_ms":1000,"verdict":null,"usd":null,"error":null,"parent_span_id":null}
+{"loop_id":"shell-team","run_id":"RUN-EV","seq":2,"ts":"2026-08-01T00:00:02Z","kind":"event","event":"handoff","from":"plan","to":"specify","label":null}
+{"loop_id":"shell-team","run_id":"RUN-EV","seq":3,"ts":"2026-08-01T00:00:03Z","kind":"event","event":"gate","from":"validate","to":null,"label":"PASS"}
+{"loop_id":"shell-team","run_id":"RUN-EV","seq":4,"ts":"2026-08-01T00:00:04Z","kind":"event","event":"rework","from":"review","to":"implement","label":"REQUEST_CHANGES"}
+{"loop_id":"shell-team","run_id":"RUN-EV","seq":5,"ts":"2026-08-01T00:00:05Z","kind":"event","event":"human","from":null,"to":null,"label":"human-stop"}
+{"loop_id":"shell-team","run_id":"RUN-EV","seq":6,"ts":"2026-08-01T00:00:06Z","kind":"event","event":"release","from":null,"to":null,"label":null}

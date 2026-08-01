@@ -1,25 +1,53 @@
 #!/usr/bin/env bash
 # log-run.sh — the single canonical writer for Operating-Loop telemetry.
 #
-# Appends ONE span row (one JSON object per line) to the resolved runs dir's
+# Appends ONE row (one JSON object per line) to the resolved runs dir's
 # <loop_id>.jsonl ($TEAM_RUNS_DIR or $RUNS_DIR if set, else team-paths.sh
-# resolves it from cwd: .shell-team/runs by default, tasks/runs in a legacy layout),
-# following the schema finalized in
-# T-014 (docs/specs/T-014-telemetry-spike.md). Validates every field before
-# writing — a malformed invocation writes NOTHING and exits 2, so the log never
-# gains a corrupt line. Pure bash, no JSON library, so it runs anywhere the
-# other bin/ scripts do.
+# resolves it from cwd: .shell-team/runs by default, tasks/runs in a legacy
+# layout). Two row shapes share the file (T-1011):
 #
-# Usage:
+#   SPAN row (T-014/T-015, the original shape) — one call into a sub-agent.
+#     17 keys, no `kind` key at all. Unchanged by this task, byte-for-byte.
+#   EVENT row (T-1011) — a transition the loop made *between* spans: a
+#     hand-off, a route-back, a gate verdict, a human stop/GO, a release.
+#     9 keys, discriminated by `"kind":"event"`.
+#
+# `--event <id>` selects event mode; its absence is span mode, unchanged.
+# Validates every field before writing — a malformed invocation writes
+# NOTHING and exits 2, so the log never gains a corrupt line. Pure bash, no
+# JSON library, so it runs anywhere the other bin/ scripts do.
+#
+# Usage (span mode, unchanged):
 #   log-run.sh <loop_id> --run-id R --seq K --span S --phase P \
 #              --iteration N --attempt A --status STATUS \
 #              [--model M] [--tokens T] [--tool-uses U] [--duration-ms D] \
 #              [--verdict V] [--usd X] [--error E] [--parent-span-id PS]
 #
-# Required: loop_id (positional), --run-id, --seq, --span, --phase,
-#           --iteration, --attempt, --status.
-# Nullable (omit => null in the row): --model --tokens --tool-uses
-#           --duration-ms --verdict --usd --error --parent-span-id.
+# Usage (event mode, T-1011):
+#   log-run.sh <loop_id> --run-id R --seq K --event ID \
+#              [--from X] [--to Y] [--label L]
+#
+#   ID ∈ handoff | rework | gate | human | release. `seq` is ONE monotonic
+#   counter per run, shared across spans and events, so the rows of a run
+#   form a total order. Per-event-id requiredness (absent, null, or an
+#   empty-string value all count as "not provided" — an empty string is
+#   treated exactly as absent, since jstr below renders both as JSON null):
+#     handoff  --from required, --to required
+#     rework   --from required, --to required, --label required
+#     gate     --from required, --label required
+#     human    --label required
+#     release  none required
+#   All 13 span-only flags (--span --phase --iteration --attempt --status
+#   --model --tokens --tool-uses --duration-ms --verdict --usd --error
+#   --parent-span-id) are forbidden in event mode (exit 2, nothing written);
+#   `--from`/`--to`/`--label` are forbidden in span mode (same). `--event`
+#   together with `--span` is rejected by name.
+#
+# Required (span mode): loop_id (positional), --run-id, --seq, --span,
+#           --phase, --iteration, --attempt, --status.
+# Nullable (span mode, omit => null in the row): --model --tokens
+#           --tool-uses --duration-ms --verdict --usd --error
+#           --parent-span-id.
 #
 # status  ∈ success | error | timeout | skipped | stopped
 # verdict ∈ PASS | FAIL | APPROVE | REQUEST_CHANGES   (or omit => null)
@@ -37,6 +65,16 @@
 # If check-run.sh is missing from the sibling bin/ dir, or not
 # readable/executable, the self-check is skipped entirely and this script
 # still exits 0 — it must never hard-depend on check-run.sh being present.
+#
+# Version skew (T-1011, D5 — confirmed, not redesigned): if this script
+# writes an event row and the SIBLING check-run.sh predates event-row
+# support, the post-write self-check above reports the row invalid, so this
+# script exits 1 with the row already on disk — never rolled back. That is
+# exactly the behavior this header already documents for every other
+# self-check failure: every in-repo caller wraps this call in `|| true`, and
+# telemetry is best-effort by contract, so no new mechanism is needed here.
+# The reverse skew (an old writer, a new checker) is inert: span rows written
+# by an old log-run.sh are still valid under the new checker.
 #
 # Exit: 0 = row appended (and, if checked, passed self-check), 1 = row
 #       appended but failed the post-write self-check, 2 = validation error
@@ -67,11 +105,24 @@ shift
 
 RUN_ID="" SEQ="" SPAN="" PHASE="" ITERATION="" ATTEMPT="" STATUS=""
 MODEL="" TOKENS="" TOOL_USES="" DURATION_MS="" VERDICT="" USD="" ERROR="" PARENT=""
+EVENT="" FROM="" TO="" LABEL=""
+
+# Every flag actually passed on the command line, verbatim, in encounter
+# order — used below to reject a forbidden flag by PRESENCE, independent of
+# its value (an explicit-but-empty --from must still be rejected in span
+# mode, for example; presence, not value, is what D5 forbids).
+SEEN=()
+seen() {
+  local want="$1" f
+  for f in "${SEEN[@]}"; do [[ "$f" == "$want" ]] && return 0; done
+  return 1
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id)
+    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--event|--from|--to|--label)
       [[ $# -ge 2 ]] || die "missing value for $1"
+      SEEN+=("$1")
       case "$1" in
         --run-id)         RUN_ID="$2" ;;
         --seq)            SEQ="$2" ;;
@@ -88,6 +139,10 @@ while [[ $# -gt 0 ]]; do
         --usd)            USD="$2" ;;
         --error)          ERROR="$2" ;;
         --parent-span-id) PARENT="$2" ;;
+        --event)          EVENT="$2" ;;
+        --from)           FROM="$2" ;;
+        --to)             TO="$2" ;;
+        --label)          LABEL="$2" ;;
       esac
       shift 2
       ;;
@@ -95,32 +150,73 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- required fields ---
-[[ -n "$RUN_ID"    ]] || die "missing required --run-id"
-[[ -n "$SPAN"      ]] || die "missing required --span"
-[[ -n "$PHASE"     ]] || die "missing required --phase"
-[[ "$SEQ"       =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --seq (non-negative int): '${SEQ}'"
-[[ "$ITERATION" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --iteration (non-negative int): '${ITERATION}'"
-[[ "$ATTEMPT"   =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --attempt (non-negative int): '${ATTEMPT}'"
+if seen --event; then MODE="event"; else MODE="span"; fi
 
-case "$STATUS" in
-  success|error|timeout|skipped|stopped) : ;;
-  *) die "invalid --status '${STATUS}' (success|error|timeout|skipped|stopped)" ;;
-esac
+# --- required fields shared by both modes ---
+[[ -n "$RUN_ID" ]] || die "missing required --run-id"
+[[ "$SEQ" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --seq (non-negative int): '${SEQ}'"
 
-# --- nullable numeric fields ---
-for pair in "tokens:$TOKENS" "tool-uses:$TOOL_USES" "duration-ms:$DURATION_MS"; do
-  name="${pair%%:*}"; val="${pair#*:}"
-  [[ -z "$val" || "$val" =~ ^[0-9]{1,12}$ ]] || die "--${name} must be a non-negative integer: '${val}'"
-done
-[[ -z "$USD" || "$USD" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--usd must be a non-negative number: '${USD}'"
+SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id)
+EVENT_ONLY_FLAGS=(--from --to --label)
 
-# --- verdict enum (nullable) ---
-if [[ -n "$VERDICT" ]]; then
-  case "$VERDICT" in
-    PASS|FAIL|APPROVE|REQUEST_CHANGES) : ;;
-    *) die "invalid --verdict '${VERDICT}' (PASS|FAIL|APPROVE|REQUEST_CHANGES)" ;;
+if [[ "$MODE" == "event" ]]; then
+  # D5: --event and --span are named explicitly with a frozen message; the
+  # other 12 span-only flags are rejected the same way (exit 2, nothing
+  # written) without a frozen message of their own — this mirrors D2's
+  # shape-mixing rule 1:1 rather than deferring the rejection to lint time.
+  seen --span && die "--event and --span are mutually exclusive"
+  for f in "${SPAN_ONLY_FLAGS[@]}"; do
+    [[ "$f" == "--span" ]] && continue
+    seen "$f" && die "$f is not allowed with --event"
+  done
+
+  case "$EVENT" in
+    handoff|rework|gate|human|release) : ;;
+    *) die "invalid --event '${EVENT}' (handoff|rework|gate|human|release)" ;;
   esac
+
+  # Per-event-id requiredness (D3's table). "Required" = present and
+  # non-empty; an omitted or empty-string value is a usage error here.
+  req_from=0 req_to=0 req_label=0
+  case "$EVENT" in
+    handoff) req_from=1; req_to=1 ;;
+    rework)  req_from=1; req_to=1; req_label=1 ;;
+    gate)    req_from=1; req_label=1 ;;
+    human)   req_label=1 ;;
+    release) : ;;
+  esac
+  [[ "$req_from"  -eq 1 && -z "$FROM"  ]] && die "event '${EVENT}' requires non-empty --from"
+  [[ "$req_to"    -eq 1 && -z "$TO"    ]] && die "event '${EVENT}' requires non-empty --to"
+  [[ "$req_label" -eq 1 && -z "$LABEL" ]] && die "event '${EVENT}' requires non-empty --label"
+else
+  for f in "${EVENT_ONLY_FLAGS[@]}"; do
+    seen "$f" && die "$f is not allowed in span mode"
+  done
+
+  [[ -n "$SPAN"  ]] || die "missing required --span"
+  [[ -n "$PHASE" ]] || die "missing required --phase"
+  [[ "$ITERATION" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --iteration (non-negative int): '${ITERATION}'"
+  [[ "$ATTEMPT"   =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --attempt (non-negative int): '${ATTEMPT}'"
+
+  case "$STATUS" in
+    success|error|timeout|skipped|stopped) : ;;
+    *) die "invalid --status '${STATUS}' (success|error|timeout|skipped|stopped)" ;;
+  esac
+
+  # --- nullable numeric fields ---
+  for pair in "tokens:$TOKENS" "tool-uses:$TOOL_USES" "duration-ms:$DURATION_MS"; do
+    name="${pair%%:*}"; val="${pair#*:}"
+    [[ -z "$val" || "$val" =~ ^[0-9]{1,12}$ ]] || die "--${name} must be a non-negative integer: '${val}'"
+  done
+  [[ -z "$USD" || "$USD" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--usd must be a non-negative number: '${USD}'"
+
+  # --- verdict enum (nullable) ---
+  if [[ -n "$VERDICT" ]]; then
+    case "$VERDICT" in
+      PASS|FAIL|APPROVE|REQUEST_CHANGES) : ;;
+      *) die "invalid --verdict '${VERDICT}' (PASS|FAIL|APPROVE|REQUEST_CHANGES)" ;;
+    esac
+  fi
 fi
 
 # Escape a string for embedding in a JSON value, PRESERVING content: backslash
@@ -140,25 +236,39 @@ jnum() { if [[ -z "$2" ]]; then printf '"%s":null' "$1"; else printf '"%s":%s' "
 
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-ROW="{"
-ROW+="$(jstr loop_id "$LOOP_ID"),"
-ROW+="$(jstr run_id "$RUN_ID"),"
-ROW+="$(jnum seq "$SEQ"),"
-ROW+="$(jstr ts "$TS"),"
-ROW+="$(jstr span "$SPAN"),"
-ROW+="$(jstr phase "$PHASE"),"
-ROW+="$(jnum iteration "$ITERATION"),"
-ROW+="$(jnum attempt "$ATTEMPT"),"
-ROW+="$(jstr status "$STATUS"),"
-ROW+="$(jstr model "$MODEL"),"
-ROW+="$(jnum tokens "$TOKENS"),"
-ROW+="$(jnum tool_uses "$TOOL_USES"),"
-ROW+="$(jnum duration_ms "$DURATION_MS"),"
-ROW+="$(jstr verdict "$VERDICT"),"
-ROW+="$(jnum usd "$USD"),"
-ROW+="$(jstr error "$ERROR"),"
-ROW+="$(jstr parent_span_id "$PARENT")"
-ROW+="}"
+if [[ "$MODE" == "event" ]]; then
+  ROW="{"
+  ROW+="$(jstr loop_id "$LOOP_ID"),"
+  ROW+="$(jstr run_id "$RUN_ID"),"
+  ROW+="$(jnum seq "$SEQ"),"
+  ROW+="$(jstr ts "$TS"),"
+  ROW+="$(jstr kind "event"),"
+  ROW+="$(jstr event "$EVENT"),"
+  ROW+="$(jstr from "$FROM"),"
+  ROW+="$(jstr to "$TO"),"
+  ROW+="$(jstr label "$LABEL")"
+  ROW+="}"
+else
+  ROW="{"
+  ROW+="$(jstr loop_id "$LOOP_ID"),"
+  ROW+="$(jstr run_id "$RUN_ID"),"
+  ROW+="$(jnum seq "$SEQ"),"
+  ROW+="$(jstr ts "$TS"),"
+  ROW+="$(jstr span "$SPAN"),"
+  ROW+="$(jstr phase "$PHASE"),"
+  ROW+="$(jnum iteration "$ITERATION"),"
+  ROW+="$(jnum attempt "$ATTEMPT"),"
+  ROW+="$(jstr status "$STATUS"),"
+  ROW+="$(jstr model "$MODEL"),"
+  ROW+="$(jnum tokens "$TOKENS"),"
+  ROW+="$(jnum tool_uses "$TOOL_USES"),"
+  ROW+="$(jnum duration_ms "$DURATION_MS"),"
+  ROW+="$(jstr verdict "$VERDICT"),"
+  ROW+="$(jnum usd "$USD"),"
+  ROW+="$(jstr error "$ERROR"),"
+  ROW+="$(jstr parent_span_id "$PARENT")"
+  ROW+="}"
+fi
 
 # Runs dir resolution (precedence):
 #   1. $TEAM_RUNS_DIR  — explicit, exported by an orchestrator

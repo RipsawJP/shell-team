@@ -48,6 +48,16 @@
 # well as GNU bash. PROPOSE-ONLY: stdout only, never writes tasks/todo.md,
 # never invokes the GitHub CLI.
 #
+# T-1011 adds a second row shape, EVENT rows (a hand-off, a route-back, a
+# gate verdict, a human stop/GO, a release — discriminated by `"kind":
+# "event"`), sharing the same file. This script skips them: an event row has
+# no `status`/`verdict` field, so its free-form `label` (which CAN carry a
+# verdict-shaped token, e.g. "REQUEST_CHANGES") is never mistaken for a
+# failing span. The skip rule is fail-safe (D1) and independent of
+# rollup-runs.sh's copy (H4, no shared helper): any `kind` value other than
+# absent or `"span"` — including an unrecognized one — is skipped here too.
+# No new output is added for event rows (D1).
+#
 # Usage:  cluster-failures.sh <run.jsonl> [<run.jsonl>...]
 # Exit:   0 = summary printed (incl. "no failure clusters found"),
 #         2 = usage / unreadable file.
@@ -64,7 +74,22 @@ if [[ "$#" -lt 1 ]]; then
   exit 2
 fi
 
-# --- buffer every span line from every input file (in file/line order) ---
+# is_span_row <line> — fail-safe `kind` discriminator (T-1011, D1), a
+# deliberate copy of rollup-runs.sh's own (H4, sibling-script pattern — not a
+# shared helper): a row is a span when its `kind` value is absent or "span";
+# anything else (an event row, or an unrecognized/malformed `kind`) is
+# skipped by this reporter. Boundary-anchored the same way field_str below is.
+is_span_row() {
+  local line="$1"
+  if [[ "$line" =~ [\{,]\"kind\":\"([^\"]*)\" ]]; then
+    [[ "${BASH_REMATCH[1]}" == "span" ]]
+    return
+  fi
+  ! [[ "$line" =~ [\{,]\"kind\": ]]
+}
+
+# --- buffer every span line from every input file (in file/line order);
+#     event rows are skipped here so no pass below ever sees one ---
 LINES=()
 for FILE in "$@"; do
   if [[ ! -r "$FILE" ]]; then
@@ -74,6 +99,7 @@ for FILE in "$@"; do
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"
     [[ -z "$line" ]] && continue
+    is_span_row "$line" || continue
     LINES+=("$line")
   done < "$FILE"
 done

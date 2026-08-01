@@ -162,5 +162,113 @@ after2="$(wc -l < "$TMP/shell-team.jsonl")"
 [[ "$before2" -eq "$after2" ]] || fail "log-run wrote a row despite non-numeric --tokens"
 printf 'PASS: log-run non-numeric --tokens exits 2 and writes nothing\n'
 
+# =====================================================================
+# T-1011: event rows — writer (log-run.sh --event) and checker coverage.
+# =====================================================================
+
+EVENTS_DIR="$TMP/events"
+mkdir -p "$EVENTS_DIR"
+
+# --- writer: the frozen 9-key event row shape, check-run-clean ---
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop --run-id R1 --seq 1 --event handoff --from specify --to implement >/dev/null 2>&1
+ev_rc=$?
+set -e
+[[ "$ev_rc" -eq 0 ]] || fail "log-run --event handoff expected exit 0, got $ev_rc"
+[[ -f "$EVENTS_DIR/evloop.jsonl" ]] || fail "log-run --event did not create evloop.jsonl"
+[[ "$(wc -l < "$EVENTS_DIR/evloop.jsonl")" -eq 1 ]] || fail "log-run --event did not append exactly 1 line"
+ev_keys="$(grep -oE '"[a-z_]+":' "$EVENTS_DIR/evloop.jsonl" | tr -d '":' | tr '\n' ' ')"
+[[ "$ev_keys" == "loop_id run_id seq ts kind event from to label " ]] \
+  || fail "log-run --event wrote unexpected key order: $ev_keys"
+grep -qF -- '"kind":"event"' "$EVENTS_DIR/evloop.jsonl" || fail "log-run --event row missing kind:event"
+bash "$CHECK" "$EVENTS_DIR/evloop.jsonl" >/dev/null 2>&1 || fail "log-run --event row failed check-run lint"
+printf 'PASS: log-run --event handoff appends the frozen 9-key row, check-run-clean\n'
+
+# --- writer: --event and --span are mutually exclusive (frozen message) ---
+set +e
+mux_err="$(RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop --run-id R1 --seq 2 --event handoff --from a --to b --span engineer 2>&1 >/dev/null)"
+mux_rc=$?
+set -e
+[[ "$mux_rc" -eq 2 ]] || fail "log-run --event with --span expected exit 2, got $mux_rc"
+grep -qF -- '--event and --span are mutually exclusive' <<< "$mux_err" \
+  || fail "log-run --event+--span missing the frozen mutual-exclusion message"
+printf 'PASS: log-run --event and --span are mutually exclusive (exit 2, frozen message)\n'
+
+# --- writer: an unknown --event value is a usage error, nothing written ---
+before_ev="$(wc -l < "$EVENTS_DIR/evloop.jsonl")"
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop --run-id R1 --seq 3 --event bogus --from a --to b >/dev/null 2>&1
+bogus_rc=$?
+set -e
+[[ "$bogus_rc" -eq 2 ]] || fail "log-run --event bogus expected exit 2, got $bogus_rc"
+after_ev="$(wc -l < "$EVENTS_DIR/evloop.jsonl")"
+[[ "$before_ev" -eq "$after_ev" ]] || fail "log-run --event bogus wrote a row despite invalid --event"
+printf 'PASS: log-run --event bogus exits 2 and writes nothing\n'
+
+# --- writer: a span-only flag is forbidden in event mode ---
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop --run-id R1 --seq 4 --event handoff --from a --to b --phase implement >/dev/null 2>&1
+spanonly_rc=$?
+set -e
+[[ "$spanonly_rc" -eq 2 ]] || fail "log-run --event with --phase expected exit 2, got $spanonly_rc"
+printf 'PASS: log-run rejects a span-only flag (--phase) in event mode (exit 2)\n'
+
+# --- writer: --from/--to/--label are forbidden in span mode ---
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop --run-id R1 --seq 5 --span engineer --phase implement \
+  --iteration 1 --attempt 1 --status success --from a >/dev/null 2>&1
+fromspan_rc=$?
+set -e
+[[ "$fromspan_rc" -eq 2 ]] || fail "log-run --from in span mode expected exit 2, got $fromspan_rc"
+printf 'PASS: log-run rejects --from in span mode (exit 2)\n'
+
+# --- writer: per-type requiredness — rework with no --label writes nothing ---
+before_ev2="$(wc -l < "$EVENTS_DIR/evloop.jsonl")"
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" evloop --run-id R1 --seq 6 --event rework --from a --to b >/dev/null 2>&1
+rework_rc=$?
+set -e
+[[ "$rework_rc" -eq 2 ]] || fail "log-run --event rework with no --label expected exit 2, got $rework_rc"
+after_ev2="$(wc -l < "$EVENTS_DIR/evloop.jsonl")"
+[[ "$before_ev2" -eq "$after_ev2" ]] || fail "log-run --event rework wrote a row despite missing --label"
+printf 'PASS: log-run --event rework requires --label (exit 2, nothing written)\n'
+
+# --- writer: nullable event fields render as explicit null and lint clean ---
+set +e
+RUNS_DIR="$EVENTS_DIR" bash "$LOG" relloop --run-id R1 --seq 1 --event release >/dev/null 2>&1
+rel_rc=$?
+set -e
+[[ "$rel_rc" -eq 0 ]] || fail "log-run --event release expected exit 0, got $rel_rc"
+grep -qF -- '"from":null,"to":null,"label":null' "$EVENTS_DIR/relloop.jsonl" \
+  || fail "log-run --event release did not render nullable fields as explicit null"
+bash "$CHECK" "$EVENTS_DIR/relloop.jsonl" >/dev/null 2>&1 || fail "log-run --event release row failed check-run lint"
+printf 'PASS: log-run --event release nullable fields render as JSON null, check-run-clean\n'
+
+# --- checker: the committed mixed/unknown-id fixtures (AC11/AC12) ---
+assert_check "valid-events.jsonl -> 0"          0 "$FIX/valid-events.jsonl"
+assert_check "fail-event-unknown-id.jsonl -> 1" 1 "$FIX/fail-event-unknown-id.jsonl" "invalid event '"
+
+# --- checker: `kind` discriminates shape; shape mixing fails closed both ways ---
+VALID_SPAN_LINE="$(head -n1 "$FIX/valid.jsonl")"
+assert_line "--line kind:span behaves like kind-less" 0 \
+  "$(printf '%s' "$VALID_SPAN_LINE" | sed 's/^{/{"kind":"span",/')"
+assert_line "--line kind:bogus -> 1" 1 \
+  "$(printf '%s' "$VALID_SPAN_LINE" | sed 's/^{/{"kind":"bogus",/')" "invalid kind 'bogus'"
+assert_line "--line kind:null -> 1" 1 \
+  "$(printf '%s' "$VALID_SPAN_LINE" | sed 's/^{/{"kind":null,/')" "kind must be a quoted enum value"
+assert_line "--line span row carrying an event key -> 1" 1 \
+  "$(printf '%s' "$VALID_SPAN_LINE" | sed 's/}$/,"event":"handoff"}/')" "span row carries event-only key: event"
+
+EVENT_HANDOFF_LINE='{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","kind":"event","event":"handoff","from":"specify","to":"implement","label":null}'
+assert_line "--line a valid event row -> 0" 0 "$EVENT_HANDOFF_LINE"
+assert_line "--line event row carrying a span-only key -> 1" 1 \
+  "$(printf '%s' "$EVENT_HANDOFF_LINE" | sed 's/}$/,"phase":"implement"}/')" 'event row carries span-only key\(s\): phase'
+assert_line "--line unknown event id -> 1" 1 \
+  '{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","kind":"event","event":"bogus","from":"a","to":"b","label":null}' \
+  "invalid event 'bogus'"
+assert_line "--line event missing required from -> 1" 1 \
+  '{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","kind":"event","event":"handoff","from":null,"to":"implement","label":null}' \
+  "requires non-null from"
+
 printf 'OK\n'
 exit 0
