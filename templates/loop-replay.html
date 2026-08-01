@@ -350,17 +350,22 @@
      event handoff              -> a ball move from -> to
      event rework                -> a ball move from -> to, rework treatment
      event gate                  -> a gate signal at `from`
-     event human                  -> the human-layer settle (mapped onto the
-                                     same "gate, agent===human" branch the
-                                     ratified ring model already has)
-     event release                -> the release settle */
+     event human                  -> the human-layer settle
+     event release                -> the release settle
+     T-1012 rework round 1 (Codex Major #2): `human` gets its OWN adapted
+     `type`, never collapsed onto `type:"gate"` with a recovered `agent==="human"`
+     guess. `from` on a real `gate` event is free-form (D3) and reachably
+     equals the literal string "human" — reconstructing "was this a human
+     event" from that value would silently conflate a real gate signal with
+     a human-layer settle. The event id itself, not a derived guess, is what
+     downstream code (buildStepsB, the degradation classifier) now branches on. */
   function adaptRow(row){
     if (row && row.kind === "event") {
       switch (row.event) {
         case "handoff": return { seq:row.seq, type:"handoff", from:row.from, to:row.to, label:row.label };
         case "rework":  return { seq:row.seq, type:"rework",  from:row.from, to:row.to, label:row.label };
         case "gate":    return { seq:row.seq, type:"gate",    agent:row.from, label:row.label };
-        case "human":   return { seq:row.seq, type:"gate",    agent:"human",  label:row.label };
+        case "human":   return { seq:row.seq, type:"human",   label:row.label };
         case "release": return { seq:row.seq, type:"release", agent:(row.from != null ? row.from : "orchestrator"), label:row.label };
         default: return null; // unreachable: bin/check-run.sh already rejects any other event id
       }
@@ -562,11 +567,11 @@
   var hasEvent = eventKindEvents.length > 0;
   var distinctEventIds = {};
   events.forEach(function(e){
-    if(e.type === "handoff" || e.type === "rework" || e.type === "gate" || e.type === "release"){
-      // "human" events were mapped onto type:"gate", agent:"human" — recover
-      // the original event id for vocabulary classification.
-      var id = (e.type === "gate" && e.agent === "human") ? "human" : e.type;
-      distinctEventIds[id] = true;
+    // T-1012 rework round 1: `human` now carries its own adapted `type`
+    // (Major #2), so the vocabulary id is the adapted type itself — no more
+    // recovering it from a `gate` row's `agent` value.
+    if(e.type === "handoff" || e.type === "rework" || e.type === "gate" || e.type === "human" || e.type === "release"){
+      distinctEventIds[e.type] = true;
     }
   });
   var distinctEventCount = Object.keys(distinctEventIds).length;
@@ -676,16 +681,27 @@
         lastWorkSeq = e.seq;
         ringHolder = e.agent; ballAt = e.agent;
       } else if(e.type === "rework"){
-        if(ringHolder !== e.to){ move(ringHolder, e.to, true, "raw", e.seq); ballAt = e.to; ringHolder = e.to; }
+        // T-1012 rework round 1 (Codex Blocker #3): the "from" side of this
+        // move is the ball's actual tracked position (`ballAt`), never the
+        // ring-only `ringHolder` bookkeeping variable, which is still `null`
+        // whenever a rework arrives before any span has run (the committed
+        // `event-only` fixture does exactly this) — `ballAt` is initialised
+        // to "human" and kept valid by every branch below, so this can never
+        // feed a `null` origin into `move()`/`worldPos()`. This tolerates any
+        // event order the frozen schema permits, per D3.
+        if(ballAt !== e.to){ move(ballAt, e.to, true, "raw", e.seq); ballAt = e.to; ringHolder = e.to; }
         else { signal("orchestrator", e.to, "danger", e.seq); }
       } else if(e.type === "gate"){
-        if(e.agent === "human"){
-          if(ringHolder){ move(ringHolder, "orchestrator", false, "report", lastWorkSeq); ringHolder = null; ballAt = "orchestrator"; }
-          move("orchestrator", "human", false, "confirm", null); ballAt = "human";
-          settle("human", e, "accent");
-        } else {
-          signal(e.agent, null, "accent", e.seq);
-        }
+        // T-1012 rework round 1 (Codex Major #2): a real `gate` is ALWAYS a
+        // gate signal at `from` — never a human-layer settle, regardless of
+        // what string value `from` happens to carry (D3's affordance table;
+        // `human` is its own adapted `type` now, handled in its own branch
+        // below, never reconstructed from `agent==="human"`).
+        signal(e.agent, null, "accent", e.seq);
+      } else if(e.type === "human"){
+        if(ringHolder){ move(ringHolder, "orchestrator", false, "report", lastWorkSeq); ringHolder = null; ballAt = "orchestrator"; }
+        move("orchestrator", "human", false, "confirm", null); ballAt = "human";
+        settle("human", e, "accent");
       } else if(e.type === "release"){
         if(ballAt !== e.agent){ move(ballAt, e.agent, false, "go", null); ballAt = e.agent; }
         settle(e.agent, e, "success");
@@ -724,14 +740,33 @@
   }
 
   /* ---------------- world layout: ring on the ground, Orchestrator + Human hover above ---------------- */
+  // T-1012 rework round 1 (Codex Major #1): the angle step is derived from
+  // the ACTUAL roster size, not a fixed Math.PI/3 (= 2*PI/6, correct only for
+  // exactly six ring agents). D3's roster union (the six known ids plus any
+  // distinct `span` value) makes a 7th+ agent reachable (the committed
+  // `adopter` fixture does this), and a fixed six-way step lands the 7th
+  // agent on the exact same angle as the 1st — an invisible, unfocusable
+  // collision, which is exactly the "never dropped" contract D3 protects
+  // against for data, silently broken for the visual position.
   var RING_POS = {};
+  var RING_ANGLE_STEP = (Math.PI * 2) / RING_AGENTS.length;
   RING_AGENTS.forEach(function(id, i){
-    var ang = -Math.PI/2 + i*(Math.PI/3);
+    var ang = -Math.PI/2 + i*RING_ANGLE_STEP;
     RING_POS[id] = { x:Math.cos(ang), y:0, z:Math.sin(ang) };
   });
   var ORCH_POS = { x:0, y:1.15, z:0 };
   var HUMAN_POS = { x:0, y:2.15, z:0 };
-  function worldPos(id){ return id==="orchestrator"?ORCH_POS : id==="human"?HUMAN_POS : RING_POS[id]; }
+  // T-1012 rework round 1 (Codex Blocker #3): NEVER returns undefined. `from`/
+  // `to` on a handoff/rework/release event are free-form (D3 — "an adopter's
+  // phases are not this loop's phases") and are not required to also appear
+  // as a `span` value in RING_POS, so an id this function has never seen
+  // (including `null`, reachable when a rework arrives before any ring
+  // position is established) falls back to the orchestrator's position —
+  // "start from orchestrator" for an unrecognised/absent origin, matching the
+  // ring model's own topology (every hop already organizationally routes
+  // through the orchestrator). Without this, `lerp3()` dereferences `.x` on
+  // `undefined` and throws.
+  function worldPos(id){ return id==="orchestrator"?ORCH_POS : id==="human"?HUMAN_POS : (RING_POS[id] || ORCH_POS); }
   function lerp3(a,b,t){ return { x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t, z:a.z+(b.z-a.z)*t }; }
 
   /* ---------------- shared per-frame scene (consumed identically by B-1/B-2/B-3) ---------------- */
@@ -811,11 +846,15 @@
     });
     // T-1012 (design note §3): one dynamically-appended row per distinct
     // unrecognised roster id actually present in the payload — never dropped.
+    // T-1012 rework round 1 (Codex Blocker #2, the review's own primary
+    // example): `id` here is an unrecognised `span` value — telemetry an
+    // adopter fully controls (D3) — so it is escaped before reaching
+    // .innerHTML, exactly like every other free-form field in this file.
     RING_AGENTS.filter(function(id){ return !KNOWN_COLOR_IDS[id]; }).forEach(function(id){
       var row = document.createElement("div");
       row.className = "legend-row";
       row.innerHTML = '<span class="legend-swatch dot" style="background:var(--agent-unknown);border:1px dashed var(--border-strong);"></span>'+
-        id+' — '+T().unknownAgent;
+        agentLabelHtml(id)+' — '+T().unknownAgent;
       el.appendChild(row);
     });
     // UI Designer never appears in this real run's spans — but the check is
@@ -876,6 +915,33 @@
     return a ? a.label : id;
   }
 
+  // T-1012 rework round 1 (Codex Blocker #2): D2's escape (bin/gen-loop-replay.sh)
+  // protects the ONE JSON-envelope injection site against terminating the
+  // page's own inline <script> block. It says nothing about how THIS script
+  // renders the JSON.parse-decoded values back into the DOM — a second,
+  // independent trust boundary. Every free-form telemetry field (`phase`,
+  // `model`, `verdict`, `from`, `to`, and any unrecognised `span` value — an
+  // adopter's own agent name, which D3 requires this page to render, never
+  // drop) reaches the page only through `jstr`/`jesc` (bin/log-run.sh), which
+  // escapes just `\` and `"` — not `<`/`>`/`&`. Any string built for
+  // `.innerHTML` must run every payload-derived piece through this helper;
+  // `.textContent`/canvas `fillText` need no escaping (they never interpret
+  // markup) and are left alone.
+  function escapeHtml(s){
+    if(s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  // agentLabel(), escaped for HTML-string contexts. Kept separate from
+  // agentLabel() itself: the canvas fillText() call sites need the RAW label
+  // (canvas draws literal glyphs and never interprets markup — escaping there
+  // would show literal "&lt;" instead of "<" on the ring/mini-card).
+  function agentLabelHtml(id){ return escapeHtml(agentLabel(id)); }
+
   /* ---------------- "now playing" readout (driven by the same ring step) ---------------- */
   function updateBNow(simMs){
     var current = getCurrentStepB(simMs).step;
@@ -903,17 +969,20 @@
   }
 
   /* ---------------- detail panel (real telemetry, real simMs) ---------------- */
-  function verdictChip(v){ return '<span class="chip '+((v==="PASS"||v==="APPROVE")?"verdict-pass":"verdict-reject")+'">'+v+'</span>'; }
+  // verdict/status are validated closed enums (bin/check-run.sh), so neither
+  // can carry an HTML metacharacter — escaped anyway (T-1012 rework round 1),
+  // so no sink here is "safe by enum" and therefore exempt from the rule.
+  function verdictChip(v){ return '<span class="chip '+((v==="PASS"||v==="APPROVE")?"verdict-pass":"verdict-reject")+'">'+escapeHtml(v)+'</span>'; }
   // T-1012 (design note §4): a non-success span status, shown as its own chip
   // — independently of whether a verdict chip is ALSO present, since a span
   // can carry both and neither field substitutes for the other.
   function statusChip(status){
     var sev = statusSeverity(status);
     var cls = sev === "warning" ? "status-warning" : "status-danger";
-    return '<span class="chip '+cls+'">'+String(status).toUpperCase()+'</span>';
+    return '<span class="chip '+cls+'">'+escapeHtml(String(status).toUpperCase())+'</span>';
   }
   function agentDot(id){ return '<span class="chip-dot" style="background:'+agentColorVar(id)+'"></span>'; }
-  function agentChip(id){ return '<span class="chip">'+agentDot(id)+agentLabel(id)+'</span>'; }
+  function agentChip(id){ return '<span class="chip">'+agentDot(id)+agentLabelHtml(id)+'</span>'; }
   function updateDetailPanel(simMs){
     var current = null;
     for(var i=0;i<events.length;i++){ if(events[i]._tStart <= simMs) current = events[i]; }
@@ -922,17 +991,17 @@
     document.getElementById("detailTitle").textContent = stepText(current);
     var chips = [];
     if(current.type === "work") chips.push(agentChip(current.agent));
-    if(current.from && current.to) chips.push('<span class="chip">'+agentDot(current.from)+agentLabel(current.from)+' → '+agentDot(current.to)+agentLabel(current.to)+'</span>');
-    if(current.phase) chips.push('<span class="chip">'+current.phase+'</span>');
+    if(current.from && current.to) chips.push('<span class="chip">'+agentDot(current.from)+agentLabelHtml(current.from)+' → '+agentDot(current.to)+agentLabelHtml(current.to)+'</span>');
+    if(current.phase) chips.push('<span class="chip">'+escapeHtml(current.phase)+'</span>');
     if(current.verdict) chips.push(verdictChip(current.verdict));
     if(current.type === "work" && current.status != null && current.status !== "success") chips.push(statusChip(current.status));
-    if(current.flag) chips.push('<span class="chip flag">'+current.flag+'</span>');
+    if(current.flag) chips.push('<span class="chip flag">'+escapeHtml(current.flag)+'</span>');
     document.getElementById("detailChips").innerHTML = chips.join("");
     var stats = [
       { k:T().statTokens, v: current.tokens != null ? current.tokens.toLocaleString() : "—" },
       { k:T().statToolUses, v: current.tool_uses != null ? current.tool_uses : "—" },
       { k:T().statDuration, v: current.duration_ms != null ? fmtMs(current.duration_ms) : "—" },
-      { k:T().statModel, v: current.model || "—" }
+      { k:T().statModel, v: current.model ? escapeHtml(current.model) : "—" }
     ];
     document.getElementById("detailStats").innerHTML = stats.map(function(s){ return '<div class="stat"><dt>'+s.k+'</dt><dd>'+s.v+'</dd></div>'; }).join("");
     // T-1012: `outcome`/`finding` were sample-data-only fields — a real span's
@@ -942,17 +1011,25 @@
 
   /* ---------------- tooltip (shared) ---------------- */
   var tooltip = document.getElementById("tooltip");
+  // T-1012 rework round 1 (Codex Blocker #2): every field here is escaped
+  // before joining into tooltip.innerHTML. model/tokens/tool_uses/duration/
+  // verdict stay conditionally omitted-if-absent rather than switched to the
+  // design note's null->"—" placeholder pattern: this function's only live
+  // caller (nodeTipData(), an agent-hover tooltip) never supplies any of
+  // them, so adding an always-shown "model: —" / "verdict: —" line here would
+  // be a new, unrelated cosmetic change to a working feature, not a
+  // null-safety fix (see .shell-team/provenance/T-1012.md for the disposition).
   function showTip(clientX, clientY, e){
-    var lines = ["<b>" + (e.label||"") + "</b>"];
-    if(e.model) lines.push("model: " + e.model);
+    var lines = ["<b>" + escapeHtml(e.label||"") + "</b>"];
+    if(e.model) lines.push("model: " + escapeHtml(e.model));
     if(e.tokens != null) lines.push("tokens: " + e.tokens.toLocaleString());
     if(e.tool_uses != null) lines.push("tool_uses: " + e.tool_uses);
     if(e.duration_ms != null) lines.push("duration: " + fmtMs(e.duration_ms));
-    if(e.verdict) lines.push("verdict: " + e.verdict);
+    if(e.verdict) lines.push("verdict: " + escapeHtml(e.verdict));
     // T-1012: a non-success status, colored via the same danger/warning
     // mapping, the status token itself appended verbatim (not run through T()).
-    if(e.status && e.status !== "success") lines.push('<span style="color:'+colorFor(statusSeverity(e.status)||"danger")+'">'+T().nonSuccessLabel+e.status+'</span>');
-    if(e.outcome && !e.tokens) lines.push(e.outcome);
+    if(e.status && e.status !== "success") lines.push('<span style="color:'+colorFor(statusSeverity(e.status)||"danger")+'">'+escapeHtml(T().nonSuccessLabel+e.status)+'</span>');
+    if(e.outcome && !e.tokens) lines.push(escapeHtml(e.outcome));
     tooltip.innerHTML = lines.join("<br>");
     tooltip.hidden = false;
     tooltip.style.left = (clientX+14) + "px"; tooltip.style.top = (clientY+14) + "px";
@@ -1131,7 +1208,13 @@
       lines.push({ t:T().miniCardTokens+(e.tokens != null ? e.tokens.toLocaleString() : DASH) });
       lines.push({ t:T().miniCardToolUses+(e.tool_uses != null ? e.tool_uses : DASH) });
       lines.push({ t:T().miniCardDuration+durTxt(e.duration_ms) });
-      if(e.verdict != null) lines.push({ t:T().miniCardVerdict+e.verdict, c:(e.verdict==="PASS"||e.verdict==="APPROVE")?"success":"danger" });
+      // T-1012 rework round 1 (Minor #1): matches every other field on this
+      // branch — the line always shows, with the em-dash placeholder when
+      // `verdict` is null, instead of being omitted (the design note's exact
+      // `field != null ? field : "—"` pattern, not merely "never print the
+      // word null"). Canvas fillText draws literal glyphs — no HTML escaping
+      // applies here, unlike the innerHTML sinks elsewhere in this file.
+      lines.push({ t:T().miniCardVerdict+(e.verdict != null ? e.verdict : DASH), c: e.verdict != null ? ((e.verdict==="PASS"||e.verdict==="APPROVE")?"success":"danger") : null });
       if(e.status && e.status !== "success") lines.push({ t:T().nonSuccessLabel+e.status, c:statusSeverity(e.status) });
     } else {
       lines.push({ t:T().miniCardSpans(spans.length) });

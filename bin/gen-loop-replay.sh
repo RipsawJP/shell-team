@@ -252,11 +252,24 @@ if [ "${#SORTED_FILES[@]}" -gt 0 ]; then
   done
 fi
 
+# json_escape_str <s> — the same escaping bin/log-run.sh's jesc() applies
+# (backslash first, then double-quote), so a basename the filesystem allowed
+# to contain a literal '"' or '\' cannot break the `source` array's JSON
+# structure. Filenames are operator/system-controlled, not telemetry content,
+# so this is a defensive fail-safe fix rather than an escaping gap that
+# reaches an XSS-shaped sink (T-1012 rework round 1, Minor #2).
+json_escape_str() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
 # --- build the `source` list (basenames only — never absolute paths) ---------
 SOURCE_ITEMS=()
 if [ "${#SORTED_FILES[@]}" -gt 0 ]; then
   for f in "${SORTED_FILES[@]}"; do
-    SOURCE_ITEMS+=("\"$(basename -- "$f")\"")
+    SOURCE_ITEMS+=("\"$(json_escape_str "$(basename -- "$f")")\"")
   done
 fi
 SOURCE_JSON=""
