@@ -136,6 +136,7 @@ It also works standalone, one agent or skill at a time, when you want to be expl
 │   ├── check-contract.sh            # loop-contract schema linter
 │   ├── loop-guard.sh                # runtime BUDGET/STOP enforcement
 │   ├── log-run.sh / check-run.sh    # telemetry writer + JSONL lint
+│   ├── gen-loop-replay.sh           # renders a run's telemetry as an HTML replay page
 │   ├── discover-work.sh             # read-only triage discovery engine
 │   ├── team-init.sh                 # adopting-repo scaffolder
 │   └── install                      # legacy vendoring fallback
@@ -169,11 +170,33 @@ The agent pipeline above is the **inner loop**. An **outer loop** of operating d
 
 - **Loop contracts** — every loop declares TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT in `tasks/loops/*.contract.yaml`; `bin/check-contract.sh` lints them. BUDGET + STOP are mandatory.
 - **Runtime guardrails** — `bin/loop-guard.sh` enforces the contract's BUDGET/STOP at run time (a fail-closed runaway / billing kill-switch).
-- **Telemetry** — `/shell-team:run` emits one span row per phase via `bin/log-run.sh`; `bin/check-run.sh` lints the JSONL, and cross-run roll-ups surface systemic issues instead of showing up one run at a time.
+- **Telemetry** — `/shell-team:run` emits one `--span` row per phase and one `--event` row per hand-off (event vocabulary: `handoff|rework|gate|human|release`) via `bin/log-run.sh`; `bin/check-run.sh` lints the JSONL, `bin/gen-loop-replay.sh` renders either kind back as a run-replay page (see [Replaying a run](#replaying-a-run)), and cross-run roll-ups surface systemic issues instead of showing up one run at a time.
 - **Opt-in triage** — `/shell-team:loop-triage` (`bin/discover-work.sh`) is read-only: it finds failing CI / open PRs / labelled issues and *proposes* todo candidates, never editing the board.
 - **Model routing** — agent roles are assigned across model tiers (planning vs. execution vs. cross-provider review) so cost tracks each role's judgment load, with an explicit re-evaluation trigger whenever the model landscape or cost structure shifts.
 
 See [docs/history.md](docs/history.md) for how this operating discipline evolved.
+
+## Replaying a run
+
+A run's telemetry (span rows plus event rows) replays as one self-contained HTML page — no network, no external asset, no build step; it opens straight from a `file://` URL.
+
+Generate one:
+
+```bash
+gen-loop-replay.sh <run-id>
+```
+
+(`bin/` is on `PATH` while the plugin is loaded, so the bare form above and the `bin/`-prefixed form both work.) The page lands at `<runs>/replay-<run-id>.html`, where `<runs>` is whatever `bin/team-paths.sh --get runs` resolves for this repo — it is already `git-ignore`d, so there is nothing to add to an ignore file. Pass `--out <path>` to write it somewhere else instead.
+
+**Caveat**: the board-flag rail only lights for a run whose `handoff` events carry the board flag on `--label` as a bare token (`READY_FOR_ARCH` … `READY_FOR_MERGE`) — see `skills/run/SKILL.md` for where that convention is produced. A run recorded without those labels — still the dominant case — shows the empty-state caption instead.
+
+No run of your own yet? The committed fixture demonstrates a rail that does light:
+
+```bash
+gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-replay/fixtures/flag-rail --out /tmp/replay-demo.html
+```
+
+`--out` is required in this demo — omitting it would default the page into the fixture directory under `tests/`, leaving an untracked file behind.
 
 ## Design choices
 

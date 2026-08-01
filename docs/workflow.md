@@ -77,7 +77,13 @@ language-neutral `<!-- retro-section: keep|problem|try|traps|lessons -->`
 markers — the heading text beside each marker is free, so a retro in
 Japanese, English, or anything else passes the same structural check. See
 `docs/templates/retro-template.md` for the shipped (English) skeleton and its
-migration note for retros written before the marker contract existed.
+migration note for retros written before the marker contract existed. The
+run-replay page `bin/gen-loop-replay.sh` renders on demand joins the same
+class: the operator-authored `label` text an event carries renders verbatim
+in the page, and the page's own UI dictionary carries both languages, while
+machine tokens (the rail's five `READY_FOR_*` stops, the verdict labels) stay
+verbatim English — the shipped `templates/loop-replay.html` itself is
+shipped surface, written in English like every other shipped file.
 
 **Known limitation**: the mirror is guaranteed only on the **SKILL-driven path**
 (`/shell-team:run`, `/goal`), where the orchestrator injects the directive. Invoking an

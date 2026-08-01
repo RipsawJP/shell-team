@@ -136,6 +136,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 │   ├── check-contract.sh            # Loop 契約スキーマ linter
 │   ├── loop-guard.sh                # 実行時 BUDGET/STOP enforcement
 │   ├── log-run.sh / check-run.sh    # テレメトリ writer + JSONL lint
+│   ├── gen-loop-replay.sh           # run のテレメトリを HTML リプレイページに描画
 │   ├── discover-work.sh             # read-only triage 発見エンジン
 │   ├── team-init.sh                 # 適用先リポ scaffolder
 │   └── install                      # 旧 vendoring フォールバック
@@ -169,11 +170,33 @@ build sha と uptime を返す /healthz を shell-team で追加して
 
 - **Loop 契約** — 各ループは TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT を `tasks/loops/*.contract.yaml` に宣言し、`bin/check-contract.sh` で lint。BUDGET ＋ STOP は必須。
 - **実行時ガードレール** — `bin/loop-guard.sh` が契約の BUDGET/STOP を実行時に強制（fail-closed な暴走 / 課金 kill-switch）。
-- **テレメトリ** — `/shell-team:run` が各フェーズで 1 span 行を `bin/log-run.sh` で emit、`bin/check-run.sh` が JSONL を lint。run 横断のロールアップが、1 run ずつでは見えない系統的な問題も浮かび上がらせる。
+- **テレメトリ** — `/shell-team:run` が各フェーズで 1 `--span` 行、各ハンドオフで 1 `--event` 行（イベント語彙: `handoff|rework|gate|human|release`）を `bin/log-run.sh` で emit、`bin/check-run.sh` が JSONL を lint、`bin/gen-loop-replay.sh` がどちらの行種別も run-replay ページとして描画し直す（[run のリプレイ](#run-のリプレイ)参照）。run 横断のロールアップが、1 run ずつでは見えない系統的な問題も浮かび上がらせる。
 - **オプトイン triage** — `/shell-team:loop-triage`（`bin/discover-work.sh`）は read-only：CI 失敗 / open PR / ラベル付き issue を見つけて todo 候補を*提案*する（ボードは編集しない）。
 - **モデルルーティング** — エージェントの役割はモデル tier（計画 / 実行 / 別プロバイダレビュー）に振り分けられ、コストが各役割の判断負荷に追従する。モデル環境やコスト構造が変わればいつでも再評価する明示トリガ付き。
 
 この運用規律がどう進化したかは [docs/history.ja.md](docs/history.ja.md) を参照。
+
+## run のリプレイ
+
+1 run のテレメトリ（span 行 + event 行）は、1 枚の自己完結した HTML ページとしてリプレイできる — ネットワークも外部アセットもビルドステップも不要で、`file://` URL からそのまま開ける。
+
+生成コマンド:
+
+```bash
+gen-loop-replay.sh <run-id>
+```
+
+（プラグインをロードしていれば `bin/` は `PATH` に載るので、上の裸の形でも `bin/` 付きの形でも動く。）ページは `<runs>/replay-<run-id>.html` に生成される。ここでの `<runs>` は、このリポジトリで `bin/team-paths.sh --get runs` が解決するディレクトリで、すでに `git-ignore` 済みなので ignore ファイルに追記する必要はない。別の場所に書き出したいときは `--out <path>` を渡す。
+
+**注意**: board-flag のレールが点灯するのは、その run の `handoff` イベントが board flag を裸のトークンとして `--label` に載せている場合だけ（`READY_FOR_ARCH` … `READY_FOR_MERGE`）— この convention がどこで作られるかは `skills/run/SKILL.md` を参照。それらのラベルが無い run（依然として大多数のケース）では、代わりに empty-state のキャプションが表示される。
+
+自分の run がまだ無い場合は、レールが実際に点灯するコミット済みの fixture を試せる:
+
+```bash
+gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-replay/fixtures/flag-rail --out /tmp/replay-demo.html
+```
+
+このデモでは `--out` が必須 — 省略するとページが `tests/` 配下の fixture ディレクトリにデフォルトで書き出され、untracked ファイルが残ってしまう。
 
 ## 設計上の選択
 
