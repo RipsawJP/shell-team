@@ -183,14 +183,14 @@ build sha と uptime を返す /healthz を shell-team で追加して
 生成コマンド:
 
 ```bash
-bash bin/gen-loop-replay.sh <run-id>
+bash gen-loop-replay.sh <run-id>
 ```
 
-（`bash bin/…` の形は `PATH` にも実行ビットにも依存せずに動く — CI ワークフロー自身が常に使っている形と同じ。）ページは `<runs>/replay-<run-id>.html` に生成される。ここでの `<runs>` は、このリポジトリで `bin/team-paths.sh --get runs` が解決するディレクトリで、すでに `git-ignore` 済みなので ignore ファイルに追記する必要はない。別の場所に書き出したいときは `--out <path>` を渡す。
+（プラグインをロードしていれば `bin/` は `PATH` に載るので、`bash gen-loop-replay.sh` はそこから解決される — 実行ビットには依存しない。`bin/` 接頭辞も自前の `PATH` 設定も不要。）ページは `<runs>/replay-<run-id>.html` に生成される。ここでの `<runs>` は、このリポジトリで `bin/team-paths.sh --get runs` が解決するディレクトリで、すでに `git-ignore` 済みなので ignore ファイルに追記する必要はない。別の場所に書き出したいときは `--out <path>` を渡す。
 
 **注意**: board-flag のレールが点灯するのは、その run の `handoff` イベントが board flag を裸のトークンとして `--label` に載せている場合だけ（`READY_FOR_ARCH` … `READY_FOR_MERGE`）— この convention がどこで作られるかは `skills/run/SKILL.md` を参照。それらのラベルが無い run（依然として大多数のケース）では、代わりに empty-state のキャプションが表示される。
 
-自分の run がまだ無い場合は、レールが実際に点灯するコミット済みの fixture を試せる:
+自分の run がまだ無い場合は、レールが実際に点灯するコミット済みの fixture を試せる（下の fixture パスはこのリポジトリ自身のものなので、shell-team のチェックアウトルートから実行すること）:
 
 ```bash
 bash bin/gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-replay/fixtures/flag-rail --out /tmp/replay-demo.html
