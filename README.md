@@ -183,17 +183,17 @@ A run's telemetry (span rows plus event rows) replays as one self-contained HTML
 Generate one:
 
 ```bash
-gen-loop-replay.sh <run-id>
+bash bin/gen-loop-replay.sh <run-id>
 ```
 
-(`bin/` is on `PATH` while the plugin is loaded, so the bare form above and the `bin/`-prefixed form both work.) The page lands at `<runs>/replay-<run-id>.html`, where `<runs>` is whatever `bin/team-paths.sh --get runs` resolves for this repo — it is already `git-ignore`d, so there is nothing to add to an ignore file. Pass `--out <path>` to write it somewhere else instead.
+(the `bash bin/…` form works regardless of `PATH` or the executable bit — the same form the CI workflow itself always uses.) The page lands at `<runs>/replay-<run-id>.html`, where `<runs>` is whatever `bin/team-paths.sh --get runs` resolves for this repo — it is already `git-ignore`d, so there is nothing to add to an ignore file. Pass `--out <path>` to write it somewhere else instead.
 
 **Caveat**: the board-flag rail only lights for a run whose `handoff` events carry the board flag on `--label` as a bare token (`READY_FOR_ARCH` … `READY_FOR_MERGE`) — see `skills/run/SKILL.md` for where that convention is produced. A run recorded without those labels — still the dominant case — shows the empty-state caption instead.
 
 No run of your own yet? The committed fixture demonstrates a rail that does light:
 
 ```bash
-gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-replay/fixtures/flag-rail --out /tmp/replay-demo.html
+bash bin/gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-replay/fixtures/flag-rail --out /tmp/replay-demo.html
 ```
 
 `--out` is required in this demo — omitting it would default the page into the fixture directory under `tests/`, leaving an untracked file behind.
