@@ -1,0 +1,1680 @@
+<title>shell-team loop replay</title>
+<style>
+  :root{
+    --bg:#F1F4F3; --bg-panel:#FFFFFF; --bg-raised:#FAFBFA;
+    --border:#D6DEDC; --border-strong:#B9C4C1;
+    --text:#12181A; --text-dim:#5C6A67; --text-faint:#8B9895;
+    --accent:#1C9187; --accent-soft:#DEF3F0;
+    --danger:#C63F3F; --danger-soft:#FBE6E6;
+    --success:#2E8B52; --success-soft:#E4F3EA;
+    --warning:#A8781F; --warning-soft:#F5EAD3;
+    --shadow:0 1px 0 rgba(10,20,20,.05);
+    --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,"Noto Sans Mono CJK JP",monospace;
+    --font-ui:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic Medium","Noto Sans JP",-apple-system,"Segoe UI",sans-serif;
+    /* per-agent identity colors — kept out of the accent/danger/success hue bands
+       (accent≈175°, danger≈3°, success≈145°) so a state overlay never gets lost
+       against an agent's own color. */
+    --agent-human:hsl(30 78% 42%); --agent-orchestrator:hsl(270 55% 48%);
+    --agent-tech-lead:hsl(235 60% 50%); --agent-pm-spec:hsl(305 55% 42%);
+    --agent-engineer:hsl(65 75% 32%); --agent-qa-verifier:hsl(200 65% 42%);
+    --agent-codex-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
+    /* T-1012: a roster id outside the six known agents (an adopter's own
+       agent names) gets this neutral, reused text token — deliberately not a
+       new hue, so it sits outside every identity color band. */
+    --agent-unknown: var(--text-faint);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#07090A; --bg-panel:#0F1517; --bg-raised:#141B1D;
+      --border:#232E2F; --border-strong:#324041;
+      --text:#E7EFED; --text-dim:#93A6A2; --text-faint:#5E706C;
+      --accent:#3FD8C9; --accent-soft:#123C38;
+      --danger:#F1706E; --danger-soft:#3A1B1C;
+      --success:#5FCB86; --success-soft:#123A24;
+      --warning:#E7BB63; --warning-soft:#3A2E14;
+      --shadow:0 1px 0 rgba(0,0,0,.5);
+      --agent-human:hsl(30 85% 62%); --agent-orchestrator:hsl(270 70% 72%);
+      --agent-tech-lead:hsl(235 78% 74%); --agent-pm-spec:hsl(305 70% 70%);
+      --agent-engineer:hsl(65 78% 60%); --agent-qa-verifier:hsl(200 78% 66%);
+      --agent-codex-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
+      --agent-unknown: var(--text-faint);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#07090A; --bg-panel:#0F1517; --bg-raised:#141B1D;
+    --border:#232E2F; --border-strong:#324041;
+    --text:#E7EFED; --text-dim:#93A6A2; --text-faint:#5E706C;
+    --accent:#3FD8C9; --accent-soft:#123C38;
+    --danger:#F1706E; --danger-soft:#3A1B1C;
+    --success:#5FCB86; --success-soft:#123A24;
+    --warning:#E7BB63; --warning-soft:#3A2E14;
+    --shadow:0 1px 0 rgba(0,0,0,.5);
+    --agent-human:hsl(30 85% 62%); --agent-orchestrator:hsl(270 70% 72%);
+    --agent-tech-lead:hsl(235 78% 74%); --agent-pm-spec:hsl(305 70% 70%);
+    --agent-engineer:hsl(65 78% 60%); --agent-qa-verifier:hsl(200 78% 66%);
+    --agent-codex-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
+    --agent-unknown: var(--text-faint);
+  }
+  :root[data-theme="light"]{
+    --bg:#F1F4F3; --bg-panel:#FFFFFF; --bg-raised:#FAFBFA;
+    --border:#D6DEDC; --border-strong:#B9C4C1;
+    --text:#12181A; --text-dim:#5C6A67; --text-faint:#8B9895;
+    --accent:#1C9187; --accent-soft:#DEF3F0;
+    --danger:#C63F3F; --danger-soft:#FBE6E6;
+    --success:#2E8B52; --success-soft:#E4F3EA;
+    --warning:#A8781F; --warning-soft:#F5EAD3;
+    --shadow:0 1px 0 rgba(10,20,20,.05);
+    --agent-human:hsl(30 78% 42%); --agent-orchestrator:hsl(270 55% 48%);
+    --agent-tech-lead:hsl(235 60% 50%); --agent-pm-spec:hsl(305 55% 42%);
+    --agent-engineer:hsl(65 75% 32%); --agent-qa-verifier:hsl(200 65% 42%);
+    --agent-codex-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
+    --agent-unknown: var(--text-faint);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  .console{
+    background:var(--bg); color:var(--text); font-family:var(--font-ui); line-height:1.6;
+    height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding:0 0 92px 0;
+  }
+  .console *:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+  /* the no-page-scroll layout only makes sense once there's room for it —
+     below that, fall back to a normal scrolling page with a fixed-height stage. */
+  @media (max-width:900px), (max-height:640px){
+    .console{ height:auto; overflow:visible; }
+  }
+
+  .masthead{ flex:0 0 auto; padding:16px clamp(16px,4vw,40px) 14px; border-bottom:1px solid var(--border); }
+  .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint); margin:0 0 6px; }
+  .title-row{ display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  .title{ font-family:var(--font-mono); font-weight:600; font-size:clamp(18px,2.6vw,24px); letter-spacing:.01em; margin:0; text-wrap:balance; color:var(--text); flex:0 0 auto; }
+  .title .blink{ color:var(--accent); animation:blink 1.1s steps(1) infinite; }
+  @media (prefers-reduced-motion: reduce){ .title .blink{ animation:none; opacity:1; } }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  .chip-strip{ display:flex; flex-wrap:wrap; gap:6px; list-style:none; margin:0; padding:0; flex:1 1 auto; min-width:0; }
+  .chip-strip li{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.02em; color:var(--text-dim);
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:20px; padding:3px 10px;
+    white-space:nowrap; font-variant-numeric:tabular-nums; cursor:default;
+  }
+  .chip-strip li.rework{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+  .chip-strip li.tokens{ color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+  .chip-strip li.degraded{ color:var(--warning); border-color:var(--warning); background:var(--warning-soft); }
+  @media (max-width:760px){ .chip-strip{ flex-basis:100%; } }
+
+  .lang-toggle{ display:flex; gap:2px; border:1px solid var(--border-strong); border-radius:6px; overflow:hidden; flex:0 0 auto; }
+  .lang-toggle button{ font-family:var(--font-mono); font-size:11px; letter-spacing:.03em; padding:5px 10px; background:var(--bg-panel); border:none; color:var(--text-dim); cursor:pointer; }
+  .lang-toggle button:hover{ color:var(--text); }
+  .lang-toggle button[aria-pressed="true"]{ background:var(--accent); color:var(--bg-panel); font-weight:700; }
+
+
+  .stage-wrap{ display:grid; grid-template-columns:1fr 300px; gap:0; border-top:1px solid var(--border); flex:1 1 auto; min-height:0; overflow:hidden; }
+  @media (max-width:900px), (max-height:640px){ .stage-wrap{ grid-template-columns:1fr; flex:none; min-height:0; overflow:visible; } }
+  .stage-col{ min-width:0; min-height:0; padding:16px clamp(16px,4vw,32px); display:flex; flex-direction:column; }
+
+  .b-layout{ display:flex; gap:16px; align-items:stretch; flex:1; min-height:0; }
+  .b-graph-wrap{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:12px; }
+  .b-rail{ flex:0 0 118px; display:flex; flex-direction:column; background:var(--bg-raised); border:1px solid var(--border); border-radius:8px; padding:14px 10px; }
+  .b-rail-title{ font-family:var(--font-mono); font-size:9px; letter-spacing:.09em; color:var(--text-faint); text-align:center; margin:0 0 14px; }
+  .b-rail-track{ position:relative; flex:1; display:flex; flex-direction:column; justify-content:space-between; min-height:220px; }
+  .b-rail-line{ position:absolute; left:50%; top:7px; bottom:7px; width:2px; background:var(--border-strong); transform:translateX(-50%); z-index:0; }
+  .b-rail-stop{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .b-rail-dot{ width:13px; height:13px; border-radius:50%; background:var(--bg-panel); border:2px solid var(--border-strong); transition:background .25s,border-color .25s,box-shadow .25s,transform .3s; flex:0 0 auto; }
+  .b-rail-dot.reached{ background:var(--accent-soft); border-color:var(--accent); }
+  .b-rail-dot.current{ background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 5px var(--accent-soft); transform:scale(1.15); }
+  .b-rail-dot.current.flash{ background:var(--danger); border-color:var(--danger); box-shadow:0 0 0 5px var(--danger-soft); }
+  .b-rail-name{ font-family:var(--font-mono); font-size:7.6px; letter-spacing:.02em; color:var(--text-faint); text-align:center; line-height:1.25; max-width:78px; }
+  .b-rail-name.current-name{ color:var(--text); font-weight:700; }
+  /* T-1012: an empty flag rail (no board-flag event in the run) must not read
+     as "stuck mid-playback" — dashed + dimmed is a SHAPE change, not just a
+     color dim, and never overlaps the reached/current states. */
+  .b-rail-track.rail-empty .b-rail-dot{ opacity:.4; border-style:dashed; }
+  .b-rail-empty-note{ font-family:var(--font-mono); font-size:8px; letter-spacing:.06em;
+    color:var(--text-faint); text-align:center; margin:0 0 10px; text-wrap:balance; }
+  @media (max-width:760px){
+    .b-layout{ flex-direction:column; }
+    .b-rail{ flex-direction:row; align-items:center; gap:10px; padding:10px 12px; }
+    .b-rail-title{ margin:0; white-space:nowrap; }
+    .b-rail-track{ flex-direction:row; min-height:0; height:56px; width:100%; }
+    .b-rail-line{ left:7px; right:7px; top:50%; bottom:auto; width:auto; height:2px; transform:translateY(-50%); }
+    .b-rail-name{ max-width:56px; }
+  }
+  @media (prefers-reduced-motion: reduce){ .b-rail-dot{ transition:none; } }
+
+  .b-now{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 16px; background:var(--bg-raised); border:1px solid var(--border); border-radius:8px; min-height:20px; }
+  .b-now-label{ font-family:var(--font-mono); font-weight:700; font-size:17px; color:var(--text); text-wrap:balance; }
+  .b-now-verdict{ font-family:var(--font-mono); font-size:12px; padding:4px 11px; border-radius:20px; font-weight:700; }
+  .b-now-verdict.pass{ color:var(--success); background:var(--success-soft); border:1px solid var(--success); }
+  .b-now-verdict.reject{ color:var(--danger); background:var(--danger-soft); border:1px solid var(--danger); }
+  .b-now-flag{ font-family:var(--font-mono); font-size:12px; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent); padding:4px 11px; border-radius:20px; }
+
+  /* ---------- shared 3D-stage frame ---------- */
+  .variant-stage{ position:relative; height:560px; border-radius:10px; border:1px solid var(--border); overflow:hidden;
+    background: radial-gradient(ellipse 70% 60% at 50% 28%, var(--bg-raised), var(--bg) 75%); }
+  .variant-stage canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+  /* B-2 stage fills whatever vertical space the flex layout leaves it —
+     not a fixed vh value, so it grows/shrinks with the viewport instead of
+     fighting the page for scroll room. The media-query fallback below gives
+     it a sane fixed height again once the no-scroll layout itself backs off. */
+  #stageB2{ flex:1 1 auto; min-height:0; height:auto; cursor:grab; }
+  @media (max-width:900px), (max-height:640px){ #stageB2{ flex:none; height:min(70vh,600px); } }
+  #stageB2.dragging{ cursor:grabbing; }
+  #stageB2.expanded{ position:fixed; inset:14px 14px 96px 14px; height:auto; z-index:15; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  #expandBackdrop{ position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:10; }
+  #expandBackdrop[hidden]{ display:none; }
+  .stage-toolbar{ position:absolute; top:10px; right:10px; z-index:5; display:flex; gap:6px; }
+  .stage-toolbar button{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.02em; color:var(--text-dim);
+    background:rgba(255,255,255,.03); backdrop-filter:blur(2px); border:1px solid var(--border-strong);
+    border-radius:6px; padding:6px 9px; cursor:pointer; line-height:1;
+  }
+  .stage-toolbar button:hover{ color:var(--text); border-color:var(--accent); }
+  .stage-toolbar button[aria-pressed="true"]{ color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+  .stage-hint{ position:absolute; left:10px; bottom:10px; z-index:5; font-family:var(--font-mono); font-size:9.5px;
+    color:var(--text-dim); background:var(--bg-panel); border:1px solid var(--border); border-radius:6px;
+    padding:6px 9px; pointer-events:none; max-width:60%; line-height:1.5; opacity:.85; }
+  .zoom-hint{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:6;
+    font-family:var(--font-mono); font-size:12.5px; color:var(--text); background:var(--bg-panel);
+    border:1px solid var(--border-strong); border-radius:8px; padding:10px 18px; white-space:nowrap;
+    opacity:0; transition:opacity .25s; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.3);
+  }
+  .zoom-hint.show{ opacity:1; }
+  @media (prefers-reduced-motion: reduce){ .zoom-hint{ transition:none; } }
+
+  /* ---------- mini-card (LOD detail popup drawn on canvas, not DOM — no CSS needed) ---------- */
+
+  /* ---------- detail panel ---------- */
+  .detail-panel{ border-left:1px solid var(--border); padding:20px clamp(16px,4vw,24px); background:var(--bg-raised); min-height:0; overflow-y:auto; }
+  @media (max-width:900px), (max-height:640px){ .detail-panel{ border-left:none; border-top:1px solid var(--border); overflow-y:visible; } }
+  .detail-eyebrow{ font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint); margin:0 0 8px; }
+  .detail-title{ font-size:16px; font-weight:700; margin:0 0 10px; text-wrap:balance; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .chip{ font-family:var(--font-mono); font-size:11px; padding:3px 9px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-dim); background:var(--bg-panel); display:inline-flex; align-items:center; gap:5px; }
+  .chip-dot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .chip.verdict-pass{ color:var(--success); border-color:var(--success); background:var(--success-soft); }
+  .chip.verdict-reject{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+  .chip.flag{ color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+  /* T-1012: a non-success span status, shown independently of any verdict chip. */
+  .chip.status-danger{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+  .chip.status-warning{ color:var(--warning); border-color:var(--warning); background:var(--warning-soft); }
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-bottom:14px; }
+  .stat{ background:var(--bg-panel); padding:8px 10px; }
+  .stat dt{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); margin:0 0 2px; }
+  .stat dd{ font-family:var(--font-mono); font-size:13px; margin:0; font-variant-numeric:tabular-nums; }
+  .detail-note{ font-size:12.5px; color:var(--text-dim); border-left:2px solid var(--border-strong); padding-left:10px; margin:0 0 16px; }
+  .legend{ border-top:1px solid var(--border); padding-top:12px; margin-top:6px; }
+  .legend h3{ font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); margin:0 0 8px; }
+  .legend-row{ display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:var(--text-dim); margin-bottom:7px; }
+  .agent-legend-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; margin-bottom:8px; }
+  .agent-legend-grid .legend-row{ margin-bottom:0; align-items:center; }
+  .legend-swatch{ width:16px; height:3px; border-radius:2px; flex:0 0 auto; margin-top:5px; }
+  .legend-swatch.dot{ width:10px; height:10px; border-radius:50%; margin-top:2px; }
+  .legend-swatch.fade{ opacity:.5; }
+
+  .transport{ position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--bg-panel); border-top:1px solid var(--border); padding:10px clamp(12px,3vw,32px); box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .transport button{ font-family:var(--font-mono); cursor:pointer; }
+  .play-btn{ width:38px; height:38px; border-radius:50%; border:1.5px solid var(--border-strong); background:var(--bg-raised); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .play-btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .speed-group{ display:flex; gap:2px; border:1px solid var(--border-strong); border-radius:6px; overflow:hidden; }
+  .speed-group button{ background:var(--bg-panel); border:none; color:var(--text-dim); font-size:11.5px; padding:6px 10px; }
+  .speed-group button.active{ background:var(--accent); color:var(--bg-panel); font-weight:700; }
+  .seek{ flex:1 1 160px; min-width:120px; accent-color:var(--accent); }
+  .jump-btn{ background:var(--danger-soft); border:1px solid var(--danger); color:var(--danger); font-size:11.5px; padding:7px 12px; border-radius:6px; white-space:nowrap; }
+  .jump-btn:hover{ background:var(--danger); color:#fff; }
+  .time-readout{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .time-readout .real{ color:var(--text-faint); }
+
+  .tooltip{ position:fixed; z-index:50; background:var(--text); color:var(--bg); font-family:var(--font-mono); font-size:11px; padding:8px 10px; border-radius:6px; pointer-events:none; max-width:240px; line-height:1.5; box-shadow:0 4px 14px rgba(0,0,0,.25); }
+  .tooltip b{ color:var(--accent); }
+  .tooltip[hidden]{ display:none; }
+  ::selection{ background:var(--accent-soft); color:var(--text); }
+</style>
+
+<div class="console">
+  <header class="masthead">
+    <p class="eyebrow">shell-team · flight recorder</p>
+    <div class="title-row">
+      <h1 class="title">LOOP REPLAY — <span id="titleRunId"></span><span class="blink">_</span></h1>
+      <ul class="chip-strip" id="readouts"></ul>
+      <div class="lang-toggle" id="langToggle" role="group" aria-label="Language / 表示言語">
+        <button type="button" data-lang="ja" aria-pressed="false">JA</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage-wrap">
+    <div class="stage-col">
+      <div class="b-layout">
+        <div class="b-rail" id="bRail">
+          <p class="b-rail-title" id="bRailTitle">BOARD<br>STATUS<br>FLAG</p>
+          <p class="b-rail-empty-note" id="railEmptyNote" hidden></p>
+          <div class="b-rail-track" id="bRailTrack"></div>
+        </div>
+        <div class="b-graph-wrap">
+          <div class="b-now" id="bNow">
+            <span class="b-now-label" id="bNowLabel">再生を開始してください</span>
+            <span class="b-now-verdict" id="bNowVerdict" hidden></span>
+            <span class="b-now-flag" id="bNowFlag" hidden></span>
+          </div>
+          <div class="variant-stage" id="stageB2">
+            <canvas id="canvasB2"></canvas>
+            <div class="stage-toolbar">
+              <button id="camResetBtn" type="button" title="カメラを初期構図に戻す">⟲ リセット</button>
+              <button id="camFollowBtn" type="button" aria-pressed="false" title="ボールを画面中央に保って追いかける">👁 追尾</button>
+              <button id="camLockBtn" type="button" aria-pressed="false" title="自動オービットの固定/解除">🔄 自動回転</button>
+              <button id="camExpandBtn" type="button" aria-pressed="false" title="拡大表示">⤢ 拡大</button>
+            </div>
+            <p class="stage-hint">ノードのダブルクリックでカメラがフライト（フォーカス）。もう一度かリセットで解除／⌘/Ctrl+スクロールでズーム</p>
+            <div class="zoom-hint" id="zoomHint">⌘/Ctrl + スクロールでズーム</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="detail-panel" id="detailPanel">
+      <p class="detail-eyebrow" id="detailEyebrow">SEQ —</p>
+      <h3 class="detail-title" id="detailTitle">再生を開始してください</h3>
+      <div class="chip-row" id="detailChips"></div>
+      <dl class="stat-grid" id="detailStats"></dl>
+      <p class="detail-note" id="detailNote"></p>
+      <div class="legend">
+        <h3 id="agentLegendHeading">エージェント</h3>
+        <div class="agent-legend-grid" id="agentLegendGrid"></div>
+        <div class="legend-row" style="margin-top:2px"><span class="legend-swatch dot fade" style="background:var(--agent-ui-designer)"></span><span id="uiDesignerNote"></span></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="transport">
+    <button class="play-btn" id="playBtn" aria-label="再生 / 一時停止">▶</button>
+    <div class="speed-group" id="speedGroup">
+      <button data-speed="1" class="active">1x</button><button data-speed="2">2x</button><button data-speed="4">4x</button>
+    </div>
+    <input type="range" class="seek" id="seek" min="0" max="1000" value="0" aria-label="シーク">
+    <button class="jump-btn" id="jumpRework">差し戻しへジャンプ ⏭</button>
+    <span class="time-readout" id="timeReadout">再生 00:00 / 01:36　<span class="real">実測 0:00 / 2:00</span></span>
+  </footer>
+</div>
+<div id="expandBackdrop" hidden></div>
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script type="application/json" id="loop-replay-data">__LOOP_REPLAY_DATA__</script>
+<script>
+(function(){
+  "use strict";
+
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ================= T-1012: load + parse the injected payload =================
+     The bash generator does no field-level transformation (D3): it filters,
+     orders, wraps and escapes, and ships each row EXACTLY as bin/log-run.sh
+     wrote it. Everything below this point is the data-adaptation layer that
+     turns those frozen row shapes into the ratified scene model — the part
+     that changed for T-1012; the ring/beam/camera/transport code beneath it
+     is the ratified prototype, untouched. */
+  var payloadEl = document.getElementById("loop-replay-data");
+  var PAYLOAD = null;
+  try {
+    PAYLOAD = JSON.parse(payloadEl ? payloadEl.textContent : "");
+  } catch (parseErr) {
+    PAYLOAD = null;
+  }
+  if (!PAYLOAD || typeof PAYLOAD !== "object" || !Array.isArray(PAYLOAD.rows)) {
+    // D2/D3: an unparseable or missing payload is a real, explicit error
+    // state — never a blank page. Reached when this file is opened directly
+    // (the placeholder was never replaced) or if the payload was hand-edited
+    // into something JSON.parse rejects.
+    document.title = "shell-team loop replay — parse error";
+    var runIdSpanEl = document.getElementById("titleRunId");
+    if (runIdSpanEl) { runIdSpanEl.textContent = "parse error"; }
+    var consoleEl = document.querySelector(".console");
+    if (consoleEl) {
+      var bannerEl = document.createElement("div");
+      bannerEl.id = "parseErrorBanner";
+      bannerEl.setAttribute("role", "alert");
+      bannerEl.style.cssText = "margin:16px clamp(16px,4vw,40px);padding:14px 18px;" +
+        "border:1px solid var(--danger);background:var(--danger-soft);color:var(--danger);" +
+        "font-family:var(--font-mono);font-size:13px;border-radius:8px;";
+      bannerEl.textContent = "Could not parse telemetry payload — this page was likely opened " +
+        "without running bin/gen-loop-replay.sh <run-id>, or the injected payload is corrupt.";
+      consoleEl.insertBefore(bannerEl, consoleEl.firstChild);
+    }
+    return; // stop here — nothing below this point may assume PAYLOAD exists.
+  }
+
+  /* ---------------- row adaptation (D3's frozen affordance table) ----------------
+     span (kind absent/"span")  -> a "work" step by the agent named in `span`
+     event handoff              -> a ball move from -> to
+     event rework                -> a ball move from -> to, rework treatment
+     event gate                  -> a gate signal at `from`
+     event human                  -> the human-layer settle
+     event release                -> the release settle
+     T-1012 rework round 1 (Codex Major #2): `human` gets its OWN adapted
+     `type`, never collapsed onto `type:"gate"` with a recovered `agent==="human"`
+     guess. `from` on a real `gate` event is free-form (D3) and reachably
+     equals the literal string "human" — reconstructing "was this a human
+     event" from that value would silently conflate a real gate signal with
+     a human-layer settle. The event id itself, not a derived guess, is what
+     downstream code (buildStepsB, the degradation classifier) now branches on. */
+  function adaptRow(row){
+    if (row && row.kind === "event") {
+      switch (row.event) {
+        case "handoff": return { seq:row.seq, type:"handoff", from:row.from, to:row.to, label:row.label };
+        case "rework":  return { seq:row.seq, type:"rework",  from:row.from, to:row.to, label:row.label };
+        case "gate":    return { seq:row.seq, type:"gate",    agent:row.from, label:row.label };
+        case "human":   return { seq:row.seq, type:"human",   label:row.label };
+        case "release": return { seq:row.seq, type:"release", agent:(row.from != null ? row.from : "orchestrator"), label:row.label };
+        default: return null; // unreachable: bin/check-run.sh already rejects any other event id
+      }
+    }
+    // span row (kind absent or "span") — never dropped, even when status !== "success".
+    return {
+      seq:row.seq, type:"work", agent:row.span, phase:row.phase, status:row.status,
+      model:row.model, tokens:row.tokens, tool_uses:row.tool_uses,
+      duration_ms:row.duration_ms, verdict:row.verdict, error:row.error
+    };
+  }
+
+  var events = PAYLOAD.rows.map(adaptRow).filter(function(e){ return e != null; });
+  events.sort(function(a,b){ return a.seq - b.seq; });
+  var cum = 0;
+  events.forEach(function(e){
+    if(e.type === "work"){ e._tStart = cum; cum += (e.duration_ms != null ? e.duration_ms : 0); e._tEnd = cum; }
+    else { e._tStart = cum; e._tEnd = cum; }
+  });
+  // Guarded against zero: an event-only run (D3's degraded shape ii) has no
+  // "work" step at all, so cum stays 0 — a bare TOTAL_MS would divide by zero
+  // downstream (playback progress, camera easing) and propagate NaN.
+  var TOTAL_MS = cum > 0 ? cum : 1;
+  var PLAYBACK_SECONDS = 96;
+
+  /* ---------------- roster: the six known ids UNION every distinct `span`
+     value present (D3) — orchestrator/human stay structural, never derived,
+     since they are this loop's topology and emit no spans themselves. ---------------- */
+  var KNOWN_RING_AGENTS = ["tech-lead","pm-spec","engineer","qa-verifier","codex-reviewer","ui-designer"];
+  var KNOWN_COLOR_IDS = { "human":1, "orchestrator":1, "tech-lead":1, "pm-spec":1, "engineer":1, "qa-verifier":1, "codex-reviewer":1, "ui-designer":1 };
+  var STATIC_AGENTS = [
+    {"id":"orchestrator","label":"Orchestrator","note_ja":"メインセッション。指示の発行・ゲート判定・board 更新・PR/マージ","note_en":"Main session. Issues instructions, judges gates, updates the board, merges PRs."},
+    {"id":"tech-lead","label":"Tech Lead","note_ja":"Routing Map（計画）","note_en":"Routing Map (planning)"},
+    {"id":"pm-spec","label":"PM / Spec","note_ja":"spec 起草・AC 定義","note_en":"Drafts the spec, defines acceptance criteria"},
+    {"id":"engineer","label":"Engineer","note_ja":"実装・rework","note_en":"Implementation, rework"},
+    {"id":"qa-verifier","label":"QA","note_ja":"経験的検証（実行レンズ）","note_en":"Empirical verification (the execution lens)"},
+    {"id":"codex-reviewer","label":"Codex Reviewer","note_ja":"cross-provider レビュー（静的レンズ・別モデル系列）","note_en":"Cross-provider review (the static-analysis lens, a different model family)"},
+    {"id":"human","label":"Human","note_ja":"merge GO（Phase A では全マージに人間の GO）","note_en":"Merge GO (in Phase A, every merge needs a human's GO)"}
+  ];
+  var agentById = {};
+  STATIC_AGENTS.forEach(function(a){ agentById[a.id] = a; });
+  agentById["ui-designer"] = { id:"ui-designer", label:"UI Designer" };
+
+  var RING_AGENTS = KNOWN_RING_AGENTS.slice();
+  var ringSeen = {};
+  RING_AGENTS.forEach(function(id){ ringSeen[id] = true; });
+  events.forEach(function(e){
+    if (e.type === "work" && e.agent && !ringSeen[e.agent]) {
+      ringSeen[e.agent] = true;
+      RING_AGENTS.push(e.agent);
+      if (!agentById[e.agent]) { agentById[e.agent] = { id:e.agent, label:e.agent }; }
+    }
+  });
+
+  /* ================= i18n =================
+     One dictionary, one accessor (T()). Every UI string not already invariant
+     across languages (agent names, machine tokens like the READY_FOR_ flags,
+     PASS, FAIL, REQUEST_CHANGES, APPROVE, and real measurements) is pulled from here so a
+     missed hardcoded string is structurally hard to introduce. */
+  var I18N = {
+    ja: {
+      resetTitle:"カメラを初期構図に戻す", resetLabel:"⟲ リセット",
+      followTitle:"ボールを画面中央に保って追いかける", followLabel:"👁 追尾", followingLabel:"👁 追尾中",
+      lockTitle:"自動オービットの固定/解除", lockLabel:"🔄 自動回転", lockedLabel:"⏸ 自動回転オフ",
+      expandTitle:"拡大表示", expandLabel:"⤢ 拡大", collapseLabel:"⤡ 元に戻す",
+      hintDefault:"ノードのダブルクリックでカメラがフライト（フォーカス）。もう一度かリセットで解除／⌘/Ctrl+スクロールでズーム",
+      hintFocused:function(name){ return name + " にフォーカス中 — もう一度ダブルクリックかリセットで解除"; },
+      zoomHint:"⌘/Ctrl + スクロールでズーム",
+      legendAgentsTitle:"エージェント",
+      uiDesignerIdle:"UI Designer（今回は出番なし）", uiDesignerActive:"UI Designer（出番きた！）",
+      uiDesignerTip:"今回は出番なし（非UIタスク） — UI タスクの時だけ参加するロール",
+      startPlayback:"再生を開始してください", detailEyebrowInitial:"SEQ —",
+      statTokens:"トークン数", statToolUses:"ツール呼び出し数", statDuration:"所要時間", statModel:"モデル",
+      railTitleHtml:"ボード<br>ステータス<br>フラグ", railAriaLabel:"Board Status Flag（現在位置）",
+      playAria:"再生 / 一時停止", seekAria:"シーク", jumpRework:"差し戻しへジャンプ ⏭",
+      playbackLabel:"再生", realLabel:"実測",
+      chipRunTitle:"ラン ID", chipGeneratedTitle:"生成日時", chipReworkTitle:"差し戻し回数",
+      chipTokensTitle:function(n){ return "サブエージェント トークン数（合計）: " + n; }, chipWallClockTitle:"実時間（壁時計）",
+      reworkChip:function(n){ return "差し戻し ×" + n; },
+      tokChip:function(s){ return "≈" + s + " トークン"; },
+      tokensPartialSuffix:"（一部欠落）",
+      moveDispatch:function(l){ return "作業指示（" + l + "）"; },
+      moveHandoff:function(l){ return "ハンドオフ（" + l + "）"; },
+      moveReport:function(d){ return "結果報告" + (d ? "（" + d + "）" : ""); },
+      moveConfirm:"確認依頼",
+      moveLine:function(rework, from, to, desc){ return (rework?"差し戻し移動中":"移動中") + " — " + from + " → " + to + "（" + desc + "）"; },
+      workingLine:function(seq, agent, label){ return "SEQ " + seq + " · " + agent + " が作業中 — " + label; },
+      settleLine:function(agent, label){ return agent + " — " + label; },
+      signalLine:function(label){ return "Orchestrator — " + label; },
+      miniCardModel:"モデル: ", miniCardTokens:"トークン数: ", miniCardToolUses:"ツール呼び出し: ", miniCardDuration:"所要時間: ", miniCardVerdict:"判定: ",
+      miniCardSpans:function(n){ return n + " 件のスパン"; },
+      /* T-1012: degraded-fidelity + roster/status chrome (design note) */
+      degradedNoEvents:"イベント行なし（スパンのみ）",
+      degradedNoSpans:"スパン行なし（イベントのみ）",
+      degradedPartialEvents:"イベント語彙が部分的 — 一部のシグナルが欠落",
+      flagRailEmpty:"このランにはボードフラグのイベントがありません",
+      unknownAgent:"未登録エージェント",
+      nonSuccessLabel:"ステータス: "
+    },
+    en: {
+      resetTitle:"Reset camera to the default framing", resetLabel:"⟲ Reset",
+      followTitle:"Keep the ball centered and follow it", followLabel:"👁 Follow", followingLabel:"👁 Following",
+      lockTitle:"Lock/unlock auto-orbit", lockLabel:"🔄 Auto-orbit", lockedLabel:"⏸ Auto-orbit off",
+      expandTitle:"Expand", expandLabel:"⤢ Expand", collapseLabel:"⤡ Collapse",
+      hintDefault:"Double-click a node to fly the camera in (focus). Double-click again or reset to release / ⌘/Ctrl+scroll to zoom",
+      hintFocused:function(name){ return "Focused on " + name + " — double-click again or reset to release"; },
+      zoomHint:"⌘/Ctrl + scroll to zoom",
+      legendAgentsTitle:"Agents",
+      uiDesignerIdle:"UI Designer (no appearance this run)", uiDesignerActive:"UI Designer (it's their turn!)",
+      uiDesignerTip:"No appearance this run (non-UI task) — a role that only joins for UI tasks",
+      startPlayback:"Press play to begin", detailEyebrowInitial:"SEQ —",
+      statTokens:"TOKENS", statToolUses:"TOOL_USES", statDuration:"DURATION", statModel:"MODEL",
+      railTitleHtml:"BOARD<br>STATUS<br>FLAG", railAriaLabel:"Board Status Flag (current position)",
+      playAria:"Play / pause", seekAria:"Seek", jumpRework:"Jump to rework ⏭",
+      playbackLabel:"Playback", realLabel:"Real",
+      chipRunTitle:"Run ID", chipGeneratedTitle:"Generated", chipReworkTitle:"Rework rounds",
+      chipTokensTitle:function(n){ return "Subagent tokens (total): " + n; }, chipWallClockTitle:"Wall clock",
+      reworkChip:function(n){ return "REWORK ×" + n; },
+      tokChip:function(s){ return "≈" + s + " tok"; },
+      tokensPartialSuffix:" (partial)",
+      moveDispatch:function(l){ return "Dispatch (" + l + ")"; },
+      moveHandoff:function(l){ return "Handoff (" + l + ")"; },
+      moveReport:function(d){ return "Reporting back" + (d ? " (" + d + ")" : ""); },
+      moveConfirm:"Confirmation request",
+      moveLine:function(rework, from, to, desc){ return (rework?"Reworking":"Moving") + " — " + from + " → " + to + " (" + desc + ")"; },
+      workingLine:function(seq, agent, label){ return "SEQ " + seq + " · " + agent + " working — " + label; },
+      settleLine:function(agent, label){ return agent + " — " + label; },
+      signalLine:function(label){ return "Orchestrator — " + label; },
+      miniCardModel:"model: ", miniCardTokens:"tokens: ", miniCardToolUses:"tool_uses: ", miniCardDuration:"duration: ", miniCardVerdict:"verdict: ",
+      miniCardSpans:function(n){ return n + " spans"; },
+      /* T-1012: degraded-fidelity + roster/status chrome (design note) — the
+         page's own chrome; machine tokens (READY_FOR_*, PASS, FAIL, APPROVE,
+         REQUEST_CHANGES) and operator label/from/to text never pass through
+         any of these, staying verbatim in both languages. */
+      degradedNoEvents:"No event rows — spans only",
+      degradedNoSpans:"No span rows — events only",
+      degradedPartialEvents:"Partial event vocabulary — some signals missing",
+      flagRailEmpty:"No board-flag events in this run",
+      unknownAgent:"Unrecognised agent",
+      nonSuccessLabel:"status: "
+    }
+  };
+  /* T-1012: labels/from/to are operator-authored text (T-1011's frozen row
+     shapes) and stay verbatim in BOTH languages — the JA/EN toggle localizes
+     the page's own chrome only, never the operator's words (grounding: a
+     prior decision settled that per-cycle artifacts are written in the
+     operator's language and are not translated after the fact). The
+     prototype's per-seq English override table is removed for exactly this
+     reason. Machine tokens (READY_FOR_*, PASS, FAIL, APPROVE,
+     REQUEST_CHANGES, REWORK) already pass through unchanged in both
+     languages — nothing below ever wraps them. */
+  var LANG_KEY = "loopReplayLang";
+  function detectDefaultLang(){
+    try{
+      var saved = window.localStorage && localStorage.getItem(LANG_KEY);
+      if(saved === "ja" || saved === "en") return saved;
+    } catch(err){ /* localStorage unavailable (sandboxed context) — fall through */ }
+    return ((navigator.language||"").toLowerCase().indexOf("ja") === 0) ? "ja" : "en";
+  }
+  var currentLang = detectDefaultLang();
+  function T(){ return I18N[currentLang]; }
+  var eventBySeq = {};
+  events.forEach(function(e){ eventBySeq[e.seq] = e; });
+  // Operator text, verbatim: label first (events), phase as a data-shaped
+  // fallback (spans carry no `label` field at all).
+  function stepText(e){
+    if(!e) return "";
+    if(e.label != null) return e.label;
+    if(e.phase != null) return e.phase;
+    return "";
+  }
+  function describeStepVerbose(seq){
+    var e = eventBySeq[seq];
+    if(!e) return "";
+    if(e.verdict) return e.verdict; // machine token — invariant
+    return stepText(e);
+  }
+  function statusSeverity(status){
+    if(status === "error" || status === "timeout" || status === "stopped") return "danger";
+    if(status === "skipped") return "warning";
+    return null; // success, or no status on this row shape
+  }
+  function agentNote(id){
+    if(id === "ui-designer") return T().uiDesignerTip;
+    if(!KNOWN_COLOR_IDS[id]) return T().unknownAgent; // an adopter's own agent name
+    var a = agentById[id];
+    return currentLang === "en" ? a.note_en : a.note_ja;
+  }
+
+  var reworkEvents = events.filter(function(e){ return e.type === "rework"; });
+  var flagEvents = events.filter(function(e){ return !!e.flag; });
+  var FLAG_STOPS = ["READY_FOR_ARCH","READY_FOR_ENG","READY_FOR_QA","READY_FOR_REVIEW","READY_FOR_MERGE"];
+
+  /* ---------------- degradation classification (design note, fixed precedence,
+     evaluated once at load so exactly one message ever shows) ---------------- */
+  var EVENT_ID_VOCAB = ["handoff","rework","gate","human","release"];
+  var hasSpan = events.some(function(e){ return e.type === "work"; });
+  var eventKindEvents = events.filter(function(e){ return e.type !== "work"; });
+  var hasEvent = eventKindEvents.length > 0;
+  var distinctEventIds = {};
+  events.forEach(function(e){
+    // T-1012 rework round 1: `human` now carries its own adapted `type`
+    // (Major #2), so the vocabulary id is the adapted type itself — no more
+    // recovering it from a `gate` row's `agent` value.
+    if(e.type === "handoff" || e.type === "rework" || e.type === "gate" || e.type === "human" || e.type === "release"){
+      distinctEventIds[e.type] = true;
+    }
+  });
+  var distinctEventCount = Object.keys(distinctEventIds).length;
+  var degradedKey = null;
+  if(!hasEvent){ degradedKey = "degradedNoEvents"; }
+  else if(!hasSpan){ degradedKey = "degradedNoSpans"; }
+  else if(distinctEventCount < EVENT_ID_VOCAB.length){ degradedKey = "degradedPartialEvents"; }
+
+  function fmtMs(ms){
+    var s = Math.round(ms/1000);
+    var h = Math.floor(s/3600); s -= h*3600;
+    var m = Math.floor(s/60); s -= m*60;
+    if(h > 0) return h + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+    return m + ":" + String(s).padStart(2,"0");
+  }
+  function fmtClock(sec){ var m=Math.floor(sec/60), s=Math.floor(sec%60); return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0"); }
+  function fmtTokens(n){ if(n>=1000000) return (n/1000000).toFixed(2)+"M"; if(n>=1000) return Math.round(n/1000)+"k"; return String(n); }
+
+  /* ---------------- header readouts ---------------- */
+  function computeTotals(){
+    var totalTokens = 0, tokensPartial = false, tsMin = null, tsMax = null;
+    events.forEach(function(e){
+      if(e.type === "work"){
+        if(e.tokens != null){ totalTokens += e.tokens; } else { tokensPartial = true; }
+      }
+    });
+    PAYLOAD.rows.forEach(function(r){
+      if(!r.ts) return;
+      var t = Date.parse(r.ts);
+      if(isNaN(t)) return;
+      if(tsMin === null || t < tsMin) tsMin = t;
+      if(tsMax === null || t > tsMax) tsMax = t;
+    });
+    var wallClockMs = (tsMin != null && tsMax != null && tsMax >= tsMin) ? (tsMax - tsMin) : null;
+    return { totalTokens:totalTokens, tokensPartial:tokensPartial, wallClockMs:wallClockMs };
+  }
+  var TOTALS = computeTotals();
+  var REWORK_COUNT = reworkEvents.length;
+
+  function renderHeaderChips(){
+    var el = document.getElementById("readouts");
+    el.innerHTML = "";
+    var tokLabel = T().tokChip(fmtTokens(TOTALS.totalTokens)) + (TOTALS.tokensPartial ? T().tokensPartialSuffix : "");
+    var chips = [
+      { v:PAYLOAD.run_id, title:T().chipRunTitle },
+      { v:PAYLOAD.generated_at, title:T().chipGeneratedTitle },
+      { v:T().reworkChip(REWORK_COUNT), title:T().chipReworkTitle, cls:"rework" },
+      { v:tokLabel, title:T().chipTokensTitle(TOTALS.totalTokens.toLocaleString()), cls:"tokens" },
+      { v:TOTALS.wallClockMs != null ? fmtMs(TOTALS.wallClockMs) : "—", title:T().chipWallClockTitle }
+    ];
+    chips.forEach(function(c){
+      var li = document.createElement("li");
+      li.className = c.cls || "";
+      li.textContent = c.v;
+      li.title = c.title;
+      el.appendChild(li);
+    });
+    // T-1012: the degradation badge (design note §1) — a single chip, shown
+    // only when this run is missing something, using the frozen dictionary
+    // key so the contract has a machine-checkable anchor.
+    if(degradedKey){
+      var dchip = document.createElement("li");
+      dchip.id = "degradedChip";
+      dchip.className = "degraded";
+      dchip.textContent = T()[degradedKey];
+      dchip.title = T()[degradedKey];
+      el.appendChild(dchip);
+    }
+  }
+
+  /* ================= ring model: derive a single strictly-serial ball path =================
+     Applied mechanically to every event in seq order (no per-case patches):
+     - the ball starts with Human, hands to Orchestrator, then descends onto the ring
+       (Tech Lead / PM / Engineer / QA / Codex / UI Designer, laid out on the ground).
+     - from the first ring arrival onward, the ball hops directly ring-agent → ring-agent
+       (no visible return trip to Orchestrator) — collapsing the earlier
+       "agent → Orchestrator → next agent" pair into one hop.
+     - rework turns the hop red; if the ball is already sitting with the rework target
+       (nothing to hand off), that becomes a "signal" instead of a hop.
+     - every gate/handoff still really goes through Orchestrator organizationally; that
+       is drawn as a separate, always-concurrent "beam" layer (computeSceneB), not as
+       ball motion — the ball's serial/one-at-a-time rule applies only to the ball.
+     RING_AGENTS/agentById are already built above (data ∪ the six known ids, D3). */
+  /* every real work span, grouped by agent — the LOD mini-card's source data. */
+  var agentSpans = {};
+  RING_AGENTS.forEach(function(id){ agentSpans[id] = events.filter(function(e){ return e.type === "work" && e.agent === id; }); });
+  var MOVE_WEIGHT = 70000, SIGNAL_WEIGHT = 25000, SETTLE_WEIGHT = 30000;
+  var stepsB = [];
+  /* Steps store a descKind + seq reference rather than a baked string, so the
+     move/signal label can be localized at render time (see localizeMoveDesc /
+     localizeSignalLabel) instead of being frozen in whatever language was
+     active when the page loaded. */
+  (function buildStepsB(){
+    var ringHolder = null, ballAt = "human", lastWorkSeq = null;
+    function move(from, to, rework, descKind, seq){ stepsB.push({ kind:"move", from:from, to:to, rework:!!rework, descKind:descKind, seq:seq, weight:MOVE_WEIGHT, _parkedAt:ballAt }); }
+    function signal(agent, target, color, seq){ stepsB.push({ kind:"signal", agent:agent, target:target||null, color:color, seq:seq, weight:SIGNAL_WEIGHT, _parkedAt:ballAt }); }
+    function settle(agent, evt, color){ stepsB.push({ kind:"settle", agent:agent, event:evt, color:color, weight:SETTLE_WEIGHT, _parkedAt:ballAt }); }
+    function work(e){ stepsB.push({ kind:"work", event:e, agent:e.agent, weight:e.duration_ms, _parkedAt:ballAt }); }
+
+    events.forEach(function(e){
+      if(e.type === "handoff"){
+        move(e.from, e.to, false, "raw", e.seq); ballAt = e.to;
+      } else if(e.type === "work"){
+        if(ringHolder === null){ move("orchestrator", e.agent, false, "dispatch", e.seq); ballAt = e.agent; ringHolder = e.agent; }
+        else if(ringHolder !== e.agent){ move(ringHolder, e.agent, false, "handoff", e.seq); ballAt = e.agent; ringHolder = e.agent; }
+        work(e);
+        lastWorkSeq = e.seq;
+        ringHolder = e.agent; ballAt = e.agent;
+      } else if(e.type === "rework"){
+        // T-1012 rework round 1 (Codex Blocker #3): the "from" side of this
+        // move is the ball's actual tracked position (`ballAt`), never the
+        // ring-only `ringHolder` bookkeeping variable, which is still `null`
+        // whenever a rework arrives before any span has run (the committed
+        // `event-only` fixture does exactly this) — `ballAt` is initialised
+        // to "human" and kept valid by every branch below, so this can never
+        // feed a `null` origin into `move()`/`worldPos()`. This tolerates any
+        // event order the frozen schema permits, per D3.
+        if(ballAt !== e.to){ move(ballAt, e.to, true, "raw", e.seq); ballAt = e.to; ringHolder = e.to; }
+        else { signal("orchestrator", e.to, "danger", e.seq); }
+      } else if(e.type === "gate"){
+        // T-1012 rework round 1 (Codex Major #2): a real `gate` is ALWAYS a
+        // gate signal at `from` — never a human-layer settle, regardless of
+        // what string value `from` happens to carry (D3's affordance table;
+        // `human` is its own adapted `type` now, handled in its own branch
+        // below, never reconstructed from `agent==="human"`).
+        signal(e.agent, null, "accent", e.seq);
+      } else if(e.type === "human"){
+        if(ringHolder){ move(ringHolder, "orchestrator", false, "report", lastWorkSeq); ringHolder = null; ballAt = "orchestrator"; }
+        move("orchestrator", "human", false, "confirm", null); ballAt = "human";
+        settle("human", e, "accent");
+      } else if(e.type === "release"){
+        if(ballAt !== e.agent){ move(ballAt, e.agent, false, "go", null); ballAt = e.agent; }
+        settle(e.agent, e, "success");
+      }
+    });
+  })();
+  var B_TOTAL = 0;
+  (function layoutStepsB(){ var c=0; stepsB.forEach(function(s){ s._start=c; c+=s.weight; s._end=c; }); B_TOTAL=c; })();
+
+  /* render-time localization for the synthetic move/signal steps above —
+     re-evaluated on every call, so a language switch takes effect immediately
+     without needing to rebuild stepsB. */
+  function localizeMoveDesc(step){
+    if(step.descKind === "confirm") return T().moveConfirm;
+    if(step.descKind === "go") return "GO"; // already English, invariant
+    if(step.descKind === "raw") return stepText(eventBySeq[step.seq]);
+    if(step.descKind === "dispatch") return T().moveDispatch(stepText(eventBySeq[step.seq]));
+    if(step.descKind === "handoff") return T().moveHandoff(stepText(eventBySeq[step.seq]));
+    if(step.descKind === "report") return T().moveReport(step.seq != null ? describeStepVerbose(step.seq) : "");
+    return "";
+  }
+  function localizeSignalLabel(step){ return stepText(eventBySeq[step.seq]); }
+
+  function getCurrentStepB(simMs){
+    var f = Math.max(0, Math.min(1, simMs / TOTAL_MS));
+    var bMs = f * B_TOTAL;
+    for(var i=0;i<stepsB.length;i++){
+      var s = stepsB[i];
+      if(bMs >= s._start && (bMs < s._end || i === stepsB.length-1)){
+        var span = s._end - s._start;
+        var progress = span > 0 ? (bMs - s._start) / span : 1;
+        return { step:s, progress:Math.max(0,Math.min(1,progress)) };
+      }
+    }
+    return { step:stepsB[stepsB.length-1], progress:1 };
+  }
+
+  /* ---------------- world layout: ring on the ground, Orchestrator + Human hover above ---------------- */
+  // T-1012 rework round 1 (Codex Major #1): the angle step is derived from
+  // the ACTUAL roster size, not a fixed Math.PI/3 (= 2*PI/6, correct only for
+  // exactly six ring agents). D3's roster union (the six known ids plus any
+  // distinct `span` value) makes a 7th+ agent reachable (the committed
+  // `adopter` fixture does this), and a fixed six-way step lands the 7th
+  // agent on the exact same angle as the 1st — an invisible, unfocusable
+  // collision, which is exactly the "never dropped" contract D3 protects
+  // against for data, silently broken for the visual position.
+  var RING_POS = {};
+  var RING_ANGLE_STEP = (Math.PI * 2) / RING_AGENTS.length;
+  RING_AGENTS.forEach(function(id, i){
+    var ang = -Math.PI/2 + i*RING_ANGLE_STEP;
+    RING_POS[id] = { x:Math.cos(ang), y:0, z:Math.sin(ang) };
+  });
+  var ORCH_POS = { x:0, y:1.15, z:0 };
+  var HUMAN_POS = { x:0, y:2.15, z:0 };
+  // T-1012 rework round 1 (Codex Blocker #3): NEVER returns undefined. `from`/
+  // `to` on a handoff/rework/release event are free-form (D3 — "an adopter's
+  // phases are not this loop's phases") and are not required to also appear
+  // as a `span` value in RING_POS, so an id this function has never seen
+  // (including `null`, reachable when a rework arrives before any ring
+  // position is established) falls back to the orchestrator's position —
+  // "start from orchestrator" for an unrecognised/absent origin, matching the
+  // ring model's own topology (every hop already organizationally routes
+  // through the orchestrator). Without this, `lerp3()` dereferences `.x` on
+  // `undefined` and throws.
+  function worldPos(id){ return id==="orchestrator"?ORCH_POS : id==="human"?HUMAN_POS : (RING_POS[id] || ORCH_POS); }
+  function lerp3(a,b,t){ return { x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t, z:a.z+(b.z-a.z)*t }; }
+
+  /* ---------------- shared per-frame scene (consumed identically by B-1/B-2/B-3) ---------------- */
+  function computeSceneB(simMs){
+    var cur = getCurrentStepB(simMs), step = cur.step, progress = cur.progress;
+    var scene = { ballPos:null, ballColor:"accent", ballCeremonial:false, beams:[], workingAgent:null, workingSeverity:null,
+      settleAgent:null, settleColor:null, finale:false, orchestratorPulse:false, isMoving:false, moveProgress:0 };
+
+    if(step.kind === "move"){
+      scene.ballPos = lerp3(worldPos(step.from), worldPos(step.to), progress);
+      scene.ballColor = step.rework ? "danger" : "accent";
+      scene.ballCeremonial = (step.from === "human" || step.to === "human");
+      scene.isMoving = true; scene.moveProgress = progress;
+      var fromUpper = (step.from === "orchestrator" || step.from === "human");
+      var toUpper = (step.to === "orchestrator" || step.to === "human");
+      if(!fromUpper && !toUpper){
+        scene.beams.push({ from:worldPos(step.from), to:ORCH_POS, color:scene.ballColor });
+        scene.beams.push({ from:ORCH_POS, to:worldPos(step.to), color:scene.ballColor });
+      }
+    } else {
+      scene.ballPos = worldPos(step._parkedAt);
+      if(step.kind === "work"){
+        scene.workingAgent = step.agent;
+        // T-1012: a real span's `status` drives severity — the sample-data-era
+        // label-text sniff (/rework/i) is gone. A non-success span is never
+        // dropped and is always visibly marked (design note §4).
+        scene.workingSeverity = statusSeverity(step.event.status);
+        scene.ballColor = scene.workingSeverity === "danger" ? "danger" : scene.workingSeverity === "warning" ? "warning" : "accent";
+        scene.beams.push({ from:worldPos(step.agent), to:ORCH_POS, color:scene.ballColor });
+      } else if(step.kind === "signal"){
+        scene.orchestratorPulse = true;
+        scene.orchestratorPulseColor = step.color;
+        scene.ballColor = step.color;
+        if(step.target){ scene.beams.push({ from:ORCH_POS, to:worldPos(step.target), color:step.color }); }
+      } else if(step.kind === "settle"){
+        scene.settleAgent = step.agent;
+        scene.settleColor = step.color;
+        scene.ballColor = step.color === "success" ? "success" : "accent";
+        if(step.agent === "human"){ scene.beams.push({ from:ORCH_POS, to:HUMAN_POS, color:"accent" }); }
+        if(step.color === "success" && progress > 0.12){ scene.finale = true; }
+      }
+    }
+
+    /* single "who's highlighted right now, and with what color rule" — every
+       renderer derives node coloring from this instead of recomputing its own
+       working/settle/pulse booleans, so identity-vs-semantic-color logic can't
+       drift between B-1/B-2/B-3:
+         - 'rework'  → danger red overrides identity (a rework-labeled work item)
+         - 'success' → success green overrides identity (the release settle)
+         - 'identity'→ the agent's own color, just brighter/pulsing            */
+    scene.highlightId = null; scene.highlightMode = null;
+    if(scene.workingAgent){
+      scene.highlightId = scene.workingAgent;
+      scene.highlightMode = scene.workingSeverity === "danger" ? "rework" : scene.workingSeverity === "warning" ? "status-warning" : "identity";
+    }
+    else if(scene.settleAgent){ scene.highlightId = scene.settleAgent; scene.highlightMode = scene.settleColor === "success" ? "success" : "identity"; }
+    else if(scene.orchestratorPulse){ scene.highlightId = "orchestrator"; scene.highlightMode = scene.orchestratorPulseColor === "danger" ? "rework" : "identity"; }
+    return scene;
+  }
+
+  /* per-agent identity color (CSS custom property) — the ball itself never
+     uses this: the ball is board status, not an agent, and stays accent/danger/success.
+     T-1012: an id outside the eight known identities (an adopter's own agent
+     name) gets the shared --agent-unknown token instead of an undefined var. */
+  function agentColorVar(id){ return KNOWN_COLOR_IDS[id] ? ("var(--agent-" + id + ")") : "var(--agent-unknown)"; }
+
+  function renderAgentLegend(){
+    document.getElementById("agentLegendHeading").textContent = T().legendAgentsTitle;
+    var el = document.getElementById("agentLegendGrid");
+    el.innerHTML = "";
+    var ids = ["human","orchestrator","tech-lead","pm-spec","engineer","qa-verifier","codex-reviewer"];
+    ids.forEach(function(id){
+      var row = document.createElement("div");
+      row.className = "legend-row";
+      row.innerHTML = '<span class="legend-swatch dot" style="background:'+agentColorVar(id)+'"></span>'+agentById[id].label;
+      el.appendChild(row);
+    });
+    // T-1012 (design note §3): one dynamically-appended row per distinct
+    // unrecognised roster id actually present in the payload — never dropped.
+    // T-1012 rework round 1 (Codex Blocker #2, the review's own primary
+    // example): `id` here is an unrecognised `span` value — telemetry an
+    // adopter fully controls (D3) — so it is escaped before reaching
+    // .innerHTML, exactly like every other free-form field in this file.
+    RING_AGENTS.filter(function(id){ return !KNOWN_COLOR_IDS[id]; }).forEach(function(id){
+      var row = document.createElement("div");
+      row.className = "legend-row";
+      row.innerHTML = '<span class="legend-swatch dot" style="background:var(--agent-unknown);border:1px dashed var(--border-strong);"></span>'+
+        agentLabelHtml(id)+' — '+T().unknownAgent;
+      el.appendChild(row);
+    });
+    // UI Designer never appears in this real run's spans — but the check is
+    // data-driven, not hardcoded, so a future run where it does gets spans
+    // would flip this line automatically.
+    document.getElementById("uiDesignerNote").textContent =
+      (agentSpans["ui-designer"] && agentSpans["ui-designer"].length > 0) ? T().uiDesignerActive : T().uiDesignerIdle;
+  }
+
+  /* ---------------- board-flag rail (real telemetry, unaffected by ring model) ---------------- */
+  var flagStopsReached = {};
+  var railStopsB = [];
+  (function buildRailB(){
+    var track = document.getElementById("bRailTrack");
+    var line = document.createElement("div"); line.className = "b-rail-line"; track.appendChild(line);
+    FLAG_STOPS.forEach(function(f){
+      var stopEl = document.createElement("div"); stopEl.className = "b-rail-stop";
+      var dot = document.createElement("div"); dot.className = "b-rail-dot";
+      var name = document.createElement("div"); name.className = "b-rail-name"; name.textContent = f;
+      stopEl.appendChild(dot); stopEl.appendChild(name); track.appendChild(stopEl);
+      railStopsB.push({ dot:dot, name:name, flag:f });
+    });
+    // T-1012 (design note §2): T-1011's frozen row shapes carry no `flag`
+    // field at all — this is the ordinary, expected state for every real
+    // run, not a rare edge case — so a rail with zero flag-bearing rows must
+    // read as "no data" rather than "stuck mid-playback, hasn't reached its
+    // first stop yet". Evaluated once at load; never combined with the
+    // reached/current classes, which only ever apply when flagEvents.length > 0.
+    if(flagEvents.length === 0){
+      track.classList.add("rail-empty");
+      var emptyNote = document.getElementById("railEmptyNote");
+      if(emptyNote){ emptyNote.textContent = T().flagRailEmpty; emptyNote.hidden = false; }
+    }
+  })();
+  function updateRailB(simMs){
+    var current = null;
+    flagEvents.forEach(function(e){ if(e._tStart <= simMs){ current = e.flag; flagStopsReached[e.flag] = true; } });
+    var idx = current ? FLAG_STOPS.indexOf(current) : -1;
+    var FLASH_MS = Math.max(TOTAL_MS*0.025, 45000);
+    var isFlashing = reworkEvents.some(function(r){ return simMs >= r._tStart && simMs <= r._tStart + FLASH_MS; });
+    railStopsB.forEach(function(s, i){
+      s.dot.classList.toggle("reached", !!flagStopsReached[s.flag]);
+      var isCurrent = i === idx;
+      s.dot.classList.toggle("current", isCurrent);
+      s.dot.classList.toggle("flash", isCurrent && isFlashing);
+      s.name.classList.toggle("current-name", isCurrent);
+    });
+  }
+
+  // Safe display-label lookup: `from`/`to` on a handoff/rework event are
+  // free-form (T-1011 D3 — "an adopter's phases are not this loop's phases")
+  // and are NOT required to also appear as a `span` value, so they may never
+  // have entered `agentById` at all. Falls back to the raw id — never throws,
+  // never drops the value.
+  function agentLabel(id){
+    if(id == null) return "";
+    var a = agentById[id];
+    return a ? a.label : id;
+  }
+
+  // T-1012 rework round 1 (Codex Blocker #2): D2's escape (bin/gen-loop-replay.sh)
+  // protects the ONE JSON-envelope injection site against terminating the
+  // page's own inline <script> block. It says nothing about how THIS script
+  // renders the JSON.parse-decoded values back into the DOM — a second,
+  // independent trust boundary. Every free-form telemetry field (`phase`,
+  // `model`, `verdict`, `from`, `to`, and any unrecognised `span` value — an
+  // adopter's own agent name, which D3 requires this page to render, never
+  // drop) reaches the page only through `jstr`/`jesc` (bin/log-run.sh), which
+  // escapes just `\` and `"` — not `<`/`>`/`&`. Any string built for
+  // `.innerHTML` must run every payload-derived piece through this helper;
+  // `.textContent`/canvas `fillText` need no escaping (they never interpret
+  // markup) and are left alone.
+  function escapeHtml(s){
+    if(s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  // agentLabel(), escaped for HTML-string contexts. Kept separate from
+  // agentLabel() itself: the canvas fillText() call sites need the RAW label
+  // (canvas draws literal glyphs and never interprets markup — escaping there
+  // would show literal "&lt;" instead of "<" on the ring/mini-card).
+  function agentLabelHtml(id){ return escapeHtml(agentLabel(id)); }
+
+  /* ---------------- "now playing" readout (driven by the same ring step) ---------------- */
+  function updateBNow(simMs){
+    var current = getCurrentStepB(simMs).step;
+    var labelEl = document.getElementById("bNowLabel");
+    var verdictEl = document.getElementById("bNowVerdict");
+    var flagEl = document.getElementById("bNowFlag");
+    if(current.kind === "move"){
+      labelEl.textContent = T().moveLine(current.rework, agentLabel(current.from), agentLabel(current.to), localizeMoveDesc(current));
+      verdictEl.hidden = true;
+    } else if(current.kind === "work"){
+      var e = current.event;
+      labelEl.textContent = T().workingLine(e.seq, agentLabel(e.agent), stepText(e));
+      if(e.verdict){ verdictEl.hidden=false; verdictEl.textContent=e.verdict; verdictEl.className="b-now-verdict "+((e.verdict==="PASS"||e.verdict==="APPROVE")?"pass":"reject"); }
+      else { verdictEl.hidden = true; }
+    } else if(current.kind === "signal"){
+      labelEl.textContent = T().signalLine(localizeSignalLabel(current));
+      verdictEl.hidden = true;
+    } else {
+      labelEl.textContent = T().settleLine(agentLabel(current.agent), stepText(current.event));
+      verdictEl.hidden = true;
+    }
+    var flagNow = null;
+    flagEvents.forEach(function(fe){ if(fe._tStart <= simMs) flagNow = fe.flag; });
+    if(flagNow){ flagEl.hidden=false; flagEl.textContent=flagNow; } else { flagEl.hidden = true; }
+  }
+
+  /* ---------------- detail panel (real telemetry, real simMs) ---------------- */
+  // verdict/status are validated closed enums (bin/check-run.sh), so neither
+  // can carry an HTML metacharacter — escaped anyway (T-1012 rework round 1),
+  // so no sink here is "safe by enum" and therefore exempt from the rule.
+  function verdictChip(v){ return '<span class="chip '+((v==="PASS"||v==="APPROVE")?"verdict-pass":"verdict-reject")+'">'+escapeHtml(v)+'</span>'; }
+  // T-1012 (design note §4): a non-success span status, shown as its own chip
+  // — independently of whether a verdict chip is ALSO present, since a span
+  // can carry both and neither field substitutes for the other.
+  function statusChip(status){
+    var sev = statusSeverity(status);
+    var cls = sev === "warning" ? "status-warning" : "status-danger";
+    return '<span class="chip '+cls+'">'+escapeHtml(String(status).toUpperCase())+'</span>';
+  }
+  function agentDot(id){ return '<span class="chip-dot" style="background:'+agentColorVar(id)+'"></span>'; }
+  function agentChip(id){ return '<span class="chip">'+agentDot(id)+agentLabelHtml(id)+'</span>'; }
+  function updateDetailPanel(simMs){
+    var current = null;
+    for(var i=0;i<events.length;i++){ if(events[i]._tStart <= simMs) current = events[i]; }
+    if(!current) return;
+    document.getElementById("detailEyebrow").textContent = "SEQ " + current.seq + " · " + current.type.toUpperCase();
+    document.getElementById("detailTitle").textContent = stepText(current);
+    var chips = [];
+    if(current.type === "work") chips.push(agentChip(current.agent));
+    if(current.from && current.to) chips.push('<span class="chip">'+agentDot(current.from)+agentLabelHtml(current.from)+' → '+agentDot(current.to)+agentLabelHtml(current.to)+'</span>');
+    if(current.phase) chips.push('<span class="chip">'+escapeHtml(current.phase)+'</span>');
+    if(current.verdict) chips.push(verdictChip(current.verdict));
+    if(current.type === "work" && current.status != null && current.status !== "success") chips.push(statusChip(current.status));
+    if(current.flag) chips.push('<span class="chip flag">'+escapeHtml(current.flag)+'</span>');
+    document.getElementById("detailChips").innerHTML = chips.join("");
+    var stats = [
+      { k:T().statTokens, v: current.tokens != null ? current.tokens.toLocaleString() : "—" },
+      { k:T().statToolUses, v: current.tool_uses != null ? current.tool_uses : "—" },
+      { k:T().statDuration, v: current.duration_ms != null ? fmtMs(current.duration_ms) : "—" },
+      { k:T().statModel, v: current.model ? escapeHtml(current.model) : "—" }
+    ];
+    document.getElementById("detailStats").innerHTML = stats.map(function(s){ return '<div class="stat"><dt>'+s.k+'</dt><dd>'+s.v+'</dd></div>'; }).join("");
+    // T-1012: `outcome`/`finding` were sample-data-only fields — a real span's
+    // free-form `error` is the closest equivalent, shown verbatim when present.
+    document.getElementById("detailNote").textContent = (current.type === "work" && current.error) ? current.error : "";
+  }
+
+  /* ---------------- tooltip (shared) ---------------- */
+  var tooltip = document.getElementById("tooltip");
+  // T-1012 rework round 1 (Codex Blocker #2): every field here is escaped
+  // before joining into tooltip.innerHTML. model/tokens/tool_uses/duration/
+  // verdict stay conditionally omitted-if-absent rather than switched to the
+  // design note's null->"—" placeholder pattern: this function's only live
+  // caller (nodeTipData(), an agent-hover tooltip) never supplies any of
+  // them, so adding an always-shown "model: —" / "verdict: —" line here would
+  // be a new, unrelated cosmetic change to a working feature, not a
+  // null-safety fix (see .shell-team/provenance/T-1012.md for the disposition).
+  function showTip(clientX, clientY, e){
+    var lines = ["<b>" + escapeHtml(e.label||"") + "</b>"];
+    if(e.model) lines.push("model: " + escapeHtml(e.model));
+    if(e.tokens != null) lines.push("tokens: " + e.tokens.toLocaleString());
+    if(e.tool_uses != null) lines.push("tool_uses: " + e.tool_uses);
+    if(e.duration_ms != null) lines.push("duration: " + fmtMs(e.duration_ms));
+    if(e.verdict) lines.push("verdict: " + escapeHtml(e.verdict));
+    // T-1012: a non-success status, colored via the same danger/warning
+    // mapping, the status token itself appended verbatim (not run through T()).
+    if(e.status && e.status !== "success") lines.push('<span style="color:'+colorFor(statusSeverity(e.status)||"danger")+'">'+escapeHtml(T().nonSuccessLabel+e.status)+'</span>');
+    if(e.outcome && !e.tokens) lines.push(escapeHtml(e.outcome));
+    tooltip.innerHTML = lines.join("<br>");
+    tooltip.hidden = false;
+    tooltip.style.left = (clientX+14) + "px"; tooltip.style.top = (clientY+14) + "px";
+  }
+  function hideTip(){ tooltip.hidden = true; }
+  function attachTip(node, e){
+    node.addEventListener("pointerenter", function(ev){ showTip(ev.clientX, ev.clientY, e); });
+    node.addEventListener("pointermove", function(ev){ showTip(ev.clientX, ev.clientY, e); });
+    node.addEventListener("pointerleave", hideTip);
+    node.addEventListener("focus", function(){ var r=node.getBoundingClientRect(); showTip(r.left, r.bottom, e); });
+    node.addEventListener("blur", hideTip);
+    node.addEventListener("click", function(ev){ ev.stopPropagation(); showTip(ev.clientX||0, ev.clientY||0, e); });
+  }
+  document.addEventListener("click", hideTip);
+
+  function nodeTipData(id){
+    if(id === "ui-designer") return { label:"UI Designer", outcome:T().uiDesignerTip, agentId:id };
+    var a = agentById[id]; return { label:a.label, outcome:agentNote(id), agentId:id };
+  }
+
+  /* ---------------- shared canvas helpers ---------------- */
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function hexToRgb(hex){
+    hex = hex.replace("#","");
+    if(hex.length===3) hex = hex.split("").map(function(c){return c+c;}).join("");
+    var n = parseInt(hex,16);
+    return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+  }
+  function rgba(hex, a){ var c=hexToRgb(hex); return "rgba("+c.r+","+c.g+","+c.b+","+a+")"; }
+  function colorFor(key){ return key==="danger" ? cssVar("--danger") : key==="success" ? cssVar("--success") : key==="warning" ? cssVar("--warning") : cssVar("--accent"); }
+  // Canvas contexts need the RESOLVED color (cssVar), never the unresolved
+  // `var(--x)` reference agentColorVar() returns for DOM/CSS `style=` strings
+  // — ctx.strokeStyle/fillStyle silently ignore an unrecognized var() token.
+  function agentCanvasColor(id){ return KNOWN_COLOR_IDS[id] ? cssVar("--agent-"+id) : cssVar("--agent-unknown"); }
+  function resizeCanvas(c){
+    var r = c.parentElement.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    c.width = Math.max(1,Math.round(r.width*dpr)); c.height = Math.max(1,Math.round(r.height*dpr));
+    c.style.width = r.width+"px"; c.style.height = r.height+"px";
+    var ctx = c.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+    return { w:r.width, h:r.height };
+  }
+  var ALL_NODE_IDS = RING_AGENTS.concat(["orchestrator","human"]);
+
+  function canvasHitTest(canvas, hitTargets, ev){
+    var r = canvas.getBoundingClientRect();
+    var mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    var best = null, bestD = 1e9;
+    hitTargets.forEach(function(t){
+      var d = Math.hypot(mx-t.x, my-t.y);
+      if(d < t.r && d < bestD){ bestD = d; best = t; }
+    });
+    return best;
+  }
+
+  /* ============================================================
+     B-2 — Canvas pseudo-3D: hand-written perspective projection,
+     slow auto-orbit camera, neon glow, ball trail, always-on beams.
+     ============================================================ */
+  var canvasB2 = document.getElementById("canvasB2");
+  var trailB2 = [];
+  var hitB2 = [];
+  var burstB2StartedAt = null, burstB2Prev = false;
+
+  /* ---- interactive camera ----
+     Two regimes, kept explicitly separate so zoom and the anti-clip fit never
+     fight each other:
+       - "default" (fit applies): nothing has been touched yet — az auto-orbits,
+         and every frame we compute a fresh bounding-box fit so the whole
+         Human/Orchestrator/ring stack always stays inside the canvas.
+       - "free" (fit is OFF): the instant the user drags, wheels, pinches, or
+         double-clicks a node, camB2.interacted flips true and the fit stops
+         being applied at all — zoom and orbit then behave like a real camera,
+         including nodes leaving the frame, which is the whole point of zoom.
+     Reset is the only way back to "default". */
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  var CAM_DEFAULT = { az:0.55, el:0.5, zoom:1 };
+  var EL_MIN = 0.12, EL_MAX = 1.45, ZOOM_MIN = 0.55, ZOOM_MAX = 2.4;
+  var FOCUS_CAM_DIST = 2.0; // close-up distance used while a node is focused
+  var camB2 = { az:CAM_DEFAULT.az, el:CAM_DEFAULT.el, zoom:CAM_DEFAULT.zoom, autoOrbit:true, lastInteractionAt:0,
+    dragging:false, dragStartX:0, dragStartY:0, dragStartAz:0, dragStartEl:0,
+    interacted:false, followBall:false, focusedNode:null };
+  var camPointers = new Map(); // pointerId -> {x,y}, supports 1-finger drag / 2-finger pinch
+  var pinchStartDist = null, pinchStartZoom = 1;
+  var camLastTs = null;
+  var CAM_IDLE_MS = 3200;
+  var camLookCur = { x:0, y:1.0, z:0 }; // smoothed look-at, chases the current target every frame
+  var camDistCur = 3.8;
+  var camPrevFocused = null;
+
+  function resetCameraB2(){
+    camB2.az = CAM_DEFAULT.az; camB2.el = CAM_DEFAULT.el; camB2.zoom = CAM_DEFAULT.zoom;
+    camB2.interacted = false; camB2.followBall = false; camB2.focusedNode = null;
+    camB2.lastInteractionAt = performance.now();
+    camLookCur = { x:0, y:1.0, z:0 }; camDistCur = 3.8; camPrevFocused = null;
+    updateToolbarLabels(); updateHintText();
+  }
+
+  function updateCameraAuto(nowMs, scene){
+    if(camLastTs == null){ camLastTs = nowMs; return; }
+    var dt = nowMs - camLastTs; camLastTs = nowMs;
+    var isDefault = !camB2.interacted && !camB2.followBall && !camB2.focusedNode;
+    var idle = (nowMs - camB2.lastInteractionAt) > CAM_IDLE_MS;
+    if(camB2.autoOrbit && !reduceMotion && !camB2.dragging && camPointers.size === 0 && isDefault && idle){
+      camB2.az += dt * 0.00014;
+    }
+
+    // where the camera should be looking, and from how far — smoothed so
+    // focus-fly and ball-follow feel like a camera move, not a jump cut.
+    var target = camB2.focusedNode ? worldPos(camB2.focusedNode) : camB2.followBall ? scene.ballPos : CAM_LOOK_AT;
+    var distTarget = camB2.focusedNode ? FOCUS_CAM_DIST : clamp(CAM_BASE_DIST/camB2.zoom, CAM_DIST_MIN2, CAM_DIST_MAX2);
+    var focusJustChanged = camPrevFocused !== camB2.focusedNode;
+    camPrevFocused = camB2.focusedNode;
+    if(reduceMotion && focusJustChanged){
+      camLookCur = { x:target.x, y:target.y, z:target.z }; camDistCur = distTarget;
+    } else {
+      var amt = 1 - Math.exp(-dt/220);
+      camLookCur.x += (target.x-camLookCur.x)*amt; camLookCur.y += (target.y-camLookCur.y)*amt; camLookCur.z += (target.z-camLookCur.z)*amt;
+      camDistCur += (distTarget-camDistCur)*amt;
+    }
+  }
+
+  /* ---- true look-at camera: depth is an unambiguous, always-positive
+     "distance travelled along the forward axis", so scale = FOCAL/depth is
+     guaranteed monotonic (near → large, far → small) by construction — see
+     the self-test in computeCameraBasis's companion note in the completion
+     report; no sign convention to get backwards here. ---- */
+  var CAM_LOOK_AT = { x:0, y:1.0, z:0 };
+  var CAM_BASE_DIST = 3.8, CAM_DIST_MIN2 = 2.6, CAM_DIST_MAX2 = 7.5, CAM_FOCAL = 3.6, CAM_RADIUS_FRACTION = 0.40;
+  function computeCameraBasis(az, el, camDist, lookAt){
+    var dir = { x:Math.cos(el)*Math.sin(az), y:Math.sin(el), z:Math.cos(el)*Math.cos(az) };
+    var camPos = { x:lookAt.x+camDist*dir.x, y:lookAt.y+camDist*dir.y, z:lookAt.z+camDist*dir.z };
+    var forward = { x:-dir.x, y:-dir.y, z:-dir.z };
+    var right = { x:Math.cos(az), y:0, z:-Math.sin(az) };
+    var trueUp = { x:-Math.sin(az)*Math.sin(el), y:Math.cos(el), z:-Math.cos(az)*Math.sin(el) };
+    return { camPos:camPos, forward:forward, right:right, trueUp:trueUp };
+  }
+  function camProject(p, cam, focal){
+    var rx=p.x-cam.camPos.x, ry=p.y-cam.camPos.y, rz=p.z-cam.camPos.z;
+    var camX = rx*cam.right.x + ry*cam.right.y + rz*cam.right.z;
+    var camY = rx*cam.trueUp.x + ry*cam.trueUp.y + rz*cam.trueUp.z;
+    var camZ = rx*cam.forward.x + ry*cam.forward.y + rz*cam.forward.z;
+    var depth = Math.max(camZ, 0.35); // guards the (never-expected-to-trigger) near-camera case
+    return { camX:camX, camY:camY, depth:depth, scale:focal/depth };
+  }
+  function withAlpha(colorStr, a){
+    colorStr = (colorStr||"").trim();
+    if(colorStr.charAt(0) === "#") return rgba(colorStr, a);
+    if(colorStr.indexOf("hsl(") === 0) return colorStr.slice(0,-1) + " / " + a + ")";
+    return colorStr;
+  }
+
+  /* ---- LOD (level of detail): zoom in past 1.3x and the nearest agent(s)
+     grow a telemetry mini-card; back out past 1.3x and it's labels-only again.
+     A focused node's card is always shown at full opacity regardless of zoom,
+     since flying in on it is itself a "show me detail" request. ---- */
+  var LOD_ZOOM_MIN = 1.3, LOD_ZOOM_FULL = 1.9;
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  function drawMiniCard(ctx, id, px, py, baseR, w, h, alpha){
+    var spans = agentSpans[id];
+    if(!spans || !spans.length || alpha <= 0.02) return;
+    // T-1012 (design note §5): every nullable span field is interpolated
+    // through this same em-dash placeholder — the codebase's own existing
+    // convention (the detail panel's stat grid already does this) — never
+    // the literal word "null".
+    var DASH = "—";
+    function durTxt(ms){ return ms != null ? fmtMs(ms) : DASH; }
+    var lines = [];
+    if(spans.length === 1){
+      var e = spans[0];
+      lines.push({ t:T().miniCardModel+(e.model != null ? e.model : DASH) });
+      lines.push({ t:T().miniCardTokens+(e.tokens != null ? e.tokens.toLocaleString() : DASH) });
+      lines.push({ t:T().miniCardToolUses+(e.tool_uses != null ? e.tool_uses : DASH) });
+      lines.push({ t:T().miniCardDuration+durTxt(e.duration_ms) });
+      // T-1012 rework round 1 (Minor #1): matches every other field on this
+      // branch — the line always shows, with the em-dash placeholder when
+      // `verdict` is null, instead of being omitted (the design note's exact
+      // `field != null ? field : "—"` pattern, not merely "never print the
+      // word null"). Canvas fillText draws literal glyphs — no HTML escaping
+      // applies here, unlike the innerHTML sinks elsewhere in this file.
+      lines.push({ t:T().miniCardVerdict+(e.verdict != null ? e.verdict : DASH), c: e.verdict != null ? ((e.verdict==="PASS"||e.verdict==="APPROVE")?"success":"danger") : null });
+      if(e.status && e.status !== "success") lines.push({ t:T().nonSuccessLabel+e.status, c:statusSeverity(e.status) });
+    } else {
+      lines.push({ t:T().miniCardSpans(spans.length) });
+      spans.forEach(function(e){
+        var vb = e.verdict != null ? "  "+e.verdict : "";
+        var lineColor = e.verdict != null ? ((e.verdict==="PASS"||e.verdict==="APPROVE")?"success":"danger")
+          : (e.status && e.status !== "success" ? statusSeverity(e.status) : null);
+        lines.push({ t:"#"+e.seq+" "+durTxt(e.duration_ms)+vb, c: lineColor });
+      });
+    }
+    var lineH=15, pad=10, cardW=192;
+    var cardH = pad*2 + 18 + lines.length*lineH;
+    var flip = (px + baseR + 14 + cardW + 12) > w;
+    var cardX = flip ? px - baseR - 14 - cardW : px + baseR + 14;
+    var cardY = clamp(py - cardH/2, 8, h-cardH-8);
+    // T-1012 (design note §3): an id outside the eight known identities gets
+    // the shared neutral token instead of an undefined CSS var, and the
+    // card's own border is dashed to echo the canvas ring node treatment.
+    var cardColor = agentCanvasColor(id);
+    var unknown = !KNOWN_COLOR_IDS[id];
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = rgba(cssVar("--bg-panel"), 0.94);
+    ctx.strokeStyle = cardColor; ctx.lineWidth = 1.4;
+    if(unknown){ ctx.setLineDash([4,3]); }
+    roundRect(ctx, cardX, cardY, cardW, cardH, 8); ctx.fill(); ctx.stroke();
+    if(unknown){ ctx.setLineDash([]); }
+    ctx.fillStyle = cardColor; ctx.fillRect(cardX, cardY, 4, cardH);
+
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.font = "700 12px " + cssVar("--font-mono");
+    ctx.fillStyle = cssVar("--text");
+    ctx.fillText(agentLabel(id), cardX+pad+4, cardY+pad);
+
+    ctx.font = "500 11px " + cssVar("--font-mono");
+    lines.forEach(function(ln, i){
+      ctx.fillStyle = ln.c ? colorFor(ln.c) : cssVar("--text-dim");
+      ctx.fillText(ln.t, cardX+pad+4, cardY+pad+18+i*lineH);
+    });
+    ctx.restore();
+  }
+
+  function drawB2(scene, nowMs){
+    var dims = resizeCanvas(canvasB2);
+    var ctx = canvasB2.getContext("2d");
+    var w = dims.w, h = dims.h;
+    updateCameraAuto(nowMs, scene);
+    var az = camB2.az, el = camB2.el;
+    var cam = computeCameraBasis(az, el, camDistCur, camLookCur);
+    var R = Math.min(w,h) * CAM_RADIUS_FRACTION;
+    var isDefault = !camB2.interacted && !camB2.followBall && !camB2.focusedNode;
+
+    /* the anti-clip fit is a "default composition" affordance only — the
+       moment the camera is user-driven (drag/zoom/follow/focus) it turns
+       off entirely, so zoom behaves like a real camera and nodes are
+       allowed to leave the frame; that IS what zooming in means. */
+    var fitScale = 1, shiftX = 0, shiftY = 0;
+    if(isDefault){
+      var TOP_MARGIN=56, BOTTOM_MARGIN=56, SIDE_MARGIN=24;
+      var fbMinX=Infinity, fbMaxX=-Infinity, fbMinY=Infinity, fbMaxY=-Infinity;
+      ALL_NODE_IDS.forEach(function(id){
+        var cp = camProject(worldPos(id), cam, CAM_FOCAL);
+        var allowance = (id==="orchestrator"||id==="human" ? 44 : 34) * cp.scale;
+        var px = w/2 + cp.camX*cp.scale*R, py = h/2 - cp.camY*cp.scale*R;
+        fbMinX = Math.min(fbMinX, px-allowance); fbMaxX = Math.max(fbMaxX, px+allowance);
+        fbMinY = Math.min(fbMinY, py-allowance); fbMaxY = Math.max(fbMaxY, py+allowance);
+      });
+      var availW = Math.max(40, w-SIDE_MARGIN*2), availH = Math.max(40, h-TOP_MARGIN-BOTTOM_MARGIN);
+      fitScale = Math.min(1, availW/((fbMaxX-fbMinX)||1), availH/((fbMaxY-fbMinY)||1));
+      var targetCenterY = (TOP_MARGIN + (h-BOTTOM_MARGIN)) / 2;
+      var bboxCenterX = (fbMinX+fbMaxX)/2, bboxCenterY = (fbMinY+fbMaxY)/2;
+      shiftX = w/2 - (w/2 + (bboxCenterX-w/2)*fitScale);
+      shiftY = targetCenterY - (h/2 + (bboxCenterY-h/2)*fitScale);
+    }
+
+    function proj(p){
+      var cp = camProject(p, cam, CAM_FOCAL);
+      var px0 = w/2 + cp.camX*cp.scale*R, py0 = h/2 - cp.camY*cp.scale*R;
+      return { x: w/2 + (px0-w/2)*fitScale + shiftX, y: h/2 + (py0-h/2)*fitScale + shiftY, scale: cp.scale*fitScale };
+    }
+
+    ctx.clearRect(0,0,w,h);
+    var bg = ctx.createRadialGradient(w/2,h*0.4,10,w/2,h*0.4,Math.max(w,h)*0.75);
+    bg.addColorStop(0, rgba(cssVar("--accent"),0.07));
+    bg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+
+    // ring platform (projected circle)
+    ctx.beginPath();
+    for(var i=0;i<=64;i++){
+      var ang = i/64*Math.PI*2;
+      var pp = proj({x:Math.cos(ang), y:0, z:Math.sin(ang)});
+      if(i===0) ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y);
+    }
+    ctx.strokeStyle = rgba(cssVar("--accent"), 0.25); ctx.lineWidth = 1; ctx.stroke();
+
+    // pillars up to orchestrator / human
+    [ORCH_POS, HUMAN_POS].forEach(function(pos){
+      var base = proj({x:pos.x,y:0,z:pos.z}), top = proj(pos);
+      ctx.beginPath(); ctx.moveTo(base.x,base.y); ctx.lineTo(top.x,top.y);
+      ctx.strokeStyle = rgba(cssVar("--text-faint"),0.25); ctx.lineWidth=1; ctx.stroke();
+    });
+
+    hitB2 = [];
+    // depth-sort ring nodes + orchestrator + human
+    var drawList = ALL_NODE_IDS.map(function(id){
+      var wp = worldPos(id); var pr = proj(wp);
+      return { id:id, wp:wp, pr:pr };
+    }).sort(function(a,b){ return a.pr.scale - b.pr.scale; });
+
+    // beams (always-on report channel — drawn under nodes, animated flow)
+    scene.beams.forEach(function(b){
+      var p0 = proj(b.from), p1 = proj(b.to);
+      var col = colorFor(b.color);
+      var beamScale = (p0.scale+p1.scale)/2;
+      var grad = ctx.createLinearGradient(p0.x,p0.y,p1.x,p1.y);
+      grad.addColorStop(0, rgba(col,0.05)); grad.addColorStop(0.5, rgba(col,0.55)); grad.addColorStop(1, rgba(col,0.05));
+      ctx.strokeStyle = grad; ctx.lineWidth = 2.4*beamScale; ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.stroke();
+      if(!reduceMotion){
+        var t = (nowMs*0.0016) % 1;
+        [t, (t+0.5)%1].forEach(function(tt){
+          var sx = p0.x+(p1.x-p0.x)*tt, sy = p0.y+(p1.y-p0.y)*tt;
+          ctx.beginPath(); ctx.arc(sx,sy,2.6,0,Math.PI*2); ctx.fillStyle = rgba(col,0.9); ctx.fill();
+        });
+      } else {
+        var mx=(p0.x+p1.x)/2, my=(p0.y+p1.y)/2;
+        ctx.beginPath(); ctx.arc(mx,my,2.6,0,Math.PI*2); ctx.fillStyle = rgba(col,0.9); ctx.fill();
+      }
+    });
+
+    // ball trail
+    trailB2.push({ x:scene.ballPos.x, y:scene.ballPos.y, z:scene.ballPos.z, color:scene.ballColor });
+    if(trailB2.length > (reduceMotion?1:20)) trailB2.shift();
+    if(!reduceMotion){
+      trailB2.forEach(function(tp, idx){
+        var pr = proj(tp); var a = (idx+1)/trailB2.length;
+        ctx.beginPath(); ctx.arc(pr.x,pr.y, 3+a*4*pr.scale, 0, Math.PI*2);
+        ctx.fillStyle = rgba(colorFor(tp.color), a*0.35); ctx.fill();
+      });
+    }
+
+    // nodes (depth sorted — far drawn first, near drawn last so near occludes far;
+    // correct because d.pr.scale is now guaranteed larger-when-nearer, see camProject)
+    drawList.forEach(function(d){
+      var isRing = d.id !== "orchestrator" && d.id !== "human";
+      var idle = d.id === "ui-designer";
+      var unknownAgentId = !KNOWN_COLOR_IDS[d.id]; // T-1012: an adopter's own agent name
+      var idColor = agentCanvasColor(d.id);
+      var isHighlighted = scene.highlightId === d.id;
+      var col = isHighlighted
+        ? (scene.highlightMode === "rework" ? colorFor("danger") : scene.highlightMode === "status-warning" ? colorFor("warning") : scene.highlightMode === "success" ? colorFor("success") : idColor)
+        : idColor;
+      var baseR = (isRing ? 26 : 32) * d.pr.scale;
+
+      if(isHighlighted && !reduceMotion){
+        var pulsePhase = (nowMs%1200)/1200;
+        for(var ring=0; ring<2; ring++){
+          var rp = (pulsePhase + ring*0.5) % 1;
+          ctx.beginPath(); ctx.arc(d.pr.x, d.pr.y, baseR + rp*30*d.pr.scale, 0, Math.PI*2);
+          ctx.strokeStyle = withAlpha(col, 0.5*(1-rp)); ctx.lineWidth = 2*d.pr.scale; ctx.stroke();
+        }
+      } else if(isHighlighted){
+        ctx.beginPath(); ctx.arc(d.pr.x, d.pr.y, baseR+10*d.pr.scale, 0, Math.PI*2);
+        ctx.strokeStyle = withAlpha(col,0.6); ctx.lineWidth=3*d.pr.scale; ctx.stroke();
+      }
+
+      ctx.save();
+      ctx.shadowColor = col; ctx.shadowBlur = (isHighlighted ? 22 : 9) * d.pr.scale;
+      ctx.beginPath(); ctx.arc(d.pr.x, d.pr.y, baseR, 0, Math.PI*2);
+      ctx.fillStyle = rgba(cssVar("--bg-panel"), idle?0.55:0.92); ctx.fill();
+      ctx.lineWidth = 2*d.pr.scale; ctx.strokeStyle = col; ctx.globalAlpha = idle?0.55:1;
+      // T-1012 (design note §3): dashed + neutral so a roster id outside the
+      // ratified eight is never confused with the existing idle treatment
+      // (solid ring, lower fill opacity) — two different reasons for a node
+      // to look "different" get two different visual cues.
+      if(unknownAgentId){ ctx.setLineDash([4,3]); }
+      ctx.stroke();
+      if(unknownAgentId){ ctx.setLineDash([]); }
+      ctx.restore();
+
+      ctx.fillStyle = idle ? rgba(cssVar("--text-faint"),0.8) : cssVar("--text");
+      ctx.font = "600 " + Math.max(9, 11*d.pr.scale) + "px " + cssVar("--font-mono");
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(agentLabel(d.id), d.pr.x, d.pr.y);
+
+      hitB2.push({ x:d.pr.x, y:d.pr.y, r:baseR+6, data:nodeTipData(d.id) });
+    });
+
+    // LOD: zoom in past 1.3x (or focus a node) and its telemetry mini-card fades in
+    var lodAlpha = clamp((camB2.zoom-LOD_ZOOM_MIN)/(LOD_ZOOM_FULL-LOD_ZOOM_MIN), 0, 1);
+    if(lodAlpha > 0 || camB2.focusedNode){
+      var spanNodes = drawList.filter(function(d){ return agentSpans[d.id] && agentSpans[d.id].length; });
+      var maxSpanScale = spanNodes.length ? Math.max.apply(null, spanNodes.map(function(d){ return d.pr.scale; })) : 0;
+      spanNodes.filter(function(d){
+        return d.id === camB2.focusedNode || (lodAlpha > 0 && d.pr.scale >= maxSpanScale*0.78);
+      }).sort(function(a,b){ return b.pr.scale - a.pr.scale; }).slice(0,2).forEach(function(d){
+        var alpha = d.id === camB2.focusedNode ? 1 : lodAlpha;
+        var baseR = (d.id!=="orchestrator" && d.id!=="human" ? 26 : 32) * d.pr.scale;
+        drawMiniCard(ctx, d.id, d.pr.x, d.pr.y, baseR, w, h, alpha);
+      });
+    }
+
+    // finale burst on release
+    if(scene.finale){
+      if(!burstB2Prev) burstB2StartedAt = nowMs;
+      burstB2Prev = true;
+      var age = nowMs - burstB2StartedAt;
+      if(!reduceMotion && age < 1600){
+        var orch = proj(ORCH_POS);
+        ALL_NODE_IDS.concat(["human"]).forEach(function(id){
+          var target = proj(worldPos(id));
+          var t2 = Math.min(1, age/1200);
+          var bx = orch.x + (target.x-orch.x)*t2, by = orch.y + (target.y-orch.y)*t2;
+          ctx.beginPath(); ctx.arc(bx,by, 4*(1-t2)+2, 0, Math.PI*2);
+          ctx.fillStyle = rgba(cssVar("--success"), 0.8*(1-t2)); ctx.fill();
+        });
+      } else if(reduceMotion){
+        var op = proj(ORCH_POS);
+        ctx.beginPath(); ctx.arc(op.x,op.y,40,0,Math.PI*2);
+        ctx.strokeStyle = rgba(cssVar("--success"),0.5); ctx.lineWidth=3; ctx.stroke();
+      }
+    } else { burstB2Prev = false; }
+
+    // ball on top
+    var bp = proj(scene.ballPos);
+    var ballR = (scene.ballCeremonial ? 11 : 8) * Math.max(0.7,bp.scale);
+    ctx.save();
+    ctx.shadowColor = colorFor(scene.ballColor); ctx.shadowBlur = 26 * Math.max(0.7,bp.scale);
+    ctx.beginPath(); ctx.arc(bp.x,bp.y,ballR,0,Math.PI*2);
+    ctx.fillStyle = colorFor(scene.ballColor); ctx.fill();
+    ctx.restore();
+  }
+
+  function endCamPointer(ev){
+    camPointers.delete(ev.pointerId);
+    if(camPointers.size < 2) pinchStartDist = null;
+    if(camPointers.size === 0){ camB2.dragging = false; document.getElementById("stageB2").classList.remove("dragging"); camB2.lastInteractionAt = performance.now(); }
+  }
+  canvasB2.addEventListener("pointerdown", function(ev){
+    canvasB2.setPointerCapture(ev.pointerId);
+    camPointers.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+    camB2.lastInteractionAt = performance.now();
+    if(camPointers.size === 1){
+      camB2.dragging = true;
+      camB2.dragStartX = ev.clientX; camB2.dragStartY = ev.clientY;
+      camB2.dragStartAz = camB2.az; camB2.dragStartEl = camB2.el;
+      camB2.interacted = true;
+      document.getElementById("stageB2").classList.add("dragging");
+      hideTip();
+    } else if(camPointers.size === 2){
+      camB2.dragging = false;
+      camB2.interacted = true;
+      var pts = Array.from(camPointers.values());
+      pinchStartDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      pinchStartZoom = camB2.zoom;
+    }
+  });
+  canvasB2.addEventListener("pointermove", function(ev){
+    if(camPointers.has(ev.pointerId)) camPointers.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+    if(camPointers.size >= 2){
+      camB2.lastInteractionAt = performance.now();
+      var pts = Array.from(camPointers.values());
+      var dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      if(pinchStartDist){ camB2.zoom = clamp(pinchStartZoom * (dist/pinchStartDist), ZOOM_MIN, ZOOM_MAX); }
+      hideTip();
+      return;
+    }
+    if(camB2.dragging){
+      camB2.lastInteractionAt = performance.now();
+      var dx = ev.clientX - camB2.dragStartX, dy = ev.clientY - camB2.dragStartY;
+      camB2.az = camB2.dragStartAz + dx*0.008;
+      camB2.el = clamp(camB2.dragStartEl - dy*0.006, EL_MIN, EL_MAX);
+      hideTip();
+      return;
+    }
+    var hit = canvasHitTest(canvasB2, hitB2, ev);
+    if(hit) showTip(ev.clientX, ev.clientY, hit.data); else hideTip();
+  });
+  canvasB2.addEventListener("pointerup", endCamPointer);
+  canvasB2.addEventListener("pointercancel", endCamPointer);
+  canvasB2.addEventListener("pointerleave", function(ev){ if(camPointers.size===0) hideTip(); });
+  var zoomHintTimer = null;
+  canvasB2.addEventListener("wheel", function(ev){
+    if(ev.ctrlKey || ev.metaKey){
+      // real zoom intent (also how trackpad pinch reports itself) — take over the wheel
+      ev.preventDefault();
+      camB2.zoom = clamp(camB2.zoom * (ev.deltaY < 0 ? 1.09 : 0.92), ZOOM_MIN, ZOOM_MAX);
+      camB2.interacted = true;
+      camB2.lastInteractionAt = performance.now();
+    } else {
+      // plain wheel: let the page scroll (no preventDefault), just nudge toward the modifier
+      var hint = document.getElementById("zoomHint");
+      hint.classList.add("show");
+      clearTimeout(zoomHintTimer);
+      zoomHintTimer = setTimeout(function(){ hint.classList.remove("show"); }, 1200);
+    }
+  }, { passive:false });
+  canvasB2.addEventListener("dblclick", function(ev){
+    var hit = canvasHitTest(canvasB2, hitB2, ev);
+    if(hit && hit.data && hit.data.agentId){
+      camB2.focusedNode = camB2.focusedNode === hit.data.agentId ? null : hit.data.agentId;
+      if(camB2.focusedNode){ camB2.interacted = true; }
+      camB2.lastInteractionAt = performance.now();
+      if(!camB2.focusedNode){ resetCameraB2(); }
+      updateHintText();
+    } else {
+      resetCameraB2();
+    }
+  });
+
+  function updateToolbarLabels(){
+    var reset = document.getElementById("camResetBtn");
+    reset.title = T().resetTitle; reset.textContent = T().resetLabel;
+    var follow = document.getElementById("camFollowBtn");
+    follow.title = T().followTitle; follow.textContent = camB2.followBall ? T().followingLabel : T().followLabel;
+    follow.setAttribute("aria-pressed", camB2.followBall ? "true" : "false");
+    var lock = document.getElementById("camLockBtn");
+    lock.title = T().lockTitle; lock.textContent = camB2.autoOrbit ? T().lockLabel : T().lockedLabel;
+    lock.setAttribute("aria-pressed", camB2.autoOrbit ? "false" : "true");
+    var expand = document.getElementById("camExpandBtn");
+    var expanded = document.getElementById("stageB2").classList.contains("expanded");
+    expand.title = T().expandTitle; expand.textContent = expanded ? T().collapseLabel : T().expandLabel;
+    expand.setAttribute("aria-pressed", expanded ? "true" : "false");
+  }
+  function updateHintText(){
+    var hint = document.querySelector("#stageB2 .stage-hint");
+    hint.textContent = camB2.focusedNode ? T().hintFocused(agentById[camB2.focusedNode].label) : T().hintDefault;
+  }
+
+  document.getElementById("camResetBtn").addEventListener("click", resetCameraB2);
+  document.getElementById("camFollowBtn").addEventListener("click", function(){
+    camB2.followBall = !camB2.followBall;
+    camB2.lastInteractionAt = performance.now();
+    updateToolbarLabels();
+  });
+  document.getElementById("camLockBtn").addEventListener("click", function(){
+    camB2.autoOrbit = !camB2.autoOrbit;
+    camB2.lastInteractionAt = performance.now();
+    updateToolbarLabels();
+  });
+  document.getElementById("camExpandBtn").addEventListener("click", function(){
+    var stage = document.getElementById("stageB2");
+    var backdrop = document.getElementById("expandBackdrop");
+    stage.classList.toggle("expanded");
+    backdrop.hidden = !stage.classList.contains("expanded");
+    updateToolbarLabels();
+  });
+  document.getElementById("expandBackdrop").addEventListener("click", function(){
+    document.getElementById("camExpandBtn").click();
+  });
+  document.addEventListener("keydown", function(ev){
+    if(ev.key === "Escape" && document.getElementById("stageB2").classList.contains("expanded")){
+      document.getElementById("camExpandBtn").click();
+    }
+  });
+
+  /* ---------------- playback state (shared transport) ---------------- */
+  var state = { simMs:0, playing:false, speed:1 };
+  var seekDragging = false;
+  var lastTs = null;
+
+  function updateTimeReadout(){
+    var playSec = (state.simMs/TOTAL_MS) * PLAYBACK_SECONDS;
+    document.getElementById("timeReadout").innerHTML = T().playbackLabel + " " + fmtClock(playSec) + " / " + fmtClock(PLAYBACK_SECONDS) +
+      "　<span class='real'>" + T().realLabel + " " + fmtMs(state.simMs) + " / " + fmtMs(TOTAL_MS) + "</span>";
+  }
+  function updateSeekInput(){ if(seekDragging) return; document.getElementById("seek").value = Math.round((state.simMs/TOTAL_MS)*1000); }
+  function updatePlayButton(){ document.getElementById("playBtn").textContent = state.playing ? "⏸" : "▶"; }
+
+  function renderAll(){
+    updateRailB(state.simMs);
+    updateBNow(state.simMs);
+    updateDetailPanel(state.simMs);
+    updateTimeReadout();
+    updateSeekInput();
+    var scene = computeSceneB(state.simMs);
+    var now = performance.now();
+    drawB2(scene, now);
+  }
+
+  function tick(ts){
+    if(state.playing){
+      if(lastTs != null){
+        var dt = ts - lastTs;
+        var scaled = dt * state.speed * (TOTAL_MS / (PLAYBACK_SECONDS * 1000));
+        state.simMs = Math.min(TOTAL_MS, state.simMs + scaled);
+        if(state.simMs >= TOTAL_MS){ state.playing = false; updatePlayButton(); }
+      }
+    }
+    lastTs = ts;
+    renderAll();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+  window.addEventListener("resize", function(){ /* canvases resize themselves each draw call */ });
+
+  document.getElementById("playBtn").addEventListener("click", function(){
+    if(state.simMs >= TOTAL_MS && !state.playing) state.simMs = 0;
+    state.playing = !state.playing; updatePlayButton();
+  });
+  document.getElementById("speedGroup").addEventListener("click", function(ev){
+    var btn = ev.target.closest("button"); if(!btn) return;
+    state.speed = Number(btn.dataset.speed);
+    document.querySelectorAll("#speedGroup button").forEach(function(b){ b.classList.toggle("active", b===btn); });
+  });
+  var seekEl = document.getElementById("seek");
+  ["pointerdown","touchstart"].forEach(function(ev){ seekEl.addEventListener(ev, function(){ seekDragging = true; }); });
+  ["pointerup","touchend","change"].forEach(function(ev){ seekEl.addEventListener(ev, function(){ seekDragging = false; }); });
+  seekEl.addEventListener("input", function(){ state.simMs = (Number(seekEl.value)/1000) * TOTAL_MS; });
+  document.getElementById("jumpRework").addEventListener("click", function(){
+    var next = reworkEvents.find(function(e){ return e._tStart > state.simMs + 1; });
+    if(!next) next = reworkEvents[0];
+    state.simMs = next._tStart; state.playing = false; updatePlayButton();
+  });
+
+  /* ---------------- language: applying it drives every static string in one pass;
+     everything else (detail panel, b-now, rail, canvas) already re-reads T()/
+     trField() on its own every animation frame, so it self-corrects with no
+     extra wiring. ---------------- */
+  function applyLanguage(lang){
+    currentLang = (lang === "ja" || lang === "en") ? lang : currentLang;
+    try{ window.localStorage && localStorage.setItem(LANG_KEY, currentLang); } catch(err){ /* sandboxed — session-only */ }
+    document.documentElement.lang = currentLang;
+    document.querySelectorAll("#langToggle button").forEach(function(b){
+      b.setAttribute("aria-pressed", b.dataset.lang === currentLang ? "true" : "false");
+    });
+    renderHeaderChips();
+    renderAgentLegend();
+    document.getElementById("bRailTitle").innerHTML = T().railTitleHtml;
+    document.getElementById("bRail").setAttribute("aria-label", T().railAriaLabel);
+    var railEmptyNoteEl = document.getElementById("railEmptyNote");
+    if(railEmptyNoteEl && flagEvents.length === 0){ railEmptyNoteEl.textContent = T().flagRailEmpty; }
+    document.getElementById("zoomHint").textContent = T().zoomHint;
+    document.getElementById("jumpRework").textContent = T().jumpRework;
+    document.getElementById("playBtn").setAttribute("aria-label", T().playAria);
+    document.getElementById("seek").setAttribute("aria-label", T().seekAria);
+    // defensive placeholders — renderAll() below overwrites these the instant
+    // it finds a current event/step (which is always, from simMs=0 onward),
+    // but keeps nothing stuck in the wrong language if that ever weren't true.
+    document.getElementById("detailTitle").textContent = T().startPlayback;
+    document.getElementById("bNowLabel").textContent = T().startPlayback;
+    updateToolbarLabels();
+    updateHintText();
+    renderAll();
+  }
+  document.getElementById("langToggle").addEventListener("click", function(ev){
+    var btn = ev.target.closest("button[data-lang]");
+    if(!btn) return;
+    applyLanguage(btn.dataset.lang);
+  });
+
+  // T-1012 (D2): the run id is written into the document title and the
+  // masthead by THIS script from the parsed payload at runtime — never
+  // injected into the HTML text directly (a second injection site in a
+  // different escaping context, rejected by the spec).
+  document.title = "shell-team loop replay — " + PAYLOAD.run_id;
+  var titleRunIdEl = document.getElementById("titleRunId");
+  if(titleRunIdEl){ titleRunIdEl.textContent = PAYLOAD.run_id; }
+
+  applyLanguage(currentLang);
+})();
+</script>
