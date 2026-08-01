@@ -95,6 +95,17 @@ assert_out "nulls: present phase still clusters"     '^cluster IMPLEMENT:STOPPED
 # --- empty input -> sentinel, exit 0 ---
 assert_out "empty: no failure clusters found"  '\(no failure clusters found\)' "$FIX/empty.jsonl"
 
+# --- T-1011 AC30: event rows whose `label` mimics failing verdict tokens
+# (REQUEST_CHANGES, FAIL) must not create a cluster — `label` is not a
+# verdict field, and the fail-safe skip rule keeps output identical to the
+# span-only run (defended here by this repo's own CI, not only by T-1011's
+# spec `check:` lines). ---
+grep -qF -- '"label":"REQUEST_CHANGES"' "$FIX/with-events.jsonl" \
+  || fail "with-events fixture: expected a REQUEST_CHANGES-shaped label"
+assert_out "with-events: no failure clusters found (labels are not verdicts)" \
+  '\(no failure clusters found\)' "$FIX/with-events.jsonl"
+pass "with-events: event rows (T-1011) with failing-shaped labels create no cluster"
+
 # --- usage errors ---
 assert_rc "no args -> 2"          2
 assert_rc "unreadable file -> 2"  2 "$FIX/does-not-exist.jsonl"

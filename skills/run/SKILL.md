@@ -98,6 +98,20 @@ Read `--tokens`/`--tool-uses`/`--duration-ms` from the `<usage>` block on the Ag
 log-run.sh shell-team --run-id <run_id> --seq <seq> --span <agent> --phase <phase> --iteration <n> --attempt <a> --status <status> [usage flags…] || true
 ```
 
+**Event rows (T-1011)** — alongside the span row above, also emit an EVENT row at the points below: the transition, hand-off, gate verdict, human intervention or release itself — not the sub-agent call. Same `--run-id`, the same shared monotonic seq counter (increment it for the event row too), and the same `|| true` best-effort discipline:
+
+```
+log-run.sh shell-team --run-id <run_id> --seq <seq> --event <handoff|rework|gate|human|release> [--from <phase/agent>] [--to <phase/agent>] [--label <text>] || true
+```
+
+Emit one at each of these points, mapped 1:1 to the phase steps above:
+
+- `--event handoff --from <phase> --to <phase>` at every phase transition (the step 1→2→(3)→4→5→6→7 boundaries above, wherever the board flag advances) — `--label` is optional here.
+- `--event rework --from <phase> --to implement --label <FAIL|REQUEST_CHANGES>` when a QA `FAIL` (step 5) or a Codex `REQUEST_CHANGES` (step 6) routes back to `engineer` under a `REWORK` — `--label` carries the causing verdict, so a `rework` row is never recorded without recording *why*.
+- `--event gate --from <phase> --label <PASS|FAIL|APPROVE|REQUEST_CHANGES>` at each gate judgment: the QA verdict, the Codex verdict, and every fail-closed pre-Validate seam gate (T-073's uncommitted-diff check, T-075's provenance gate, T-1002's interventions gate) — `--label` carries the verdict or the gate's own pass/fail outcome.
+- `--event human --label <the human action>` at every human stop, GO, interruption or correction — the recommended `--label` vocabulary is the interventions class slugs already in use above (`human-interrupt`, `human-correction`, `human-stop`, plus a plain `GO` or a loop-guard `STOP:<reason>`), so the two records read consistently against each other.
+- `--event release` at close-out (step 7), once `READY_FOR_MERGE` is confirmed and the summary is handed to the user — no payload flags are required.
+
 Between phases, give the user a one-line status update so they can interrupt if needed.
 
 User request:
