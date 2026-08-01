@@ -154,11 +154,33 @@ function sliceBetween(text, startAnchor, endAnchor) {
 // lookup returns a fresh fake element, so nothing in the extracted range
 // (which does no meaningful DOM work beyond existence-checks and simple
 // property sets) throws. Not a browser; just enough surface.
+//
+// T-1014 (D6): classList is now a RECORDING stub, not a no-op triple — a
+// per-element class SET, created fresh inside this function call so five
+// dots built by buildRailB() never share state (H7). `toggle(name, force)`
+// honours the DOM's own two-argument semantics exactly: a truthy `force`
+// always adds, a falsy `force` always removes, and an absent `force` flips —
+// `updateRailB` clears a dot with `toggle("reached", false)`, so a stub that
+// ignored `force` would flip instead of clear and the rewind assertion below
+// could never observe a real rewind.
 function makeFakeElement() {
+  var classes = Object.create(null);
   return {
     className: '', textContent: '', innerHTML: '', hidden: false, title: '',
     style: {}, id: '',
-    classList: { add: function () {}, remove: function () {}, toggle: function () {} },
+    classList: {
+      add: function (name) { classes[name] = true; },
+      remove: function (name) { delete classes[name]; },
+      toggle: function (name, force) {
+        if (force === undefined) {
+          if (classes[name]) { delete classes[name]; return false; }
+          classes[name] = true; return true;
+        }
+        if (force) { classes[name] = true; return true; }
+        delete classes[name]; return false;
+      },
+      contains: function (name) { return !!classes[name]; },
+    },
     appendChild: function () {}, setAttribute: function () {}, getAttribute: function () { return null; },
     addEventListener: function () {}, removeEventListener: function () {},
     getBoundingClientRect: function () { return { width: 0, height: 0, top: 0, left: 0, bottom: 0, right: 0 }; },
@@ -188,9 +210,16 @@ function loadScene(html) {
   const payloadMatch = html.match(/<script type="application\/json" id="loop-replay-data">([\s\S]*?)<\/script>/);
   if (!payloadMatch) throw new Error('could not find the injected data script tag');
   const slice = sliceBetween(script, '"use strict";', 'function updateDetailPanel(simMs){');
+  // T-1014 (D6): the rail machinery joins the harness's exported surface —
+  // flagFromLabel (the match rule), FLAG_STOPS (the single-source stop
+  // list), flagEvents (the derived flag-bearing subset), updateRailB (the
+  // per-call re-derivation) and railStopsB (the built dot/name pairs the
+  // recording classList stub observes).
   const body = slice + '\nreturn { computeSceneB: computeSceneB, getCurrentStepB: getCurrentStepB, ' +
     'TOTAL_MS: TOTAL_MS, events: events, RING_AGENTS: RING_AGENTS, PAYLOAD: PAYLOAD, RING_POS: RING_POS, ' +
-    'agentChip: agentChip, agentLabelHtml: agentLabelHtml, agentLabel: agentLabel, escapeHtml: escapeHtml };';
+    'agentChip: agentChip, agentLabelHtml: agentLabelHtml, agentLabel: agentLabel, escapeHtml: escapeHtml, ' +
+    'flagFromLabel: flagFromLabel, FLAG_STOPS: FLAG_STOPS, flagEvents: flagEvents, updateRailB: updateRailB, ' +
+    'railStopsB: railStopsB };';
   const fn = new Function('window', 'navigator', 'document', body);
   const fakeWindow = { matchMedia: function () { return { matches: false }; } };
   const fakeNavigator = { language: 'en' };
@@ -290,6 +319,178 @@ try {
   }
 })();
 
+// ---- 3. board-flag rail (T-1014, issue #83) — the eight frozen assertion
+//         ids, scoped by fixture label. rail-precondition guards every other
+//         rail assertion on the flag-rail fixture and FAILS (never skips)
+//         when the expected flag-event/rail-stop shape is wrong; the mixed
+//         fixture instead proves the empty-state half (rail-empty-state). ----
+(function boardFlagRail() {
+  if (label === 'flag-rail') {
+    // rail-precondition FAILS (never returns/skips) on a wrong flag-event or
+    // rail-stop count, but does NOT short-circuit the assertions below it:
+    // every one of them either has no positional dependency on the exact
+    // count (rail-forward-reached, rail-rewind, rail-near-miss,
+    // rail-uniform-kind) or guards its own positional access explicitly
+    // (rail-step-back, rail-determinism) — so a mutation that changes the
+    // flag count (e.g. trimming turns the trailing-space near-miss into a
+    // genuine flag) still lets the MORE SPECIFIC assertion it actually
+    // targets (rail-near-miss) report its own, more informative violation,
+    // rather than being masked behind the precondition's generic message.
+    var expectedFlagCount = 7, expectedStopCount = 5;
+    if (scene.flagEvents.length !== expectedFlagCount || scene.railStopsB.length !== expectedStopCount) {
+      fail('rail-precondition: expected ' + expectedFlagCount + ' flag events and ' + expectedStopCount +
+        ' rail stops on the flag-rail fixture, got ' + scene.flagEvents.length + ' flag event(s) and ' +
+        scene.railStopsB.length + ' rail stop(s)');
+    } else {
+      ok('rail-precondition: ' + scene.flagEvents.length + ' flag events, ' + scene.railStopsB.length + ' rail stops, as expected');
+    }
+
+    function snapshot() {
+      return scene.railStopsB.map(function (s) {
+        return s.flag + ':' + (s.dot.classList.contains('reached') ? 1 : 0) + ':' + (s.dot.classList.contains('current') ? 1 : 0);
+      }).join('|');
+    }
+    function reachedFlags() {
+      return scene.railStopsB.filter(function (s) { return s.dot.classList.contains('reached'); }).map(function (s) { return s.flag; });
+    }
+    function currentFlags() {
+      return scene.railStopsB.filter(function (s) { return s.dot.classList.contains('current'); }).map(function (s) { return s.flag; });
+    }
+
+    // rail-determinism: the class-set snapshot at one mid simMs is identical
+    // whether reached by forward-only playback or by seeking backward from
+    // TOTAL_MS first. Runs BEFORE every other rail-* assertion below —
+    // deliberately: a still-broken monotonic accumulator (the shape this
+    // task's D3 replaces) never clears once anything has called
+    // updateRailB(TOTAL_MS), so if rail-forward-reached/rail-step-back/
+    // rail-rewind ran first and each called updateRailB(TOTAL_MS) at least
+    // once, a broken accumulator would already be saturated to "everything
+    // reached" by the time this comparison ran and BOTH its forward and
+    // rewind-first snapshots would read that same saturated state — passing
+    // for the wrong reason (mutation self-check #5 caught this ordering
+    // blind spot: with the assertions in file order, restoring the old
+    // accumulator left this check green instead of red).
+    var midEvt = scene.flagEvents[2]; // the fixture's first READY_FOR_QA
+    if (!midEvt) {
+      fail('rail-determinism: fixture shape assumption broken — flagEvents[2] does not exist (only ' + scene.flagEvents.length + ' flag event(s))');
+    } else {
+      var midMs = midEvt._tStart;
+      scene.updateRailB(0);
+      scene.updateRailB(midMs);
+      var forwardSnapshot = snapshot();
+      scene.updateRailB(scene.TOTAL_MS);
+      scene.updateRailB(midMs);
+      var rewindSnapshot = snapshot();
+      if (forwardSnapshot === rewindSnapshot) {
+        ok('rail-determinism: the rail at simMs=' + midMs + ' is identical whether reached forward-only or by rewinding first');
+      } else {
+        fail('rail-determinism: forward snapshot (' + forwardSnapshot + ') != rewind-first snapshot (' + rewindSnapshot + ') at simMs=' + midMs);
+      }
+    }
+
+    // rail-forward-reached: after seeking to TOTAL_MS, all five dots are
+    // reached and exactly one is current — the positive control that proves
+    // the recording classList stub actually records at all (without it,
+    // rail-rewind below would pass for the wrong reason: vacuously).
+    scene.updateRailB(scene.TOTAL_MS);
+    var reachedAtEnd = reachedFlags(), currentAtEnd = currentFlags();
+    if (reachedAtEnd.length === scene.railStopsB.length && currentAtEnd.length === 1) {
+      ok('rail-forward-reached: all ' + reachedAtEnd.length + ' dots reached, exactly one current after seeking to TOTAL_MS');
+    } else {
+      fail('rail-forward-reached: expected all ' + scene.railStopsB.length + ' dots reached and exactly one current, got reached=[' +
+        reachedAtEnd.join(',') + '] current=[' + currentAtEnd.join(',') + ']');
+    }
+
+    // rail-step-back: flagEvents[4] is the fixture's re-emitted READY_FOR_QA
+    // (the step-back, seq 14) — at its _tStart, READY_FOR_REVIEW (a LATER
+    // stop, reached earlier at seq 9) stays reached while current moves back
+    // to READY_FOR_QA. Times are derived from the fixture's own flagEvents,
+    // never hardcoded (a hardcoded ms would silently detach the first time a
+    // span duration changes).
+    var stepBack = scene.flagEvents[4];
+    if (!stepBack || stepBack.flag !== 'READY_FOR_QA') {
+      fail('rail-step-back: fixture shape assumption broken — flagEvents[4] is not the step-back READY_FOR_QA row (got ' +
+        (stepBack ? stepBack.flag : 'undefined') + ')');
+    } else {
+      scene.updateRailB(stepBack._tStart);
+      var reachedAtStepBack = reachedFlags(), currentAtStepBack = currentFlags();
+      var expectedReached = ['READY_FOR_ARCH', 'READY_FOR_ENG', 'READY_FOR_QA', 'READY_FOR_REVIEW'];
+      var reachedSetOk = reachedAtStepBack.length === expectedReached.length &&
+        expectedReached.every(function (f) { return reachedAtStepBack.indexOf(f) !== -1; });
+      if (reachedSetOk && currentAtStepBack.length === 1 && currentAtStepBack[0] === 'READY_FOR_QA') {
+        ok('rail-step-back: the first four stops stay reached (including the later READY_FOR_REVIEW), current moves back to READY_FOR_QA');
+      } else {
+        fail('rail-step-back: expected reached=[' + expectedReached.join(',') + '] current=[READY_FOR_QA], got reached=[' +
+          reachedAtStepBack.join(',') + '] current=[' + currentAtStepBack.join(',') + ']');
+      }
+    }
+
+    // rail-rewind: after seeking to TOTAL_MS then back to 0, zero dots are
+    // reached and zero are current — the reached trace is derived fresh per
+    // call (D3), never accumulated, so a rewind un-reaches every stop the
+    // playhead has not yet passed.
+    scene.updateRailB(scene.TOTAL_MS);
+    scene.updateRailB(0);
+    var reachedAtZero = reachedFlags(), currentAtZero = currentFlags();
+    if (reachedAtZero.length === 0 && currentAtZero.length === 0) {
+      ok('rail-rewind: seeking back to 0 after reaching the end leaves zero dots reached and zero current');
+    } else {
+      fail('rail-rewind: expected zero reached and zero current after rewinding to 0, got reached=[' +
+        reachedAtZero.join(',') + '] current=[' + currentAtZero.join(',') + ']');
+    }
+
+    // rail-near-miss: none of the three committed near-miss labels derive a
+    // flag — asserted through flagFromLabel directly AND through the adapted
+    // event set, and each near-miss label is asserted PRESENT in events
+    // first, so this cannot pass against a fixture that never carried it.
+    var nearMisses = ['now READY_FOR_QA', 'ready_for_qa', 'READY_FOR_QA '];
+    var nearMissOk = true;
+    nearMisses.forEach(function (nm) {
+      var present = scene.events.some(function (e) { return e.label === nm; });
+      if (!present) {
+        fail('rail-near-miss: the flag-rail fixture never carried the near-miss label ' + JSON.stringify(nm));
+        nearMissOk = false;
+        return;
+      }
+      if (scene.flagFromLabel(nm) != null) {
+        fail('rail-near-miss: flagFromLabel() derived a flag for the near-miss label ' + JSON.stringify(nm));
+        nearMissOk = false;
+      }
+      var derivedOnEvent = scene.events.some(function (e) { return e.label === nm && e.flag; });
+      if (derivedOnEvent) {
+        fail('rail-near-miss: an adapted event carrying the near-miss label ' + JSON.stringify(nm) + ' derived a flag');
+        nearMissOk = false;
+      }
+    });
+    if (nearMissOk) {
+      ok('rail-near-miss: none of the three near-miss labels (prose-embedded, lowercase, trailing-space) derive a flag, directly or via the adapted event set');
+    }
+
+    // rail-uniform-kind: D1's uniformity probe — the fixture's `human` row
+    // (seq 22) carries a bare READY_FOR_MERGE label and IS the last entry of
+    // flagEvents, proving the derivation is not restricted to `handoff` rows.
+    var lastFlagEvent = scene.flagEvents[scene.flagEvents.length - 1];
+    if (lastFlagEvent && lastFlagEvent.type === 'human' && lastFlagEvent.flag === 'READY_FOR_MERGE') {
+      ok('rail-uniform-kind: the human-kind row\'s bare token (READY_FOR_MERGE) derives a flag and is the last flagEvents entry');
+    } else {
+      fail('rail-uniform-kind: expected the last flagEvents entry to be a human-kind row carrying READY_FOR_MERGE, got ' +
+        (lastFlagEvent ? (lastFlagEvent.type + '/' + lastFlagEvent.flag) : 'none'));
+    }
+  } else if (label === 'mixed') {
+    // rail-empty-state: on the mixed fixture, flagEvents is empty — the
+    // ratified empty-state caption path — while a positive control proves
+    // events itself is non-empty, so the emptiness is a property of the
+    // labels (no READY_FOR_* string in this fixture) and not of an absent
+    // event set.
+    if (scene.events.length > 0 && scene.flagEvents.length === 0) {
+      ok('rail-empty-state: the mixed fixture carries ' + scene.events.length + ' events and zero flag events');
+    } else {
+      fail('rail-empty-state: expected events.length > 0 and flagEvents.length === 0 on the mixed fixture, got events=' +
+        scene.events.length + ' flagEvents=' + scene.flagEvents.length);
+    }
+  }
+})();
+
 if (violations > 0) {
   console.error(label + ': ' + violations + ' violation(s)');
   process.exit(1);
@@ -309,6 +510,7 @@ HARNESS_EOF
   run_harness adopter    20260801T000000Z-adopter adopter
   run_harness hostile    20260801T000000Z-hostile hostile
   run_harness multi-run  20260801T000000Z-a      multi-run
+  run_harness flag-rail  20260801T000000Z-flagrail flag-rail
   pass "node-harness.js: every fixture executes the real scene/adaptation code without a crash or an injection escape"
 fi
 

@@ -359,14 +359,33 @@
      event" from that value would silently conflate a real gate signal with
      a human-layer settle. The event id itself, not a derived guess, is what
      downstream code (buildStepsB, the degradation classifier) now branches on. */
+  /* T-1014 (issue #83): the five closed board-flag tokens are the single
+     source for the rail's stops (D2) — declared here, ABOVE adaptRow's own
+     call site below, so the derivation never reads it before it is assigned
+     (a `var` declared after the `.map(adaptRow)` call would still exist by
+     hoisting, but its value would be `undefined` at that point and the
+     derivation would throw). flagFromLabel() is the ONE named match rule:
+     byte-exact whole-label equality, no trimming, no case-folding, no
+     substring search, no regular expression, no Unicode normalization — a
+     null/absent/non-string label returns null-ish and is never an error. */
+  var FLAG_STOPS = ["READY_FOR_ARCH","READY_FOR_ENG","READY_FOR_QA","READY_FOR_REVIEW","READY_FOR_MERGE"];
+  function flagFromLabel(label){
+    if (typeof label !== "string") return null;
+    return FLAG_STOPS.indexOf(label) !== -1 ? label : null;
+  }
   function adaptRow(row){
     if (row && row.kind === "event") {
+      // D1: every kind:"event" row derives `flag` uniformly, off the row's
+      // `label` alone — no per-event-id branch. `human` in particular carries
+      // a free-form, required label (T-1011 D3), which is exactly how an
+      // operator settling the flag directly ("the maintainer set the flag at
+      // the gate") reaches the rail.
       switch (row.event) {
-        case "handoff": return { seq:row.seq, type:"handoff", from:row.from, to:row.to, label:row.label };
-        case "rework":  return { seq:row.seq, type:"rework",  from:row.from, to:row.to, label:row.label };
-        case "gate":    return { seq:row.seq, type:"gate",    agent:row.from, label:row.label };
-        case "human":   return { seq:row.seq, type:"human",   label:row.label };
-        case "release": return { seq:row.seq, type:"release", agent:(row.from != null ? row.from : "orchestrator"), label:row.label };
+        case "handoff": return { seq:row.seq, type:"handoff", from:row.from, to:row.to, label:row.label, flag:flagFromLabel(row.label) };
+        case "rework":  return { seq:row.seq, type:"rework",  from:row.from, to:row.to, label:row.label, flag:flagFromLabel(row.label) };
+        case "gate":    return { seq:row.seq, type:"gate",    agent:row.from, label:row.label, flag:flagFromLabel(row.label) };
+        case "human":   return { seq:row.seq, type:"human",   label:row.label, flag:flagFromLabel(row.label) };
+        case "release": return { seq:row.seq, type:"release", agent:(row.from != null ? row.from : "orchestrator"), label:row.label, flag:flagFromLabel(row.label) };
         default: return null; // unreachable: bin/check-run.sh already rejects any other event id
       }
     }
@@ -556,8 +575,9 @@
   }
 
   var reworkEvents = events.filter(function(e){ return e.type === "rework"; });
+  // T-1014: FLAG_STOPS is declared above, before adaptRow's call site — see
+  // the comment there. flagEvents is every adapted row that derived a flag.
   var flagEvents = events.filter(function(e){ return !!e.flag; });
-  var FLAG_STOPS = ["READY_FOR_ARCH","READY_FOR_ENG","READY_FOR_QA","READY_FOR_REVIEW","READY_FOR_MERGE"];
 
   /* ---------------- degradation classification (design note, fixed precedence,
      evaluated once at load so exactly one message ever shows) ---------------- */
@@ -865,7 +885,6 @@
   }
 
   /* ---------------- board-flag rail (real telemetry, unaffected by ring model) ---------------- */
-  var flagStopsReached = {};
   var railStopsB = [];
   (function buildRailB(){
     var track = document.getElementById("bRailTrack");
@@ -889,14 +908,24 @@
       if(emptyNote){ emptyNote.textContent = T().flagRailEmpty; emptyNote.hidden = false; }
     }
   })();
+  // T-1014 D3: a fresh reached-set derived from flagEvents with `_tStart <=
+  // simMs` — no module-level accumulator, so the same simMs always renders
+  // the same rail regardless of how playback got there (forward-only vs a
+  // rewind). Called on every updateRailB() invocation, never memoized.
+  function railReachedAt(simMs){
+    var reached = {};
+    flagEvents.forEach(function(e){ if(e._tStart <= simMs){ reached[e.flag] = true; } });
+    return reached;
+  }
   function updateRailB(simMs){
     var current = null;
-    flagEvents.forEach(function(e){ if(e._tStart <= simMs){ current = e.flag; flagStopsReached[e.flag] = true; } });
+    flagEvents.forEach(function(e){ if(e._tStart <= simMs){ current = e.flag; } });
+    var reached = railReachedAt(simMs);
     var idx = current ? FLAG_STOPS.indexOf(current) : -1;
     var FLASH_MS = Math.max(TOTAL_MS*0.025, 45000);
     var isFlashing = reworkEvents.some(function(r){ return simMs >= r._tStart && simMs <= r._tStart + FLASH_MS; });
     railStopsB.forEach(function(s, i){
-      s.dot.classList.toggle("reached", !!flagStopsReached[s.flag]);
+      s.dot.classList.toggle("reached", !!reached[s.flag]);
       var isCurrent = i === idx;
       s.dot.classList.toggle("current", isCurrent);
       s.dot.classList.toggle("flash", isCurrent && isFlashing);
