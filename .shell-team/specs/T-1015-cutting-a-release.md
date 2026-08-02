@@ -48,7 +48,14 @@ collisions actually require.
 `CONTRIBUTING.md` carries a `## Cutting a release` section written from the v1.1.0
 execution and from nothing else, stating what has to be true at each step —
 including the head-branch mitigation that release paid for — and stating nothing
-about which environment, wrapper or tool performs a step. Its two board-hygiene
+about which environment, wrapper or tool performs a step. It carries **both** git-state
+cautions the promotion path needs, not one of them: bring `develop` up to date
+before cutting the release branch from it, and fetch `main` before tagging its merge
+commit. It says which of the local checks mean anything before the preparation is
+committed and which do not. And it states, where a reader meets it, that the release
+path is the scoped exception to the rule under `## How changes get merged` — exempt
+from the loop, not from the check, the merge gate or the maintainer go-ahead — so
+the two statements no longer contradict each other in silence. Its two board-hygiene
 bullets run in the order the steps actually run, and the flow gains one bullet
 requiring the task records, the interventions record included, to be complete
 before the board entry moves. `CLAUDE.md`'s single pointer bullet names the new
@@ -133,10 +140,11 @@ Each decision below is resolved. Nothing here is left to implementation judgment
   `T-1000` v7 keeps the five section headings, the six pull-request-flow bullets
   (including the reordered pair), the CI-green, board-format and scope bullets, and
   the one surviving absence assertion. This spec pins the ten canonical bullets of
-  the new section, the records-complete bullet, and the backticked heading token
-  inside `CLAUDE.md`'s pointer. Neither spec restates the other's bytes. The
-  ownership table below is the whole list, including the two deliberate,
-  bounded exceptions.
+  the new section, the records-complete bullet, the backticked heading token inside
+  `CLAUDE.md`'s pointer, and — at v2 — the three superseded v1 openers, each
+  asserted absent by exactly the criterion that pins its replacement. Neither spec
+  restates the other's bytes. The ownership table below is the whole list, including
+  the two deliberate, bounded exceptions.
   - **The `CLAUDE.md` pointer bullet's own bytes stay unpinned**, preserving
     `T-1000`'s DP-2 exception: what is frozen is the *property* that every
     destination it names exists, not the sentence. This task adds one property to
@@ -152,7 +160,30 @@ Each decision below is resolved. Nothing here is left to implementation judgment
     excludes them, and AC20 forbids the vocabulary outright. The document states
     the observed consequence and the mitigation for it, and asserts nothing about
     which setting produced the consequence.
-- **D5 — a release gets no board entry.** Three reasons, in order of weight: the
+  - **v2 — the same bullet also says to bring `develop` up to date before cutting
+    from it, and to confirm the local and remote refs name the same commit.** The
+    cross-provider review found the omission adversarially, and it is the second
+    git-state hazard of the same step: the preceding bullet merges the preparation
+    on the remote, a local branch pointer does not follow a merge that happened
+    elsewhere, and a branch cut from the stale pointer carries none of the bump, the
+    badges or the changelog entries. **Nothing detects it.** The badge check compares
+    the badges against the manifest, and in a stale tree those still agree with each
+    other; no check in this repository compares either against the release number
+    being cut. So the operator tags and publishes the previous release under a new
+    number, and every gate stays green throughout.
+    - **Rejected — adding a check that compares the tree against the intended
+      release number.** New mechanical checks are a Non-goal of this task, and the
+      hazard is a transient local state rather than a property of the committed
+      tree, which is a poor fit for a content checker. The documented state
+      confirmation is the proportionate answer; if this recurs in practice, a
+      checker is a separate task with its own design question.
+    - **Rejected — leaving it to the reader as ordinary git hygiene.** The very next
+      bullet already spells out the identical caution for the tag step (fetch first,
+      do not tag a local approximation), so the document would be teaching the
+      discipline in one step and assuming it in the step before — and the assumed
+      one is where the damage is silent.
+- **D5 — a release does not run the loop, and gets no board entry.** Three reasons
+  for the board half, in order of weight: the
   enforced `## Active` line requires a `spec:` pointer and a release has no spec,
   so an entry could only be created by inventing one; v1.0.0 and v1.1.0 both
   shipped without one, so writing "a release gets an entry" would document a
@@ -160,6 +191,28 @@ Each decision below is resolved. Nothing here is left to implementation judgment
   durable records — its changelog entry, its tag, and its published release page.
   This is written into the section as its own canonical line rather than left
   implicit, so the next operator does not have to re-decide it.
+  - **v2 — the same bullet reconciles the release path with the unqualified rule
+    under `## How changes get merged`.** "No board entry" was only the visible half
+    of the decision; the other half is that a release runs no spec, no acceptance
+    criteria and no second review, which makes this section the first worked
+    counter-example to a sentence two sections up that admits no exceptions. The
+    decision is to state the exception **where it applies and with its reason**
+    rather than to weaken the older sentence: every change a release publishes
+    already went through the loop one at a time, what a release adds of its own
+    lands as an ordinary pull request under the same check and the same maintainer
+    go-ahead, and the procedure itself was specified, verified and reviewed once —
+    as this task.
+    - **Rejected — amending `## How changes get merged` to admit exceptions.** That
+      paragraph is inside `T-1000`'s pinned territory, so it would cost a further
+      ratification of a merged task to say something that is only true of one
+      section; and a rule qualified at its source reads weaker everywhere, while a
+      scoped exception reads exactly where a reader needs it.
+    - **Rejected — saying nothing and letting the reader reconcile it.** That is the
+      state the cross-provider review found and named: two statements in one
+      document that cannot both be read literally, with nothing telling the reader
+      which governs. An operator would most likely resolve it conservatively and
+      route a release through a review that does not exist, which is a slower
+      failure than a wrong one but still a failure of the document.
 
 ## Non-goals
 
@@ -196,30 +249,79 @@ scripts as `bash bin/<script>.sh`, asserts readability before any negative grep,
 names every file it reads explicitly, and writes only under `$TMPDIR`. The base ref
 for every `git` anchor is the branch point `6750dcf`, except where a criterion
 names `develop` deliberately to match what CI compares against. **The exact bytes
-of every canonical line this task adds are the `grep -qxF` patterns below** — there
-is no second copy of them anywhere in this spec (D3). Each canonical line must be
-one physical, unwrapped line in `CONTRIBUTING.md`.
+of every canonical line this task adds are the `grep -qxF` patterns below**, and the
+three v1 lines that v2 replaces are the three `grep -qF` absence patterns beside
+them — there is no second copy of any of them anywhere in this spec (D3). Each
+canonical line must be one physical, unwrapped line in `CONTRIBUTING.md`.
 
 - [ ] **AC1** The new section opens with four canonical bullets: the quiet-tree
-  precondition, the no-board-entry rule (D5), how the release content is measured
-  and the number chosen, and where the version lives together with what CI compares
-  against it. The heading itself is asserted by `T-1000`'s amended AC1, which owns
-  those bytes; this criterion asserts the bullets. The file is proved readable and
-  a stable sentence of it is grepped first, so an unreadable or truncated file
-  cannot read as a clean pass.
-  - check: rc=0; F=CONTRIBUTING.md; test -r "$F" || exit 1; grep -qF 'Thanks for looking' "$F" || rc=1; grep -qxF -- '- **Start from a quiet tree.** Every task meant for the release is merged and closed out, the board carries no entry under `## Active`, and the working tree is clean before anything is bumped.' "$F" || rc=1; grep -qxF -- '- **A release gets no board entry.** The enforced Active line requires a spec pointer and a release has no spec; what records a release is its changelog entry, its tag, and its published release page.' "$F" || rc=1; grep -qxF -- '- **Measure the release before naming it.** `git log <previous-tag>..develop --oneline` is the content of the release, and the number follows semantic versioning applied to the surface this project declared stable at v1.0.0 — the plugin namespace and its command names.' "$F" || rc=1; grep -qxF -- '- **The version lives in exactly one tracked file.** `.claude-plugin/plugin.json` carries it, `.claude-plugin/marketplace.json` carries no version at any level, and CI compares the static version badge in both READMEs against that manifest — so the manifest and the two badges move together or the check fails.' "$F" || rc=1; test "$rc" -eq 0
+  precondition, the no-loop-and-no-board-entry rule with the scoped exception it
+  states (D5), how the release content is measured and the number chosen, and where
+  the version lives together with what CI compares against it. The heading itself is
+  asserted by `T-1000`'s amended AC1, which owns those bytes; this criterion asserts
+  the bullets. The file is proved readable and a stable sentence of it is grepped
+  first, so an unreadable or truncated file cannot read as a clean pass.
+  **At v2 the second bullet also reconciles the release path with the unqualified
+  rule two sections up.** `## How changes get merged` says every change goes through
+  the loop, and this section describes a path with no spec, no acceptance criteria
+  and no second review — the first worked example of an exception to a sentence that
+  states none. Leaving the two to contradict each other silently is the defect;
+  editing the older sentence to admit exceptions is the expensive fix, because that
+  paragraph is `T-1000`-pinned territory and would cost a further ratification of a
+  merged task. The cheap and more readable form is a **scoped exception stated where
+  the exception applies**: the release bullet says what is exempt (the loop), what is
+  not (the check, the merge gate, the maintainer go-ahead), and why (every change a
+  release publishes already went through the loop individually, and the procedure
+  itself was specified and reviewed once, as this task). It is worded to avoid both
+  literals `T-1000` AC25 counts at exactly one occurrence apiece in that older
+  paragraph, so an adjacent exemption cannot trip the duplication lock.
+  **The superseded v1 opener is asserted absent**, because a presence-only check
+  passes while the old and the new line sit side by side — the failure mode this
+  repository has hit before and the reason `T-1000` AC3 carries the same pair of
+  assertions.
+  - check: rc=0; F=CONTRIBUTING.md; test -r "$F" || exit 1; grep -qF 'Thanks for looking' "$F" || rc=1; grep -qxF -- '- **Start from a quiet tree.** Every task meant for the release is merged and closed out, the board carries no entry under `## Active`, and the working tree is clean before anything is bumped.' "$F" || rc=1; grep -qxF -- '- **A release does not run the loop, and gets no board entry.** Every change it publishes already went through the loop one at a time; what a release adds of its own is the mechanical output of this procedure — the bump, the badges and the changelog entries — which lands as an ordinary pull request under the same check and the same maintainer go-ahead as anything else, with no spec of its own for a board entry to point at, and the enforced Active line requires a spec pointer. What records a release is its changelog entry, its tag, and its published release page. Read this as the scoped exception to the rule under "How changes get merged" above: the procedure itself was specified, verified and reviewed once, as the task that wrote this section.' "$F" || rc=1; if grep -qF -- '- **A release gets no board entry.**' "$F"; then rc=1; fi; grep -qxF -- '- **Measure the release before naming it.** `git log <previous-tag>..develop --oneline` is the content of the release, and the number follows semantic versioning applied to the surface this project declared stable at v1.0.0 — the plugin namespace and its command names.' "$F" || rc=1; grep -qxF -- '- **The version lives in exactly one tracked file.** `.claude-plugin/plugin.json` carries it, `.claude-plugin/marketplace.json` carries no version at any level, and CI compares the static version badge in both READMEs against that manifest — so the manifest and the two badges move together or the check fails.' "$F" || rc=1; test "$rc" -eq 0
 - [ ] **AC2** The preparation half is stated as three canonical bullets: the
   release-prep branch and the four edits on it, the local verification that
   precedes the push, and landing the preparation on `develop`. The verification
   bullet points at the checks the CI-green section already names rather than
-  restating them, and says which of the two cannot run before the commit exists.
-  - check: rc=0; F=CONTRIBUTING.md; test -r "$F" || exit 1; grep -qF 'Thanks for looking' "$F" || rc=1; grep -qxF -- '- **Prepare the release on its own branch off `develop`.** Bump the manifest version, move the version badge in both READMEs to match, and add the new entry to `CHANGELOG.md` and `CHANGELOG.ja.md` — newest entry first, describing behaviour a reader can observe, with no internal task or issue references, which is the style those files declare for themselves.' "$F" || rc=1; grep -qxF -- '- **Verify the preparation locally before pushing.** `bash bin/check-readme-version.sh README.md README.ja.md` is the badge check with the argument list CI itself uses; the two checks named under "Confirming the CI check is green" above apply as well, and the commit-identity one reads commits, so it runs after the preparation is committed rather than before.' "$F" || rc=1; grep -qxF -- '- **Land the preparation on `develop` through a pull request** and wait for the check to report a conclusion on it before merging, exactly as for any other change; a release has no board hygiene and no issue to close.' "$F" || rc=1; test "$rc" -eq 0
+  restating them.
+  **At v2 the verification bullet splits the three checks by what they read, not by
+  which one is special.** The v1 wording named only the commit-identity check as
+  post-commit, which is true of it and equally true of the shape check beside it:
+  measured in the producers, the shape check enumerates changed paths from a git
+  diff and reads each path out of the commit object, so it cannot see an uncommitted
+  edit either, while the badge check contains no git invocation at all and reads the
+  working tree directly. Singling out one of the two invites a reader to run the
+  other before committing and conclude that the preparation was verified when
+  nothing of it was read. The bullet therefore states the split itself — one check
+  before the commit, two after — which is correct for all three and stays correct if
+  a fourth is ever added to the section it points at. The superseded v1 opener is
+  asserted absent, for the same reason AC1's is.
+  - check: rc=0; F=CONTRIBUTING.md; test -r "$F" || exit 1; grep -qF 'Thanks for looking' "$F" || rc=1; grep -qxF -- '- **Prepare the release on its own branch off `develop`.** Bump the manifest version, move the version badge in both READMEs to match, and add the new entry to `CHANGELOG.md` and `CHANGELOG.ja.md` — newest entry first, describing behaviour a reader can observe, with no internal task or issue references, which is the style those files declare for themselves.' "$F" || rc=1; grep -qxF -- '- **Verify the preparation locally before pushing, in two passes.** `bash bin/check-readme-version.sh README.md README.ja.md` is the badge check, with the argument list CI itself uses, and it reads the working tree — so it is the only one of the three that means anything before the change is committed. The two named under "Confirming the CI check is green" above both read committed content — one enumerates the changed paths and reads each of them out of the commit, the other reads the commits themselves — so both belong after the preparation is committed, and neither can see an uncommitted edit.' "$F" || rc=1; if grep -qF -- '- **Verify the preparation locally before pushing.**' "$F"; then rc=1; fi; grep -qxF -- '- **Land the preparation on `develop` through a pull request** and wait for the check to report a conclusion on it before merging, exactly as for any other change; a release has no board hygiene and no issue to close.' "$F" || rc=1; test "$rc" -eq 0
 - [ ] **AC3** The promotion half is stated as three canonical bullets: the
   promotion from a throwaway `release/vX.Y.Z` head branch with the reason it exists
   (D4), the annotated tag on the merge commit, and publishing the release against
   that tag. The head-branch bullet names the observed consequence and the repair,
   and asserts no configuration.
-  - check: rc=0; F=CONTRIBUTING.md; test -r "$F" || exit 1; grep -qF 'Thanks for looking' "$F" || rc=1; grep -qxF -- '- **Promote `develop` to `main` from a throwaway `release/vX.Y.Z` branch cut from `develop`.** A pull request whose head branch is `develop` itself can leave `develop` deleted once the merge completes — that happened at v1.1.0 and had to be repaired by pushing the branch back from a local clone — and a throwaway head branch is what keeps the integration branch out of reach. The merge waits for the maintainer go-ahead and for the check to report its conclusion.' "$F" || rc=1; grep -qxF -- '- **Tag the merge commit on `main` with an annotated tag named `vX.Y.Z`.** Fetch `main` first so that the merge commit exists locally, tag that commit rather than a local approximation of it, push the tag, and confirm the remote lists it.' "$F" || rc=1; grep -qxF -- '- **Publish the release against that tag.** The notes are drafted before the promotion merges and approved by the maintainer with the same go-ahead, they are written in English as both earlier releases were, and the release is confirmed published rather than left as a draft.' "$F" || rc=1; test "$rc" -eq 0
+  **At v2 the promotion bullet also says to update `develop` before cutting from
+  it**, which the v1 wording left out. The preceding step merges the preparation on
+  the remote; a local branch pointer does not move because a merge happened
+  elsewhere, so the very next instruction — cut a branch from `develop` — can cut
+  from a commit that predates the bump, the badges and the changelog entries. **The
+  failure is silent by construction**: a stale tree carries a manifest and two
+  badges that still agree with each other, which is the only relation the badge
+  check compares, so nothing local and nothing in CI reports it, and the operator
+  tags and publishes a release whose content is the previous one. This is the same
+  class as the head-branch deletion this bullet already warns about — a git state
+  transition whose damage is invisible at the moment it is taken — and the very next
+  bullet already applies the same caution to the tag step (fetch first, do not tag a
+  local approximation). The asymmetry was the defect; the two bullets now carry the
+  same discipline. The instruction is written as a **state to verify** (the local and
+  remote `develop` name the same commit) rather than as a tool to run, per this
+  section, and it names no configuration, so `T-1000` AC20's vocabulary lock is
+  untouched. The superseded v1 opener is asserted absent, for the same reason
+  AC1's is.
+  - check: rc=0; F=CONTRIBUTING.md; test -r "$F" || exit 1; grep -qF 'Thanks for looking' "$F" || rc=1; grep -qxF -- '- **Promote `develop` to `main` from a throwaway `release/vX.Y.Z` branch cut from `develop`, and fetch `develop` before cutting it.** The preparation merged on the remote moments earlier, so the local branch is still behind until it is updated: confirm that the local `develop` and the remote one name the same commit, and cut the throwaway branch from that. A stale cut is the quiet failure of this step — the release tree would carry none of the bump, the badges or the changelog entries, and no check would notice, because the manifest and the badges stay consistent with each other. A pull request whose head branch is `develop` itself can leave `develop` deleted once the merge completes — that happened at v1.1.0 and had to be repaired by pushing the branch back from a local clone — and a throwaway head branch is what keeps the integration branch out of reach. The merge waits for the maintainer go-ahead and for the check to report its conclusion.' "$F" || rc=1; if grep -qF -- '- **Promote `develop` to `main` from a throwaway `release/vX.Y.Z` branch cut from `develop`.**' "$F"; then rc=1; fi; grep -qxF -- '- **Tag the merge commit on `main` with an annotated tag named `vX.Y.Z`.** Fetch `main` first so that the merge commit exists locally, tag that commit rather than a local approximation of it, push the tag, and confirm the remote lists it.' "$F" || rc=1; grep -qxF -- '- **Publish the release against that tag.** The notes are drafted before the promotion merges and approved by the maintainer with the same go-ahead, they are written in English as both earlier releases were, and the release is confirmed published rather than left as a draft.' "$F" || rc=1; test "$rc" -eq 0
 - [ ] **AC4** The promoted lesson lands as one canonical bullet inside
   `## The pull-request flow`, and it names all three records rather than only the
   new one — the point of the lesson is that the interventions record is checked
@@ -402,6 +504,11 @@ to an explicit exemption with a reason.
 | The section is written from the v1.1.0 execution and from nothing else | Goal, Problem | AC13 (attested), with the claim-to-evidence table as its record; AC1/AC2/AC3 pin the sentences that resulted |
 | The section states what must be true, never which environment or tool performs a step | Goal, Non-goals | AC11 (vocabulary proxy), AC13 (the judgment half) |
 | The head-branch mitigation is a throwaway `release/vX.Y.Z` branch | D4 | AC3 |
+| The throwaway branch is cut from a `develop` brought up to date, and the local/remote match is confirmed first (v2) | D4, AC3 body | AC3 — the pinned bullet carries the instruction and its reason |
+| The stale-cut failure is silent because no check compares the manifest or the badges against a release number (v2) | AC3 body, row R8 | `info-only (not promoted to AC)` — it is a statement about what the existing checkers do *not* compare, and the response to it is the documented state check, not a new check (adding one is a Non-goal). The assertable half is that the instruction is present, which AC3 pins |
+| All three local checks are placed correctly relative to the commit: one before, two after (v2) | AC2 body, row R6 | AC2 |
+| A release does not run the loop; the exception is scoped, reasoned, and stated where it applies (v2) | D5, AC1 body | AC1 |
+| The `## How changes get merged` section is not edited, and the exemption is worded so the two duplication anchors it carries stay at exactly one occurrence each (v2) | AC1 body | AC6 (through `T-1000` AC25, which counts both anchors), AC10 (a `CONTRIBUTING.md` edit outside the release section and the flow bullets would still be inside the allow-listed file, so the count lock is the real guard here, not the scope lock) |
 | No configuration or protection setting is asserted | D4, Non-goals | `T-1000` AC20 via AC6 (the forbidden vocabulary), AC3 (the bullet states a consequence, not a setting) |
 | A release gets no board entry | D5 | AC1 |
 | The two board-hygiene bullets run in the order the steps run | Goal, Problem | AC5 (order), `T-1000` AC3 via AC6 (the reworded bytes and both superseded openings asserted absent) |
@@ -423,6 +530,7 @@ to an explicit exemption with a reason.
 | No change to `bin/close-out.sh`; the tooling half is issue #90 | Non-goals | AC10 |
 | The lessons corpus is not edited; the promoted entry is an input | Non-goals | AC10 (the corpus file is outside the allow-list, so an edit surfaces as an extra path) |
 | No `CONTRIBUTING.ja.md`; nothing under `bin/`, `tests/`, `.github/`, `templates/`, `docs/`, `agents/`, `skills/` | Non-goals | AC10 (any of them surfaces as an extra path), `T-1000` AC24 via AC6 for the four directories it already covers |
+| A superseded canonical line must not survive alongside its replacement (v2) | AC1/AC2/AC3 bodies | AC1, AC2 and AC3 each assert the v1 opener they replace absent, mirroring `T-1000` AC3's own pair |
 | Canonical lines are one physical unwrapped line each | AC preamble | AC1–AC4 (`grep -qxF` is a whole-line match, so a wrapped line cannot pass) |
 | Every check asserts readability before a negative grep and proves its extraction non-empty | AC preamble | AC1–AC5, AC7–AC11 each carry the guard; AC6 guards `T-1000`'s spec path |
 | The whole CI list is run locally, and the mutation self-check is performed | AC12 | AC12 (runtime, `SKIP` by design) |
@@ -439,16 +547,50 @@ recorded in the observation log the orchestrator carried into this task;
 | # | Canonical line | Evidence | AC |
 |---|---|---|---|
 | R1 | Start from a quiet tree | Observed: the v1.1.0 preparation began with every task merged and closed out, an empty `## Active`, and a clean tree. Measured: the board's `## Active` section is empty today, immediately after the T-1013 close-out | AC1 |
-| R2 | A release gets no board entry | Measured three ways: the board has no entry for v1.0.0 or v1.1.0; `bin/check-handoff.sh`'s `LINE_RE` requires ` — spec: <path>.md` on every Active line, and a release has no spec; the three records a release leaves (changelog entry, tag, release page) all exist for both shipped releases | AC1 |
+| R2 | A release does not run the loop, gets no board entry, and this is a scoped exception to the rule two sections up | Measured four ways: the board has no entry for v1.0.0 or v1.1.0; `bin/check-handoff.sh`'s `LINE_RE` requires ` — spec: <path>.md` on every Active line, and a release has no spec; the three records a release leaves (changelog entry, tag, release page) all exist for both shipped releases; and `## How changes get merged` states its rule unqualified, with no exception clause anywhere in the file — so the reconciliation had to be written rather than found. **v2**: the exception half was added after the cross-provider review observed that this section is the first worked counter-example to that unqualified sentence and that the two were left silently contradicting each other | AC1 |
 | R3 | Measure the release, then choose the number | Observed: the content of v1.1.0 was read off the commit range from the previous tag to `develop` before the number was chosen. Measured: `CHANGELOG.md`'s v1.0.0 entry states that the namespace and command surface were adopted "as the stable public surface under semantic versioning", which is the surface the number is judged against | AC1 |
 | R4 | The version lives in exactly one tracked file; CI compares both badges against it | Measured: `.claude-plugin/plugin.json` carries `"version"`; `.claude-plugin/marketplace.json` has no version field at any level; `bin/check-readme-version.sh`'s header names the manifest as the source of truth and says the check "looks ONLY at the badge"; the workflow's dogfood step passes `README.md README.ja.md` | AC1 |
 | R5 | Prepare on a branch off `develop`; four edits; changelog style | Observed: v1.1.0 was prepared on a branch off `develop` carrying exactly the manifest bump, both badges, and the two changelog entries. Measured: `CHANGELOG.md`'s own opening paragraph declares the style — newest first, and scrubbed of internal task and issue references | AC2 |
-| R6 | Verify locally before pushing | Observed: the badge check, the shape check against `develop`, and the identity check after committing were all run locally before the push. Measured: the two checks other than the badge one are already described in `## Confirming the CI check is green`, which is why this bullet points at that section instead of restating them; `bin/check-commit-identity.sh` reads commits, so it has nothing to read before one exists | AC2 |
+| R6 | Verify locally before pushing, in two passes — one check before the commit, two after | Observed: the badge check, the shape check against `develop`, and the identity check after committing were all run locally before the push. Measured: the two checks other than the badge one are already described in `## Confirming the CI check is green`, which is why this bullet points at that section instead of restating them. **v2, measured in the producers rather than inferred**: `bin/check-commit-identity.sh` reads commits, and `bin/check-pii-shapes.sh` enumerates changed paths from a git diff and reads each path's content out of the commit — so **both** are post-commit, while `bin/check-readme-version.sh` contains no git invocation at all and reads the working tree, so it is the only one of the three that means anything before the commit. The v1 wording named only the identity check as post-commit, which was true but asymmetric, and the asymmetry invited exactly the wrong inference about the other one | AC2 |
 | R7 | Land the preparation on `develop` through a pull request and wait for a reported conclusion | Observed: the preparation went in as an ordinary pull request and its check was allowed to report before the merge. Measured: the flow's existing bullets already state the target and the confirmation rule, so this line adds only the two things that differ for a release — no board hygiene, no issue to close | AC2 |
-| R8 | Promote from a throwaway `release/vX.Y.Z` head branch | Observed, and this is the row the whole task exists for: at v1.1.0 the promotion pull request was opened with `develop` as its head branch, `develop` was deleted when the merge completed, and it was restored by pushing the branch back from a local clone. Measured: `release` is a legal `<type>/<slug>` type, since the flow's own bullet leaves the type set open | AC3 |
-| R9 | Annotated tag on the merge commit; fetch first; verify on the remote | Observed: the merge commit had to be fetched before it could be tagged locally, and the tag's presence on the remote was confirmed after the push. Measured (carried forward from `T-1000` DP-7): the single pre-existing tag `v1.0.0` is annotated, so the annotated form is this project's practice and not an invention | AC3 |
+| R8 | Promote from a throwaway `release/vX.Y.Z` head branch, cut from a `develop` that has been brought up to date | Observed, and this is the row the whole task exists for: at v1.1.0 the promotion pull request was opened with `develop` as its head branch, `develop` was deleted when the merge completed, and it was restored by pushing the branch back from a local clone. Measured: `release` is a legal `<type>/<slug>` type, since the flow's own bullet leaves the type set open. **v2, the fetch-before-cut half**: derived rather than observed, and stated as such — the preceding bullet merges the preparation on the remote, a local branch pointer does not follow a merge that happened elsewhere, and `bin/check-readme-version.sh` compares the badges against the manifest only, so a tree that predates the bump is internally consistent and passes. No check in this repository compares either against a release number, which is what makes the failure silent; the mitigation is therefore a documented state to confirm, not a check to add (adding one is a Non-goal). The same caution is already applied one bullet later to the tag step, and the two are now symmetric | AC3 |
+| R9 | Annotated tag on the merge commit; fetch first; verify on the remote | Observed: the merge commit had to be fetched before it could be tagged locally, and the tag's presence on the remote was confirmed after the push. Measured (carried forward from `T-1000` DP-7): the single pre-existing tag `v1.0.0` is annotated, so the annotated form is this project's practice and not an invention. **Corrected — see the dated note directly below this table; the grounding sentence in this cell is stale and the row is kept as written for the trail** | AC3 |
 | R10 | Publish the release against the tag; notes drafted and approved beforehand; English | Observed: the notes were drafted before the promotion merged, approved by the maintainer together with the go-ahead, and the published state was confirmed afterwards. Measured: the release notes for v1.0.0 and v1.1.0 are both in English | AC3 |
 | R11 | The task records are complete before the board entry moves | Grounded in the promoted lessons entry `## 2026-08-01 — Close-out verifies the task's interventions record exists`, whose `Bound-in` field names this document. Measured across the last sprint's tasks (T-1005 through T-1013): every one of them has a provenance record and a review record, and every one has an interventions record **except exactly one** — the omission the lesson was written from. Measured on the tooling side: `bin/close-out.sh` contains no occurrence of the word at all, which is why the tooling half is a separate issue (#90) and this line is the whole of the in-scope half | AC4 |
+
+### Correction to R9 (2026-08-02) — the annotated-tag grounding is stale
+
+**Measured independently by QA and by the cross-provider review, and reproduced in
+both records** (`.shell-team/reviews/T-1015.md`, §6 and the Minor entry of the Codex
+verdict): `v1.0.0` is a genuine annotated tag object, but **`v1.1.0` — the very
+release this section is written from — is a lightweight tag**. R9's sentence "the
+annotated form is this project's practice" was accurate when `T-1000` DP-7 measured
+it, because `v1.1.0` did not exist yet; by the time this spec was drafted it
+described one of two releases and therefore no longer described a practice.
+
+**Disposition, stated explicitly.**
+
+- **The row is not amended and the correction lives here instead.** R9 sits outside
+  the intent block, so amending it would cost no ratification — but it is a
+  *historical* evidence record, and rewriting a measurement after the fact erases
+  the trail of what the spec was grounded on when it was frozen. The correction is
+  therefore additive and dated, and R9 carries a pointer to it. This also keeps the
+  v1→v2 ratification scope to exactly the three shipped bullets the review found
+  defects in, which is the point of scoping a ratification at all.
+- **The shipped bullet is not changed and is not defective.** It reads "Tag the
+  merge commit on `main` with an annotated tag named `vX.Y.Z`" — an instruction for
+  the next release, never a claim to the reader about past practice. QA and the
+  review independently reached the same conclusion: no criterion is violated and no
+  reader is misled. AC13's attestation is qualified by this note rather than by a
+  changed row.
+- **Retagging `v1.1.0` is not proposed.** Deleting and recreating a tag is a named
+  out-of-scope class in this spec's own Input space, and doing it to make a past
+  release match a sentence would be the tail wagging the dog. The historical fact
+  stands; only the description of it is corrected.
+- **A fast-follow is recommended and not filed here** — pm-spec has no shell or
+  network in this role. The review's own disposition names it: soften the grounding
+  language to "prescribed going forward" wherever it recurs, which is a spec-hygiene
+  item and not a merge blocker.
 
 ## `T-1000` criterion disposition after v7
 
@@ -478,7 +620,7 @@ All twenty-four, so that "must pass" is a closed list rather than an impression.
 | AC22 | **stale by design — expected FAIL** | self-declared merge-point-scoped; this task's own files are outside `T-1000`'s allow-list by construction |
 | AC23 | **stale, expected FAIL, not fixed here** | two of its clauses grep for strings a later task legitimately removed (issue #30, shipped in v1.1.0), so it has been red since then; recorded in D2, out of scope |
 | AC24 | unaffected, must pass | nothing under `bin/`, `tests/`, `.github/` or `templates/` changes, and its positive control holds while this task is in flight |
-| AC25 | unaffected, must pass | **collision row** — the regression lock against re-importing release prose from `README.md` or `docs/distribution.md`; the new section is written from an execution, so it must not carry any of the three forbidden phrases |
+| AC25 | unaffected, must pass | **collision row**, and at v2 the tightest one — it is the regression lock against re-importing release prose from `README.md` or `docs/distribution.md` (none of the three forbidden phrases may appear), **and** it counts two sentences of `## How changes get merged` at exactly one occurrence each. v2's loop-exemption sentence sits adjacent to that paragraph and refers to it, so it is worded to contain neither anchor string; reproducing either while paraphrasing the rule would take the count to two and fail this criterion |
 | AC26 | unaffected, must pass | **collision row** — six of the seven status-flag tokens must not appear; the records bullet is the line most at risk |
 | AC27 | unaffected, must pass | the About-CI correction is untouched |
 
@@ -491,8 +633,9 @@ All twenty-four, so that "must pass" is a closed list rather than an impression.
 | The six pull-request-flow bullets, including the reordered pair | `T-1000` AC3 | this spec restates none of them |
 | `- **Merge, then run board hygiene.**` and `- **Publish the board edit as its own pull request.**` (absence) | `T-1000` AC3 | the superseded pre-reorder openings |
 | The five CI-green bullets, the five board-format bullets, the three scope bullets | `T-1000` AC9 / AC12 / AC15 | untouched by this task |
-| The ten `## Cutting a release` bullets | this spec, AC1 / AC2 / AC3 | four, three and three respectively |
+| The ten `## Cutting a release` bullets | this spec, AC1 / AC2 / AC3 | four, three and three respectively. **v2 rewords three of the ten** — the no-loop/no-board-entry bullet (AC1), the local-verification bullet (AC2) and the promotion bullet (AC3). Ownership does not move: each reworded line is still pinned by exactly the criterion that pinned its predecessor, and no fragment of any of the three appears in `T-1000` or anywhere else in this spec |
 | The records-complete bullet | this spec, AC4 | the seventh bullet of the pull-request flow |
+| The three superseded v1 openers (absence) — `- **A release gets no board entry.**`, `- **Verify the preparation locally before pushing.**`, and the promotion opener ending `cut from `develop`.**` | this spec, AC1 / AC2 / AC3 respectively | added at v2; each is asserted absent by exactly the criterion that pins its replacement, and none of the three appears anywhere else in either spec |
 | `` `## Cutting a release` `` as a backticked token inside `CLAUDE.md` | this spec, AC8 | **declared exception**: a different string in a different file from AC1's whole-line heading assertion. The two are near-duplicates by nature — a pointer names its target — and the alternative, deriving one from the other at run time, buys nothing and costs legibility |
 | `merge commit` and `close-out.sh` as **position** anchors | this spec, AC5 | **declared exception**: both are substrings of bullets `T-1000` AC3 pins. They are used to establish an order, never to assert content, and the branching bullet is worded so that the second anchor appears only in the bullet that must come later |
 | The `CLAUDE.md` pointer bullet's prose | nobody, deliberately | `T-1000`'s DP-2 exception, preserved: AC17 freezes the property, not the sentence |
@@ -530,6 +673,27 @@ All twenty-four, so that "must pass" is a closed list rather than an impression.
   itself**: it passes only after the v7 hash and the sixth ratification record are
   written, so re-run it after the ledger update rather than reading its first result
   as final.
+- **v1→v2 re-freeze (2026-08-02), and its own predicted result.** The
+  cross-provider review returned `REQUEST_CHANGES` with one Blocker and two Majors,
+  all three of them inside pinned canonical bytes, so the fix is a frozen-region
+  revision rather than an implementation change: three of the ten shipped bullets
+  are reworded (the promotion bullet gains fetch-before-cut; the verification bullet
+  states the pre/post-commit split for all three checks; the no-board-entry bullet
+  becomes the no-loop-and-no-board-entry bullet carrying the scoped exception), and
+  AC1, AC2 and AC3's `grep -qxF` patterns move with them, each gaining an absence
+  assertion against the v1 opener it supersedes. Nothing else in the intent block
+  changes — no criterion is added or retired, the count stays at thirteen, the ten
+  bullets stay ten, `T-1000`'s v7 region is not touched, and the Input space is
+  unchanged. **Predicted at the v2 freeze, against the tree as the engineer left it
+  (v1 bullets shipped): AC1, AC2 and AC3 report FAIL — twice over each, since the
+  reworded pattern does not match the v1 line still in the file and the absence
+  assertion finds that same v1 line present — and the other eight live checks report
+  PASS**, because the v1 work they measure (the flow reorder, the records bullet,
+  the pointer, both ledgers, the records, the scope lock, the vocabulary) is
+  untouched by this revision. AC6 in particular must stay PASS: no `T-1000` pattern
+  changes, so its twenty must-pass criteria are unaffected. Any other shape is worth
+  reading before it is accepted — an AC4/AC5/AC7/AC8 failure would mean the revision
+  reached further than it was scoped to.
 - **Shapes the executing side must verify at the freeze, disclosed rather than left
   to be discovered:**
   1. **AC6's wall time.** It runs `bin/check-acs.sh` over `T-1000`'s twenty-four
@@ -600,6 +764,7 @@ All twenty-four, so that "must pass" is a closed list rather than an impression.
     | `git log <previous-tag>..develop --oneline` | the new section (R3) | a shell at the repository root | none — `git clone` fetches tags by default, so the previous tag resolves; the placeholder is filled in by the operator |
     | `bash bin/check-readme-version.sh README.md README.ja.md` | the new section (R6) | a shell at the repository root | none — the script and both READMEs are tracked, and the argument list is the workflow's own |
     | the tag and fetch operations of R9 | the new section | a shell at the repository root | written as prose (`fetch`, `tag`, `push`, `confirm`) rather than as literal command lines, precisely because the exact invocation is the part that varies |
+    | **v2** — updating `develop` and confirming it names the same commit as the remote, before cutting `release/vX.Y.Z` (R8) | the new section | a shell at the repository root, with a remote configured — which is already true of any clone the promotion step can be performed from | written as a **state to confirm**, not as a command line, for the same reason as the row above: the fetch invocation and the way an operator compares the two refs both vary, while the state that must hold does not. No new runnable example is introduced |
     | `bash bin/close-out.sh --task T-NNNN --issue N --pr N` | the flow's reworded bullet | a shell at the repository root | unchanged from before this task; `T-1000` AC4 grounds it |
     | every `check:` line in this spec | this spec | `bin/check-acs.sh`, from the repository root, on this branch | `develop` and `6750dcf` resolvable locally; no network, no tags, no environment variable |
 
@@ -624,6 +789,46 @@ been red since issue #30 shipped, and deciding between re-grounding it and
 retiring it is not this task's call (D2).
 
 ## Notes for engineer
+
+### v2 rework (2026-08-02) — read this first; the rest of this section is the v1 brief
+
+**Three shipped bullets are replaced in place, and nothing else changes.** The
+section, the flow bullets, the pointer, both ledgers and all the records are already
+correct and stay as they are. Swap each of the three for the new `grep -qxF` pattern
+in its criterion, one physical unwrapped line each, and confirm the superseded line
+is gone rather than sitting alongside its replacement:
+
+1. **AC1's second pattern** — `- **A release gets no board entry.** …` becomes
+   `- **A release does not run the loop, and gets no board entry.** …`, which is
+   longer: it carries the scoped exception to `## How changes get merged`.
+2. **AC2's second pattern** — `- **Verify the preparation locally before pushing.** …`
+   becomes `- **Verify the preparation locally before pushing, in two passes.** …`,
+   which states the pre/post-commit split for all three checks instead of naming one.
+3. **AC3's first pattern** — the promotion bullet gains `, and fetch `develop` before
+   cutting it` in its bold opener plus two sentences of reason before the existing
+   head-branch text, which is otherwise unchanged.
+
+**Do not touch `## How changes get merged`.** The reconciliation is written into the
+release bullet on purpose (AC1's body says why): that paragraph is `T-1000`-pinned
+and editing it would cost a further ratification of a merged task. `T-1000` AC25
+counts two of its sentences at exactly one occurrence each, so also do not
+paraphrase either of them into the new bullet — check both counts are still one
+after your edit, which AC6 does for you.
+
+Each of the three criteria now also **asserts its superseded v1 opener absent**, so
+replacing a line means replacing it: adding the new bullet while leaving the old one
+above it fails, even though the new text is present.
+
+**Mutation self-check for this round** (AC12, same discipline as v1, one at a time
+on a scratch copy): each of the three reworded lines altered by a single character
+must turn exactly its own criterion red; **each superseded v1 line pasted back
+alongside its replacement must turn its criterion red too** — that is the one
+mutation a presence-only check would have passed, and it is what the three new
+absence assertions exist for; and after restoring, re-run AC6 to confirm none of
+`T-1000`'s twenty must-pass criteria moved — in particular AC25, whose two counts
+the new exemption sentence sits next to.
+
+### v1 brief (unchanged, and already implemented)
 
 **Read `T-1000`'s amended AC1, AC3 and AC17 before you touch `CONTRIBUTING.md`.**
 They are already written and already ratified by the time you start; the canonical
