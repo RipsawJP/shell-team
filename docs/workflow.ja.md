@@ -75,7 +75,11 @@ status flag（`READY_FOR_ARCH` … `READY_FOR_MERGE`、`BLOCKED`、`REWORK`）�
 マーカーに基づきます — マーカーの隣の見出しテキストは自由なので、日本語でも英語でも他の
 どんな言語で書かれた retro でも同じ構造チェックを通ります。出荷される（英語の）雛形は
 `docs/templates/retro-template.md` を、マーカー契約以前に書かれた retro の移行手順は
-そのファイルの移行注記を参照してください。
+そのファイルの移行注記を参照してください。`bin/gen-loop-replay.sh` が生成する run-replay
+ページも同じクラスに入ります: operator が書いた `label` テキストはページ内に逐語で
+表示され、ページ自身の UI 辞書は英日どちらの言語も持ちますが、機械トークン（rail の
+5 つの `READY_FOR_*` 停止点、判定ラベル）は逐語の英語のままです — 出荷される
+`templates/loop-replay.html` 自体は、他の出荷ファイルと同様に英語で書かれた出荷物です。
 
 **既知の制約**: ミラーが保証されるのは **SKILL 駆動の経路**（`/shell-team:run`・`/goal`）
 だけで、そこではオーケストレータがディレクティブを注入します。エージェントを

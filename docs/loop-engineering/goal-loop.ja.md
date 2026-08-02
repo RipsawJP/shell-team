@@ -44,7 +44,7 @@ STOP を返すまで、tick ごとに 1 回の **implement → verify** 試行�
 | バウンド（暴走 STOP） | `bin/loop-guard.sh` + `goal.contract.yaml` | イテレーション / 実時間 / no-progress |
 | 完了（tick ごとのジャッジ） | `check-acs.sh` → `check-intent.sh`（spec が凍結 intent ブロックを持つ場合のみ） → `check-provenance.sh` → `qa-verifier` → `codex-reviewer` | 決定的 → 決定的（条件付き） → 決定的 → 判断 → クロスプロバイダ、それぞれ独立 |
 | tick をまたぐ状態 | `bin/goal-state.sh` + `<runs>/goal-<task>.state` | ループ開始時刻・イテレーション・前回の失敗シグネチャ |
-| テレメトリ | `bin/log-run.sh` | サブエージェント呼び出しごとに 1 span（`loop_id=goal`） |
+| テレメトリ | `bin/log-run.sh` | サブエージェント呼び出しごとに 1 span（`loop_id=goal`）。event 行は goal loop 自身ではなく `/shell-team:run` から来る。`bin/gen-loop-replay.sh` がどちらの行種別も replay ページとして読み戻す |
 
 完了シグナルは**階層化**されており、単一の小さなモデルではありません — まず決定的な
 `check-acs`（無料、誤った「完了っぽい」が無い）、次に `check-intent`（spec が凍結

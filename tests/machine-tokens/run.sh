@@ -78,6 +78,29 @@ for t in '<!-- BEGIN prompt-block:' '<!-- END prompt-block:'; do
   assert_token bin/check-prompt-sync.sh "$t"
 done
 
+# --- event vocabulary (T-1011): the closed 5-member event-id enum, plus the
+# `"kind":"event"` discriminator token that selects it, must survive verbatim
+# in both the writer and the checker that enforce it. Consumers here are
+# restricted to bin/ — never skills/ — so this group's own mutation
+# self-check (which copies only bin/agents/templates into a scratch root,
+# see --root above) stays meaningful: a file this group asserted against but
+# didn't copy would fail closed (usage exit 2) rather than red (exit 1).
+for t in handoff rework gate human release; do
+  assert_token bin/log-run.sh "$t"
+  assert_token bin/check-run.sh "$t"
+done
+assert_token bin/check-run.sh '"kind":"event"'
+
+# --- rendered UI machine tokens (T-1012): the flag rail and verdict chips in
+# templates/loop-replay.html carry a SUBSET of the status flags (the five
+# forward-progress phases; BLOCKED/REWORK are exception states not drawn on
+# the rail) and all four verdict labels, verbatim. Scoped to exactly this set
+# rather than folded into the loops above, so this group's own requirement
+# stays what AC24 (T-1012) actually checks.
+for t in READY_FOR_ARCH READY_FOR_ENG READY_FOR_QA READY_FOR_REVIEW READY_FOR_MERGE PASS FAIL APPROVE REQUEST_CHANGES; do
+  assert_token templates/loop-replay.html "$t"
+done
+
 # --- lesson labels: bin/check-retro.sh + agents/scrum-master.md only.
 for t in '[common]' '[target-specific]'; do
   assert_token bin/check-retro.sh "$t"

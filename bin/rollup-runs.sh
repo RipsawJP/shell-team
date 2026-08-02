@@ -9,6 +9,17 @@
 # span count, phases covered, status / verdict breakdowns, token & duration
 # totals, the wall-clock window, and a health flag.
 #
+# T-1011 adds a second row shape, EVENT rows (a hand-off, a route-back, a
+# gate verdict, a human stop/GO, a release — discriminated by `"kind":
+# "event"`), sharing the same file. This script skips them: they carry no
+# span-shaped telemetry (no phase/status/tokens/etc.), so folding one in
+# would corrupt every count below. The skip rule is fail-safe (D1): any
+# `kind` value other than absent or `"span"` — including an unrecognized one
+# — is skipped, not counted; reporting an unrecognized `kind` is
+# bin/check-run.sh's job, not this reporter's. No new output is added for
+# event rows (D1) — this script's stdout for a file is byte-identical to its
+# stdout for the same file with every event row deleted.
+#
 # It assumes check-run-valid input (malformed lines are check-run's job); a line
 # with no extractable `run_id` is skipped. Pure bash + coreutils — no
 # jq/yq/python, and no bash-4 features (associative arrays, `${x,,}`), so it runs
@@ -37,7 +48,23 @@ if [[ "$#" -lt 1 ]]; then
   exit 2
 fi
 
-# --- buffer every span line from every input file (in file/line order) ---
+# is_span_row <line> — fail-safe `kind` discriminator (T-1011, D1): a row is
+# a span when its `kind` value is absent or "span"; anything else (an event
+# row, or an unrecognized/malformed `kind`) is skipped by this reporter. Keys
+# are boundary-anchored (`{` or `,` then `"kind":`), the same anchoring
+# field_str below uses, so a `kind`-shaped substring inside another field's
+# value can never be mistaken for the discriminator.
+is_span_row() {
+  local line="$1"
+  if [[ "$line" =~ [\{,]\"kind\":\"([^\"]*)\" ]]; then
+    [[ "${BASH_REMATCH[1]}" == "span" ]]
+    return
+  fi
+  ! [[ "$line" =~ [\{,]\"kind\": ]]
+}
+
+# --- buffer every span line from every input file (in file/line order);
+#     event rows are skipped here so no pass below ever sees one ---
 LINES=()
 for FILE in "$@"; do
   if [[ ! -r "$FILE" ]]; then
@@ -47,6 +74,7 @@ for FILE in "$@"; do
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"
     [[ -z "$line" ]] && continue
+    is_span_row "$line" || continue
     LINES+=("$line")
   done < "$FILE"
 done

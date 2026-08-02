@@ -77,6 +77,14 @@ pass "cross-file: same run_id across two files folds to 1 block, spans summed"
 # --- empty input -> "(no runs found)", exit 0 ---
 assert_out "empty: no runs found"     '\(no runs found\)'           "$FIX/empty.jsonl"
 
+# --- T-1011 AC30: an event-row-bearing input rolls up byte-identical to the
+# same run with the event rows removed — the invariance property, defended
+# here by this repo's own CI, not only by T-1011's spec `check:` lines. ---
+events_out="$(bash "$ROLLUP" "$FIX/with-events.jsonl" 2>/dev/null)"
+clean_out="$(bash "$ROLLUP" "$FIX/clean.jsonl" 2>/dev/null)"
+[ "$events_out" = "$clean_out" ] || fail "with-events: rollup output changed by event rows (T-1011 regression)"
+pass "with-events: event rows (T-1011) are skipped, output identical to the span-only run"
+
 # --- usage errors ---
 assert_rc "no args -> 2"          2
 assert_rc "unreadable file -> 2"  2 "$FIX/does-not-exist.jsonl"
