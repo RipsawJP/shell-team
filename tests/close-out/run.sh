@@ -297,4 +297,122 @@ grep -q '^- \[x\] \*\*T-151\*\*' "$PQ/tasks/todo.md" \
   || fail "T-068: T-151 must complete Active -> Done despite the prose quoting the anchor"
 pass "T-068: prose quoting the anchor + pending: on one line does not false-positive-block close-out (round3 regression lock)"
 
+# ============================================================================
+# T-1016: board-entry continuation canon at bin/close-out.sh's pass-1 awk
+# (entry extent, trailing-blank trim) + the pre-write interlock (D3/D6).
+# Runs with cwd inside the scratch root so best-effort telemetry/
+# project_status regeneration cannot write into this repository.
+# ============================================================================
+MOVE_ROOT="$TMP/move-fixtures"
+mkdir -p "$MOVE_ROOT"
+
+# move-carries-internal-blank / move-carries-table-row / move-trims-trailing-blanks:
+# an entry carrying an internal blank line, indented table rows and a
+# trailing blank run is moved to the TOP of ## Done in one piece; ## Active
+# is left with zero non-blank lines (no strand); the entry extent is
+# trimmed, proved by counting exactly one blank line between the moved
+# entry's last content line and the next ## Done entry (an untrimmed
+# implementation leaves three).
+M1="$MOVE_ROOT/m1"
+mkdir -p "$M1"
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - first note\n\n  | a | b |\n  |---|---|\n\n  - last note\n\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M1/todo.md"
+( cd "$M1" && TEAM_TODO="$M1/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M1/out" 2>"$M1/err" \
+  || fail "move-carries-internal-blank: close-out should exit 0 (stderr: $(cat "$M1/err"))"
+m1_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M1/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$m1_a_count" -eq 0 ] || fail "move-carries-internal-blank: expected zero non-blank lines left in ## Active, got $m1_a_count"
+grep -qF -- '  | a | b |' "$M1/todo.md" || fail "move-carries-table-row: table row must survive the move"
+grep -qF -- '  - last note' "$M1/todo.md" || fail "move-carries-internal-blank: post-blank sub-bullet must survive the move"
+pass "move-carries-internal-blank — an internal blank line inside the moved entry does not truncate the move"
+pass "move-carries-table-row — an indented table row (non-dash first character) inside the moved entry survives the move verbatim"
+
+m1_blanks="$(awk '/^  - last note$/{f=1;next} f&&/^- \[x\]/{print n+0; exit} f&&/^[[:space:]]*$/{n++}' "$M1/todo.md")"
+[ "$m1_blanks" = "1" ] || fail "move-trims-trailing-blanks: expected exactly one blank line between the moved entry and the next ## Done entry, got $m1_blanks"
+pass "move-trims-trailing-blanks — the entry extent ends at the last continuation line; an untrimmed implementation would leave three blank lines here, not one"
+
+m1_first="$(awk '/^## Done/{f=1;next} f&&/^- \[x\]/{print; exit}' "$M1/todo.md")"
+case "$m1_first" in *'**T-901**'*) ;; *) fail "move-done-insertion-position: expected T-901 at the top of ## Done, got: $m1_first" ;; esac
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M1/todo.md" >/dev/null 2>&1 || fail "move-done-insertion-position: rewritten board must lint clean"
+pass "move-done-insertion-position — the moved entry (with its table rows and post-blank sub-bullet) lands at the TOP of ## Done"
+
+# move-final-entry-eof / move-section-end-boundary: the task is the last
+# entry of the last section, its continuation lines run to the final line of
+# the file, and ## Done precedes ## Active. The move still carries every
+# continuation line, leaves no strand, and lints clean.
+M2="$MOVE_ROOT/m2"
+mkdir -p "$M2"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note one\n\n  | a | b |\n' > "$M2/todo.md"
+( cd "$M2" && TEAM_TODO="$M2/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M2/out" 2>"$M2/err" \
+  || fail "move-final-entry-eof: close-out should exit 0 (stderr: $(cat "$M2/err"))"
+m2_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M2/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$m2_a_count" -eq 0 ] || fail "move-final-entry-eof: expected zero non-blank lines left in ## Active, got $m2_a_count"
+grep -qF -- '  | a | b |' "$M2/todo.md" || fail "move-final-entry-eof: the file's own last line (a table row) must survive the move"
+grep -qF -- '  - note one' "$M2/todo.md" || fail "move-section-end-boundary: sub-bullet must survive the move"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M2/todo.md" >/dev/null 2>&1 || fail "move-final-entry-eof: rewritten board must lint clean"
+pass "move-final-entry-eof — the entry's continuation lines run all the way to EOF; the move still carries every one"
+pass "move-section-end-boundary — a board where ## Done precedes ## Active still moves the Active entry correctly"
+
+# move-crlf-board: the same shape as M1 (internal blank + table row),
+# CRLF-terminated throughout (built with awk, not a sed `\r` replacement —
+# that replacement is not portable). The move still carries every line and
+# leaves no strand.
+M3="$MOVE_ROOT/m3"
+mkdir -p "$M3"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - first note\n\n  | a | b |\n\n  - last note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M3/plain.md"
+awk '{ printf "%s\r\n", $0 }' "$M3/plain.md" > "$M3/todo.md"
+( cd "$M3" && TEAM_TODO="$M3/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M3/out" 2>"$M3/err" \
+  || fail "move-crlf-board: close-out should exit 0 on a CRLF board (stderr: $(cat "$M3/err"))"
+m3_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M3/todo.md" | tr -d '\r' | grep -c '[^[:space:]]' || true)"
+[ "$m3_a_count" -eq 0 ] || fail "move-crlf-board: expected zero non-blank lines left in ## Active, got $m3_a_count"
+grep -qF -- '**T-901**' "$M3/todo.md" || fail "move-crlf-board: T-901 must have moved to ## Done"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M3/todo.md" >/dev/null 2>&1 || fail "move-crlf-board: rewritten board must lint clean"
+pass "move-crlf-board — a CRLF-terminated board (awk-produced, not sed) moves the whole entry with no strand left behind"
+
+# move-tab-indented-subbullets: a tab-indented sub-bullet is carried by the
+# move (the same shape the T-1013 incident's stranded lines took).
+M4="$MOVE_ROOT/m4"
+mkdir -p "$M4"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\t- tab note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M4/todo.md"
+( cd "$M4" && TEAM_TODO="$M4/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M4/out" 2>"$M4/err" \
+  || fail "move-tab-indented-subbullets: close-out should exit 0 (stderr: $(cat "$M4/err"))"
+grep -qF -- "$(printf '\t- tab note')" "$M4/todo.md" \
+  || fail "move-tab-indented-subbullets: tab-indented sub-bullet must survive the move"
+m4_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M4/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$m4_a_count" -eq 0 ] || fail "move-tab-indented-subbullets: expected zero non-blank lines left in ## Active, got $m4_a_count"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M4/todo.md" >/dev/null 2>&1 || fail "move-tab-indented-subbullets: rewritten board must lint clean"
+pass "move-tab-indented-subbullets — a tab-indented sub-bullet (leading whitespace, non-dash-neutral) is carried by the move"
+
+# move-refuses-stranded-board / move-refusal-names-the-reason: the interlock
+# (D3/D6). Against a board that already carries a strand, close-out exits 1,
+# leaves the board byte-identical, and its stderr names the strand reason —
+# paired with a positive control (same board, strand removed) exiting 0, so
+# the refusal is attributable to the strand rather than the fixture being
+# broken in general.
+M5="$MOVE_ROOT/m5"
+mkdir -p "$M5"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n  - stranded line\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n' > "$M5/bad.md"
+cp "$M5/bad.md" "$M5/bad.orig"
+set +e
+( cd "$M5" && TEAM_TODO="$M5/bad.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M5/out" 2>"$M5/err"
+m5_rc=$?
+set -e
+[ "$m5_rc" -eq 1 ] || fail "move-refuses-stranded-board: expected exit 1, got $m5_rc (stderr: $(cat "$M5/err"))"
+cmp -s "$M5/bad.md" "$M5/bad.orig" || fail "move-refuses-stranded-board: the board must stay byte-identical on refusal"
+pass "move-refuses-stranded-board — close-out refuses (exit 1, board untouched) to write a rewritten board that already carries a strand (the interlock, D3)"
+
+[ -s "$M5/err" ] || fail "move-refusal-names-the-reason: expected non-empty stderr"
+grep -qF -- 'stranded continuation line' "$M5/err" \
+  || fail "move-refusal-names-the-reason: stderr must name the strand reason (D6), not just a generic refusal"
+pass "move-refusal-names-the-reason — the refusal's stderr names the strand reason instead of only \"would fail check-handoff.sh\" (D6)"
+
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n' > "$M5/good.md"
+( cd "$M5" && TEAM_TODO="$M5/good.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M5/out2" 2>"$M5/err2" \
+  || fail "move-refuses-stranded-board positive control: close-out should succeed once the strand is removed and nothing else changed"
+pass "move-refuses-stranded-board positive control — the same board with the strand removed and nothing else changed exits 0"
+
 printf '\nAll close-out assertions passed.\n'

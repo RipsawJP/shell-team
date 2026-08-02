@@ -241,47 +241,56 @@ RATIFIED_LINE_RE='^[[:space:]]+- intent-ratified'
 # shellcheck disable=SC2016
 RATIFIED_FULL_RE='^[[:space:]]+- intent-ratified \([0-9]{4}-[0-9]{2}-[0-9]{2}\): v([0-9]+)→v([0-9]+) — .+ — .+$'
 
-# Board parser state machine (T-071 rework3 canonical — spec "## 形式文法 /
-# 状態機械" § "board パース状態機械の正典（rework3 — 反転定義）"). Round1
-# Major, round2 Blocker/Major, and round3 Blocker were FOUR independent
-# defects in a row from *enumerating* which line shapes close a scope
-# (round2's canonical only listed `## ` headings and non-indented "- "
-# lines as boundaries, so a CommonMark-legal `* [ ]`/`+ [ ]` bullet — or any
-# other non-"- " non-indented line — fell through as a no-op and let a
-# neighboring task's real hash leak into an empty scope). Rework3 INVERTS
-# the definition instead of patching another shape onto the enumeration:
+# Board parser state machine (T-071 rework3 canonical, re-grounded for T-1016
+# D2 — spec "## 形式文法 / 状態機械" § "board パース状態機械の正典（rework3
+# — 反転定義）"; T-1016's "## Settled decisions" D2 for the blank-line
+# change below). Round1 Major, round2 Blocker/Major, and round3 Blocker were
+# FOUR independent defects in a row from *enumerating* which line shapes
+# close a scope (round2's canonical only listed `## ` headings and
+# non-indented "- " lines as boundaries, so a CommonMark-legal `* [ ]`/
+# `+ [ ]` bullet — or any other non-"- " non-indented line — fell through as
+# a no-op and let a neighboring task's real hash leak into an empty scope).
+# Rework3 INVERTS the definition instead of patching another shape onto the
+# enumeration; T-1016 D2 additionally makes a blank line NEUTRAL rather than
+# a scope terminator, so this checker's ledger and bin/close-out.sh's mover
+# agree about what belongs to an entry — board-entry continuation canon (T-1016):
 #   Rule 1 — an INDENTED, non-blank line (`^[[:space:]]+[^[:space:]]`, i.e.
 #     leading whitespace followed by a non-whitespace character) is the
 #     ONLY thing that ever keeps a scope open: in_entry is left untouched.
 #     While inside this task's own open scope (in_entry==1), such a line is
 #     matched as a structured sub-bullet (HASH_LINE_RE / RATIFIED_LINE_RE,
 #     themselves anchored on leading whitespace); otherwise it is a no-op.
-#     A line of ONLY whitespace (or a truly empty line) has no non-
-#     whitespace character and therefore does NOT match this rule — it
-#     falls through to rule 2/3 below and closes the scope, matching
-#     close-out.sh's own "blank line ends the continuous block" semantics
-#     (spec "空行の扱いの接地").
-#   Rule 2/3 — EVERY other line, with NO exceptions: any non-indented line
-#     regardless of bullet form ("- "/"* "/"+ "/numbered/anything else), any
-#     heading (`^#`, any level), any bare prose, and any blank line (per
-#     rule 1 above) — unconditionally closes any open scope FIRST
-#     (in_entry=0). Only THEN, if the SAME line also matches TOP_RE with
-#     this task's own bold task-id captured (an EXACT capture-group compare
-#     against $TASK_ID, never a substring search against the whole line —
-#     a substring search would wrongly pull in another task's entry whose
-#     TITLE merely cross-references this task-id in bold prose, e.g.
-#     "- [ ] **T-800** ... see also **T-900** ..."; Codex round1 MAJOR), is
-#     a NEW scope opened for this entry (in_entry=1) and entry_count
-#     incremented.
+#   Rule 1b (T-1016 D2) — a BLANK line (only whitespace, or truly empty) is
+#     NEUTRAL: it is neither a continuation nor a boundary, and leaves
+#     in_entry untouched, exactly like a non-matching indented line under
+#     rule 1. This is the one behavioral change from rework3: previously a
+#     blank line fell through to rule 2/3 and unconditionally closed the
+#     scope; that is no longer true, so a task's `- intent-hash` /
+#     `- intent-ratified` sub-bullets remain in scope even when separated by
+#     a blank line from the task line or from each other.
+#   Rule 2/3 — EVERY remaining line, with NO exceptions: any non-indented,
+#     non-blank line, regardless of bullet form ("- "/"* "/"+ "/numbered/
+#     anything else) or heading level (`^#`, any level), and any bare prose
+#     — unconditionally closes any open scope FIRST (in_entry=0). Only THEN,
+#     if the SAME line also matches TOP_RE with this task's own bold
+#     task-id captured (an EXACT capture-group compare against $TASK_ID,
+#     never a substring search against the whole line — a substring search
+#     would wrongly pull in another task's entry whose TITLE merely
+#     cross-references this task-id in bold prose, e.g. "- [ ] **T-800**
+#     ... see also **T-900** ..."; Codex round1 MAJOR), is a NEW scope
+#     opened for this entry (in_entry=1) and entry_count incremented.
 # Scope END (rule 2/3 + EOF): once opened, a scope closes at the FIRST of
-# (a) ANY non-indented line at all (TOP_RE match or not, any bullet shape
-# or none), (b) a blank line, or (c) EOF — so neither a duplicate/stale
-# top-level entry, nor a malformed non-TOP_RE top-level-looking line, nor a
-# `* `/`+ ` CommonMark-legal bullet (round3 Blocker, the same class's
-# fourth independent defect) can ever let scope leak past it.
+# (a) ANY non-indented, non-blank line at all (TOP_RE match or not, any
+# bullet shape or none), or (b) EOF — a blank line no longer closes it
+# (rule 1b) — so neither a duplicate/stale top-level entry, nor a malformed
+# non-TOP_RE top-level-looking line, nor a `* `/`+ ` CommonMark-legal bullet
+# (round3 Blocker, the same class's fourth independent defect) can ever let
+# scope leak past it.
 #
 # shellcheck disable=SC2016
 INDENT_NONBLANK_RE='^[[:space:]]+[^[:space:]]'
+# shellcheck disable=SC2016
+BLANK_LINE_RE='^[[:space:]]*$'
 
 # extract_task_records TASK_ID < board-content  (T-071 rework4 "共有抽出関数
 # の義務" — the single shared implementation of the state machine above).
@@ -375,15 +384,20 @@ extract_task_records() {
           fi
         fi
       fi
+    elif [[ "$line" =~ $BLANK_LINE_RE ]]; then
+      # Rule 1b (T-1016 D2): a blank line is NEUTRAL — it leaves in_entry
+      # untouched, exactly like a non-matching indented line under rule 1.
+      # This is the only behavioral change from rework3: a blank line no
+      # longer closes an open scope.
+      :
     else
-      # Rule 2/3 (rework3-A canonical inversion): EVERY other line — any
-      # non-indented line regardless of bullet form ("- "/"* "/"+ "/numbered/
-      # other), any heading, any bare prose, and any blank line (it failed
-      # the rule-1 test above) — unconditionally closes any open scope
-      # first. Only THEN, if the SAME line also matches TOP_RE with this
-      # task's own bold task-id captured (an exact capture-group compare,
-      # never a substring search against the whole line), is a NEW scope
-      # opened.
+      # Rule 2/3 (rework3-A canonical inversion): EVERY remaining line — any
+      # non-indented, non-blank line regardless of bullet form ("- "/"* "/
+      # "+ "/numbered/other), any heading, any bare prose — unconditionally
+      # closes any open scope first. Only THEN, if the SAME line also
+      # matches TOP_RE with this task's own bold task-id captured (an exact
+      # capture-group compare, never a substring search against the whole
+      # line), is a NEW scope opened.
       in_entry=0
       if [[ "$line" =~ $TOP_RE ]] && [[ "${BASH_REMATCH[1]}" == "$task_id" ]]; then
         in_entry=1

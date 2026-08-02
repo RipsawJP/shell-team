@@ -59,11 +59,18 @@
 # conventions (no new mini-parser — 2026-07-12 lesson on parser/consumer
 # drift): the top-level line shape close-out.sh's pass-1 awk uses
 # (`^- \[[x ]\] (\*\*)?T-NNN(\*\*)? `, bold optional, [ ]/[x] both allowed)
-# and check-handoff.sh's sub-bullet skip (`^[[:space:]]+-`). Indented lines
-# (sub-bullets, including ones that merely QUOTE a heading-shaped string —
-# the self-referential-prose fixture, 2026-07-17 lesson) are never treated
-# as headings. Order of headings is never gated (close-out moves entries to
-# the TOP of ## Done, which legitimately reorders Done — DP-C).
+# and the canonical entry-continuation predicate (T-1016) check-handoff.sh's
+# own strand check now enforces: a boundary is any non-indented non-blank
+# line or EOF, a blank line is neutral, and every indented non-blank line
+# (`-`, `|`, a tab, a digit, prose — any first character) continues an entry.
+# Indented lines (sub-bullets and table rows alike, including ones that
+# merely QUOTE a heading-shaped string — the self-referential-prose fixture,
+# 2026-07-17 lesson) are never treated as headings — this alignment is
+# purely a predicate-widening: the heading match below already requires a
+# non-indented `- [ ]`/`- [x]` prefix, so an indented line was never a
+# heading candidate under either predicate (behavior-preserving, T-1016 D5).
+# Order of headings is never gated (close-out moves entries to the TOP of
+# ## Done, which legitimately reorders Done — DP-C).
 #
 # Exit: 0 = no violations (or structural check skipped for lack of a base,
 #           per (4) above, and no duplicates found).
@@ -221,7 +228,11 @@ extract_ids_to_file() {
     /^## Done([[:space:]]+#+)?[[:space:]]*$/   { in_section=1; next }
     /^##([[:space:]]|$)/ { in_section=0; next }
     !in_section { next }
-    /^[[:space:]]+-/ { next }
+    # board-entry continuation canon (T-1016): skip every indented,
+    # non-blank line (the canonical continuation predicate), not merely a
+    # dash-led one — behavior-preserving here, since the heading match below
+    # already requires a non-indented `- [ ]`/`- [x]` prefix (T-1016 D5).
+    /^[[:space:]]+[^[:space:]]/ { next }
     /^- \[[x ]\] (\*\*)?T-[0-9]+(\*\*)? / {
       if (match($0, /T-[0-9]+/)) print substr($0, RSTART, RLENGTH)
     }

@@ -642,6 +642,63 @@ grep -q 'structural' <<< "$ERR" || fail "(xiii-b-plus): stderr must carry 'struc
 pass "(xiii-b): '* [ ]'/'+ [ ]' CommonMark-legal bullets (neither an enumerated '- ' line) still close the preceding entry's scope under the inverted board-scope definition — no hash leak, structural(2) both ways"
 
 # ============================================================================
+# (xiv) T-1016 D2: a blank line between two `- intent-hash` sub-bullets no
+# longer closes the ledger's scope — proved as an invariance property, not a
+# message string. Two boards differ only by one blank line between the
+# task's two intent-hash sub-bullets; the checker must return the SAME exit
+# code for both, and that code must be 2 (a structural duplicate) — before
+# T-1016 the blank-line board hid the second record from the entry's scope
+# and returned a different (wrong) verdict. A third board carrying exactly
+# one (mismatched) hash returns 1, the positive control proving 2 is not
+# returned unconditionally.
+# ============================================================================
+C="$TMP/case-xiv"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+DUMMY_HASH_0="$(printf '0%.0s' {1..40})"
+DUMMY_HASH_1="$(printf '1%.0s' {1..40})"
+{
+  printf '# Tasks\n\n## Active\n\n'
+  # shellcheck disable=SC2016  # the backtick-quoted `READY_FOR_ARCH` is a
+  # literal board flag token, not a command substitution.
+  printf -- '- [ ] **%s** fixture task — `READY_FOR_ARCH` — spec: spec.md\n' "$TASK_ID"
+  printf '  - intent-hash (v1): %s\n' "$DUMMY_HASH_0"
+  printf '\n'
+  printf '  - intent-hash (v1): %s\n' "$DUMMY_HASH_1"
+  printf '\n## Done\n'
+} > "$C/board-blank.md"
+{
+  printf '# Tasks\n\n## Active\n\n'
+  # shellcheck disable=SC2016  # same literal token as above.
+  printf -- '- [ ] **%s** fixture task — `READY_FOR_ARCH` — spec: spec.md\n' "$TASK_ID"
+  printf '  - intent-hash (v1): %s\n' "$DUMMY_HASH_0"
+  printf '  - intent-hash (v1): %s\n' "$DUMMY_HASH_1"
+  printf '\n## Done\n'
+} > "$C/board-noblank.md"
+{
+  printf '# Tasks\n\n## Active\n\n'
+  # shellcheck disable=SC2016  # same literal token as above.
+  printf -- '- [ ] **%s** fixture task — `READY_FOR_ARCH` — spec: spec.md\n' "$TASK_ID"
+  printf '  - intent-hash (v1): %s\n' "$DUMMY_HASH_0"
+  printf '\n## Done\n'
+} > "$C/board-single.md"
+
+run_checker "$C/spec.md" "$C/board-blank.md"
+XIV_BLANK_RC="$RC"
+run_checker "$C/spec.md" "$C/board-noblank.md"
+XIV_NOBLANK_RC="$RC"
+run_checker "$C/spec.md" "$C/board-single.md"
+XIV_SINGLE_RC="$RC"
+
+[ "$XIV_BLANK_RC" -eq "$XIV_NOBLANK_RC" ] \
+  || fail "blank-line-verdict-invariance: expected the blank-line and no-blank-line boards to return the SAME exit code, got blank=$XIV_BLANK_RC noblank=$XIV_NOBLANK_RC"
+[ "$XIV_BLANK_RC" -eq 2 ] \
+  || fail "blank-line-verdict-invariance: expected exit 2 (structural duplicate) for the blank-line board, got $XIV_BLANK_RC"
+[ "$XIV_SINGLE_RC" -eq 1 ] \
+  || fail "blank-line-verdict-invariance: positive control (single hash) expected exit 1 (drift), got $XIV_SINGLE_RC — proves exit 2 is not returned unconditionally"
+pass "blank-line-verdict-invariance — a blank line between the task's two intent-hash sub-bullets does not change the verdict (both exit 2); a single-hash positive control returns 1, proving 2 is not unconditional"
+pass "blank-line-inside-entry-keeps-scope — the blank-line board's SECOND intent-hash sub-bullet is still counted as belonging to the SAME entry (both records seen => structural duplicate, never a hidden second record producing a false aligned board)"
+
+# ============================================================================
 # AC8 (#233 item 5, non-vacuous lock): a `dirname` failure during the
 # symlink-resolution bootstrap must fail CLOSED as a classified usage error
 # (exit 2), never fail OPEN into $PWD (the T-074-rework1-ported independent
