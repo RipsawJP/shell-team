@@ -11,7 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1018** A freeze is refused unless the board attests that every check: line ran live — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1018-freeze-attestation-gate.md
+
+## Done
+
+- [x] **T-1018** A freeze is refused unless the board attests that every check: line ran live — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - closed: 2026-08-02, PR #106 → develop, closes #96
   - source: GitHub issue #96 — the tooling half of the corpus lesson `## 2026-07-26 — Run a spec's check: lines live and reconcile them before recording an intent hash`, whose own text (as extended 2026-08-02) states the rule must become "a gating step with an owner and a moment, not a standing reminder". Backlog item 3/5 of the v1.3.0 sprint goal (mechanize unenforced loop invariants). Base `develop` @ `87daf74` (post T-1017 and its close-out, confirmed as this branch's real fork point), branch `feature/96-freeze-attestation-gate`.
   - issue-filing disposition: #96 already exists and is acted on here; **no separate issue was filed**, because #96 states the whole requirement (an owner, a moment, a machine-checkable record, fail-closed refusal of the freeze) as one question, and splitting it would fragment the answer to "is #96 done".
   - incident it closes: the rule is already promoted and already bound into pm-spec's prompt, and it still failed at the freeze three times. T-1011 and T-1012 each found a broken frozen `check:` line mid-implementation and each cost a human-ratified re-freeze; T-1016 ran the discipline, wrote a free-form disclosure on the board, and still froze an AC10 whose inline fixture lacked the `**Task ID**` line the checker structurally requires — the compound `check:` line was never decomposed, so one exit code hid a criterion that measured nothing (v1→v2 ratification). T-1017 decomposed up front and needed zero corrections. The difference between those two data points is whether the run was decomposed and recorded, or merely intended.
@@ -35,8 +39,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - fast-follow disposition (2026-08-02): repo-wide base-10/width audit for digit strings fed to bash arithmetic in bin/ (round-1 file-an-issue intent, round-2 overflow finding folded in) — filed as issue #104 (next planning input, not this sprint)
   - fast-follow disposition (2026-08-02): run skill attestation branch — name the fourth post-append outcome (attestation again = more versions missing) — filed as issue #105 (next planning input, not this sprint)
   - fast-follow disposition (2026-08-02): duplicated version_int computation in check-intent.sh — waived: harmless duplication, reviewer's own disposition intent was won't-fix
-
-## Done
 
 - [x] **T-1017** Close-out refuses a task whose interventions record is missing or non-conformant — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1017-close-out-interventions-gate.md
   - closed: 2026-08-02
