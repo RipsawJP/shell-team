@@ -11,7 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1016** One canonical board-entry boundary, and a stranded continuation line that fails closed — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1016-close-out-entry-boundary.md
+
+## Done
+
+- [x] **T-1016** One canonical board-entry boundary, and a stranded continuation line that fails closed — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - closed: 2026-08-02
   - source: GitHub issue #89 — both fix directions it asks for, in one task. Backlog item 1 of the v1.3.0 sprint goal (mechanize unenforced loop invariants). Base `develop` @ `a3ee283`, branch `fix/89-close-out-stranding`.
   - issue-filing disposition: #89 already exists and is acted on here; **no separate issue was filed**, because #89 itself records the incident and names both halves (widen the mover, add the missing gate) as one question — splitting it would fragment the answer to "is #89 done".
   - incident it closes: T-1013's entry accumulated internal blank lines and a markdown table, `bin/close-out.sh`'s dash-led continuation predicate stopped the move mid-entry, and 15 lines were left stranded in `## Active` with no top-level entry above them. `check-handoff.sh` skips indented lines and `check-intent.sh` treats them as out of scope, so nothing failed loudly; repaired by hand in `develop` commit `6750dcf`, which is this task's base and is not re-touched.
@@ -36,8 +40,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - fast-follow disposition (2026-08-02): `bin/close-out.sh` MAIN_LINE flag-rewrite regex looser than check-handoff's LINE_RE — filed as issue #98 (pre-existing, outside this task's Non-goals; next planning input, not this sprint)
   - fast-follow disposition (2026-08-02): stale header comment at `bin/check-handoff.sh:13` — waived: wording-only, no behavioural effect; reviewer's own disposition intent was won't-fix
   - fast-follow disposition (2026-08-02): confusing fail-message wording near `tests/check-handoff/run.sh:105` — waived: wording-only, no behavioural effect; reviewer's own disposition intent was won't-fix
-
-## Done
 
 - [x] **T-1015** The release procedure, written from the release that was run, plus two batched fixes to the same document — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1015-cutting-a-release.md
   - closed: 2026-08-02, PR #91 → develop, closes #29 — T-1000 ratified v6->v7 in the same round; #31 and the promoted-lesson line ride the same document change
