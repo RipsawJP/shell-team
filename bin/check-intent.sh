@@ -588,16 +588,39 @@ $remedy
   done
 
   # Out-of-range + arithmetic, over every well-formed attestation in scope.
+  #
+  # T-1018 rework1 Blocker fix: EVERY captured digit string this loop feeds
+  # into an arithmetic context is normalized through the base-10 `10#`
+  # prefix IMMEDIATELY after extraction, exactly once, mirroring this file's
+  # own pre-existing `declared_n=$((10#$hash_version))` /
+  # `version_int=$((10#$hash_version))` convention two call sites away. D4's
+  # grammar leaves `lines=`/`verdict=` unrestricted `[0-9]+` (leading zeros
+  # conformant, e.g. `verdict=08P/00F`), and bash's `$(())` arithmetic
+  # expansion (unlike the `[ -eq/-ne/-lt/-gt ]` test operator, which parses
+  # decimal only) treats a leading-zero digit string as octal — `08`/`09`
+  # are invalid octal literals and abort the expansion with an unclassified,
+  # un-namespaced stderr line. Because that failure occurs inside an `if [
+  # ... ]` CONDITION, `set -e` does not apply to it (POSIX/bash exempt an
+  # `if`/`while`/`until` condition from errexit), so the script does not
+  # abort either — the cross-check is silently skipped and a
+  # self-contradictory attestation (`lines=1/1 verdict=08P/00F`, 8+0≠1) is
+  # accepted as `aligned`, exit 0. Normalizing HERE, once, before any
+  # comparison or arithmetic touches these values, closes the hole at its
+  # source rather than requiring every downstream `-eq`/`$(())` site to
+  # remember the prefix independently. `attest_version[$idx]` (`av`) is
+  # normalized too even though `ATTEST_FULL_RE`'s `[1-9][0-9]*` already
+  # forbids a leading zero there — normalizing it costs nothing and keeps
+  # every digit this loop touches under the same rule, not a special case.
   idx=0
   while [ "$idx" -lt "$n_attest" ]; do
-    av="${attest_version[$idx]}"
+    av=$((10#${attest_version[$idx]}))
     if [ "$av" -lt 1 ] || [ "$av" -gt "$declared_n" ]; then
       fail_attestation "freeze-attestation record for $TASK_ID names v$av in $BOARD, outside the required range v1..v$declared_n"
     fi
-    ar="${attest_ran[$idx]}"
-    at="${attest_total[$idx]}"
-    ap="${attest_p[$idx]}"
-    af="${attest_f[$idx]}"
+    ar=$((10#${attest_ran[$idx]}))
+    at=$((10#${attest_total[$idx]}))
+    ap=$((10#${attest_p[$idx]}))
+    af=$((10#${attest_f[$idx]}))
     # D4: internal arithmetic ("ran == total", "P + F == ran") is checked
     # for EVERY well-formed record, regardless of version.
     if [ "$ar" -ne "$at" ]; then

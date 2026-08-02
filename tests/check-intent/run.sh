@@ -1028,6 +1028,50 @@ for p in structural usage drift-detected; do
 done
 pass "attestation-classification-channel-exclusive: the unattested refusal carries exactly one 'check-intent: attestation: ' line and zero lines of the other three prefixes"
 
+# ============================================================================
+# T-1018 rework round 1 (Codex REQUEST_CHANGES, Blocker): the freeze-attestation
+# grammar leaves `lines=`/`verdict=` unrestricted `[0-9]+` (D4), so a
+# conformant record may carry a leading-zero count. Both shapes below are
+# INSIDE the frozen grammar (no re-freeze needed) — this locks the
+# implementation defect the Blocker found, not a grammar change.
+# ============================================================================
+
+# --- attestation-leading-zero-inconsistent-refused --------------------------
+# An internally INCONSISTENT leading-zero record (verdict=08P/00F against
+# lines=1/1; 8+0 != 1) must be refused with the attestation classification.
+# Before the rework1 fix, bash's $(()) arithmetic expansion parsed "08" as
+# invalid octal, aborted only the ARITHMETIC EXPANSION (not the script —
+# that failure sits inside an `if [ ... ]` condition, which `set -e` does
+# not cover), and the cross-check was silently skipped: the board was
+# wrongly accepted as aligned, exit 0.
+C="$TMP/case-t1018-lz-inconsistent"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+GOOD_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board.md" 1 "$GOOD_HASH" \
+  '  - freeze-attestation (v1, 2026-08-03): lines=1/1 sweep=mutual-satisfiability verdict=08P/00F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "attestation-leading-zero-inconsistent-refused: expected exit 2, got $RC: $ERR"
+grep -q '^check-intent: attestation: ' <<< "$ERR" || fail "attestation-leading-zero-inconsistent-refused: stderr must carry the 'attestation' token (not a raw, un-namespaced arithmetic error, and not a silent aligned pass), got: $ERR"
+pass "attestation-leading-zero-inconsistent-refused: a freeze-attestation with a leading-zero verdict that is internally inconsistent (verdict=08P/00F against lines=1/1) is refused with the attestation classification, exit 2 — the leading-zero shape does not bypass the P + F == ran cross-check"
+
+# --- attestation-leading-zero-consistent-numeric-pass ------------------------
+# An internally CONSISTENT leading-zero record (lines=01/01, verdict=01P/00F;
+# 01 == 1 numerically) must be treated numerically and pass the attestation
+# judgment, reaching whatever judgment follows (here: the bootstrap
+# `structural`, since no hash record exists yet) — never refused merely for
+# carrying a leading zero, and never miscounted as inconsistent.
+C="$TMP/case-t1018-lz-consistent"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing." "" $'- [ ] AC1 x\n  - check: true'
+printf -- '- [ ] **T-900** fixture task\n' > "$C/none.md"
+printf '  - freeze-attestation (v1, 2026-08-03): lines=01/01 sweep=mutual-satisfiability verdict=01P/00F owner=coordinating session\n' >> "$C/none.md"
+run_checker "$C/spec.md" "$C/none.md"
+[ "$RC" -eq 2 ] || fail "attestation-leading-zero-consistent-numeric-pass: expected exit 2 (bootstrap structural, no hash record present), got $RC: $ERR"
+grep -q '^check-intent: structural: ' <<< "$ERR" || fail "attestation-leading-zero-consistent-numeric-pass: expected the 'structural' token (bootstrap case — attestation judgment passed), got: $ERR"
+if grep -q '^check-intent: attestation: ' <<< "$ERR"; then
+  fail "attestation-leading-zero-consistent-numeric-pass: a leading-zero-but-numerically-consistent record (01==1) must not be refused as attestation, got: $ERR"
+fi
+pass "attestation-leading-zero-consistent-numeric-pass: a freeze-attestation whose leading-zero counts are internally consistent (lines=01/01 verdict=01P/00F, 01 treated as the numeral 1) passes the attestation judgment and reaches the bootstrap structural, not refused merely for the leading zero"
+
 # --- self-check: this suite's own script is shellcheck clean (soft-skip) ---
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$CHECKER" "$HERE/run.sh" || fail "shellcheck: check-intent.sh / run.sh must be clean"
