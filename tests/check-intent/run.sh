@@ -109,8 +109,8 @@ compute_hash() {  # $1 = spec file
     | git hash-object --stdin
 }
 
-write_spec() {  # $1 = dest file, $2 = Goal sentence, $3 = extra content to append (or "")
-  local dest="$1" goal="$2" extra="${3:-}"
+write_spec() {  # $1 = dest file, $2 = Goal sentence, $3 = extra content to append (or ""), $4 = Acceptance-criteria section body (or "" for the default single-line AC1 — T-1018 appended-only param, so every existing 3-arg call keeps its old 0-`check:`-line behavior)
+  local dest="$1" goal="$2" extra="${3:-}" ac_body="${4:-}"
   {
     printf '# Fixture spec\n\n'
     printf '**Status**: READY_FOR_ARCH\n**Owner**: pm-spec\n**Task ID**: %s\n\n' "$TASK_ID"
@@ -118,7 +118,11 @@ write_spec() {  # $1 = dest file, $2 = Goal sentence, $3 = extra content to appe
     printf '<!-- BEGIN intent-block: %s -->\n\n' "$TASK_ID"
     printf '## Goal\n%s\n\n' "$goal"
     printf '## Non-goals\n- Not this.\n\n'
-    printf '## Acceptance criteria\n- [ ] AC1 something\n\n'
+    if [ -n "$ac_body" ]; then
+      printf '## Acceptance criteria\n%s\n\n' "$ac_body"
+    else
+      printf '## Acceptance criteria\n- [ ] AC1 something\n\n'
+    fi
     printf '## Input space\n- Reachable: X\n- Out-of-scope: Y\n\n'
     printf '<!-- END intent-block: %s -->\n\n' "$TASK_ID"
     printf '## Assumptions\n- none\n'
@@ -227,11 +231,23 @@ C="$TMP/case-v"; mkdir -p "$C"
 write_spec "$C/spec.md" "Do the thing."
 GOOD_HASH="$(compute_hash "$C/spec.md")"
 
+# (v-a) T-1018: the freeze moment (no intent-hash record at all) with no
+# attestation is now the `attestation` classification, not `structural` — the
+# one shipped-behaviour change T-1018's D2 names.
 write_board "$C/board-missing.md" 1 "$GOOD_HASH"
 grep -v 'intent-hash' "$C/board-missing.md" > "$C/board-missing2.md"
 run_checker "$C/spec.md" "$C/board-missing2.md"
-[ "$RC" -eq 2 ] || fail "(v-a) missing intent-hash record: expected exit 2, got $RC: $ERR"
-grep -q 'structural' <<< "$ERR" || fail "(v-a): stderr must carry 'structural' token, got: $ERR"
+[ "$RC" -eq 2 ] || fail "(v-a) attestation-freeze-moment-unattested-refused: missing intent-hash record (freeze moment, unattested): expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "(v-a) attestation-freeze-moment-unattested-refused: stderr must carry the 'attestation' token (T-1018 gate), got: $ERR"
+
+# (v-a2) T-1018 sibling: the SAME freeze-moment board, but WITH a conformant
+# v1 freeze-attestation appended, reaches the pre-existing bootstrap
+# `structural` token unchanged (D3 row 10) — documents the split from (v-a)
+# rather than losing the old coverage.
+printf '  - freeze-attestation (v1, 2026-08-03): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session\n' >> "$C/board-missing2.md"
+run_checker "$C/spec.md" "$C/board-missing2.md"
+[ "$RC" -eq 2 ] || fail "(v-a2) attestation-freeze-moment-attested-reaches-structural: expected exit 2, got $RC: $ERR"
+grep -q 'structural' <<< "$ERR" || fail "(v-a2) attestation-freeze-moment-attested-reaches-structural: stderr must carry 'structural' token, got: $ERR"
 
 write_board "$C/board-dup.md" 1 "$GOOD_HASH"
 printf '  - intent-hash (v1): %s\n' "$GOOD_HASH" >> "$C/board-dup.md"
@@ -514,7 +530,13 @@ pass "(xii-a): a duplicate top-level board entry for this task-id (stale leftove
 # (xii-b) Major: a non-TOP_RE top-level-LOOKING line (malformed casing) must
 # still act as a scope boundary — its own (matching) intent-hash sub-bullet
 # must never leak into the PRECEDING real entry's scope, which itself has no
-# record of its own and must fail closed as structural(2), not aligned(0).
+# record of its own and must fail closed (never aligned(0)). T-1018: this
+# scope-leak fixture mechanically produces exactly the "zero well-formed
+# intent-hash records for this task" shape D2 names as the one shipped
+# behaviour change (see the T-1018 Notes-from-engineer addendum below) — so
+# the unattested freeze moment is now reported as `attestation`, not
+# `structural`; the "no false aligned" property this case exists to lock is
+# unaffected (still exit 2, never exit 0).
 C="$TMP/case-xii-b"; mkdir -p "$C"
 write_spec "$C/spec.md" "Do the thing."
 GOOD_HASH="$(compute_hash "$C/spec.md")"
@@ -527,9 +549,9 @@ GOOD_HASH="$(compute_hash "$C/spec.md")"
   printf '  - intent-hash (v1): %s\n' "$GOOD_HASH"
 } > "$C/board-scope-leak.md"
 run_checker "$C/spec.md" "$C/board-scope-leak.md"
-[ "$RC" -eq 2 ] || fail "(xii-b) non-TOP_RE malformed top-level-looking line leaking scope: expected exit 2 (structural), got $RC: $ERR"
-grep -q 'structural' <<< "$ERR" || fail "(xii-b): stderr must carry 'structural' token, got: $ERR"
-pass "(xii-b): a malformed (non-TOP_RE) top-level-looking line still closes the preceding entry's scope — its own intent-hash never leaks in (structural(2), no false aligned)"
+[ "$RC" -eq 2 ] || fail "(xii-b) non-TOP_RE malformed top-level-looking line leaking scope: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "(xii-b): stderr must carry 'attestation' token (T-1018: the leaked-away hash leaves this entry at the unattested freeze moment), got: $ERR"
+pass "(xii-b): a malformed (non-TOP_RE) top-level-looking line still closes the preceding entry's scope — its own intent-hash never leaks in (exit 2, attestation — the unattested freeze moment T-1018 gates — no false aligned)"
 
 # (xii-c) Major: the extraction pipeline's WRITE (not just mktemp's earlier
 # file creation) must fail closed. Under `ulimit -f 0`, the pipeline write
@@ -612,8 +634,12 @@ pass "(xii-f): a malformed '**Task ID**: ${TASK_ID}junk...' line (trailing garba
 # independent defect): a CommonMark-legal `* [ ]` / `+ [ ]` bullet directly
 # after this task's own (record-less) entry must still close its scope — its
 # own (matching) intent-hash sub-bullet must never leak into the PRECEDING
-# entry, which has no record of its own and must fail closed as
-# structural(2), never a false aligned(0).
+# entry, which has no record of its own and must fail closed (never a false
+# aligned(0)). T-1018: as with (xii-b) above, the leaked-away hash leaves
+# the real entry with zero well-formed intent-hash records — the unattested
+# freeze moment D2 names — so both sub-cases now report `attestation`, not
+# `structural` (see the T-1018 Notes-from-engineer addendum below); the
+# scope-leak property under test (exit 2, never aligned) is unaffected.
 C="$TMP/case-xiii-b"; mkdir -p "$C"
 write_spec "$C/spec.md" "Do the thing."
 GOOD_HASH="$(compute_hash "$C/spec.md")"
@@ -626,8 +652,8 @@ GOOD_HASH="$(compute_hash "$C/spec.md")"
   printf '  - intent-hash (v1): %s\n' "$GOOD_HASH"
 } > "$C/board-star-bullet.md"
 run_checker "$C/spec.md" "$C/board-star-bullet.md"
-[ "$RC" -eq 2 ] || fail "(xiii-b-star) '* [ ]' bullet leaking scope: expected exit 2 (structural), got $RC: $ERR"
-grep -q 'structural' <<< "$ERR" || fail "(xiii-b-star): stderr must carry 'structural' token, got: $ERR"
+[ "$RC" -eq 2 ] || fail "(xiii-b-star) '* [ ]' bullet leaking scope: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "(xiii-b-star): stderr must carry 'attestation' token (T-1018: unattested freeze moment), got: $ERR"
 
 {
   printf '# Tasks\n\n## Active\n\n'
@@ -637,9 +663,9 @@ grep -q 'structural' <<< "$ERR" || fail "(xiii-b-star): stderr must carry 'struc
   printf '  - intent-hash (v1): %s\n' "$GOOD_HASH"
 } > "$C/board-plus-bullet.md"
 run_checker "$C/spec.md" "$C/board-plus-bullet.md"
-[ "$RC" -eq 2 ] || fail "(xiii-b-plus) '+ [ ]' bullet leaking scope: expected exit 2 (structural), got $RC: $ERR"
-grep -q 'structural' <<< "$ERR" || fail "(xiii-b-plus): stderr must carry 'structural' token, got: $ERR"
-pass "(xiii-b): '* [ ]'/'+ [ ]' CommonMark-legal bullets (neither an enumerated '- ' line) still close the preceding entry's scope under the inverted board-scope definition — no hash leak, structural(2) both ways"
+[ "$RC" -eq 2 ] || fail "(xiii-b-plus) '+ [ ]' bullet leaking scope: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "(xiii-b-plus): stderr must carry 'attestation' token (T-1018: unattested freeze moment), got: $ERR"
+pass "(xiii-b): '* [ ]'/'+ [ ]' CommonMark-legal bullets (neither an enumerated '- ' line) still close the preceding entry's scope under the inverted board-scope definition — no hash leak, exit 2 both ways (attestation — the unattested freeze moment T-1018 gates)"
 
 # ============================================================================
 # (xiv) T-1016 D2: a blank line between two `- intent-hash` sub-bullets no
@@ -829,6 +855,222 @@ if grep -q 'BASH_ENV_LEAK_MARKER' <<< "$AC7_NOLEAK_OUT"; then
   fail "AC7: unsetting BASH_ENV before spawning a bash subprocess should prevent the startup-file marker from leaking, got: $AC7_NOLEAK_OUT"
 fi
 pass "AC7: an inherited BASH_ENV startup file leaks its marker into a bash subprocess's output when left set (OLD-suite-like); unsetting it first (NEW-suite-like, matching this runner's own top-of-file guard) prevents the leak — non-vacuous counterfactual"
+
+# ============================================================================
+# T-1018 (docs/specs/T-1018-freeze-attestation-gate.md AC19): the 12
+# remaining frozen assertion ids (2 of the 14 are (v-a)/(v-a2) above). Each
+# id names exactly one behavior the freeze-attestation gate must exhibit;
+# put in the text of the fail()/pass() calls so a reader of the suite
+# output can map a failure straight back to the criterion.
+# ============================================================================
+
+# --- attestation-legacy-hash-without-record-still-aligned ------------------
+C="$TMP/case-t1018-legacy"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+GOOD_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board.md" 1 "$GOOD_HASH"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 0 ] || fail "attestation-legacy-hash-without-record-still-aligned: expected exit 0 (aligned, the legacy carve-out), got $RC: $ERR"
+pass "attestation-legacy-hash-without-record-still-aligned: a well-formed intent-hash record with zero attestation-shaped lines is still aligned (exit 0), never gated retroactively"
+
+# --- attestation-grammar-near-miss-refused ---------------------------------
+C="$TMP/case-t1018-nearmiss"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")"
+grep -v 'intent-hash' "$C/board.md" > "$C/board-freeze.md"
+printf '  - freeze-attestation (v1, 2026-08-03): lines=1/1 verdict=1P/0F owner=coordinating session\n' >> "$C/board-freeze.md"
+run_checker "$C/spec.md" "$C/board-freeze.md"
+[ "$RC" -eq 2 ] || fail "attestation-grammar-near-miss-refused: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-grammar-near-miss-refused: stderr must carry 'attestation' token, got: $ERR"
+pass "attestation-grammar-near-miss-refused: a freeze-attestation line missing the fixed sweep= literal is refused with the attestation classification (exit 2)"
+
+# --- attestation-internal-arithmetic-refused --------------------------------
+C="$TMP/case-t1018-arith"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")"
+grep -v 'intent-hash' "$C/board.md" > "$C/board-freeze.md"
+printf '  - freeze-attestation (v1, 2026-08-03): lines=1/2 sweep=mutual-satisfiability verdict=1P/0F owner=coordinating session\n' >> "$C/board-freeze.md"
+run_checker "$C/spec.md" "$C/board-freeze.md"
+[ "$RC" -eq 2 ] || fail "attestation-internal-arithmetic-refused: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-internal-arithmetic-refused: stderr must carry 'attestation' token, got: $ERR"
+pass "attestation-internal-arithmetic-refused: a freeze-attestation whose ran != total is refused with the attestation classification (exit 2) — internal arithmetic is checked for every well-formed record"
+
+# --- attestation-count-disagrees-with-spec-refused --------------------------
+C="$TMP/case-t1018-count"; mkdir -p "$C"
+T1018_AC_BODY_2CHECK=$'- [ ] AC1 x\n  - check: true\n- [ ] AC2 y\n  - check: true'
+write_spec "$C/spec.md" "Do the thing." "" "$T1018_AC_BODY_2CHECK"
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")"
+grep -v 'intent-hash' "$C/board.md" > "$C/board-freeze.md"
+printf '  - freeze-attestation (v1, 2026-08-03): lines=3/3 sweep=mutual-satisfiability verdict=3P/0F owner=coordinating session\n' >> "$C/board-freeze.md"
+run_checker "$C/spec.md" "$C/board-freeze.md"
+[ "$RC" -eq 2 ] || fail "attestation-count-disagrees-with-spec-refused: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-count-disagrees-with-spec-refused: stderr must carry 'attestation' token, got: $ERR"
+pass "attestation-count-disagrees-with-spec-refused: an internally-consistent freeze-attestation whose total overcounts the spec's own 2 '- check:' lines is refused with the attestation classification (exit 2), proving the checker counts rather than trusts"
+
+# --- attestation-remedy-names-counted-total ---------------------------------
+C="$TMP/case-t1018-remedy"; mkdir -p "$C"
+T1018_AC_BODY_3CHECK=$'- [ ] AC1 x\n  - check: true\n- [ ] AC2 y\n  - check: true\n- [ ] AC3 z\n  - check: true'
+write_spec "$C/spec.md" "Do the thing." "" "$T1018_AC_BODY_3CHECK"
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")"
+grep -v 'intent-hash' "$C/board.md" > "$C/board-freeze.md"
+run_checker "$C/spec.md" "$C/board-freeze.md"
+[ "$RC" -eq 2 ] || fail "attestation-remedy-names-counted-total: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-remedy-names-counted-total: stderr must carry 'attestation' token, got: $ERR"
+grep -qF -- 'lines=3/3' <<< "$ERR" || fail "attestation-remedy-names-counted-total: refusal must name the counted total lines=3/3, got: $ERR"
+grep -qF -- 'sweep=mutual-satisfiability' <<< "$ERR" || fail "attestation-remedy-names-counted-total: refusal must print the fixed sweep literal, got: $ERR"
+grep -qF -- 'YYYY-MM-DD' <<< "$ERR" || fail "attestation-remedy-names-counted-total: refusal must print the YYYY-MM-DD placeholder, got: $ERR"
+pass "attestation-remedy-names-counted-total: the missing-attestation refusal prints the exact counted total (lines=3/3), the fixed sweep literal, and the YYYY-MM-DD placeholder so the freeze-runner never has to guess"
+
+# --- attestation-placeholder-paste-refused ----------------------------------
+C="$TMP/case-t1018-paste"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")"
+grep -v 'intent-hash' "$C/board.md" > "$C/board-freeze.md"
+printf '  - freeze-attestation (v1, YYYY-MM-DD): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session\n' >> "$C/board-freeze.md"
+run_checker "$C/spec.md" "$C/board-freeze.md"
+[ "$RC" -eq 2 ] || fail "attestation-placeholder-paste-refused: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-placeholder-paste-refused: stderr must carry 'attestation' token, got: $ERR"
+pass "attestation-placeholder-paste-refused: pasting the printed remedy shape verbatim (the YYYY-MM-DD placeholder left in place) is refused again with the attestation classification, never silently accepted"
+
+# --- attestation-prose-quote-not-miscounted ---------------------------------
+C="$TMP/case-t1018-prose"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+GOOD_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board.md" 1 "$GOOD_HASH" \
+  '  - engineer hand-off: the freeze-attestation (v1, 2026-08-03) grammar is documented in the checker header'
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 0 ] || fail "attestation-prose-quote-not-miscounted: expected exit 0 (aligned), got $RC: $ERR"
+pass "attestation-prose-quote-not-miscounted: a prose sub-bullet that quotes the freeze-attestation grammar mid-sentence is invisible to the loose anchor and never miscounted as a record (aligned, exit 0, legacy carve-out)"
+
+# --- attestation-refreeze-missing-version-refused ---------------------------
+C="$TMP/case-t1018-refreeze"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_spec "$C/spec.md" "Do the REVISED thing."
+V2_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board.md" 2 "$V2_HASH" \
+  '  - intent-ratified (2026-08-03): v1→v2 — human GO recorded in conversation — a criterion was unsatisfiable' \
+  '  - freeze-attestation (v1, 2026-08-02): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "attestation-refreeze-missing-version-refused: expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-refreeze-missing-version-refused: stderr must carry 'attestation' token, got: $ERR"
+grep -q 'v2' <<< "$ERR" || fail "attestation-refreeze-missing-version-refused: refusal must name v2, got: $ERR"
+pass "attestation-refreeze-missing-version-refused: a ratified v2 board carrying only a v1 attestation is refused with the attestation classification and names v2 — the pace rule gates a ratified re-freeze too"
+
+# --- attestation-duplicate-and-out-of-range-refused --------------------------
+C="$TMP/case-t1018-cardinality"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+GOOD_HASH="$(compute_hash "$C/spec.md")"
+T1018_A='  - freeze-attestation (v1, 2026-08-03): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session'
+write_board "$C/board-dup.md" 1 "$GOOD_HASH" "$T1018_A" "$T1018_A"
+run_checker "$C/spec.md" "$C/board-dup.md"
+[ "$RC" -eq 2 ] || fail "attestation-duplicate-and-out-of-range-refused (duplicate): expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-duplicate-and-out-of-range-refused (duplicate): stderr must carry 'attestation' token, got: $ERR"
+
+write_board "$C/board-oor.md" 1 "$GOOD_HASH" \
+  '  - freeze-attestation (v3, 2026-08-03): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board-oor.md"
+[ "$RC" -eq 2 ] || fail "attestation-duplicate-and-out-of-range-refused (out-of-range): expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-duplicate-and-out-of-range-refused (out-of-range): stderr must carry 'attestation' token, got: $ERR"
+pass "attestation-duplicate-and-out-of-range-refused: two conformant v1 attestations, and a single conformant attestation for a version outside the required range, are both refused with the attestation classification (exit 2)"
+
+# --- attestation-historical-version-not-cross-checked -----------------------
+C="$TMP/case-t1018-historical"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_spec "$C/spec.md" "Do the REVISED thing."
+V2_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board-histstale.md" 2 "$V2_HASH" \
+  '  - intent-ratified (2026-08-03): v1→v2 — human GO recorded in conversation — a criterion was unsatisfiable' \
+  '  - freeze-attestation (v1, 2026-08-02): lines=9/9 sweep=mutual-satisfiability verdict=9P/0F owner=coordinating session' \
+  '  - freeze-attestation (v2, 2026-08-03): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board-histstale.md"
+[ "$RC" -eq 0 ] || fail "attestation-historical-version-not-cross-checked (v1 historical mismatch tolerated): expected exit 0 (aligned), got $RC: $ERR"
+
+write_board "$C/board-currstale.md" 2 "$V2_HASH" \
+  '  - intent-ratified (2026-08-03): v1→v2 — human GO recorded in conversation — a criterion was unsatisfiable' \
+  '  - freeze-attestation (v1, 2026-08-02): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session' \
+  '  - freeze-attestation (v2, 2026-08-03): lines=9/9 sweep=mutual-satisfiability verdict=9P/0F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board-currstale.md"
+[ "$RC" -eq 2 ] || fail "attestation-historical-version-not-cross-checked (v2 miscount refused): expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-historical-version-not-cross-checked (v2 miscount refused): stderr must carry 'attestation' token, got: $ERR"
+pass "attestation-historical-version-not-cross-checked: the spec-derived count cross-check applies only to the version-N record — a stale v1 count is tolerated, but the same mismatch on v2 (the declared version) is refused"
+
+# --- attestation-precedes-drift-judgment ------------------------------------
+C="$TMP/case-t1018-order"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_spec "$C/spec.md" "Do the REVISED thing."
+V2_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board-both.md" 2 "$V2_HASH" \
+  '  - freeze-attestation (v1, 2026-08-02): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board-both.md"
+[ "$RC" -eq 2 ] || fail "attestation-precedes-drift-judgment (unattested v2, broken chain): expected exit 2, got $RC: $ERR"
+grep -q 'attestation' <<< "$ERR" || fail "attestation-precedes-drift-judgment (unattested v2, broken chain): stderr must carry 'attestation' token, got: $ERR"
+
+cp "$C/board-both.md" "$C/board-chain.md"
+printf '  - freeze-attestation (v2, 2026-08-03): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=coordinating session\n' >> "$C/board-chain.md"
+run_checker "$C/spec.md" "$C/board-chain.md"
+[ "$RC" -eq 1 ] || fail "attestation-precedes-drift-judgment (attested but still broken chain): expected exit 1 (drift-detected), got $RC: $ERR"
+grep -q 'drift-detected' <<< "$ERR" || fail "attestation-precedes-drift-judgment (attested but still broken chain): stderr must carry 'drift-detected' token, got: $ERR"
+pass "attestation-precedes-drift-judgment: an unattested v2 board with a broken version chain refuses as attestation (exit 2), not drift-detected; attesting v2 makes the drift judgment reachable again (exit 1, still broken chain)"
+
+# --- attestation-classification-channel-exclusive ---------------------------
+C="$TMP/case-t1018-exclusive"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")"
+grep -v 'intent-hash' "$C/board.md" > "$C/board-freeze.md"
+run_checker "$C/spec.md" "$C/board-freeze.md"
+[ "$RC" -eq 2 ] || fail "attestation-classification-channel-exclusive: expected exit 2, got $RC: $ERR"
+T1018_ACOUNT=$(awk '/^check-intent: attestation: /{n++} END{print n+0}' <<< "$ERR")
+[ "$T1018_ACOUNT" = "1" ] || fail "attestation-classification-channel-exclusive: expected exactly one 'check-intent: attestation: ' line, got $T1018_ACOUNT in: $ERR"
+for p in structural usage drift-detected; do
+  if grep -q "^check-intent: $p: " <<< "$ERR"; then
+    fail "attestation-classification-channel-exclusive: unexpected '$p' classification line alongside attestation, got: $ERR"
+  fi
+done
+pass "attestation-classification-channel-exclusive: the unattested refusal carries exactly one 'check-intent: attestation: ' line and zero lines of the other three prefixes"
+
+# ============================================================================
+# T-1018 rework round 1 (Codex REQUEST_CHANGES, Blocker): the freeze-attestation
+# grammar leaves `lines=`/`verdict=` unrestricted `[0-9]+` (D4), so a
+# conformant record may carry a leading-zero count. Both shapes below are
+# INSIDE the frozen grammar (no re-freeze needed) — this locks the
+# implementation defect the Blocker found, not a grammar change.
+# ============================================================================
+
+# --- attestation-leading-zero-inconsistent-refused --------------------------
+# An internally INCONSISTENT leading-zero record (verdict=08P/00F against
+# lines=1/1; 8+0 != 1) must be refused with the attestation classification.
+# Before the rework1 fix, bash's $(()) arithmetic expansion parsed "08" as
+# invalid octal, aborted only the ARITHMETIC EXPANSION (not the script —
+# that failure sits inside an `if [ ... ]` condition, which `set -e` does
+# not cover), and the cross-check was silently skipped: the board was
+# wrongly accepted as aligned, exit 0.
+C="$TMP/case-t1018-lz-inconsistent"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+GOOD_HASH="$(compute_hash "$C/spec.md")"
+write_board "$C/board.md" 1 "$GOOD_HASH" \
+  '  - freeze-attestation (v1, 2026-08-03): lines=1/1 sweep=mutual-satisfiability verdict=08P/00F owner=coordinating session'
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "attestation-leading-zero-inconsistent-refused: expected exit 2, got $RC: $ERR"
+grep -q '^check-intent: attestation: ' <<< "$ERR" || fail "attestation-leading-zero-inconsistent-refused: stderr must carry the 'attestation' token (not a raw, un-namespaced arithmetic error, and not a silent aligned pass), got: $ERR"
+pass "attestation-leading-zero-inconsistent-refused: a freeze-attestation with a leading-zero verdict that is internally inconsistent (verdict=08P/00F against lines=1/1) is refused with the attestation classification, exit 2 — the leading-zero shape does not bypass the P + F == ran cross-check"
+
+# --- attestation-leading-zero-consistent-numeric-pass ------------------------
+# An internally CONSISTENT leading-zero record (lines=01/01, verdict=01P/00F;
+# 01 == 1 numerically) must be treated numerically and pass the attestation
+# judgment, reaching whatever judgment follows (here: the bootstrap
+# `structural`, since no hash record exists yet) — never refused merely for
+# carrying a leading zero, and never miscounted as inconsistent.
+C="$TMP/case-t1018-lz-consistent"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing." "" $'- [ ] AC1 x\n  - check: true'
+printf -- '- [ ] **T-900** fixture task\n' > "$C/none.md"
+printf '  - freeze-attestation (v1, 2026-08-03): lines=01/01 sweep=mutual-satisfiability verdict=01P/00F owner=coordinating session\n' >> "$C/none.md"
+run_checker "$C/spec.md" "$C/none.md"
+[ "$RC" -eq 2 ] || fail "attestation-leading-zero-consistent-numeric-pass: expected exit 2 (bootstrap structural, no hash record present), got $RC: $ERR"
+grep -q '^check-intent: structural: ' <<< "$ERR" || fail "attestation-leading-zero-consistent-numeric-pass: expected the 'structural' token (bootstrap case — attestation judgment passed), got: $ERR"
+if grep -q '^check-intent: attestation: ' <<< "$ERR"; then
+  fail "attestation-leading-zero-consistent-numeric-pass: a leading-zero-but-numerically-consistent record (01==1) must not be refused as attestation, got: $ERR"
+fi
+pass "attestation-leading-zero-consistent-numeric-pass: a freeze-attestation whose leading-zero counts are internally consistent (lines=01/01 verdict=01P/00F, 01 treated as the numeral 1) passes the attestation judgment and reaches the bootstrap structural, not refused merely for the leading zero"
 
 # --- self-check: this suite's own script is shellcheck clean (soft-skip) ---
 if command -v shellcheck >/dev/null 2>&1; then
