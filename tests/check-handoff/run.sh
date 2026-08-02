@@ -78,6 +78,33 @@ grep -q 'format mismatch' "$bf_err" || fail "bad-format stderr missing 'format m
 grep -Eq ":${bad_line}:" "$bf_err" || fail "bad-format stderr missing line number ${bad_line} (got: $(cat "$bf_err"))"
 printf 'PASS: AC2 bad-format.md exits %s, stderr names line %s\n' "$bf_rc" "$bad_line"
 
+# D4 / Codex round-1 Blocker regression lock: a malformed top-level line
+# (checkbox shape, no space after the closing bracket) must still open an
+# entry, so its own continuation lines — including one separated by a blank
+# line, and one non-dash shape (a table row) — are never misreported as
+# strands. Two variants, mirroring the Blocker's two measured cases:
+# unchecked (`- [ ]...`, format-validated, reported once) and checked
+# (`- [x]...`, never format-validated at all, so no message of its own).
+# The spec's Body-to-AC correspondence table names this exact fixture as the
+# guard against a strand-message cascade under a malformed line — until this
+# lock, that guard was vacuous (no continuation lines existed to cascade).
+nospace_unchecked_line="$(grep -nE 'INTENTIONAL_NOSPACE_UNCHECKED' "$FIX/bad-format.md" | cut -d: -f1)"
+nospace_checked_line="$(grep -nE 'INTENTIONAL_NOSPACE_CHECKED' "$FIX/bad-format.md" | cut -d: -f1)"
+[[ -n "$nospace_unchecked_line" ]] || fail "bad-format.md missing INTENTIONAL_NOSPACE_UNCHECKED marker"
+[[ -n "$nospace_checked_line" ]] || fail "bad-format.md missing INTENTIONAL_NOSPACE_CHECKED marker"
+grep -Eq ":${nospace_unchecked_line}: format mismatch" "$bf_err" \
+  || fail "bad-format: the unchecked no-space-after-bracket line (${nospace_unchecked_line}) must be reported as format mismatch (got: $(cat "$bf_err"))"
+if grep -Eq ":${nospace_checked_line}:" "$bf_err"; then
+  fail "bad-format: the checked no-space-after-bracket line (${nospace_checked_line}) must produce NO message of its own (checked lines are never format-validated), got: $(cat "$bf_err")"
+fi
+if grep -q 'stranded continuation line' "$bf_err"; then
+  fail "bad-format: a malformed top-level line must open an entry — its own continuation lines (including the one after a blank line, and the table-row shape) must never be misreported as strands, got: $(cat "$bf_err")"
+fi
+bf_violation_count="$(grep -c . "$bf_err")"
+[[ "$bf_violation_count" -eq 2 ]] \
+  || fail "bad-format: expected exactly 2 total violations (the two malformed top-level lines, one message each — one defect, one message, D4), got $bf_violation_count: $(cat "$bf_err")"
+printf 'PASS: D4/Blocker regression lock — a malformed checkbox-shaped line with no space after the bracket still opens an entry (unchecked: exactly one format-mismatch message, zero strand cascade; checked: zero messages at all); exact violation set asserted (2 total)\n'
+
 # AC3: bad-flag exits non-zero, stderr names the offending flag string.
 # The fixture also includes T-303 with a lowercase `ready_for_eng` flag —
 # that being reported as "unknown status flag 'ready_for_eng'" (and NOT

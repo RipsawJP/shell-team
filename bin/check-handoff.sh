@@ -82,13 +82,37 @@ emit() {
 # non-blank line, or EOF; a blank line is neutral and ends nothing; every
 # indented non-blank line — whatever its first character (`-`, `|`, a tab, a
 # digit, prose) — continues the entry. `in_entry` tracks whether a task line
-# (`^- \[[x ]\] `) has been seen, with no boundary line since, so a
-# continuation line reached with `in_entry` still 0 is a STRAND (D4) — a
-# malformed top-level line still opens an entry (one defect, one message; no
-# cascade of strand violations for its own sub-bullets), and the `_(`
-# placeholder stays a boundary that opens no entry.
+# (a loose `^- \[[x ]\]` checkbox-shaped prefix, deliberately WITHOUT the
+# Terms table's well-formed trailing space) has been seen, with no boundary
+# line since, so a continuation line reached with `in_entry` still 0 is a
+# STRAND (D4) — a malformed top-level line still opens an entry (one defect,
+# one message; no cascade of strand violations for its own sub-bullets), and
+# the `_(` placeholder stays a boundary that opens no entry.
+#
+# Codex round-1 review Blocker: an earlier cut of this predicate required the
+# trailing space (`^- \[[x ]\] `, the Terms table's WELL-FORMED "task line"
+# shape), which is stricter than the loose `"- [ ]"*` prefix the format gate
+# below actually fires on. A near-miss task-shaped line with no space after
+# the closing bracket (`- [ ]broken title`) then opened no entry at all, so
+# its own legitimate sub-bullets were misreported as strands on top of the
+# real format-mismatch message (two defects reported for one root cause) —
+# and a checked near-miss (`- [x]done...`) got WORSE: the format gate never
+# even fires for `[x]` lines, so the malformed line itself produced NO
+# message while its child was still falsely flagged. D4's malformed-line
+# clause ("A line beginning `- [ ]` that fails LINE_RE is reported once...
+# and does NOT additionally produce a strand violation for each of its
+# sub-bullets") governs exactly this near-miss-task-shaped class — the
+# Terms table's trailing-space form defines a WELL-FORMED task line, not the
+# boundary for "did something open an entry at all". Dropping the trailing
+# space here aligns the entry-opener with the loose prefix test, so any
+# checkbox-shaped line (open bracket, `x` or space, close bracket, THEN
+# anything or nothing) opens an entry regardless of what immediately follows
+# the closing bracket — empty, a tab, punctuation, or prose with no
+# separating space are all still shapes reachable per the spec's own Input
+# space ("A malformed top-level line ... followed by its own continuation
+# lines").
 # shellcheck disable=SC2016
-TASK_LINE_RE='^- \[[x ]\] '
+TASK_LINE_RE='^- \[[x ]\]'
 # shellcheck disable=SC2016
 CONTINUATION_RE='^[[:space:]]+[^[:space:]]'
 
