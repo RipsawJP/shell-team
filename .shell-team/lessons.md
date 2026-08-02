@@ -725,7 +725,8 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Applies-to**: engineer, qa-verifier
 - **Scope**: maintainer
 - **Bound-in**: CONTRIBUTING.md
-- **Status**: active
+- **Status**: superseded
+- **Superseded-by**: 2026-08-01 — A bin/ edit's completion checklist runs the full CI-wired suite list, not a self-selected subset
 - **Source**: n/a
 - **Rule**: When a task edits a `bin/` script pinned elsewhere by a `file:line:content` registry (for example, an errexit-safe test suite's not-applicable registry), treat two things as a required check, distinct from that script's own suite passing: (1) confirm with a repository-wide grep whether the edit shifted any pinned line number, and (2) explicitly run the pinning suite (at minimum the errexit-safe suite).
 - **Why**: A usage-string rewrite shifted a script's line numbers by several lines, and both the engineer and QA only ran that script's own suite and judged it green — CI then failed because the pinning registry had gone stale, requiring a fix-up commit after an otherwise-approved round. Later tasks made this a standard practice without it ever being written down as an instruction to agents.
