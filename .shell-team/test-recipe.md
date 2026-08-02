@@ -256,6 +256,24 @@ that file's order.
   the shift is not a reliable workaround either: it is brittle by
   construction (any future one-line edit reopens the same drift) and not
   worth trading against clear, adequately-commented code.
+- T-1019: `bash tests/is-span-row-parity/run.sh` is the dedicated parity
+  suite proving `bin/rollup-runs.sh`'s and `bin/cluster-failures.sh`'s
+  independently-maintained `is_span_row()` copies (T-1011 hazard H4) still
+  agree, over its own `fixtures/` (six one-row files, one per discriminator
+  class). No new prerequisite: pure bash + coreutils, black-box only (it
+  invokes both real `bin/` scripts by `$REPO_ROOT`-derived path and reads
+  their stdout — never `sed`+`eval` extraction). The mutation-based
+  anti-vacuity procedure (AC4/AC5), to run by hand on a `$TMPDIR` scratch
+  copy — never the working tree: `mkdir -p "$d/tests" && cp -R bin "$d/bin"
+  && cp -R tests/is-span-row-parity "$d/tests/is-span-row-parity"`, run the
+  scratch suite once (must be green — the positive control the scratch tree
+  runs at all), patch exactly one of `bin/rollup-runs.sh` /
+  `bin/cluster-failures.sh` with `sed 's/== "span"/!= "zzz"/'` (assert the
+  patch applied and the sibling script is still unpatched), run the scratch
+  suite again (must exit non-zero and name the patched script plus
+  `kind-event.jsonl`), then delete the scratch dir. Do this once per
+  direction (one script patched at a time) and restore/observe green is
+  implicit since the scratch copy is discarded rather than un-patched.
 - T-1016: a suite run under `set -euo pipefail` that computes a count via
   `x="$(producer | grep -c PATTERN)"` aborts the whole script the moment the
   count is genuinely `0` — `grep -c` still exits 1 when nothing matched (the
