@@ -15,29 +15,54 @@
 #      task's own top-level entry, plus well-formed
 #      `- intent-ratified (YYYY-MM-DD): vK→vK+1 — <human GO> — <reason>`
 #      sub-bullets (grammar only). Any violation => exit 2 (usage/structural).
-#   2. version-chain — the ratification records must form an unbroken chain
+#   2. attestation (T-1018) — a freeze is refused unless the board carries a conformant freeze-attestation record for the version being recorded.
+#      At the freeze moment (no well-formed intent-hash record at all — the
+#      declared version N=1) and at every later ratified version, the
+#      task's own top-level board entry must carry exactly one well-formed
+#      sub-bullet
+#        - freeze-attestation (vN, YYYY-MM-DD): lines=<ran>/<total> sweep=mutual-satisfiability verdict=<P>P/<F>F owner=<value>
+#      for each version 1..N and none outside that range — missing,
+#      duplicated, out-of-range, malformed or arithmetically inconsistent is
+#      a refusal. EXCEPTION (the legacy carve-out): a task whose entry
+#      already carries a well-formed intent-hash record and NO
+#      attestation-shaped line at all is judged exactly as it was before
+#      this task and is never gated retroactively — the whole
+#      backward-compatibility answer for every already-frozen record. A
+#      refusal here prints the exact, ready-to-adapt sub-bullet shape with
+#      the counted total already substituted (see the Exit section below).
+#   3. version-chain — the ratification records must form an unbroken chain
 #      v1->v2->...->vN (exactly N-1 records, no gaps/dupes/out-of-range/
 #      reversal; v1 needs none). Broken chain => exit 1 (drift-detected).
-#   3. hash-match — `git hash-object` of the marker region's NORMALIZED bytes
+#   4. hash-match — `git hash-object` of the marker region's NORMALIZED bytes
 #      (CR stripped, trailing whitespace stripped per line, leading/trailing
 #      blank lines dropped — identical to check-prompt-sync.sh's
 #      normalize_stdin) must equal the board's recorded vN hash. Mismatch =>
 #      exit 1 (drift-detected).
-#   4. all pass => exit 0 (aligned).
+#   5. all pass => exit 0 (aligned).
 #
 # This checker judges BYTES + LEDGER BOOKKEEPING ONLY. Whether the delivered
 # behavior still matches the intent's MEANING is never judged here — that is
-# S4 (drift/alignment evaluator), explicitly out of scope (spec DP4).
+# S4 (drift/alignment evaluator), explicitly out of scope (spec DP4). Nor
+# does it verify that an attested run actually happened or that its sweep
+# was substantive (T-1018): the freeze-attestation record is the executor's
+# claim, and only its shape, its internal arithmetic, and its agreement with
+# the spec's own counted `- check:` lines are checked — the same trust
+# boundary bin/check-interventions.sh and bin/check-acs.sh already declare
+# over a committed, reviewed artifact, inherited verbatim rather than
+# pretended away.
 #
 # Marker matching is an EXACT full-line compare (never a substring/grep -F
 # search): a marker literal quoted mid-sentence in prose (this repo's own
 # T-071 spec quotes its real marker inside a Notes-for-engineer sentence) is
 # never miscounted as a second marker pair. Board records are likewise
 # recognized only when the FULL line (after leading whitespace) matches the
-# structured `- intent-hash (vN): ...` / `- intent-ratified (...): ...`
-# shape — a prose sub-bullet that merely quotes those words mid-sentence
-# (e.g. this repo's own board `freeze (dogfood):` note) is never miscounted
-# as a record (2026-07-17 self-referential dogfooding lesson).
+# structured `- intent-hash (vN): ...` / `- intent-ratified (...): ...` /
+# `- freeze-attestation (...): ...` shape — a prose sub-bullet that merely
+# quotes those words mid-sentence (e.g. this repo's own board `freeze
+# (dogfood):` note, or a hand-off sentence that mentions a
+# `freeze-attestation (v1, …)` record mid-sentence) is never miscounted as a
+# record (2026-07-17 self-referential dogfooding lesson; re-grounded for
+# T-1018).
 #
 # Ledger tamper-evidence (first-seen-wins history-walk detection of a
 # same-version, unratified board-hash overwrite) was implemented for T-071
@@ -54,6 +79,9 @@
 # limitation (spec DP3 trust boundary), covered in Phase A by human GO + PR
 # diff review, the same way bin/check-acs.sh's own TRUST BOUNDARY documents
 # that a standalone checker cannot fully harden against a tampered history.
+# The attestation judgment (T-1018) inherits the same trust boundary and the
+# same disposition: it never reintroduces a board-git-history walk, in any
+# form, for any judgment in this file.
 #
 # Usage:
 #   check-intent.sh [--] <spec.md> <board.md>
@@ -61,7 +89,10 @@
 # Exit: 0 = aligned; 1 = drift-detected (hash mismatch or broken version
 #       chain); 2 = usage / structural error (bad args, unreadable files,
 #       missing/duplicated/reversed markers, missing/duplicated/malformed
-#       board records).
+#       board records) or an attestation error (T-1018, its own
+#       classification token — see below).
+#
+# an unattested, malformed or miscounted freeze-attestation is exit 2 with the attestation classification, and the hash is never recorded.
 
 set -euo pipefail
 
@@ -74,12 +105,17 @@ set -euo pipefail
 # in this script, from the very first line onward, must have a classified
 # exit path available (T-071 rework2 "fail-closed の全数 inventory 要求"; see
 # the inventory table in the T-071 engineer hand-off).
-die() {  # $1 = classification (usage|structural), $2 = message; exit 2
+die() {  # $1 = classification (usage|structural|attestation), $2 = message; exit 2
   printf 'check-intent: %s: %s\n' "$1" "$2" >&2 || true
   exit 2
 }
 fail_usage()      { die usage "$1"; }
 fail_structural() { die structural "$1"; }
+# fail_attestation (T-1018): a freeze-attestation is missing, malformed,
+# duplicated, out-of-range or arithmetically inconsistent. Reuses die() —
+# no new stderr write site is added, so tests/errexit-safe/run.sh's
+# file:line:content pin registry needs no re-grounding (AC18).
+fail_attestation() { die attestation "$1"; }
 fail_drift() {  # $1 = message; exit 1
   printf 'check-intent: drift-detected: %s\n' "$1" >&2 || true
   exit 1
@@ -129,7 +165,7 @@ self_name="$(basename "$script_path")" \
 SELF="$SCRIPT_DIR/$self_name"
 
 print_help() {
-  sed -n '2,64p' "$SELF" | sed 's/^# \{0,1\}//' \
+  sed -n '2,95p' "$SELF" | sed 's/^# \{0,1\}//' \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -231,6 +267,16 @@ awk -v b="$begin_ln" -v e="$end_ln" 'NR > b && NR < e' "$SPEC" | normalize_stdin
 computed_hash="$(git hash-object --stdin < "$tmp_region")" \
   || fail_usage "git hash-object failed while hashing the intent block extracted from $SPEC"
 
+# T-1018 D4: "the counted total" — the number of physical lines matching
+# `^[[:space:]]+- check:` inside the ALREADY-EXTRACTED, ALREADY-NORMALIZED
+# region temp file the hash above is taken over (Notes for engineer gotcha
+# #1) — never a fresh re-read of $SPEC, so both numbers provably describe
+# the same bytes. Counted with awk, never `grep -c` (whose exit 1 for "no
+# match" and exit 2 for "cannot read" would have to be told apart by hand,
+# and a spec with zero `- check:` lines is a legitimate 0, not an error).
+counted_total="$(awk '/^[[:space:]]+- check:/{n++} END{print n+0}' "$tmp_region")" \
+  || fail_usage "awk failed while counting '- check:' lines in the intent block extracted from $SPEC"
+
 # --- 4. board: locate the task's own top-level entry and its records -------
 # shellcheck disable=SC2016
 TOP_RE='^- \[[ xX]\] \*\*(T-[0-9]+)\*\*'
@@ -240,6 +286,18 @@ HASH_FULL_RE='^[[:space:]]+- intent-hash \(v([0-9]+)\): ([0-9a-f]{40})$'
 RATIFIED_LINE_RE='^[[:space:]]+- intent-ratified'
 # shellcheck disable=SC2016
 RATIFIED_FULL_RE='^[[:space:]]+- intent-ratified \([0-9]{4}-[0-9]{2}-[0-9]{2}\): v([0-9]+)→v([0-9]+) — .+ — .+$'
+# ATTEST_LINE_RE / ATTEST_FULL_RE (T-1018 D4): the same loose-anchor +
+# full-grammar pair HASH_LINE_RE/HASH_FULL_RE and RATIFIED_LINE_RE/
+# RATIFIED_FULL_RE already use, so a prose sub-bullet that merely quotes
+# `freeze-attestation (v1, …)` mid-sentence is never miscounted as a record.
+# Fixed field order, single spaces, `sweep=mutual-satisfiability` a literal
+# — D4 rejects order-free key=value parsing. Version is `[1-9][0-9]*` (no
+# `v0`, no leading zero) so an out-of-grammar version is malformed rather
+# than a separate case. `owner=` requires a non-space first character
+# (D5: shape only, no enum, no language rule) then anything to end of line.
+ATTEST_LINE_RE='^[[:space:]]+- freeze-attestation'
+# shellcheck disable=SC2016
+ATTEST_FULL_RE='^[[:space:]]+- freeze-attestation \(v([1-9][0-9]*), ([0-9]{4}-[0-9]{2}-[0-9]{2})\): lines=([0-9]+)/([0-9]+) sweep=mutual-satisfiability verdict=([0-9]+)P/([0-9]+)F owner=([^[:space:]].*)$'
 
 # Board parser state machine (T-071 rework3 canonical, re-grounded for T-1016
 # D2 — spec "## 形式文法 / 状態機械" § "board パース状態機械の正典（rework3
@@ -324,6 +382,14 @@ BLANK_LINE_RE='^[[:space:]]*$'
 #   ratified_from[] / ratified_to[]      — vK / vK+1 pairs from well-formed
 #                                          intent-ratified sub-bullets, in
 #                                          the order encountered
+#   attest_bad_count                     — malformed freeze-attestation
+#                                          sub-bullets in scope (T-1018)
+#   attest_version[] / attest_ran[] /
+#   attest_total[] / attest_p[] /
+#   attest_f[]                           — parallel arrays, one entry per
+#                                          well-formed freeze-attestation
+#                                          sub-bullet, in the order
+#                                          encountered (T-1018)
 extract_task_records() {
   local task_id="$1"
   in_entry=0
@@ -335,6 +401,12 @@ extract_task_records() {
   ratified_bad_count=0
   ratified_from=()
   ratified_to=()
+  attest_bad_count=0
+  attest_version=()
+  attest_ran=()
+  attest_total=()
+  attest_p=()
+  attest_f=()
 
   while true; do
     if IFS= read -r raw; then
@@ -383,6 +455,22 @@ extract_task_records() {
             ratified_bad_count=$((ratified_bad_count + 1))
           fi
         fi
+
+        # T-1018: same accumulate-inside-in_entry==1 shape as the two blocks
+        # above — added inside the single shared parser's existing branch,
+        # never a second parsing loop (Notes for engineer single-parser
+        # mandate).
+        if [[ "$line" =~ $ATTEST_LINE_RE ]]; then
+          if [[ "$line" =~ $ATTEST_FULL_RE ]]; then
+            attest_version+=("${BASH_REMATCH[1]}")
+            attest_ran+=("${BASH_REMATCH[3]}")
+            attest_total+=("${BASH_REMATCH[4]}")
+            attest_p+=("${BASH_REMATCH[5]}")
+            attest_f+=("${BASH_REMATCH[6]}")
+          else
+            attest_bad_count=$((attest_bad_count + 1))
+          fi
+        fi
       fi
     elif [[ "$line" =~ $BLANK_LINE_RE ]]; then
       # Rule 1b (T-1016 D2): a blank line is NEUTRAL — it leaves in_entry
@@ -427,8 +515,115 @@ elif [ "$entry_count" -ge 2 ]; then
 fi
 [ "$ratified_bad_count" -eq 0 ] \
   || fail_structural "$ratified_bad_count malformed intent-ratified record(s) for $TASK_ID in $BOARD (expected '- intent-ratified (YYYY-MM-DD): vK→vK+1 — <human GO> — <reason>')"
-if [ "$hash_valid_count" -ne 1 ] || [ "$hash_bad_count" -ne 0 ]; then
+
+# fail_hash_structural: the SAME message for both row (4) (>=2 well-formed
+# or any malformed intent-hash record) and row (10) below (zero well-formed
+# records — the bootstrap case) — T-1018 D3 requires row (10)'s message stay
+# byte-unchanged from before this task, so both call sites share one string.
+fail_hash_structural() {
   fail_structural "expected exactly one well-formed intent-hash record for $TASK_ID in $BOARD (found valid=$hash_valid_count malformed=$hash_bad_count; expected '- intent-hash (vN): <40-hex>')"
+}
+
+# --- row (4): too many, or any malformed, intent-hash records --------------
+if [ "$hash_valid_count" -ge 2 ] || [ "$hash_bad_count" -ne 0 ]; then
+  fail_hash_structural
+fi
+# hash_valid_count is now exactly 0 (the freeze moment) or 1 here.
+
+# --- T-1018: "the declared version N" (Terms) — the version in the board's
+# single well-formed intent-hash record; N=1 at the freeze moment, where
+# there is none. Computed ONCE, before the attestation judgment (Notes for
+# engineer gotcha #2), and reused by both the pace rule and the version-N
+# count cross-check below.
+if [ "$hash_valid_count" -eq 1 ]; then
+  declared_n=$((10#$hash_version))
+else
+  declared_n=1
+fi
+
+# --- rows (5)-(9): the attestation judgment (T-1018 D2/D3) — a freeze is
+# refused unless the board carries a conformant freeze-attestation record
+# for the version being recorded. Skipped ENTIRELY under the legacy
+# carve-out (D2 rule 2): a well-formed intent-hash record already exists
+# AND there is no attestation-shaped line (well-formed or malformed) at
+# all — the whole backward-compatibility answer for the 21 already-frozen
+# records here and every adopter's; a well-formed hash plus even one
+# malformed attestation line is NOT the carve-out (rule 1 still fires).
+attest_shaped_count=$(( ${#attest_version[@]} + attest_bad_count ))
+if [ "$hash_valid_count" -eq 1 ] && [ "$attest_shaped_count" -eq 0 ]; then
+  : # D2 rule 2 — the legacy carve-out; judgment skipped, never gated
+else
+  # D2 rule 1 — malformed first: ANY attestation-shaped line that fails the
+  # full grammar is a refusal, whatever else is true. A record this checker
+  # cannot parse is never treated as absent, and never as present.
+  [ "$attest_bad_count" -eq 0 ] \
+    || fail_attestation "$attest_bad_count malformed freeze-attestation record(s) for $TASK_ID in $BOARD (expected '- freeze-attestation (vN, YYYY-MM-DD): lines=<ran>/<total> sweep=mutual-satisfiability verdict=<P>P/<F>F owner=<value>')"
+
+  # D2 rule 3 — the pace rule: exactly one well-formed attestation for each
+  # version 1..N, and none outside that range. A missing, duplicated or
+  # out-of-range version is a refusal.
+  n_attest="${#attest_version[@]}"
+  v=1
+  while [ "$v" -le "$declared_n" ]; do
+    count_v=0
+    idx=0
+    while [ "$idx" -lt "$n_attest" ]; do
+      if [ "${attest_version[$idx]}" -eq "$v" ]; then
+        count_v=$((count_v + 1))
+      fi
+      idx=$((idx + 1))
+    done
+    if [ "$count_v" -ne 1 ]; then
+      # D4: the refusal prints the exact, ready-to-adapt sub-bullet shape
+      # with the counted total already substituted, so the freeze-runner
+      # never has to guess (AC3). Deliberately NOT a valid record: the
+      # YYYY-MM-DD / <P> / <F> / <who ran them> placeholders make a
+      # verbatim paste refuse again rather than silently pass (D4).
+      remedy="  - freeze-attestation (v${v}, YYYY-MM-DD): lines=${counted_total}/${counted_total} sweep=mutual-satisfiability verdict=<P>P/<F>F owner=<who ran them>"
+      fail_attestation "expected exactly one freeze-attestation record for $TASK_ID v$v in $BOARD (found $count_v; a freeze is refused unless the board carries a conformant freeze-attestation record for the version being recorded — write:
+$remedy
+)"
+    fi
+    v=$((v + 1))
+  done
+
+  # Out-of-range + arithmetic, over every well-formed attestation in scope.
+  idx=0
+  while [ "$idx" -lt "$n_attest" ]; do
+    av="${attest_version[$idx]}"
+    if [ "$av" -lt 1 ] || [ "$av" -gt "$declared_n" ]; then
+      fail_attestation "freeze-attestation record for $TASK_ID names v$av in $BOARD, outside the required range v1..v$declared_n"
+    fi
+    ar="${attest_ran[$idx]}"
+    at="${attest_total[$idx]}"
+    ap="${attest_p[$idx]}"
+    af="${attest_f[$idx]}"
+    # D4: internal arithmetic ("ran == total", "P + F == ran") is checked
+    # for EVERY well-formed record, regardless of version.
+    if [ "$ar" -ne "$at" ]; then
+      fail_attestation "freeze-attestation v$av for $TASK_ID in $BOARD has lines=$ar/$at (expected ran == total)"
+    fi
+    if [ "$((ap + af))" -ne "$ar" ]; then
+      fail_attestation "freeze-attestation v$av for $TASK_ID in $BOARD has verdict=${ap}P/${af}F but lines ran=$ar (expected P + F == ran)"
+    fi
+    # D4: the spec-derived count cross-check applies to the VERSION-N
+    # record ONLY — a record for an older version was measured against an
+    # intent block that has since been ratified away, and this checker can
+    # only measure the current one (AC9).
+    if [ "$av" -eq "$declared_n" ] && [ "$at" -ne "$counted_total" ]; then
+      fail_attestation "freeze-attestation v$av for $TASK_ID declares total=$at but $SPEC's intent block carries $counted_total '- check:' line(s) (an unattested, malformed or miscounted freeze-attestation is exit 2 with the attestation classification, and the hash is never recorded)"
+    fi
+    idx=$((idx + 1))
+  done
+fi
+
+# --- row (10): zero well-formed intent-hash records AND the attestation
+# judgment passed — the bootstrap case. Message deliberately UNCHANGED from
+# before T-1018 (D3): this stays `structural`, not `attestation`, once the
+# gate is satisfied — `skills/run/SKILL.md`'s bootstrap branch still
+# recognizes it by this exact message.
+if [ "$hash_valid_count" -eq 0 ]; then
+  fail_hash_structural
 fi
 
 # --- 5. version-chain integrity (a broken ledger is drift, not structural) --

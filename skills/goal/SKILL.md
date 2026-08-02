@@ -167,6 +167,12 @@ later ticks — the state file already exists.
        only so this failure mode's signature differs from `drift-detected`'s.
      - `drift-detected` (exit 1, recorded hash mismatches the current intent
        block) → `check-intent: FAIL AC900002` — a second, distinct sentinel.
+     - `attestation` (exit 2, T-1018: the board carries no conformant
+       `- freeze-attestation` record for the version about to be recorded) →
+       `check-intent: FAIL AC900007` — a fourth, distinct reserved sentinel
+       (never a real spec AC number), so this outcome's signature differs
+       from `structural`'s (`AC900001`) and `drift-detected`'s (`AC900002`)
+       and cannot collapse a real `no_progress` false-positive onto either.
      This keeps `goal-state.sh` itself untouched while still making
      `structural` and `drift-detected` (and `aligned`) each produce a distinct
      signature — verified: `printf '%s' "AC1: PASS\ncheck-intent: FAIL
