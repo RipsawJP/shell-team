@@ -3,7 +3,9 @@
 **Companion to**: `.shell-team/specs/T-1020-lessons-supersede-sweep.md`
 **Owner**: pm-spec
 **Corpus adjudicated**: `.shell-team/lessons.md` at `develop` @ `392b934`
-**Status of this document**: proposal awaiting human ratification. Nothing here has been applied to the corpus.
+**Status of this document**: **ratified 2026-08-03.** The human ratified **C-01 only**; all 23 remaining `KEEP` verdicts stand, and both priced overrides in section 6 were declined. The ratified pair is recorded in the spec's "Ratified retirement set" section and baked into its acceptance criteria; this document is the durable record of *why* each candidate went the way it did, and is not edited further by the implementation.
+
+One item surfaced at the ratification gate and is recorded here as corroboration rather than as an input: the pre-publication repository ran a 74-entry pairwise domination sweep on 2026-07-26 (its T-108) and found **zero dominations**, and that deferral record never migrated into this repository. Porting it is **issue #112**, outside T-1020's scope. It matters here only as an independent second measurement pointing the same way as section 6's finding — this adjudication was performed against the committed corpus without knowledge of it.
 
 Every count and every piece of arithmetic in this document is marked `pm-spec-measured-by-reading`: pm-spec has no shell, so each number was derived by reading the corpus and the committed block files. The coordinating session re-measures all of them on a scratch copy before this is presented for ratification. Where a number below is wrong, the adjudication's *verdicts* are unaffected — they rest on quoted text, not on counts — but the ceiling arithmetic in the closing section is.
 
