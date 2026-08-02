@@ -98,15 +98,23 @@ base ref. **The exact bytes of every canonical line this task adds are the
 spec to drift from (DP-2). Each canonical line must be one physical, unwrapped
 line in `CONTRIBUTING.md`.
 
-- [ ] **AC1** `CONTRIBUTING.md` carries the four new section headings, exactly as
-  spelled, and **no trace of the deferred release section survives**: not the
-  heading, and not any of its eight canonical bullets. A section is removed by
-  deleting it, and the failure mode of a removal is leaving part of it behind, so
-  every bullet the section ever carried is asserted absent by a distinctive
-  fragment — including both wordings of the manifest bullet, since the earlier one
-  was superseded within this task and either could be the one still sitting in the
-  working tree. The file is proved readable first (positive control).
-  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF '## The pull-request flow' CONTRIBUTING.md && grep -qxF '## Confirming the CI check is green' CONTRIBUTING.md && grep -qxF '## The board line format' CONTRIBUTING.md && grep -qxF '## What does not belong in this file' CONTRIBUTING.md && ! grep -qxF '## Cutting a release' CONTRIBUTING.md && ! grep -qF -- '- **Bump the `version` field of' CONTRIBUTING.md && ! grep -qF -- '- **The version lives in one place**' CONTRIBUTING.md && ! grep -qF -- '- **Bump the static version badge in both' CONTRIBUTING.md && ! grep -qF -- '- **Nothing else is machine-checked.**' CONTRIBUTING.md && ! grep -qF -- '- **Promote `develop` to `main` through a pull request**' CONTRIBUTING.md && ! grep -qF -- '- **Tag the release on `main` with an annotated tag' CONTRIBUTING.md && ! grep -qF -- '- **The install side is documented elsewhere**' CONTRIBUTING.md && ! grep -qF -- '- The promotion and the tag are a **maintainer decision, not an observed practice**' CONTRIBUTING.md && ! grep -qF -- '- **Add the release entry to `CHANGELOG.md`' CONTRIBUTING.md
+- [ ] **AC1** `CONTRIBUTING.md` carries five section headings, exactly as spelled:
+  the four this task wrote, plus `## Cutting a release`, which returns through
+  T-1015 (issue #29) written from a release that was actually executed.
+  **The Goal and the Non-goals above are deliberately not amended.** They record
+  what *this* task's scope was, and it stays true that this task deferred the
+  release procedure to a follow-up that would run one first. Only the criteria that
+  evaluate the live tree — and would now assert something false about it — are
+  amended (AC1, AC3, AC17; v7, ratified).
+  The eight absence assertions that proved the earlier draft had been removed whole
+  retire with the deferral they served. They verified a *removal*, the section is
+  back by design, and freezing eight phrasings out of prose that is being rewritten
+  from observation would constrain wording without protecting any reader. The one
+  absence that still means something survives: the disclosure line labelling the
+  promotion and the tag a decision rather than an observed practice must not come
+  back, because the whole premise of the returning section is that both have now
+  been observed. The file is proved readable first (positive control).
+  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF '## The pull-request flow' CONTRIBUTING.md && grep -qxF '## Confirming the CI check is green' CONTRIBUTING.md && grep -qxF '## The board line format' CONTRIBUTING.md && grep -qxF '## What does not belong in this file' CONTRIBUTING.md && grep -qxF '## Cutting a release' CONTRIBUTING.md && ! grep -qF -- '- The promotion and the tag are a **maintainer decision, not an observed practice**' CONTRIBUTING.md
 - [ ] **AC2** The new content is attached to `CONTRIBUTING.md` rather than written
   over it, with exactly one licensed exception: the opening paragraph of the
   existing `## About CI on your pull request` section, whose enumeration of what CI
@@ -123,10 +131,21 @@ line in `CONTRIBUTING.md`.
   changes that file on `develop`. That is expected; do not widen its base-ref
   resolution or re-derive it per rework round.
   - check: exp="$(git show develop:CONTRIBUTING.md | awk '/^Some checks in this repository test the shipped scripts/{f=1} f{print} f&&/your change\.$/{exit}')" && test "$(printf '%s\n' "$exp" | wc -l | tr -d ' ')" -eq 4 && del="$(git diff develop -- CONTRIBUTING.md | grep -E '^-' | grep -vE '^---' | sed 's/^-//')" && test "$del" = "$exp" && test "$(git diff --numstat develop -- CONTRIBUTING.md | awk '{print $1}')" -gt 0
-- [ ] **AC3** The pull-request flow is stated as six canonical bullets: the base
-  branch and branch-name form, the pull-request target, the deferral to the
-  existing two-gate statement, the board-hygiene step, **publishing the board edit**,
-  and the manual issue close. **The flow has to reach a committed state.**
+- [ ] **AC3** The pull-request flow is stated as seven canonical bullets, **six of
+  them pinned here**: the base branch and branch-name form, the pull-request target,
+  the deferral to the existing two-gate statement, **branching for the board edit
+  before the close-out step runs**, **running the close-out step on that branch and
+  publishing it**, and the manual issue close. The seventh — the records-complete
+  precondition that sits between the two-gate bullet and the branching bullet — is
+  added and pinned by T-1015; every canonical line has exactly one pin, and for that
+  one this criterion is not it.
+  **The two board-hygiene bullets are in the order the steps actually run** (issue
+  #31). Before v7 they read as a sequence that ran the close-out step first and
+  branched afterwards, which inverts the only order that works: the script rewrites
+  the board file in place, so the branch it is to land on has to exist first. The
+  reorder is a rewording, not a move — both bullets change bytes, both superseded
+  openings are asserted absent, and their replacements are the two patterns below.
+  **The flow has to reach a committed state.**
   `bin/close-out.sh` rewrites the board file and stops: it runs no git command at
   all, so the edit is left uncommitted in the working tree, and `develop` is
   protected, so it cannot be pushed there directly. Without that bullet the
@@ -145,7 +164,7 @@ line in `CONTRIBUTING.md`.
   exception, and a "never" that the tree disproves is the same defect class as the
   `fix` claim, so the clause becomes an instruction. The superseded wording is
   asserted absent.
-  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF -- '- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line: do not branch from it.' CONTRIBUTING.md && ! grep -qF -- 'is never the base of a feature branch' CONTRIBUTING.md && grep -qxF -- '- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.' CONTRIBUTING.md && grep -qxF -- '- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.' CONTRIBUTING.md && grep -qxF -- '- **Merge, then run board hygiene.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next.' CONTRIBUTING.md && grep -qxF -- '- **Publish the board edit as its own pull request.** `bin/close-out.sh` rewrites the board file and stops there — it runs no git command — and `develop` is protected, so the edit cannot go straight to it. Branch from `develop` at the merge commit, commit that one file with a message of the form `board: close out T-NNNN — merged via PR #N`, and open that branch as a second pull request.' CONTRIBUTING.md && grep -qxF -- '- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.' CONTRIBUTING.md
+  - check: grep -qF 'Thanks for looking' CONTRIBUTING.md && grep -qxF -- '- **Branch from `develop`**, named `<type>/<slug>` — the branch names in this repository so far use the types `docs`, `chore` and `feature`, and the set is open. `main` is the release line: do not branch from it.' CONTRIBUTING.md && ! grep -qF -- 'is never the base of a feature branch' CONTRIBUTING.md && grep -qxF -- '- **Open the pull request against `develop`.** The workflow runs on pull requests targeting `main` and `develop`, so the check reports on the pull request itself.' CONTRIBUTING.md && grep -qxF -- '- **Both gates must be green before the merge** — QA and the cross-provider review, as stated under "How changes get merged" above. This section adds the mechanics around that gate and does not restate it.' CONTRIBUTING.md && grep -qxF -- '- **Branch for the board edit before the close-out step runs.** After the merge, branch from `develop` at the merge commit: the close-out step rewrites the board file in place and runs no git command, and `develop` is protected, so the board edit needs a branch of its own to land on.' CONTRIBUTING.md && grep -qxF -- '- **Run board hygiene on that branch, then publish it.** `bash bin/close-out.sh --task T-NNNN --issue N --pr N` moves the board entry to `## Done`, rewrites its status flag, and prints what to do next; commit that one file with a message of the form `board: close out T-NNNN — merged via PR #N`, and open the branch as a second pull request.' CONTRIBUTING.md && ! grep -qF -- '- **Merge, then run board hygiene.**' CONTRIBUTING.md && ! grep -qF -- '- **Publish the board edit as its own pull request.**' CONTRIBUTING.md && grep -qxF -- '- **Close the GitHub issue by hand.** A merge into `develop` does not auto-close an issue, so `bin/close-out.sh` prints the `gh issue close` command for a human to run — it never calls `gh` itself.' CONTRIBUTING.md
 - [ ] **AC4** Both claims this document makes about `bin/close-out.sh` are grounded
   in the producer, not in recollection: it says itself that a `develop` merge does
   not auto-close, it does write the board file, and it invokes **no git command** —
@@ -260,13 +279,16 @@ line in `CONTRIBUTING.md`.
   bullet staying still while its destination was removed. The direction is
   deliberately one-way: a named topic must have a section, but a section need not be
   named (`## What does not belong in this file` is real and unnamed by design). The
-  count is pinned at three as the extraction positive control — a broken pattern
-  yields zero and fails loudly instead of passing a vacuous empty loop — and it also
-  makes any change to the pointer scope require a spec change, which is the right
-  friction for this file. Absence of the superseded wording is asserted two ways:
-  the exact phrase, and any mention of releasing at all, so a reworded revival is
-  caught as well as a verbatim one.
-  - check: grep -qxF '## Branches and pull requests' CLAUDE.md && s="$(awk '/^## Branches and pull requests$/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)" && test "$(printf '%s\n' "$s" | grep -cE '^[^[:space:]]')" -eq 1 && printf '%s\n' "$s" | grep -qE '^- ' && printf '%s\n' "$s" | grep -qF 'CONTRIBUTING.md' && ! printf '%s\n' "$s" | grep -qF 'the release procedure' && ! printf '%s\n' "$s" | grep -qiF 'releas' && hs="$(printf '%s\n' "$s" | grep -oE '`## [^`]+`' | tr -d '`')" && test "$(printf '%s\n' "$hs" | grep -c '^## ')" -eq 3 && ok=1 && while IFS= read -r h; do [ -n "$h" ] || continue; grep -qxF "$h" CONTRIBUTING.md || ok=0; done <<< "$hs" && test "$ok" -eq 1 && ! grep -qF 'reject force pushes' CLAUDE.md && test "$(git diff develop -- CLAUDE.md | grep -cE '^[+-]#')" -eq 0 && test "$(git diff --numstat develop -- CLAUDE.md | awk '{print $1}')" -gt 0
+  count is pinned as the extraction positive control — a broken pattern yields zero
+  and fails loudly instead of passing a vacuous empty loop — and it also makes any
+  change to the pointer scope require a spec change, which is the right friction for
+  this file. **At v7 the count is four**, because `## Cutting a release` exists again
+  and the bullet names it; the two absence assertions that guarded the deferral (the
+  exact superseded phrase, and any mention of releasing at all) retire with it. They
+  existed to stop the bullet pointing at a section that was not there, and the
+  correspondence loop is what actually enforces that. Keeping a lock against naming a
+  section that now exists would be a lock against the truth.
+  - check: grep -qxF '## Branches and pull requests' CLAUDE.md && s="$(awk '/^## Branches and pull requests$/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)" && test "$(printf '%s\n' "$s" | grep -cE '^[^[:space:]]')" -eq 1 && printf '%s\n' "$s" | grep -qE '^- ' && printf '%s\n' "$s" | grep -qF 'CONTRIBUTING.md' && hs="$(printf '%s\n' "$s" | grep -oE '`## [^`]+`' | tr -d '`')" && test "$(printf '%s\n' "$hs" | grep -c '^## ')" -eq 4 && ok=1 && while IFS= read -r h; do [ -n "$h" ] || continue; grep -qxF "$h" CONTRIBUTING.md || ok=0; done <<< "$hs" && test "$ok" -eq 1 && ! grep -qF 'reject force pushes' CLAUDE.md && test "$(git diff develop -- CLAUDE.md | grep -cE '^[+-]#')" -eq 0 && test "$(git diff --numstat develop -- CLAUDE.md | awk '{print $1}')" -gt 0
 - [ ] **AC18** Negative — the generated prompt blocks and every agent definition are
   byte-unchanged, and prompt-sync is green. Paired with a positive control proving
   the diff command sees this task's own change.
@@ -594,7 +616,7 @@ carried forward in DP-7 for the task that writes that section after running one.
 |---|---|
 | `CONTRIBUTING.md` carries the three content areas this repository has executed | AC1 (sections), AC3/AC9/AC12 (the sentences) |
 | Every convention sentence is grounded in this tree or marked as a decision | the claim-to-evidence table above + AC4, AC10, AC11 |
-| The release procedure is deferred to a task that runs one first, and no trace of the drafted section is left behind | AC1 (the heading and all eight of its bullets asserted absent) **and AC17** (the `CLAUDE.md` pointer must not name it, in the exact wording or any other); the reasoning is the Non-goals entry and DP-7 |
+| The release procedure is deferred to a task that runs one first, and no trace of the drafted section is left behind | **Satisfied at v6 and superseded at v7.** It was AC1 (the heading and all eight of its bullets asserted absent) and AC17 (the pointer must not name it, in any wording); the reasoning is the Non-goals entry and DP-7. T-1015 ran the release and wrote the section from it, so AC1 now asserts the heading **present** and AC17 counts four destinations. The deferral itself is not undone — it is *discharged*, which is what a deferral is for |
 | Removing a section is not finished until everything that points at it has been followed | AC17 (each destination the pointer names is looked up in `CONTRIBUTING.md` at check time, so a dangling one fails) |
 | A pointer is verified by correspondence with its target, not by pinning its bytes | AC17; a byte-exact pin catches the pointer changing, and what happened was the pointer standing still while the target was removed |
 | The documented flow reaches a committed state — the board edit is published, not left uncommitted | AC3 (the publish bullet, byte-exact), AC4 (the no-git-command grounding, with a positive control on its own pattern), grounded in row P4b |
@@ -681,6 +703,14 @@ this spec answers: it is deferred whole (Non-goals, DP-7), which resolves it rat
 than leaving it open.
 
 ## Notes for engineer
+
+**Historical as of v7 (2026-08-02).** Everything below describes how *this* task was
+implemented and was written before the v6→v7 ratification. It is kept as the record
+of that work and is **not** an instruction to anyone now: the worked pointer-bullet
+example names three destinations where the file now carries four, and the "do not
+mention releasing" instruction was retired with AC17's two absence assertions. The
+live instructions for the v7 amendment are in `.shell-team/specs/T-1015-cutting-a-release.md`;
+the canonical bytes are, as always, the `grep -qxF` patterns in the criteria above.
 
 - **This round removes a section.** `## Cutting a release` — its heading and all
   eight of its bullets — comes out of `CONTRIBUTING.md` whole. Do not relocate any
