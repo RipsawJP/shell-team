@@ -31,6 +31,13 @@ jobs:
       - name: Lint the shipped board template (hand-off linter)
         run: bash bin/check-handoff.sh templates/todo-template.md
 
+      - name: Dogfood check-handoff — this repository's own board
+        run: |
+          set -e
+          B="$(bash bin/team-paths.sh --get todo)"
+          test -r "$B"
+          bash bin/check-handoff.sh "$B"
+
       - name: Run check-handoff fixture suite
         run: bash tests/check-handoff/run.sh
 

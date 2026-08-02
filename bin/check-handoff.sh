@@ -10,6 +10,12 @@
 # (or any base dir), so any non-empty path ending in `.md` is accepted. The
 # legacy `docs/specs/<slug>.md` form still matches.
 #
+# A continuation line (T-1016 D4) — an indented, non-blank line — that
+# belongs to no task entry (no task line, `^- \[[x ]\] `, seen above it since
+# the start of `## Active`) is a STRAND: reported as a violation with the
+# frozen reason "stranded continuation line (no task entry above it in this
+# section)". `## Done` is deliberately out of scope for this check.
+#
 # Reads only. Prints `<file>:<lineno>: <reason>: <line>` to stderr per
 # violation and exits non-zero if any were found.
 
@@ -72,6 +78,46 @@ emit() {
   violations=$((violations + 1))
 }
 
+# board-entry continuation canon (T-1016): a boundary is any non-indented
+# non-blank line, or EOF; a blank line is neutral and ends nothing; every
+# indented non-blank line — whatever its first character (`-`, `|`, a tab, a
+# digit, prose) — continues the entry. `in_entry` tracks whether a task line
+# (a loose `^- \[[x ]\]` checkbox-shaped prefix, deliberately WITHOUT the
+# Terms table's well-formed trailing space) has been seen, with no boundary
+# line since, so a continuation line reached with `in_entry` still 0 is a
+# STRAND (D4) — a malformed top-level line still opens an entry (one defect,
+# one message; no cascade of strand violations for its own sub-bullets), and
+# the `_(` placeholder stays a boundary that opens no entry.
+#
+# Codex round-1 review Blocker: an earlier cut of this predicate required the
+# trailing space (`^- \[[x ]\] `, the Terms table's WELL-FORMED "task line"
+# shape), which is stricter than the loose `"- [ ]"*` prefix the format gate
+# below actually fires on. A near-miss task-shaped line with no space after
+# the closing bracket (`- [ ]broken title`) then opened no entry at all, so
+# its own legitimate sub-bullets were misreported as strands on top of the
+# real format-mismatch message (two defects reported for one root cause) —
+# and a checked near-miss (`- [x]done...`) got WORSE: the format gate never
+# even fires for `[x]` lines, so the malformed line itself produced NO
+# message while its child was still falsely flagged. D4's malformed-line
+# clause ("A line beginning `- [ ]` that fails LINE_RE is reported once...
+# and does NOT additionally produce a strand violation for each of its
+# sub-bullets") governs exactly this near-miss-task-shaped class — the
+# Terms table's trailing-space form defines a WELL-FORMED task line, not the
+# boundary for "did something open an entry at all". Dropping the trailing
+# space here aligns the entry-opener with the loose prefix test, so any
+# checkbox-shaped line (open bracket, `x` or space, close bracket, THEN
+# anything or nothing) opens an entry regardless of what immediately follows
+# the closing bracket — empty, a tab, punctuation, or prose with no
+# separating space are all still shapes reachable per the spec's own Input
+# space ("A malformed top-level line ... followed by its own continuation
+# lines").
+# shellcheck disable=SC2016
+TASK_LINE_RE='^- \[[x ]\]'
+# shellcheck disable=SC2016
+CONTINUATION_RE='^[[:space:]]+[^[:space:]]'
+
+in_entry=0
+
 # Read the whole `<lineno>\t<content>` record and split manually. Using
 # `IFS=$'\t' read -r lineno content` would coalesce runs of tab and strip a
 # leading tab from `content`, causing tab-indented sub-bullets to slip past
@@ -84,13 +130,31 @@ while IFS= read -r raw; do
   # Tolerate Windows CRLF line endings: a trailing `\r` survives the awk
   # extraction and would otherwise break the LINE_RE `$` anchor.
   content="${content%$'\r'}"
-  # Skip blank lines.
+  # Blank line: neutral no-op, leaves in_entry untouched.
   [[ -z "${content//[[:space:]]/}" ]] && continue
-  # Skip placeholder lines (start with `_(`).
+
+  # Continuation line (indented, non-blank): fine while in_entry, a strand
+  # otherwise. Either way it is never itself validated against LINE_RE.
+  if [[ "$content" =~ $CONTINUATION_RE ]]; then
+    if [[ "$in_entry" -eq 0 ]]; then
+      emit "$lineno" "stranded continuation line (no task entry above it in this section)" "$content"
+    fi
+    continue
+  fi
+
+  # Boundary line: closes any open scope first.
+  in_entry=0
+
+  # Placeholder lines (`_(none)_`) are a boundary that opens no entry.
   [[ "$content" == _\(* ]] && continue
-  # Skip sub-bullets: leading whitespace followed by `-`.
-  [[ "$content" =~ ^[[:space:]]+- ]] && continue
-  # Only validate top-level checklist lines.
+
+  # A task line (checked or unchecked) opens a new entry — even a malformed
+  # `- [ ]` line that fails LINE_RE below, so its own sub-bullets are not
+  # re-reported as strands (D4).
+  [[ "$content" =~ $TASK_LINE_RE ]] && in_entry=1
+
+  # Only validate unfinished (`- [ ]`) top-level checklist lines against the
+  # hand-off grammar.
   [[ "$content" != "- [ ]"* ]] && continue
 
   if [[ ! "$content" =~ $LINE_RE ]]; then

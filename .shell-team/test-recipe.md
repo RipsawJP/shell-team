@@ -239,3 +239,33 @@ that file's order.
   look hung through a tool with a short default timeout. Run it in the
   background, or raise the timeout, rather than treating the wait itself as
   a failure signal.
+- T-1016: `tests/errexit-safe/run.sh`'s `NOT_APPLY` registry byte-exact
+  `file:line:content` pins are not specific to `bin/gen-playbook-blocks.sh`
+  (T-1008's case) — editing the header comment or any code above the pinned
+  line in **any** of the files it names (`check-handoff.sh`, `close-out.sh`,
+  `check-board-headings.sh`, `check-acs.sh`, `check-contract.sh`, …) shifts
+  that file's pins the same way. Before editing one of those files, grep
+  `tests/errexit-safe/run.sh`'s `NOT_APPLY_FILE` block for that filename
+  first. If the task's own scope lock does **not** list `tests/errexit-safe/
+  run.sh` as an editable file (a same-task collateral fix would then trip
+  that lock's own "no extra files changed" criterion), do not edit it to
+  chase the drift — leave it untouched, record the resulting suite failure
+  as a documented finding in the hand-off/board entry instead, and let a
+  human-ratified scope widening (or a dedicated fast-follow) update the
+  registry. Chasing an exact zero net line-count in the edited file to avoid
+  the shift is not a reliable workaround either: it is brittle by
+  construction (any future one-line edit reopens the same drift) and not
+  worth trading against clear, adequately-commented code.
+- T-1016: a suite run under `set -euo pipefail` that computes a count via
+  `x="$(producer | grep -c PATTERN)"` aborts the whole script the moment the
+  count is genuinely `0` — `grep -c` still exits 1 when nothing matched (the
+  printed `0` does not change that), `pipefail` propagates that 1 as the
+  pipeline's exit status, and a plain top-level assignment under `set -e`
+  treats that as a script-ending failure, before the `[ "$x" -eq 0 ]`
+  assertion that was supposed to accept the zero ever runs. This bit four
+  new `## Active`-emptiness assertions in `tests/close-out/run.sh` (the
+  suite died with a bare exit 1 and no `FAIL:` line). Fix: append `|| true`
+  to the `grep -c` pipeline itself (never to the whole assignment, and keep
+  the immediately-following explicit `[ "$x" -eq N ] || fail ...` assertion
+  so an unexpectedly non-zero count is still caught) — distinct from, but
+  the same family as, the `grep -q`-under-`pipefail`-SIGPIPE entry above.

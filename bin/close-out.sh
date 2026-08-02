@@ -2,13 +2,14 @@
 # close-out.sh — one-command post-merge close-out for a board task (T-038).
 #
 # Does, in order:
-#   1. Moves the task's top-level line (plus its contiguous sub-bullets) from
-#      `## Active` to the TOP of `## Done` on the resolved board, rewriting the
-#      status flag to `READY_FOR_MERGE`. The moved line keeps the hand-off
-#      grammar of check-handoff.sh's LINE_RE (flag backticks directly followed
-#      by ` — spec:`, NO parenthetical after the flag — the T-030 rework
-#      lesson); the closure provenance (date / PR / issue) goes into a new
-#      sub-bullet instead of the title line.
+#   1. Moves the task's top-level line plus its entry extent — per the
+#      board-entry continuation canon (T-1016): blank/indented lines of
+#      any shape belong to the entry, trailing blanks trimmed — from
+#      `## Active` to the TOP of `## Done`, rewriting the flag to
+#      `READY_FOR_MERGE`. Keeps the hand-off grammar of check-handoff.sh's
+#      LINE_RE (flag backticks directly followed by ` — spec:`, NO
+#      parenthetical — T-030 rework); closure provenance (date/PR/issue)
+#      goes into a new sub-bullet instead of the title line.
 #   2. Prints the manual issue-close procedure to stdout. This script NEVER
 #      calls `gh` or the GitHub API (sandboxes can't; the human/orchestrator
 #      runs the printed command).
@@ -125,8 +126,8 @@ fi
 
 # --- pass 1: locate the task (no writes) --------------------------------------
 # Emits: "<active_start> <active_end> <active_count> <done_count>"
-#   active_start/end — 1-based line range of the task's Active entry
-#                      (top-level line + contiguous sub-bullets)
+#   active_start/end — 1-based line range of the task's Active entry EXTENT
+#                      (through its last continuation line, canon per header)
 #   active_count     — top-level Active matches (must be exactly 1)
 #   done_count       — matches in Done (drives the "already closed" message)
 scan="$(awk -v task="$TASK" '
@@ -137,7 +138,8 @@ scan="$(awk -v task="$TASK" '
       a_count++; a_start=NR; a_end=NR; capturing=1; next
     }
     if (capturing) {
-      if ($0 ~ /^[[:space:]]+-/) { a_end=NR; next }
+      if ($0 ~ /^[[:space:]]*$/) { next }
+      if ($0 ~ /^[[:space:]]+[^[:space:]]/) { a_end=NR; next }
       capturing=0
     }
   }
@@ -196,7 +198,8 @@ if [ -n "$NOTE" ];  then CLOSURE="${CLOSURE} — ${NOTE}"; fi
 
 ENTRY_FILE="$(mktemp "${TMPDIR:-/tmp}/close-out-entry.XXXXXX")"
 TMP_BOARD="$(mktemp "${TMPDIR:-/tmp}/close-out-board.XXXXXX")"
-trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD"' EXIT
+GATE_ERR="$(mktemp "${TMPDIR:-/tmp}/close-out-gate-err.XXXXXX")"
+trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD" "$GATE_ERR"' EXIT
 
 {
   printf '%s\n' "$DONE_MAIN"
@@ -226,7 +229,10 @@ awk -v a_start="$A_START" -v a_end="$A_END" -v entry_file="$ENTRY_FILE" '
 ' "$BOARD" > "$TMP_BOARD"
 
 # --- fail-closed gate: the rewritten board must still pass the hand-off lint ---
-if ! bash "$SCRIPT_DIR/check-handoff.sh" "$TMP_BOARD" >/dev/null 2>&1; then
+# D6 (T-1016): capture+print the checker's stderr before refusing (exit 1 and
+# the no-write guarantee are unchanged).
+if ! bash "$SCRIPT_DIR/check-handoff.sh" "$TMP_BOARD" >/dev/null 2>"$GATE_ERR"; then
+  cat "$GATE_ERR" >&2 || true
   fail "rewritten board would fail check-handoff.sh — board left untouched"
 fi
 # mktemp creates 0600 files; keep the board's own permissions by copying the

@@ -26,3 +26,9 @@ _(none)_
 
 `<specs-dir>` is `.shell-team/specs/` by default (or `docs/specs/` in a legacy
 `tasks/` layout). The hand-off linter accepts any spec path ending in `.md`.
+
+A task entry runs from its top-level line to the next non-indented non-blank line,
+the next `##` heading, or the end of the file:
+blank lines and indented lines of any shape belong to the entry.
+Consequently, an indented line with no task entry above it in the section is an error,
+and the hand-off linter reports it.
