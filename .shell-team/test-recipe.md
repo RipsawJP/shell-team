@@ -287,3 +287,35 @@ that file's order.
   the immediately-following explicit `[ "$x" -eq N ] || fail ...` assertion
   so an unexpectedly non-zero count is still caught) — distinct from, but
   the same family as, the `grep -q`-under-`pipefail`-SIGPIPE entry above.
+- T-1022: `tests/close-out/run.sh`'s differential-testing harness
+  (`closeout-lineshape-differential`, D9/D10) builds a full board per
+  corpus line under `$TMP/lineshape/caseN`, runs the real `bin/close-out.sh`
+  against it, classifies the outcome as `notlocated` (pass 1 never finds
+  the task) or, for a located line, `refused`/`accepted` against an
+  **independently and live re-computed** oracle — `bin/check-handoff.sh`
+  run against a freshly-synthesized single-entry board built from that same
+  corpus line, never a hardcoded verdict — and prints one summary line
+  (`corpus=`/`refused=`/`accepted=`/`notlocated=`/`mismatches=`). Adding a
+  corpus line needs no manual prediction of its class: append it to
+  `LS_LINES` (or call `lineshape_case` directly for a CRLF variant) and let
+  the run classify it; only the five floor/`mismatches=0` assertions at the
+  bottom of that section need to hold. The suite's own runtime grew from
+  well under 10s to roughly 15s (measured, this machine) purely from this
+  harness's ~30 extra `close-out.sh` + `check-handoff.sh` subprocess pairs —
+  budget for it if invoking `tests/close-out/run.sh` through a tool with a
+  tight default timeout, same caution as the T-1008 entry above for
+  whole-tree scans.
+- T-1022: editing `bin/close-out.sh` above `tests/errexit-safe/run.sh`'s
+  `close-out.sh:<N>` pin (T-1016's entry above already covers this class;
+  recorded again here because the site count itself was undercounted once)
+  shifts **six lines / seven occurrences** of that pin in
+  `tests/errexit-safe/run.sh`: the `NOT_APPLY` heredoc entry, the
+  explanatory comment above the mutation self-check, the mutation `sed`
+  pattern (twice on one line — the escaped match pattern `close-out\.sh:<N>`
+  AND its literal replacement `close-out.sh:<N>`, both need updating), the
+  `grep -qF`, and the `ok`/`bad` message strings. Re-derive `N` with
+  `grep -oE 'close-out\.sh:[0-9]+' tests/errexit-safe/run.sh | sed
+  's/^.*://' | sort -u` (must print exactly one number) rather than
+  arithmetic-shifting a previously-written-down value, and confirm
+  `sed -n "${N}p" bin/close-out.sh` is byte-identical to the pinned content
+  before updating the number.

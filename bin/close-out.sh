@@ -34,12 +34,11 @@
 #
 # T-1022's source-line gate (#98) judges the task's Active source line the
 # same way check-handoff.sh would, by feeding it a synthesized single-entry
-# board rather than keeping a second copy of the line grammar here — so
-# the Active line's status flag must be in the allowed vocabulary — an
-# invalid flag is no longer silently rewritten. A single sibling screen sits
-# ahead of the FIRST check-handoff.sh invocation (this gate) and covers the
-# pre-write interlock below too: a missing or unreadable check-handoff.sh
-# sibling is exit 2 (it was exit 1 before this change).
+# board rather than keeping a second copy of the line grammar here —
+#   the Active line's status flag must be in the allowed vocabulary — an invalid flag is no longer silently rewritten.
+# A single sibling screen sits ahead of the FIRST check-handoff.sh
+# invocation (this gate) and covers the pre-write interlock below too —
+#   a missing or unreadable check-handoff.sh sibling is exit 2 (it was exit 1 before this change).
 #
 # The board path comes from $TEAM_TODO if set, else the sibling team-paths.sh
 # resolves it from cwd (.shell-team/todo.md by default, tasks/todo.md in a
@@ -102,7 +101,11 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --help|-h)
-      sed -n '2,59p' "$script_path" | sed 's/^# \{0,1\}//'
+      # T-1022 D7: the extent is derived at run time from the file's own
+      # contiguous leading comment block starting at line 2 — never a
+      # hardcoded range (a bare number bump is the vacuous fix this task
+      # exists to avoid; T-1017 already had to bump this exact number once).
+      awk 'NR==1{next} /^#/{l=$0; sub(/^# ?/,"",l); print l; next} {exit}' "$script_path"
       exit 0
       ;;
     *) die "unknown argument: $1" ;;

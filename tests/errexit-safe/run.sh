@@ -309,7 +309,7 @@ check-acs.sh:294:    printf 'AC%s: FAIL (check: value is wrapped in a single mat
 check-contract.sh:37:  printf '%s:%s: %s\n' "$FILE" "$1" "$2" >&2
 check-board-headings.sh:319:    printf '%s: note: no resolvable base (first commit and no --base/--base-file/env default) — skipping the deletion/replacement (structural) check; the duplicate check still runs\n' "$BOARD" >&2
 check-board-headings.sh:329:  printf '%s: %s: %s\n' "$BOARD" "$1" "$2" >&2
-close-out.sh:382:  printf 'close-out: note: project_status generated block not refreshed (file or markers absent) — see gen-project-status.sh\n' >&2
+close-out.sh:444:  printf 'close-out: note: project_status generated block not refreshed (file or markers absent) — see gen-project-status.sh\n' >&2
 gen-playbook-blocks.sh:468:        "$role" "$line_count" "$LINE_WARN_THRESHOLD" >&2
 EOF
 sort -u "$NOT_APPLY_FILE" -o "$NOT_APPLY_FILE"
@@ -368,20 +368,20 @@ fi
 
 # --- mutation self-check (non-vacuity of the CONTENT-aware match itself) ----
 # Proves the fix for the file:line-only blind spot: take a real, currently-
-# exempted NOT_APPLY line (close-out.sh:382) and simulate REWRITING its TEXT
+# exempted NOT_APPLY line (close-out.sh:444) and simulate REWRITING its TEXT
 # to an unsafe form while KEEPING THE SAME FILE:LINE — entirely in a private
 # copy; bin/close-out.sh itself is never touched. A file:line-ONLY audit
 # would still "match" this mutated candidate against the old NOT_APPLY record
 # (same key) and miss it; the content-aware audit above must NOT.
 MUTATED_CAND_FILE="$TMP/mutated-candidates.txt"
-sed 's|^close-out\.sh:382:.*$|close-out.sh:382:  printf '"'"'MUTATED: this text simulates an exempted line rewritten unsafe'"'"' >&2; exit 42|' \
+sed 's|^close-out\.sh:444:.*$|close-out.sh:444:  printf '"'"'MUTATED: this text simulates an exempted line rewritten unsafe'"'"' >&2; exit 42|' \
   "$CAND_FILE" > "$MUTATED_CAND_FILE"
 MUTATION_IN_SCOPE_FILE="$TMP/mutation-in-scope.txt"
 comm -23 "$MUTATED_CAND_FILE" "$NOT_APPLY_FILE" > "$MUTATION_IN_SCOPE_FILE" 2>/dev/null || true
-if grep -qF 'close-out.sh:382:' "$MUTATION_IN_SCOPE_FILE"; then
-  ok "mutation self-check: rewriting the close-out.sh:382 NOT_APPLY line's TEXT (same file:line) to an unsafe form IS caught by the content-aware audit (would NOT have been caught by a file:line-only match)"
+if grep -qF 'close-out.sh:444:' "$MUTATION_IN_SCOPE_FILE"; then
+  ok "mutation self-check: rewriting the close-out.sh:444 NOT_APPLY line's TEXT (same file:line) to an unsafe form IS caught by the content-aware audit (would NOT have been caught by a file:line-only match)"
 else
-  bad "mutation self-check: rewriting the close-out.sh:382 NOT_APPLY line's TEXT to an unsafe form was NOT caught — the content-aware audit is not actually content-aware; every completeness result above is suspect"
+  bad "mutation self-check: rewriting the close-out.sh:444 NOT_APPLY line's TEXT to an unsafe form was NOT caught — the content-aware audit is not actually content-aware; every completeness result above is suspect"
 fi
 
 # =============================================================================
