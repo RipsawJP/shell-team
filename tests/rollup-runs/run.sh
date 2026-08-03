@@ -85,6 +85,33 @@ clean_out="$(bash "$ROLLUP" "$FIX/clean.jsonl" 2>/dev/null)"
 [ "$events_out" = "$clean_out" ] || fail "with-events: rollup output changed by event rows (T-1011 regression)"
 pass "with-events: event rows (T-1011) are skipped, output identical to the span-only run"
 
+# --- T-1021: a leading-zero numeric field must not silently re-base -------
+# Scratch rows are written under a temp dir (never checked in as new
+# fixture files under tests/rollup-runs/fixtures/, which T-1021's diff
+# allow-list does not cover — only tests/rollup-runs/run.sh itself is in
+# scope) and cleaned up via trap.
+T1021_TMP="$(mktemp -d "${TMPDIR:-/tmp}/t1021-rollup.XXXXXX")"
+trap 'rm -rf "$T1021_TMP"' EXIT
+
+# `"tokens":010` (valid octal 8, decimal 10 — the two values genuinely
+# differ) must sum as 10, never as the octal-re-based 8.
+ZERO010="$T1021_TMP/zero-padded-010.jsonl"
+printf '{"loop_id":"shell-team","run_id":"RUN-ZERO-010","seq":1,"ts":"2026-06-13T00:00:01Z","span":"tech-lead","phase":"plan","iteration":0,"attempt":0,"status":"success","model":null,"tokens":010,"tool_uses":1,"duration_ms":1000,"verdict":null,"usd":null,"error":null,"parent_span_id":null}\n' > "$ZERO010"
+assert_out "T-1021-rollup-runs-tokens (zero-fixture=010) sums as 10" 'tokens: 10( |$)' "$ZERO010"
+
+# `"tokens":08` is invalid as an octal literal — this must neither leak
+# bash's raw arithmetic error nor abort mid-output with no diagnostic; the
+# 10# fix means it just succeeds, summing as decimal 8.
+ZERO08="$T1021_TMP/zero-padded-08.jsonl"
+printf '{"loop_id":"shell-team","run_id":"RUN-ZERO-08","seq":1,"ts":"2026-06-13T00:00:01Z","span":"tech-lead","phase":"plan","iteration":0,"attempt":0,"status":"success","model":null,"tokens":08,"tool_uses":1,"duration_ms":1000,"verdict":null,"usd":null,"error":null,"parent_span_id":null}\n' > "$ZERO08"
+ERRTMP="$T1021_TMP/zero-padded-08.err"
+out_08="$(bash "$ROLLUP" "$ZERO08" 2>"$ERRTMP")"
+grep -qE 'tokens: 8( |$)' <<< "$out_08" \
+  || fail "T-1021-rollup-runs-tokens (zero-fixture=08): expected 'tokens: 8', got: $out_08"
+grep -q 'value too great for base' "$ERRTMP" \
+  && fail "T-1021-rollup-runs-tokens (zero-fixture=08): leaked bash's raw arithmetic error"
+pass "T-1021-rollup-runs-tokens (zero-fixture=08): sums as 8 with no raw arithmetic error"
+
 # --- usage errors ---
 assert_rc "no args -> 2"          2
 assert_rc "unreadable file -> 2"  2 "$FIX/does-not-exist.jsonl"

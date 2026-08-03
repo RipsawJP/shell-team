@@ -102,4 +102,46 @@ bash "$GS" set-sig "$ST" >/dev/null 2>&1; rc=$?; [ "$rc" -eq 2 ] || fail "set-si
 set -e
 pass "usage errors -> exit 2"
 
+# --- T-1021: leading-zero digit strings must not silently re-base ---------
+# A leading-zero `iteration` value must be read as decimal, never as octal.
+# `010` (valid octal, different value) proves re-basing; `07` would not
+# (7 either way), which is why D7 forbids it as the fixture.
+printf 'start_epoch=1000000000\niteration=010\nprev_sig=\n' > "$TMP/zero1"
+[ "$(bash "$GS" bump "$TMP/zero1")" = "11" ] \
+  || fail "T-1021-goal-state-bump: zero-fixture=010 iteration must bump to 11, not 9 (octal re-basing)"
+pass "T-1021-goal-state-bump: leading-zero iteration bumps to 11 (zero-fixture=010)"
+
+# `08` is invalid as an octal literal — bash's raw arithmetic error must
+# never leak, and 10# normalization means it just bumps to 9 like any other
+# valid decimal digit string (this is the crash-vs-refusal boundary D6 names).
+printf 'start_epoch=1000000000\niteration=08\nprev_sig=\n' > "$TMP/zero2"
+set +e
+out2="$(bash "$GS" bump "$TMP/zero2" 2>"$TMP/zero2.err")"
+rc2=$?
+set -e
+[ "$rc2" -eq 0 ] && [ "$out2" = "9" ] \
+  || fail "T-1021-goal-state-bump-08: zero-fixture=08 iteration must bump to 9, got '$out2' (rc=$rc2)"
+grep -q 'value too great for base' "$TMP/zero2.err" && fail "T-1021-goal-state-bump-08: zero-fixture=08 leaked bash's raw arithmetic error"
+pass "T-1021-goal-state-bump-08: leading-zero iteration (zero-fixture=08) bumps to 9 with no raw arithmetic error"
+
+# A leading-zero start_epoch must resolve elapsed-min to the real value, not
+# an octal-derived one.
+printf 'start_epoch=01000000000\niteration=0\nprev_sig=\n' > "$TMP/zero3"
+[ "$(GOAL_NOW=1000000600 bash "$GS" elapsed-min "$TMP/zero3")" = "10" ] \
+  || fail "T-1021-goal-state-elapsed-min: zero-fixture=010 start_epoch must yield 10, not an octal-derived value"
+pass "T-1021-goal-state-elapsed-min: leading-zero start_epoch resolves to the real elapsed minutes (zero-fixture=010)"
+
+# A 20-digit grammar-conformant iteration must refuse rather than silently
+# wrap through INTMAX_MAX and print a negative value at exit 0 (D4 overflow
+# decision, AC12).
+printf 'start_epoch=1000000000\niteration=99999999999999999999\nprev_sig=\n' > "$TMP/huge"
+set +e
+bash "$GS" bump "$TMP/huge" >/dev/null 2>"$TMP/huge.err"
+rc3=$?
+set -e
+[ "$rc3" -ne 0 ] \
+  || fail "T-1021-goal-state-bump-overflow: a 20-digit iteration must refuse, not wrap and exit 0"
+grep -q 'value too great for base' "$TMP/huge.err" && fail "T-1021-goal-state-bump-overflow: leaked bash's raw arithmetic error"
+pass "T-1021-goal-state-bump-overflow: a 20-digit iteration refuses cleanly instead of wrapping"
+
 printf '\nAll goal-state assertions passed.\n'
