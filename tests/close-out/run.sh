@@ -944,7 +944,7 @@ pass "closeout-sourceline-no-temp-leftovers — a private \$TMPDIR is left with 
 # byte-identical; oracle-accept implies close-out exits 0 with the entry
 # moved. A disagreement increments `mismatches`.
 # ============================================================================
-printf '\n--- T-1022 differential harness (closeout-lineshape-differential) ---\n'
+printf '\n--- T-1022 differential-testing harness for the line-shape escape surface ---\n'
 
 LS_ROOT="$TMP/lineshape"
 mkdir -p "$LS_ROOT"
