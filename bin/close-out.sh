@@ -2,13 +2,14 @@
 # close-out.sh — one-command post-merge close-out for a board task (T-038).
 #
 # Does, in order:
-#   1. Moves the task's top-level line (plus its contiguous sub-bullets) from
-#      `## Active` to the TOP of `## Done` on the resolved board, rewriting the
-#      status flag to `READY_FOR_MERGE`. The moved line keeps the hand-off
-#      grammar of check-handoff.sh's LINE_RE (flag backticks directly followed
-#      by ` — spec:`, NO parenthetical after the flag — the T-030 rework
-#      lesson); the closure provenance (date / PR / issue) goes into a new
-#      sub-bullet instead of the title line.
+#   1. Moves the task's top-level line plus its entry extent — per the
+#      board-entry continuation canon (T-1016): blank/indented lines of
+#      any shape belong to the entry, trailing blanks trimmed — from
+#      `## Active` to the TOP of `## Done`, rewriting the flag to
+#      `READY_FOR_MERGE`. Keeps the hand-off grammar of check-handoff.sh's
+#      LINE_RE (flag backticks directly followed by ` — spec:`, NO
+#      parenthetical — T-030 rework); closure provenance (date/PR/issue)
+#      goes into a new sub-bullet instead of the title line.
 #   2. Prints the manual issue-close procedure to stdout. This script NEVER
 #      calls `gh` or the GitHub API (sandboxes can't; the human/orchestrator
 #      runs the printed command).
@@ -19,6 +20,16 @@
 #      gen-project-status.sh — also best-effort (skipped with a note when the
 #      status file or its markers are absent, e.g. a host that never adopted
 #      the generated block).
+#
+# Before any of the above runs, two fail-closed gates must pass, in order:
+# T-068's pending fast-follow disposition gate, then T-1017's interventions
+# gate —
+#   a missing or non-conformant interventions record refuses the close-out before any board write.
+# The interventions record is resolved from $TEAM_INTERVENTIONS_DIR (same
+# override precedence as $TEAM_TODO below) or else the sibling team-paths.sh,
+# then verified with the sibling check-interventions.sh --task T-NNN. The
+# gate reads ONE path for the task being closed — no other task's record, no
+# ## Done history, no backfill or migration.
 #
 # The board path comes from $TEAM_TODO if set, else the sibling team-paths.sh
 # resolves it from cwd (.shell-team/todo.md by default, tasks/todo.md in a
@@ -39,9 +50,13 @@
 #   --date   closure date, default: today (UTC not forced; pass explicitly in tests)
 #   --note   free-text closure note (single line; control chars rejected)
 #
-# Exit: 0 = board updated; 1 = task not in Active (missing or already Done) or
-#       board shape error; 2 = usage / validation / resolver error. On any
-#       non-zero exit the board file is byte-untouched.
+# Exit: 0 = board updated; 1 = task not in Active (missing or already Done),
+#       board shape error, an unresolved fast-follow disposition, or a
+#       missing/unreadable/non-conformant interventions record; 2 = usage /
+#       validation / resolver error, or an unusable interventions checker or
+#       interventions-directory resolver. On any non-zero exit the board file
+#       is byte-untouched. In one line:
+#   a missing, unreadable or non-conformant interventions record is exit 1; an unusable checker or resolver is exit 2.
 
 set -euo pipefail
 
@@ -76,7 +91,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --help|-h)
-      sed -n '2,40p' "$script_path" | sed 's/^# \{0,1\}//'
+      sed -n '2,59p' "$script_path" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) die "unknown argument: $1" ;;
@@ -125,8 +140,8 @@ fi
 
 # --- pass 1: locate the task (no writes) --------------------------------------
 # Emits: "<active_start> <active_end> <active_count> <done_count>"
-#   active_start/end — 1-based line range of the task's Active entry
-#                      (top-level line + contiguous sub-bullets)
+#   active_start/end — 1-based line range of the task's Active entry EXTENT
+#                      (through its last continuation line, canon per header)
 #   active_count     — top-level Active matches (must be exactly 1)
 #   done_count       — matches in Done (drives the "already closed" message)
 scan="$(awk -v task="$TASK" '
@@ -137,7 +152,8 @@ scan="$(awk -v task="$TASK" '
       a_count++; a_start=NR; a_end=NR; capturing=1; next
     }
     if (capturing) {
-      if ($0 ~ /^[[:space:]]+-/) { a_end=NR; next }
+      if ($0 ~ /^[[:space:]]*$/) { next }
+      if ($0 ~ /^[[:space:]]+[^[:space:]]/) { a_end=NR; next }
       capturing=0
     }
   }
@@ -176,6 +192,110 @@ if sed -n "${A_START},${A_END}p" "$BOARD" \
   fail "$TASK has an unresolved pending fast-follow disposition — resolve it to a filed issue number or a waived reason before close-out (a pending disposition must not survive close-out)"
 fi
 
+# --- fail-closed gate: the task's interventions record exists and conforms ----
+# (T-1017). The interventions record is the only durable channel for a human
+# interrupting, a measurement contradicting an assumption, or work deferred or
+# abandoned (T-1002 / check-interventions.sh). This gate reads ONE path for
+# the task being closed — no other task's record, no ## Done history, no
+# backfill or migration. Resolution: $TEAM_INTERVENTIONS_DIR at the same
+# override precedence $TEAM_TODO already has above, else the sibling
+# team-paths.sh; a resolver failure is exit 2 with no guessing fallback (a
+# guessed directory that happens to be empty would misattribute a refusal,
+# and one that happens to hold a same-named file would verify the wrong
+# task's record).
+if [ -n "${TEAM_INTERVENTIONS_DIR:-}" ]; then
+  INTERVENTIONS_DIR="$TEAM_INTERVENTIONS_DIR"
+else
+  INTERVENTIONS_DIR="$(bash "$SCRIPT_DIR/team-paths.sh" --get interventions 2>/dev/null)" \
+    || die "cannot resolve the interventions directory (team-paths.sh unavailable) — set \$TEAM_INTERVENTIONS_DIR or fix the install"
+fi
+RECORD="$INTERVENTIONS_DIR/$TASK.md"
+
+# Prints the one-step remedy (D7): the record path as resolved, the working
+# directory, and the three literal lines of a conformant zero-entry record —
+# content, never a runnable command (the two execution contexts this plugin
+# ships into would otherwise need their own printed invocation). Exit-1
+# refusals only (rows i-iii below); never printed on the exit-2 refusals,
+# where the problem is the install/environment rather than the record.
+print_interventions_remedy() {
+  printf 'close-out: record path: %s\n' "$RECORD" >&2 || true
+  printf 'close-out: working directory: %s\n' "$(pwd)" >&2 || true
+  printf 'close-out: remedy — write a conformant record with exactly:\n' >&2 || true
+  printf '<!-- BEGIN interventions: %s -->\n' "$TASK" >&2 || true
+  printf 'no interventions occurred\n' >&2 || true
+  printf '<!-- END interventions: %s -->\n' "$TASK" >&2 || true
+}
+
+# Row (i): screened before the checker ever runs — a missing path, a
+# directory, a FIFO, an unreadable file or a dangling symlink are all "no
+# readable record".
+if [ ! -f "$RECORD" ] || [ ! -r "$RECORD" ]; then
+  printf 'close-out: %s has no readable interventions record: %s\n' "$TASK" "$RECORD" >&2 || true
+  print_interventions_remedy
+  exit 1
+fi
+
+CHECKER="$SCRIPT_DIR/check-interventions.sh"
+if [ ! -f "$CHECKER" ] || [ ! -r "$CHECKER" ]; then
+  die "cannot verify the interventions record (check-interventions.sh missing or unreadable next to close-out.sh)"
+fi
+
+# Captured into a variable rather than a temp file: this gate sits ahead of
+# the mktemp/trap block below, and `trap ... EXIT` is not additive, so a
+# second temp file here would need a second trap (T-1017 Notes for
+# engineer). Redirect order matters: `2>&1 >/dev/null` sends the checker's
+# stderr into the capture and discards its stdout.
+CK_ERR="$(bash "$CHECKER" --task "$TASK" -- "$RECORD" 2>&1 >/dev/null)" && CK_RC=0 || CK_RC=$?
+
+if [ "$CK_RC" -ne 0 ]; then
+  # D5 (T-1016's pattern): the checker's own stderr is surfaced BEFORE this
+  # script's own reason string.
+  if [ -n "$CK_ERR" ]; then
+    printf '%s\n' "$CK_ERR" >&2 || true
+  fi
+  case "$CK_RC" in
+    1)
+      # Row (ii): checker exit 1 (schema violation).
+      printf 'close-out: %s interventions record does not conform: %s\n' "$TASK" "$RECORD" >&2 || true
+      print_interventions_remedy
+      exit 1
+      ;;
+    2)
+      # The checker conflates usage and structural under its own exit 2;
+      # classification matches the documented `check-interventions: <token>: `
+      # prefix, never message prose.
+      case "$CK_ERR" in
+        *'check-interventions: structural:'*)
+          # Row (iii): normalized to exit 1, NOT passed through — a
+          # structural defect (absent/duplicated/reversed markers, a
+          # BEGIN/END id mismatch, a --task disagreement) is a defect in the
+          # operator's record, remediable by editing it, same class as a
+          # schema violation.
+          printf 'close-out: %s interventions record does not conform: %s\n' "$TASK" "$RECORD" >&2 || true
+          print_interventions_remedy
+          exit 1
+          ;;
+        *'check-interventions: usage:'*)
+          # Row (iv): the arguments close-out itself constructed were
+          # rejected; no edit to the record can fix this, so it stays exit 2
+          # with no remedy block.
+          die "cannot verify the interventions record ($TASK: check-interventions.sh rejected its own invocation)"
+          ;;
+        *)
+          # Row (vi), fail-closed floor: an exit-2 with no recognized token
+          # is never guessed into row (iii).
+          die "cannot verify the interventions record ($TASK: check-interventions.sh returned an unrecognized classification)"
+          ;;
+      esac
+      ;;
+    *)
+      # Row (vi), fail-closed floor: any status other than 0/1/2 — keyed on
+      # the status FIRST, a token is only consulted within status 2.
+      die "cannot verify the interventions record ($TASK: check-interventions.sh exited $CK_RC)"
+      ;;
+  esac
+fi
+
 # --- build the Done entry ------------------------------------------------------
 MAIN_LINE="$(sed -n "${A_START}p" "$BOARD")"
 # Rewrite `— \`<FLAG>\` — spec:` to READY_FOR_MERGE, keeping everything else.
@@ -196,7 +316,8 @@ if [ -n "$NOTE" ];  then CLOSURE="${CLOSURE} — ${NOTE}"; fi
 
 ENTRY_FILE="$(mktemp "${TMPDIR:-/tmp}/close-out-entry.XXXXXX")"
 TMP_BOARD="$(mktemp "${TMPDIR:-/tmp}/close-out-board.XXXXXX")"
-trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD"' EXIT
+GATE_ERR="$(mktemp "${TMPDIR:-/tmp}/close-out-gate-err.XXXXXX")"
+trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD" "$GATE_ERR"' EXIT
 
 {
   printf '%s\n' "$DONE_MAIN"
@@ -226,7 +347,10 @@ awk -v a_start="$A_START" -v a_end="$A_END" -v entry_file="$ENTRY_FILE" '
 ' "$BOARD" > "$TMP_BOARD"
 
 # --- fail-closed gate: the rewritten board must still pass the hand-off lint ---
-if ! bash "$SCRIPT_DIR/check-handoff.sh" "$TMP_BOARD" >/dev/null 2>&1; then
+# D6 (T-1016): capture+print the checker's stderr before refusing (exit 1 and
+# the no-write guarantee are unchanged).
+if ! bash "$SCRIPT_DIR/check-handoff.sh" "$TMP_BOARD" >/dev/null 2>"$GATE_ERR"; then
+  cat "$GATE_ERR" >&2 || true
   fail "rewritten board would fail check-handoff.sh — board left untouched"
 fi
 # mktemp creates 0600 files; keep the board's own permissions by copying the

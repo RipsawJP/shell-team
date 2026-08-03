@@ -725,7 +725,8 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Applies-to**: engineer, qa-verifier
 - **Scope**: maintainer
 - **Bound-in**: CONTRIBUTING.md
-- **Status**: active
+- **Status**: superseded
+- **Superseded-by**: 2026-08-01 — A bin/ edit's completion checklist runs the full CI-wired suite list, not a self-selected subset
 - **Source**: n/a
 - **Rule**: When a task edits a `bin/` script pinned elsewhere by a `file:line:content` registry (for example, an errexit-safe test suite's not-applicable registry), treat two things as a required check, distinct from that script's own suite passing: (1) confirm with a repository-wide grep whether the edit shifted any pinned line number, and (2) explicitly run the pinning suite (at minimum the errexit-safe suite).
 - **Why**: A usage-string rewrite shifted a script's line numbers by several lines, and both the engineer and QA only ran that script's own suite and judged it green — CI then failed because the pinning registry had gone stale, requiring a fix-up commit after an otherwise-approved round. Later tasks made this a standard practice without it ever being written down as an instruction to agents.
@@ -758,8 +759,8 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Status**: active
 - **Source**: n/a
 - **Rule**: Because pm-spec has no shell and cannot execute a `check:` line itself, before freezing an intent block, whichever side has execution capability (the coordinating session, or tech-lead) must run every `check:` line in the spec live, in full, and detect (a) a line that's mechanically broken and always returns the same result, and (b) a line that passes vacuously even when the target artifact doesn't exist — correct them with a meaning-preserving fix, and only then finalize the intent hash. Verify, then correct, then freeze — in that order.
-- **Why**: In one case, two `check:` lines inside an already-frozen intent were discovered to be mechanically broken after the freeze, requiring a full re-freeze. A following case applied this same order proactively, and before freezing caught (one) a lock that always returns exit 2 in this sandbox because a diff comparison can't read a process-substitution file descriptor here — meaning it cannot distinguish "the check is broken" from "a real violation" — and (two) a criterion whose usage-error exit code returns 2 even when the fixture it's supposed to check for doesn't exist yet, meaning it cannot distinguish "the feature works" from "the deliverable is simply absent." Pm-spec, once sent back, then audited all of its acceptance criteria across the board and pre-corrected an identically-shaped one on its own. A vacuous `check:` line imports the exact same fail-open defect class this project has repeatedly had to close elsewhere, just introduced from the spec side — and if it survives past the freeze, fixing it later costs a re-freeze's churn.
-- **How to apply**: Whoever has execution capability (the coordinating session, or tech-lead) should run the checker (in this repository, the acceptance-criteria checker) once against a spec received from pm-spec, before recording an intent hash. Most acceptance criteria failing is expected and normal pre-implementation — what to look for are exactly two classes: something mechanically broken, and something that passes even though the deliverable doesn't exist. When found, send it back to pm-spec to correct as a meaning-preserving fix, and require a sweep for the same shape across every other acceptance criterion. Only record the intent hash (v1) once that correction is done. The obligation has no scale cap: a spec with a large criteria count still gets every line run live before the freeze — one applied case ran all 28 and caught a host-environment mismatch plus two vacuous-pass shapes in that single pass, each of which would otherwise have cost a re-freeze.
+- **Why**: In one case, two `check:` lines inside an already-frozen intent were discovered to be mechanically broken after the freeze, requiring a full re-freeze. A following case applied this same order proactively, and before freezing caught (one) a lock that always returns exit 2 in this sandbox because a diff comparison can't read a process-substitution file descriptor here — meaning it cannot distinguish "the check is broken" from "a real violation" — and (two) a criterion whose usage-error exit code returns 2 even when the fixture it's supposed to check for doesn't exist yet, meaning it cannot distinguish "the feature works" from "the deliverable is simply absent." Pm-spec, once sent back, then audited all of its acceptance criteria across the board and pre-corrected an identically-shaped one on its own. A vacuous `check:` line imports the exact same fail-open defect class this project has repeatedly had to close elsewhere, just introduced from the spec side — and if it survives past the freeze, fixing it later costs a re-freeze's churn. Two consecutive tasks in a later sprint then hit a third shape the pre-freeze run must catch — a frozen line that is structurally unsatisfiable (one criterion contradicting a sibling criterion, or a comparison whose two sides can never agree byte-for-byte) — each discovered only by the engineer mid-implementation and each costing a human-ratified re-freeze, even though this rule was already written and bound into the spec-writing role: a written rule with no owner and no moment mechanically attached to the freeze did not change what happened at the freeze.
+- **How to apply**: Whoever has execution capability (the coordinating session, or tech-lead) should run the checker (in this repository, the acceptance-criteria checker) once against a spec received from pm-spec, before recording an intent hash. Most acceptance criteria failing is expected and normal pre-implementation — what to look for are exactly two classes: something mechanically broken, and something that passes even though the deliverable doesn't exist. When found, send it back to pm-spec to correct as a meaning-preserving fix, and require a sweep for the same shape across every other acceptance criterion. Only record the intent hash (v1) once that correction is done. The obligation has no scale cap: a spec with a large criteria count still gets every line run live before the freeze — one applied case ran all 28 and caught a host-environment mismatch plus two vacuous-pass shapes in that single pass, each of which would otherwise have cost a re-freeze. Treat the live-run as a gating step with an owner and a moment, not a standing reminder: the freeze itself is blocked until whoever holds execution capability has recorded that every `check:` line ran, and the sweep covers mutual satisfiability across criteria (can every line hold at once against one artifact) in addition to each line's own mechanics.
 
 ## 2026-07-26 — Don't use `^-[^-]` to confirm a markdown-bullet file only had lines added
 - **Category**: verification-discipline
@@ -811,3 +812,65 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When a task creates or extends a fail-closed validation gate, its acceptance criteria must include near-miss and non-canonical input shapes aimed at the gate's own boundary logic (unknown identifiers, near-miss spellings, region-closing conditions) — a gate that validates its inputs strictly but closes its regions loosely is fail-open at exactly one spot.
 - **Why**: A checker rewrite validated section markers strictly, but its region-closing condition matched any marker-shaped line rather than the validated set, so an unknown-identifier line silently closed a region and escaped the unrecognised-line check. The cross-provider review caught it as a Major after QA had passed: the gate's own boundary was the one input class nobody had aimed a criterion at.
 - **How to apply**: At spec time, when the acceptance criteria cover a new gate, add criteria that mutate the gate's anchor vocabulary (unknown id, near-miss spelling, malformed variant placed at a boundary) and require a reported violation; QA probes the same shapes empirically, including at least one input the gate's two matching paths could disagree on.
+
+## 2026-08-02 — A spec that ships runnable commands verifies them across an execution-context matrix
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: n/a
+- **Rule**: When a task's deliverable documents runnable commands, the spec must name an execution-context matrix — at minimum the repository's own checkout root without the plugin on PATH, and an adopter-shaped repository with the plugin loaded (different cwd, bin/ scripts reached by bare name) — and every documented command must be verified by running it in every cell, not by reading it.
+- **Why**: A documentation task fixed a command's launch form for one context and the fix regressed in the other: the rewritten prefix-relative path exited 127 in an adopter repository with the plugin loaded, a defect an independent review round caught only after the first fix had already passed in the checkout-root context. The same defect class firing in two consecutive rounds forced a full inventory audit before the class closed — each round's fix was individually sound, and the missing piece was verifying the whole context matrix at once.
+- **How to apply**: At spec time, when a deliverable includes commands a reader is meant to run, add the context matrix as an explicit verification axis with one criterion per cell; QA executes each documented command in each context rather than trusting that a fix verified in one context holds in the other. A fix that changes a command's launch form re-runs the whole matrix.
+
+## 2026-08-02 — An approval gate presents every option's content, never a bare label
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: n/a
+- **Rule**: When presenting options for a human decision (an escalation, a rework disposition, a ratification), every option's actual content — the concrete text, change, or consequence it stands for — must appear in the same message as its label, because a label-only option forces the approver to decide blind or to stall the gate asking what the label means.
+- **Why**: In one sprint the same presentation defect fired twice at human gates: one request enumerated options but gave only a label for one of them, and the human had to push back before the choice was decidable; a sibling incident presented replacement text in a form the approver could not evaluate. Both gates existed formally, and neither was exercisable as presented.
+- **How to apply**: Before sending an approval request that enumerates options, check each option against one question: could the approver state what choosing it would change, from this message alone? If an option's content is long, include a faithful summary inline together with the exact text; never defer an option's substance to a follow-up message.
+
+## 2026-08-02 — A ratification request pairs the exact bytes with a summary in the approver's language
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: n/a
+- **Rule**: When human ratification covers exact text (frozen spec lines, replacement sentences, prose that will ship), the request must carry both the byte-exact text and a summary in the approver's working language — the two are jointly required, and neither one substitutes for the other.
+- **Why**: A ratification gate once presented candidate replacement sentences as byte-strings in a language the approver does not read; the gate existed formally but could not be exercised, and approval became possible only after an approver-language summary was supplied in a second pass. The exact bytes alone were unreviewable; a summary alone would have ratified a paraphrase rather than the text.
+- **How to apply**: At every gate that ratifies exact text, present three things together: a summary in the approver's working language, the exact bytes being ratified, and the presenter's own attestation of what was checked; afterwards record only the approval act itself. This holds even when the approver has delegated the judgment — answer the delegation with the attestation, and still leave the decision act to the approver.
+
+## 2026-08-02 — Run the PII-shape checker on a newly written record before its first commit
+- **Category**: security-pii
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: n/a
+- **Rule**: Whoever writes a new git-tracked record (a review, provenance, or interventions file) runs the repository's PII-shape checker against that file before its first commit — the CI diff-time check is the last-resort backstop, not the primary defense, because a value that reaches pushed history costs a history rewrite to remove.
+- **Why**: A record describing a PII shape transcribed the real value it was describing — a real home-directory path — and the leak was caught only by a cross-provider review Blocker and the CI diff step, after the record had been committed; removing it required rewriting already-pushed history. Prose that explains a PII shape is exactly the prose most likely to reproduce it, so the producer's own pre-commit run is the control that has to hold.
+- **How to apply**: Immediately before the first commit of any new record file, run the PII-shape checker against it (in this loop, check-pii-shapes.sh) and describe shapes with placeholders rather than values. This complements the existing lessons on not transcribing PII into planning documents and on write-time guards inside generating scripts: this one is the habit for records written by hand.
+
+## 2026-08-02 — A review-record appendix is committed by the round that writes it
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: maintainer
+- **Bound-in**: CONTRIBUTING.md
+- **Status**: active
+- **Source**: n/a
+- **Rule**: Whoever appends to a task's review record (a cross-provider verdict, a rework-round note) commits that edit within the same round that produced it — leaving the appendix untracked for a later round to discover and commit incidentally is a hand-off gap, not a convenience.
+- **Why**: Twice in one sprint a cross-provider round-one verdict appendix was left uncommitted: once flagged on the board by an engineer who found it untracked and declined to adopt it silently, and once committed only because an unrelated later rework round happened to sweep it up. In both cases the record's authorship and timing became reconstructable only through board archaeology, and a crash or branch switch in between would have lost the verdict entirely.
+- **How to apply**: At the end of any round that wrote or appended to a file under the reviews directory, check git status for that path and commit it as part of the round's own closing commit; the next round treats an unexpectedly dirty reviews file as a hand-off defect to flag, not as material to absorb silently.
+
+## 2026-08-02 — A spec's descriptive grounding claim is re-measured before it is trusted
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, qa-verifier
+- **Scope**: maintainer
+- **Bound-in**: CONTRIBUTING.md
+- **Status**: active
+- **Source**: n/a
+- **Rule**: Inside a spec, keep a prescriptive statement (what this project will do from now on) distinct from a descriptive grounding claim (what the project's practice has demonstrably been), and re-measure any descriptive claim against the primary artifacts before relying on it — an inherited descriptive claim is trusted by every later reader and re-checked by none of them.
+- **Why**: A spec's rationale line asserted an established tagging practice as grounding for a design decision, and the claim was already stale at the moment it was first written down — the practice it described had not held for the most recent release. The shipped document happened not to mislead, but the claim survived two sprints of review unchallenged until a QA round re-measured the actual tags and found the mismatch; nothing in the pipeline re-checks a descriptive claim once it sits inside a frozen spec.
+- **How to apply**: When drafting or reviewing a spec, for each claim of the form 'X is this project's practice', either re-measure it against the primary artifacts (the actual tags, branches, or files — never an earlier spec's assertion) and cite the measurement, or rewrite it prescriptively as 'from this task on, X' so it grounds nothing historical. QA treats an unmeasured descriptive claim used as grounding as a finding.

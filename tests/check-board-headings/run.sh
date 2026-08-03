@@ -80,6 +80,17 @@ run_check "$FIX/self-ref-head.md" --base-file "$FIX/base.md"
 [[ "$rc" -eq 0 ]] || fail "self-ref fixture expected exit 0, got $rc (stderr: $(cat "$err"))"
 pass "AC10 self-ref — exit 0 (indented sub-bullet quoting a heading-shaped string is not counted)"
 
+# --- T-1016: indented non-dash line is not a heading (predicate alignment,
+# behavior-preserving) ---------------------------------------------------------
+# An indented line whose first character is NOT `-` (a table row quoting a
+# heading-shaped string) must never be counted as a heading, exactly like an
+# indented dash-led sub-bullet already wasn't — the widened skip
+# (`^[[:space:]]+[^[:space:]]`) changes no verdict, since the heading match
+# itself already requires a non-indented `- [ ]`/`- [x]` prefix (T-1016 D5).
+run_check "$FIX/indented-non-dash-head.md" --base-file "$FIX/base.md"
+[[ "$rc" -eq 0 ]] || fail "indented-non-dash-line-is-not-a-heading: expected exit 0 (indented table row not counted as a heading), got $rc (stderr: $(cat "$err"))"
+pass "indented-non-dash-line-is-not-a-heading — an indented, non-dash-led line (a table row quoting a heading-shaped T-102 lookalike) is never counted as a heading (no false duplicate, no false deletion)"
+
 # --- T-095 (issue #300): section-boundary parser hardening — fence tracking
 # (item1) + ATX-closing-notation tolerance (item2). Each fixed-lock assertion
 # below is paired with a non-vacuous counterfactual: the SAME fixture fed to

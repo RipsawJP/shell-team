@@ -41,12 +41,24 @@ mkdir -p "$TMP"
 # copy sample hooks into a nested .git/hooks, and the fixtures need none.
 EMPTY_GIT_TPL="$TMP/empty-git-template"
 mkdir -p "$EMPTY_GIT_TPL"
+# T-1017: a conformant interventions record for a given task id, at the path
+# the resolver derives for it (legacy layout: tasks/interventions/<id>.md;
+# default layout: .shell-team/interventions/<id>.md). Written where the root
+# / task is built, not case by case (per the spec's Notes for engineer).
+write_conformant_interventions_record() {
+  local path="$1" task="$2"
+  mkdir -p "$(dirname "$path")"
+  printf '<!-- BEGIN interventions: %s -->\nno interventions occurred\n<!-- END interventions: %s -->\n' \
+    "$task" "$task" > "$path"
+}
+
 make_legacy_root() {
   local R="$1"
-  mkdir -p "$R/tasks/loops" "$R/docs/specs"
+  mkdir -p "$R/tasks/loops" "$R/docs/specs" "$R/tasks/interventions"
   : > "$R/tasks/loops/shell-team.contract.yaml"
   cp "$HERE/fixtures/todo-legacy.md" "$R/tasks/todo.md"
   cp "$HERE/fixtures/project_status.md" "$R/tasks/project_status.md"
+  write_conformant_interventions_record "$R/tasks/interventions/T-100.md" T-100
   git -C "$R" init -q -b main --template="$EMPTY_GIT_TPL"
   git -C "$R" -c user.email=t@example.invalid -c user.name=t add -A
   git -C "$R" -c user.email=t@example.invalid -c user.name=t commit -qm "fixture: initial state"
@@ -110,6 +122,7 @@ pass "AC4: telemetry failure is best-effort (close-out succeeds, board updated)"
 D="$TMP/default"
 mkdir -p "$D/.shell-team"
 cp "$HERE/fixtures/todo-default.md" "$D/.shell-team/todo.md"
+write_conformant_interventions_record "$D/.shell-team/interventions/T-200.md" T-200
 ( cd "$D" && bash "$CLOSEOUT" --task T-200 --date 2026-07-06 ) >/dev/null \
   || fail "AC5: close-out should succeed in a default-layout root"
 grep -q '^- \[x\] \*\*T-200\*\*' "$D/.shell-team/todo.md" \
@@ -230,6 +243,7 @@ inject_pending_task() {
     }
   ' "$root/tasks/todo.md" > "$root/tasks/todo.md.new"
   mv "$root/tasks/todo.md.new" "$root/tasks/todo.md"
+  write_conformant_interventions_record "$root/tasks/interventions/T-150.md" T-150
 }
 
 # Negative: pending disposition present => close-out refuses, board untouched.
@@ -285,6 +299,7 @@ inject_prose_quote_task() {
     }
   ' "$root/tasks/todo.md" > "$root/tasks/todo.md.new"
   mv "$root/tasks/todo.md.new" "$root/tasks/todo.md"
+  write_conformant_interventions_record "$root/tasks/interventions/T-151.md" T-151
 }
 
 PQ="$TMP/pending-prose-quote"
@@ -296,5 +311,415 @@ inject_prose_quote_task "$PQ"
 grep -q '^- \[x\] \*\*T-151\*\*' "$PQ/tasks/todo.md" \
   || fail "T-068: T-151 must complete Active -> Done despite the prose quoting the anchor"
 pass "T-068: prose quoting the anchor + pending: on one line does not false-positive-block close-out (round3 regression lock)"
+
+# ============================================================================
+# T-1016: board-entry continuation canon at bin/close-out.sh's pass-1 awk
+# (entry extent, trailing-blank trim) + the pre-write interlock (D3/D6).
+# Runs with cwd inside the scratch root so best-effort telemetry/
+# project_status regeneration cannot write into this repository.
+# ============================================================================
+MOVE_ROOT="$TMP/move-fixtures"
+mkdir -p "$MOVE_ROOT"
+
+# move-carries-internal-blank / move-carries-table-row / move-trims-trailing-blanks:
+# an entry carrying an internal blank line, indented table rows and a
+# trailing blank run is moved to the TOP of ## Done in one piece; ## Active
+# is left with zero non-blank lines (no strand); the entry extent is
+# trimmed, proved by counting exactly one blank line between the moved
+# entry's last content line and the next ## Done entry (an untrimmed
+# implementation leaves three).
+M1="$MOVE_ROOT/m1"
+mkdir -p "$M1"
+write_conformant_interventions_record "$M1/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - first note\n\n  | a | b |\n  |---|---|\n\n  - last note\n\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M1/todo.md"
+( cd "$M1" && TEAM_TODO="$M1/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M1/out" 2>"$M1/err" \
+  || fail "move-carries-internal-blank: close-out should exit 0 (stderr: $(cat "$M1/err"))"
+m1_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M1/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$m1_a_count" -eq 0 ] || fail "move-carries-internal-blank: expected zero non-blank lines left in ## Active, got $m1_a_count"
+grep -qF -- '  | a | b |' "$M1/todo.md" || fail "move-carries-table-row: table row must survive the move"
+grep -qF -- '  - last note' "$M1/todo.md" || fail "move-carries-internal-blank: post-blank sub-bullet must survive the move"
+pass "move-carries-internal-blank — an internal blank line inside the moved entry does not truncate the move"
+pass "move-carries-table-row — an indented table row (non-dash first character) inside the moved entry survives the move verbatim"
+
+m1_blanks="$(awk '/^  - last note$/{f=1;next} f&&/^- \[x\]/{print n+0; exit} f&&/^[[:space:]]*$/{n++}' "$M1/todo.md")"
+[ "$m1_blanks" = "1" ] || fail "move-trims-trailing-blanks: expected exactly one blank line between the moved entry and the next ## Done entry, got $m1_blanks"
+pass "move-trims-trailing-blanks — the entry extent ends at the last continuation line; an untrimmed implementation would leave three blank lines here, not one"
+
+m1_first="$(awk '/^## Done/{f=1;next} f&&/^- \[x\]/{print; exit}' "$M1/todo.md")"
+case "$m1_first" in *'**T-901**'*) ;; *) fail "move-done-insertion-position: expected T-901 at the top of ## Done, got: $m1_first" ;; esac
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M1/todo.md" >/dev/null 2>&1 || fail "move-done-insertion-position: rewritten board must lint clean"
+pass "move-done-insertion-position — the moved entry (with its table rows and post-blank sub-bullet) lands at the TOP of ## Done"
+
+# move-final-entry-eof / move-section-end-boundary: the task is the last
+# entry of the last section, its continuation lines run to the final line of
+# the file, and ## Done precedes ## Active. The move still carries every
+# continuation line, leaves no strand, and lints clean.
+M2="$MOVE_ROOT/m2"
+mkdir -p "$M2"
+write_conformant_interventions_record "$M2/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note one\n\n  | a | b |\n' > "$M2/todo.md"
+( cd "$M2" && TEAM_TODO="$M2/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M2/out" 2>"$M2/err" \
+  || fail "move-final-entry-eof: close-out should exit 0 (stderr: $(cat "$M2/err"))"
+m2_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M2/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$m2_a_count" -eq 0 ] || fail "move-final-entry-eof: expected zero non-blank lines left in ## Active, got $m2_a_count"
+grep -qF -- '  | a | b |' "$M2/todo.md" || fail "move-final-entry-eof: the file's own last line (a table row) must survive the move"
+grep -qF -- '  - note one' "$M2/todo.md" || fail "move-section-end-boundary: sub-bullet must survive the move"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M2/todo.md" >/dev/null 2>&1 || fail "move-final-entry-eof: rewritten board must lint clean"
+pass "move-final-entry-eof — the entry's continuation lines run all the way to EOF; the move still carries every one"
+pass "move-section-end-boundary — a board where ## Done precedes ## Active still moves the Active entry correctly"
+
+# move-crlf-board: the same shape as M1 (internal blank + table row),
+# CRLF-terminated throughout (built with awk, not a sed `\r` replacement —
+# that replacement is not portable). The move still carries every line and
+# leaves no strand.
+M3="$MOVE_ROOT/m3"
+mkdir -p "$M3"
+write_conformant_interventions_record "$M3/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - first note\n\n  | a | b |\n\n  - last note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M3/plain.md"
+awk '{ printf "%s\r\n", $0 }' "$M3/plain.md" > "$M3/todo.md"
+( cd "$M3" && TEAM_TODO="$M3/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M3/out" 2>"$M3/err" \
+  || fail "move-crlf-board: close-out should exit 0 on a CRLF board (stderr: $(cat "$M3/err"))"
+m3_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M3/todo.md" | tr -d '\r' | grep -c '[^[:space:]]' || true)"
+[ "$m3_a_count" -eq 0 ] || fail "move-crlf-board: expected zero non-blank lines left in ## Active, got $m3_a_count"
+grep -qF -- '**T-901**' "$M3/todo.md" || fail "move-crlf-board: T-901 must have moved to ## Done"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M3/todo.md" >/dev/null 2>&1 || fail "move-crlf-board: rewritten board must lint clean"
+pass "move-crlf-board — a CRLF-terminated board (awk-produced, not sed) moves the whole entry with no strand left behind"
+
+# move-tab-indented-subbullets: a tab-indented sub-bullet is carried by the
+# move (the same shape the T-1013 incident's stranded lines took).
+M4="$MOVE_ROOT/m4"
+mkdir -p "$M4"
+write_conformant_interventions_record "$M4/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\t- tab note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M4/todo.md"
+( cd "$M4" && TEAM_TODO="$M4/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M4/out" 2>"$M4/err" \
+  || fail "move-tab-indented-subbullets: close-out should exit 0 (stderr: $(cat "$M4/err"))"
+grep -qF -- "$(printf '\t- tab note')" "$M4/todo.md" \
+  || fail "move-tab-indented-subbullets: tab-indented sub-bullet must survive the move"
+m4_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M4/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$m4_a_count" -eq 0 ] || fail "move-tab-indented-subbullets: expected zero non-blank lines left in ## Active, got $m4_a_count"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$M4/todo.md" >/dev/null 2>&1 || fail "move-tab-indented-subbullets: rewritten board must lint clean"
+pass "move-tab-indented-subbullets — a tab-indented sub-bullet (leading whitespace, non-dash-neutral) is carried by the move"
+
+# move-refuses-stranded-board / move-refusal-names-the-reason: the interlock
+# (D3/D6). Against a board that already carries a strand, close-out exits 1,
+# leaves the board byte-identical, and its stderr names the strand reason —
+# paired with a positive control (same board, strand removed) exiting 0, so
+# the refusal is attributable to the strand rather than the fixture being
+# broken in general.
+M5="$MOVE_ROOT/m5"
+mkdir -p "$M5"
+write_conformant_interventions_record "$M5/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n  - stranded line\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n' > "$M5/bad.md"
+cp "$M5/bad.md" "$M5/bad.orig"
+set +e
+( cd "$M5" && TEAM_TODO="$M5/bad.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M5/out" 2>"$M5/err"
+m5_rc=$?
+set -e
+[ "$m5_rc" -eq 1 ] || fail "move-refuses-stranded-board: expected exit 1, got $m5_rc (stderr: $(cat "$M5/err"))"
+cmp -s "$M5/bad.md" "$M5/bad.orig" || fail "move-refuses-stranded-board: the board must stay byte-identical on refusal"
+pass "move-refuses-stranded-board — close-out refuses (exit 1, board untouched) to write a rewritten board that already carries a strand (the interlock, D3)"
+
+[ -s "$M5/err" ] || fail "move-refusal-names-the-reason: expected non-empty stderr"
+grep -qF -- 'stranded continuation line' "$M5/err" \
+  || fail "move-refusal-names-the-reason: stderr must name the strand reason (D6), not just a generic refusal"
+pass "move-refusal-names-the-reason — the refusal's stderr names the strand reason instead of only \"would fail check-handoff.sh\" (D6)"
+
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n' > "$M5/good.md"
+( cd "$M5" && TEAM_TODO="$M5/good.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M5/out2" 2>"$M5/err2" \
+  || fail "move-refuses-stranded-board positive control: close-out should succeed once the strand is removed and nothing else changed"
+pass "move-refuses-stranded-board positive control — the same board with the strand removed and nothing else changed exits 0"
+
+# ============================================================================
+# T-1017: close-out refuses a task whose interventions record is missing or
+# non-conformant (docs: .shell-team/specs/T-1017-close-out-interventions-gate.md).
+# Every fixture root below is self-contained (its own mktemp'd scratch
+# directory); assertion ids match AC12's frozen 16-item list.
+# ============================================================================
+IV_ROOT="$TMP/interventions"
+mkdir -p "$IV_ROOT"
+
+# --- interventions-happy-path-unchanged (AC1 preservation lock) -------------
+IH="$IV_ROOT/happy"
+mkdir -p "$IH"
+write_conformant_interventions_record "$IH/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$IH/todo.md"
+( cd "$IH" && TEAM_TODO="$IH/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$IH/out" 2>"$IH/err" \
+  || fail "interventions-happy-path-unchanged: close-out should still exit 0 with a conformant record present (stderr: $(cat "$IH/err"))"
+grep -q '^- \[x\] \*\*T-901\*\*' "$IH/todo.md" || fail "interventions-happy-path-unchanged: T-901 must move to Done"
+ih_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$IH/todo.md" | grep -c '[^[:space:]]' || true)"
+[ "$ih_a_count" -eq 0 ] || fail "interventions-happy-path-unchanged: expected zero non-blank lines left in ## Active, got $ih_a_count"
+bash "$REPO_ROOT/bin/check-handoff.sh" "$IH/todo.md" >/dev/null 2>&1 || fail "interventions-happy-path-unchanged: rewritten board must lint clean"
+pass "interventions-happy-path-unchanged — a conformant record leaves the happy path exactly as before (AC1 preservation lock)"
+
+# --- interventions-missing-refuses / -remedy-names-path / -positive-control -
+MB="$IV_ROOT/missing-bad"
+MG="$IV_ROOT/missing-good"
+mkdir -p "$MB" "$MG"
+write_conformant_interventions_record "$MG/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$MB/todo.md"
+cp "$MB/todo.md" "$MB/todo.orig"
+cp "$MB/todo.md" "$MG/todo.md"
+set +e
+( cd "$MB" && TEAM_TODO="$MB/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$MB/out" 2>"$MB/err"
+mb_rc=$?
+set -e
+[ "$mb_rc" -eq 1 ] || fail "interventions-missing-refuses: expected exit 1, got $mb_rc"
+cmp -s "$MB/todo.md" "$MB/todo.orig" || fail "interventions-missing-refuses: board must stay byte-identical"
+grep -qF -- 'has no readable interventions record' "$MB/err" || fail "interventions-missing-refuses: stderr must name reason A"
+pass "interventions-missing-refuses — a task with no interventions record at all refuses with exit 1, board untouched"
+
+grep -qF -- '.shell-team/interventions/T-901.md' "$MB/err" \
+  || fail "interventions-missing-remedy-names-path: the resolved record path must be named"
+grep -qF -- "$MB" "$MB/err" || fail "interventions-missing-remedy-names-path: the working directory must be named"
+grep -qF -- '<!-- BEGIN interventions: T-901 -->' "$MB/err" || fail "interventions-missing-remedy-names-path: BEGIN marker must be printed verbatim"
+grep -qF -- '<!-- END interventions: T-901 -->' "$MB/err" || fail "interventions-missing-remedy-names-path: END marker must be printed verbatim"
+grep -qF -- 'no interventions occurred' "$MB/err" || fail "interventions-missing-remedy-names-path: sentinel line must be printed verbatim"
+pass "interventions-missing-remedy-names-path — the one-step remedy names the resolved path, the cwd, and a conformant record's exact bytes"
+
+( cd "$MG" && TEAM_TODO="$MG/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$MG/out" 2>"$MG/err" \
+  || fail "interventions-missing-positive-control: the same board differing only by the record's presence must exit 0 (stderr: $(cat "$MG/err"))"
+pass "interventions-missing-positive-control — the same board differing only by the record's presence exits 0"
+
+# --- interventions-schema-refuses / -stderr-surfaced-before-reason ----------
+SC="$IV_ROOT/schema"
+mkdir -p "$SC/.shell-team/interventions"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$SC/todo.md"
+cp "$SC/todo.md" "$SC/todo.orig"
+printf '<!-- BEGIN interventions: T-901 -->\n- intervention: bogus-class\n<!-- END interventions: T-901 -->\n' > "$SC/.shell-team/interventions/T-901.md"
+set +e
+( cd "$SC" && TEAM_TODO="$SC/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$SC/out" 2>"$SC/err"
+sc_rc=$?
+set -e
+[ "$sc_rc" -eq 1 ] || fail "interventions-schema-refuses: expected exit 1, got $sc_rc"
+cmp -s "$SC/todo.md" "$SC/todo.orig" || fail "interventions-schema-refuses: board must stay byte-identical"
+grep -qF -- 'check-interventions: schema:' "$SC/err" || fail "interventions-schema-refuses: the checker's schema line must be surfaced"
+grep -qF -- 'interventions record does not conform' "$SC/err" || fail "interventions-schema-refuses: reason B must be printed"
+pass "interventions-schema-refuses — a schema-violating record (checker exit 1) refuses close-out with reason B"
+
+sc_cs="$(grep -nF -- 'check-interventions: schema:' "$SC/err" | head -1 | cut -d: -f1)"
+sc_co="$(grep -nF -- 'interventions record does not conform' "$SC/err" | head -1 | cut -d: -f1)"
+if [ -z "$sc_cs" ] || [ -z "$sc_co" ] || [ "$sc_cs" -ge "$sc_co" ]; then
+  fail "interventions-stderr-surfaced-before-reason: the checker's classified line must appear strictly before close-out's own reason (checker at line ${sc_cs:-?}, reason at line ${sc_co:-?})"
+fi
+pass "interventions-stderr-surfaced-before-reason — the checker's own stderr is printed before close-out's reason string (D5)"
+
+# --- interventions-wrong-task-id-refuses / interventions-structural-refuses -
+ST="$IV_ROOT/structural"
+mkdir -p "$ST/.shell-team/interventions"
+STR="$ST/.shell-team/interventions/T-901.md"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$ST/todo.md"
+cp "$ST/todo.md" "$ST/todo.orig"
+printf '<!-- BEGIN interventions: T-902 -->\nno interventions occurred\n<!-- END interventions: T-902 -->\n' > "$STR"
+set +e
+( cd "$ST" && TEAM_TODO="$ST/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$ST/out" 2>"$ST/err"
+st_rc=$?
+set -e
+[ "$st_rc" -eq 1 ] || fail "interventions-wrong-task-id-refuses: expected exit 1, got $st_rc"
+cmp -s "$ST/todo.md" "$ST/todo.orig" || fail "interventions-wrong-task-id-refuses: board must stay byte-identical"
+grep -qF -- 'check-interventions: structural:' "$ST/err" || fail "interventions-wrong-task-id-refuses: the checker's structural line must be surfaced"
+grep -qF -- 'interventions record does not conform' "$ST/err" || fail "interventions-wrong-task-id-refuses: reason B must be printed"
+pass "interventions-wrong-task-id-refuses — a record copied from another task (--task is actually passed through) normalizes to exit 1, reason B"
+
+printf 'no interventions occurred\n' > "$STR"
+set +e
+( cd "$ST" && TEAM_TODO="$ST/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$ST/out2" 2>"$ST/err2"
+st_rc2=$?
+set -e
+[ "$st_rc2" -eq 1 ] || fail "interventions-structural-refuses: expected exit 1 for a marker-less record, got $st_rc2"
+grep -qF -- 'check-interventions: structural:' "$ST/err2" || fail "interventions-structural-refuses: the checker's structural line must be surfaced"
+pass "interventions-structural-refuses — a record with no markers at all normalizes to exit 1, reason B"
+
+write_conformant_interventions_record "$STR" T-901
+( cd "$ST" && TEAM_TODO="$ST/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$ST/out3" 2>"$ST/err3" \
+  || fail "interventions-structural-refuses positive control: correcting the id must let close-out succeed (stderr: $(cat "$ST/err3"))"
+pass "interventions-structural-refuses positive control — correcting the record's id to match --task lets close-out succeed"
+
+# --- interventions-checker-absent-exit2 -------------------------------------
+CA_ROOT="$IV_ROOT/checker-absent"
+mkdir -p "$CA_ROOT"
+cp -R "$REPO_ROOT/bin" "$CA_ROOT/bin"
+mkdir -p "$CA_ROOT/root"
+write_conformant_interventions_record "$CA_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$CA_ROOT/root/todo.md"
+cp "$CA_ROOT/root/todo.md" "$CA_ROOT/root/todo.orig"
+rm -f "$CA_ROOT/bin/check-interventions.sh"
+set +e
+( cd "$CA_ROOT/root" && TEAM_TODO="$CA_ROOT/root/todo.md" bash "$CA_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$CA_ROOT/out" 2>"$CA_ROOT/err"
+ca_rc=$?
+set -e
+[ "$ca_rc" -eq 2 ] || fail "interventions-checker-absent-exit2: expected exit 2, got $ca_rc"
+cmp -s "$CA_ROOT/root/todo.md" "$CA_ROOT/root/todo.orig" || fail "interventions-checker-absent-exit2: board must stay byte-identical"
+grep -qF -- 'cannot verify the interventions record' "$CA_ROOT/err" || fail "interventions-checker-absent-exit2: reason C must be printed"
+if grep -qF -- 'no interventions occurred' "$CA_ROOT/err"; then
+  fail "interventions-checker-absent-exit2: the write-a-record remedy must NOT print on an exit-2 refusal"
+fi
+pass "interventions-checker-absent-exit2 — a missing sibling checker is exit 2, reason C, with no write-a-record remedy"
+
+# --- interventions-usage-classification-exit2 / -unclassified-exit2 --------
+STUB_ROOT="$IV_ROOT/stub"
+mkdir -p "$STUB_ROOT"
+cp -R "$REPO_ROOT/bin" "$STUB_ROOT/bin"
+mkdir -p "$STUB_ROOT/root"
+write_conformant_interventions_record "$STUB_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$STUB_ROOT/root/todo.md"
+cp "$STUB_ROOT/root/todo.md" "$STUB_ROOT/root/todo.orig"
+STUB="$STUB_ROOT/bin/check-interventions.sh"
+
+printf '#!/usr/bin/env bash\nprintf "check-interventions: usage: stub\\n" >&2\nexit 2\n' > "$STUB"
+set +e
+( cd "$STUB_ROOT/root" && TEAM_TODO="$STUB_ROOT/root/todo.md" bash "$STUB_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$STUB_ROOT/oA" 2>"$STUB_ROOT/eA"
+usa_rc=$?
+set -e
+[ "$usa_rc" -eq 2 ] || fail "interventions-usage-classification-exit2: expected exit 2 for a usage-classified checker failure, got $usa_rc"
+cmp -s "$STUB_ROOT/root/todo.md" "$STUB_ROOT/root/todo.orig" || fail "interventions-usage-classification-exit2: board must stay byte-identical"
+pass "interventions-usage-classification-exit2 — a usage-classified checker exit 2 stays close-out exit 2 (not normalized to 1)"
+
+printf '#!/usr/bin/env bash\nprintf "something broke\\n" >&2\nexit 2\n' > "$STUB"
+set +e
+( cd "$STUB_ROOT/root" && TEAM_TODO="$STUB_ROOT/root/todo.md" bash "$STUB_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$STUB_ROOT/oC" 2>"$STUB_ROOT/eC"
+unc_rc=$?
+set -e
+[ "$unc_rc" -eq 2 ] || fail "interventions-unclassified-exit2: expected exit 2 for an unclassified checker exit 2, got $unc_rc"
+
+printf '#!/usr/bin/env bash\nprintf "check-interventions: schema: stub\\n" >&2\nexit 3\n' > "$STUB"
+set +e
+( cd "$STUB_ROOT/root" && TEAM_TODO="$STUB_ROOT/root/todo.md" bash "$STUB_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$STUB_ROOT/oD" 2>"$STUB_ROOT/eD"
+unc_rc2=$?
+set -e
+[ "$unc_rc2" -eq 2 ] || fail "interventions-unclassified-exit2: expected exit 2 for a recognized token with an unrecognized exit status (row vi keys on status first), got $unc_rc2"
+cmp -s "$STUB_ROOT/root/todo.md" "$STUB_ROOT/root/todo.orig" || fail "interventions-unclassified-exit2: board must stay byte-identical"
+pass "interventions-unclassified-exit2 — an unrecognized token, or a recognized token with a non-{0,1,2} exit status, is exit 2 (fail-closed floor)"
+
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB"
+( cd "$STUB_ROOT/root" && TEAM_TODO="$STUB_ROOT/root/todo.md" bash "$STUB_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$STUB_ROOT/oE" 2>"$STUB_ROOT/eE" \
+  || fail "interventions-usage-classification-exit2 positive control: a stub checker exiting 0 must let close-out complete (stderr: $(cat "$STUB_ROOT/eE"))"
+pass "interventions-usage-classification-exit2 positive control — a stub checker exiting 0 lets close-out complete (the scratch bin/ copy is otherwise functional)"
+
+# --- interventions-resolver-failure-exit2 -----------------------------------
+RF_ROOT="$IV_ROOT/resolver-failure"
+mkdir -p "$RF_ROOT"
+cp -R "$REPO_ROOT/bin" "$RF_ROOT/bin"
+mkdir -p "$RF_ROOT/root"
+write_conformant_interventions_record "$RF_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$RF_ROOT/root/todo.md"
+cp "$RF_ROOT/root/todo.md" "$RF_ROOT/root/todo.orig"
+rm -f "$RF_ROOT/bin/team-paths.sh"
+set +e
+( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out" 2>"$RF_ROOT/err"
+rf_rc=$?
+set -e
+[ "$rf_rc" -eq 2 ] || fail "interventions-resolver-failure-exit2: expected exit 2, got $rf_rc"
+cmp -s "$RF_ROOT/root/todo.md" "$RF_ROOT/root/todo.orig" || fail "interventions-resolver-failure-exit2: board must stay byte-identical"
+grep -qF -- 'cannot resolve the interventions directory' "$RF_ROOT/err" || fail "interventions-resolver-failure-exit2: reason D must be printed"
+pass "interventions-resolver-failure-exit2 — with team-paths.sh removed and no override, resolution fails exit 2, reason D (no guessing fallback — a conformant record sits at the default location a fallback would use)"
+
+( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2" \
+  || fail "interventions-resolver-failure-exit2 positive control: the override needs no resolver (stderr: $(cat "$RF_ROOT/err2"))"
+pass "interventions-resolver-failure-exit2 positive control — the same crippled bin/ copy succeeds once \$TEAM_INTERVENTIONS_DIR is set"
+
+# --- interventions-env-override-precedence ----------------------------------
+OV1="$IV_ROOT/override-only"
+OV2="$IV_ROOT/override-empty-rescue"
+mkdir -p "$OV1/elsewhere" "$OV2/.shell-team/interventions" "$OV2/empty"
+write_conformant_interventions_record "$OV1/elsewhere/T-901.md" T-901
+write_conformant_interventions_record "$OV2/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$OV1/todo.md"
+cp "$OV1/todo.md" "$OV2/todo.md"
+cp "$OV2/todo.md" "$OV2/todo.orig"
+( cd "$OV1" && TEAM_TODO="$OV1/todo.md" TEAM_INTERVENTIONS_DIR="$OV1/elsewhere" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OV1/out" 2>"$OV1/err" \
+  || fail "interventions-env-override-precedence: a record present only in the override dir must let close-out succeed (stderr: $(cat "$OV1/err"))"
+set +e
+( cd "$OV2" && TEAM_TODO="$OV2/todo.md" TEAM_INTERVENTIONS_DIR="$OV2/empty" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OV2/out2" 2>"$OV2/err2"
+ov2_rc=$?
+set -e
+[ "$ov2_rc" -eq 1 ] || fail "interventions-env-override-precedence: an empty override dir must refuse even though the resolver location holds a valid record, got $ov2_rc"
+cmp -s "$OV2/todo.md" "$OV2/todo.orig" || fail "interventions-env-override-precedence: board must stay byte-identical"
+grep -qF -- 'has no readable interventions record' "$OV2/err2" || fail "interventions-env-override-precedence: reason A must be printed"
+grep -qF -- "$OV2/empty" "$OV2/err2" || fail "interventions-env-override-precedence: the override path must be named, not the resolver's default location"
+pass "interventions-env-override-precedence — \$TEAM_INTERVENTIONS_DIR wins over the resolver in both directions (override-only passes; override-empty refuses despite a valid record at the resolver location)"
+
+# --- interventions-legacy-layout-resolution ---------------------------------
+LL_ROOT="$IV_ROOT/legacy-resolution"
+mkdir -p "$LL_ROOT/tasks/loops" "$LL_ROOT/tasks/interventions" "$LL_ROOT/docs/specs"
+: > "$LL_ROOT/tasks/loops/shell-team.contract.yaml"
+write_conformant_interventions_record "$LL_ROOT/tasks/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: docs/specs/x.md\n\n## Done\n' > "$LL_ROOT/todo-src.md"
+cp "$LL_ROOT/todo-src.md" "$LL_ROOT/tasks/todo.md"
+( cd "$LL_ROOT" && bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$LL_ROOT/out" 2>"$LL_ROOT/err" \
+  || fail "interventions-legacy-layout-resolution: a record at tasks/interventions/T-901.md must close the task out (stderr: $(cat "$LL_ROOT/err"))"
+grep -q '^- \[x\] \*\*T-901\*\*' "$LL_ROOT/tasks/todo.md" || fail "interventions-legacy-layout-resolution: T-901 must move to Done"
+pass "interventions-legacy-layout-resolution — the legacy layout resolves to tasks/interventions/, no .shell-team hardcode"
+
+cp "$LL_ROOT/todo-src.md" "$LL_ROOT/tasks/todo.md"
+cp "$LL_ROOT/todo-src.md" "$LL_ROOT/todo.orig"
+rm -f "$LL_ROOT/tasks/interventions/T-901.md"
+set +e
+( cd "$LL_ROOT" && bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$LL_ROOT/out2" 2>"$LL_ROOT/err2"
+ll_rc=$?
+set -e
+[ "$ll_rc" -eq 1 ] || fail "interventions-legacy-layout-resolution: removing the legacy record must refuse, got $ll_rc"
+cmp -s "$LL_ROOT/tasks/todo.md" "$LL_ROOT/todo.orig" || fail "interventions-legacy-layout-resolution: board must stay byte-identical"
+grep -qF -- 'tasks/interventions/T-901.md' "$LL_ROOT/err2" || fail "interventions-legacy-layout-resolution: the legacy path must be named in the refusal"
+pass "interventions-legacy-layout-resolution positive+negative — the legacy record path is named on refusal (positive control above; no .shell-team hardcode)"
+
+# --- interventions-order-disposition-first ----------------------------------
+OD_ROOT="$IV_ROOT/order-disposition"
+mkdir -p "$OD_ROOT"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - fast-follow disposition (2026-01-01): pending: issue filing pending approval\n\n## Done\n' > "$OD_ROOT/todo.md"
+cp "$OD_ROOT/todo.md" "$OD_ROOT/todo.orig"
+set +e
+( cd "$OD_ROOT" && TEAM_TODO="$OD_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OD_ROOT/out" 2>"$OD_ROOT/err"
+od_rc=$?
+set -e
+[ "$od_rc" -eq 1 ] || fail "interventions-order-disposition-first: expected exit 1 (T-068 gate), got $od_rc"
+cmp -s "$OD_ROOT/todo.md" "$OD_ROOT/todo.orig" || fail "interventions-order-disposition-first: board must stay byte-identical"
+grep -qF -- 'resolve it to a filed issue number or a waived reason before close-out' "$OD_ROOT/err" \
+  || fail "interventions-order-disposition-first: the disposition message must win"
+if grep -qF -- 'has no readable interventions record' "$OD_ROOT/err"; then
+  fail "interventions-order-disposition-first: the interventions reason must NOT appear when the disposition gate already refused"
+fi
+pass "interventions-order-disposition-first — an unresolved pending disposition wins over a missing interventions record (D4 ordering)"
+
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - fast-follow disposition (2026-01-01): filed as issue #999\n\n## Done\n' > "$OD_ROOT/todo.md"
+set +e
+( cd "$OD_ROOT" && TEAM_TODO="$OD_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OD_ROOT/out2" 2>"$OD_ROOT/err2"
+od_rc2=$?
+set -e
+[ "$od_rc2" -eq 1 ] || fail "interventions-order-disposition-first positive control: expected exit 1 (now the interventions gate) once the disposition is resolved, got $od_rc2"
+grep -qF -- 'has no readable interventions record' "$OD_ROOT/err2" \
+  || fail "interventions-order-disposition-first positive control: the interventions reason must be reachable once the disposition is resolved"
+pass "interventions-order-disposition-first positive control — once the disposition resolves, the interventions gate becomes reachable (proving only ordering was being measured)"
+
+# --- interventions-board-untouched-on-refusal -------------------------------
+BU_ROOT="$IV_ROOT/board-untouched"
+mkdir -p "$BU_ROOT"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$BU_ROOT/todo.md"
+cp "$BU_ROOT/todo.md" "$BU_ROOT/todo.orig"
+set +e
+( cd "$BU_ROOT" && TEAM_TODO="$BU_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$BU_ROOT/out" 2>"$BU_ROOT/err"
+bu_rc=$?
+set -e
+[ "$bu_rc" -eq 1 ] || fail "interventions-board-untouched-on-refusal: expected exit 1, got $bu_rc"
+cmp -s "$BU_ROOT/todo.md" "$BU_ROOT/todo.orig" \
+  || fail "interventions-board-untouched-on-refusal: the board must be byte-identical after any interventions refusal"
+pass "interventions-board-untouched-on-refusal — every interventions-gate refusal leaves the board byte-identical (checked directly, not only inferred from the other assertions above)"
 
 printf '\nAll close-out assertions passed.\n'

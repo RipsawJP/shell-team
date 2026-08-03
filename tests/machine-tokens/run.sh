@@ -67,8 +67,8 @@ while IFS= read -r line; do
   assert_token bin/check-handoff.sh "$line"
 done < "$BLF_PATH"
 
-# --- intent-block tokens: bin/check-intent.sh
-for t in 'intent-block' 'intent-hash' 'intent-ratified' \
+# --- intent-block tokens: bin/check-intent.sh (T-1018 adds freeze-attestation)
+for t in 'intent-block' 'intent-hash' 'intent-ratified' 'freeze-attestation' \
          '<!-- BEGIN intent-block:' '<!-- END intent-block:'; do
   assert_token bin/check-intent.sh "$t"
 done
