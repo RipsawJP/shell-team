@@ -784,4 +784,312 @@ run_hs 0 || fail "closeout-handoff-sibling-positive-control: expected exit 0 onc
 grep -q '^- \[x\] \*\*T-901\*\*' "$HS_ROOT/root/todo.md" || fail "closeout-handoff-sibling-positive-control: T-901 must move to Done"
 pass "closeout-handoff-sibling-positive-control — restoring the real check-handoff.sh into the same scratch copy lets close-out complete"
 
+# ============================================================================
+# T-1022 (#98/D1/D3/D4): the source-line gate. The task's Active source line
+# is judged by feeding a synthesized single-entry board to the sibling
+# check-handoff.sh — no local copy of LINE_RE or the flag vocabulary.
+# ============================================================================
+SL_ROOT="$TMP/sourceline"
+mkdir -p "$SL_ROOT"
+
+sl_case() {
+  # $1 = dir name (under $SL_ROOT), $2 = the board's Active source line
+  local dir="$SL_ROOT/$1" line="$2"
+  mkdir -p "$dir"
+  write_conformant_interventions_record "$dir/.shell-team/interventions/T-901.md" T-901
+  printf -- '# Tasks\n\n## Active\n\n%s\n\n## Done\n' "$line" > "$dir/todo.md"
+  cp "$dir/todo.md" "$dir/todo.orig"
+  sl_rc=0
+  ( cd "$dir" && TEAM_TODO="$dir/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
+    >"$dir/out" 2>"$dir/err" </dev/null || sl_rc=$?
+}
+
+# --- closeout-sourceline-whitespace-title-refuses / -flag-vocabulary-positive-control ---
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+sl_case whitespace-title '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+[ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-whitespace-title-refuses: expected exit 1, got $sl_rc"
+cmp -s "$SL_ROOT/whitespace-title/todo.md" "$SL_ROOT/whitespace-title/todo.orig" \
+  || fail "closeout-sourceline-whitespace-title-refuses: board must stay byte-identical"
+grep -qF -- 'would be rejected by the hand-off lint — refusing to move a malformed line into ## Done' "$SL_ROOT/whitespace-title/err" \
+  || fail "closeout-sourceline-whitespace-title-refuses: reason F must be printed"
+pass "closeout-sourceline-whitespace-title-refuses — a whitespace-only title (accepted by the flag rewrite, rejected by LINE_RE) refuses with exit 1, reason F, board untouched"
+
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+sl_case whitespace-title-good '- [ ] **T-901** real title — `READY_FOR_QA` — spec: x.md'
+[ "$sl_rc" -eq 0 ] || fail "closeout-sourceline-flag-vocabulary-positive-control: expected exit 0 for a well-formed title, got $sl_rc"
+grep -q '^- \[x\] \*\*T-901\*\*' "$SL_ROOT/whitespace-title-good/todo.md" \
+  || fail "closeout-sourceline-flag-vocabulary-positive-control: T-901 must move to Done"
+
+# --- closeout-sourceline-refusal-names-real-board-line ----------------------
+grep -qF -- "$SL_ROOT/whitespace-title/todo.md:5:" "$SL_ROOT/whitespace-title/err" \
+  || fail "closeout-sourceline-refusal-names-real-board-line: reason F must carry the REAL board path and source-line number, not the temp file's"
+pass "closeout-sourceline-refusal-names-real-board-line — reason F names <board>:5:, not the synthesized temp file's path"
+
+# --- closeout-sourceline-invalid-flag-refuses -------------------------------
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+sl_case invalid-flag '- [ ] **T-901** demo — `ready_for_qa` — spec: x.md'
+[ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-invalid-flag-refuses: expected exit 1, got $sl_rc"
+cmp -s "$SL_ROOT/invalid-flag/todo.md" "$SL_ROOT/invalid-flag/todo.orig" \
+  || fail "closeout-sourceline-invalid-flag-refuses: board must stay byte-identical"
+grep -qF -- "unknown status flag 'ready_for_qa'" "$SL_ROOT/invalid-flag/err" \
+  || fail "closeout-sourceline-invalid-flag-refuses: the checker's own unknown-status-flag line must be surfaced verbatim"
+grep -qF -- 'would be rejected by the hand-off lint — refusing to move a malformed line into ## Done' "$SL_ROOT/invalid-flag/err" \
+  || fail "closeout-sourceline-invalid-flag-refuses: reason F must be printed"
+pass "closeout-sourceline-invalid-flag-refuses — D1's declared additional refusal class: a flag outside ALLOWED_FLAGS is refused instead of laundered into READY_FOR_MERGE"
+
+for f in READY_FOR_ARCH READY_FOR_ENG READY_FOR_QA READY_FOR_REVIEW READY_FOR_MERGE BLOCKED REWORK; do
+  sl_case "flag-ok-$f" "- [ ] **T-901** demo — \`$f\` — spec: x.md"
+  [ "$sl_rc" -eq 0 ] || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f expected exit 0, got $sl_rc"
+  grep -q '^- \[x\] \*\*T-901\*\*' "$SL_ROOT/flag-ok-$f/todo.md" \
+    || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f must move to Done"
+done
+pass "closeout-sourceline-flag-vocabulary-positive-control — each of the seven allowed flags closes out with exit 0"
+
+# --- closeout-sourceline-stderr-order-note-checker-reason -------------------
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+sl_case ordering '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+[ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-stderr-order-note-checker-reason: expected exit 1, got $sl_rc"
+[ -s "$SL_ROOT/ordering/err" ] || fail "closeout-sourceline-stderr-order-note-checker-reason: expected non-empty stderr"
+grep -qF -- 'the file:line below refers to a synthesized single-entry board, not the real board' "$SL_ROOT/ordering/err" \
+  || fail "closeout-sourceline-stderr-order-note-checker-reason: the note line must be present"
+grep -qF -- 'format mismatch' "$SL_ROOT/ordering/err" \
+  || fail "closeout-sourceline-stderr-order-note-checker-reason: the checker's own classified line must be present"
+grep -qF -- 'would be rejected by the hand-off lint' "$SL_ROOT/ordering/err" \
+  || fail "closeout-sourceline-stderr-order-note-checker-reason: reason F must be present"
+sl_l1=$(grep -nF -- 'the file:line below refers to a synthesized single-entry board, not the real board' "$SL_ROOT/ordering/err" | head -1 | cut -d: -f1)
+sl_l2=$(grep -nF -- 'format mismatch' "$SL_ROOT/ordering/err" | head -1 | cut -d: -f1)
+sl_l3=$(grep -nF -- 'would be rejected by the hand-off lint' "$SL_ROOT/ordering/err" | head -1 | cut -d: -f1)
+if [ "$sl_l1" -ge "$sl_l2" ] || [ "$sl_l2" -ge "$sl_l3" ]; then
+  fail "closeout-sourceline-stderr-order-note-checker-reason: expected strictly increasing line order note < checker-line < reason F, got $sl_l1/$sl_l2/$sl_l3"
+fi
+pass "closeout-sourceline-stderr-order-note-checker-reason — D4's three-part order (note, then checker stderr verbatim, then reason F) holds by strictly increasing stderr line number"
+
+# --- closeout-sourceline-checker-exit2-floor / -checker-exit3-floor / -stub-zero-positive-control ---
+STUB_SL_ROOT="$TMP/sourceline-stub"
+mkdir -p "$STUB_SL_ROOT/root"
+cp -R "$REPO_ROOT/bin" "$STUB_SL_ROOT/bin"
+write_conformant_interventions_record "$STUB_SL_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$STUB_SL_ROOT/root/todo.md"
+cp "$STUB_SL_ROOT/root/todo.md" "$STUB_SL_ROOT/root/todo.orig"
+STUB_SL="$STUB_SL_ROOT/bin/check-handoff.sh"
+
+run_stub_sl() {
+  sl_rc=0
+  ( cd "$STUB_SL_ROOT/root" && TEAM_TODO="$STUB_SL_ROOT/root/todo.md" bash "$STUB_SL_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) \
+    >"$STUB_SL_ROOT/root/out" 2>"$STUB_SL_ROOT/root/err" </dev/null || sl_rc=$?
+}
+
+printf '#!/usr/bin/env bash\nprintf "stub cannot read\\n" >&2\nexit 2\n' > "$STUB_SL"
+run_stub_sl
+[ "$sl_rc" -eq 2 ] || fail "closeout-sourceline-checker-exit2-floor: expected exit 2, got $sl_rc"
+cmp -s "$STUB_SL_ROOT/root/todo.md" "$STUB_SL_ROOT/root/todo.orig" || fail "closeout-sourceline-checker-exit2-floor: board must stay byte-identical"
+grep -qF -- 'cannot verify the Active line (check-handoff.sh exited' "$STUB_SL_ROOT/root/err" \
+  || fail "closeout-sourceline-checker-exit2-floor: reason G must be printed"
+pass "closeout-sourceline-checker-exit2-floor — a stub exiting 2 (cannot read the synthesized board) is close-out exit 2, reason G"
+
+printf '#!/usr/bin/env bash\nprintf "stub odd status\\n" >&2\nexit 3\n' > "$STUB_SL"
+run_stub_sl
+[ "$sl_rc" -eq 2 ] || fail "closeout-sourceline-checker-exit3-floor: expected exit 2, got $sl_rc"
+cmp -s "$STUB_SL_ROOT/root/todo.md" "$STUB_SL_ROOT/root/todo.orig" || fail "closeout-sourceline-checker-exit3-floor: board must stay byte-identical"
+grep -qF -- 'cannot verify the Active line (check-handoff.sh exited' "$STUB_SL_ROOT/root/err" \
+  || fail "closeout-sourceline-checker-exit3-floor: reason G must be printed"
+pass "closeout-sourceline-checker-exit3-floor — an unexpected exit status (3) is keyed on the status first and is NEVER guessed into row (i)'s board-defect message; also close-out exit 2, reason G"
+
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_SL"
+run_stub_sl
+[ "$sl_rc" -eq 0 ] || fail "closeout-sourceline-stub-zero-positive-control: expected exit 0, got $sl_rc"
+grep -q '^- \[x\] \*\*T-901\*\*' "$STUB_SL_ROOT/root/todo.md" \
+  || fail "closeout-sourceline-stub-zero-positive-control: T-901 must move to Done"
+pass "closeout-sourceline-stub-zero-positive-control — a stub checker exiting 0 lets close-out complete (the scratch bin/ copy is otherwise functional)"
+
+# --- closeout-sourceline-board-untouched-on-refusal -------------------------
+# Already asserted per-case above via cmp; this dedicated id checks it
+# directly against a fresh fixture, not only inferred from the cases above.
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+sl_case board-untouched '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+[ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-board-untouched-on-refusal: expected exit 1, got $sl_rc"
+cmp -s "$SL_ROOT/board-untouched/todo.md" "$SL_ROOT/board-untouched/todo.orig" \
+  || fail "closeout-sourceline-board-untouched-on-refusal: the board must be byte-identical after a source-line refusal"
+pass "closeout-sourceline-board-untouched-on-refusal — every source-line-gate refusal leaves the board byte-identical (checked directly)"
+
+# --- closeout-sourceline-no-temp-leftovers ----------------------------------
+NTL_TMP="$TMP/sourceline-tmpdir"
+mkdir -p "$NTL_TMP"
+NTL_ROOT="$TMP/sourceline-notemp"
+mkdir -p "$NTL_ROOT"
+write_conformant_interventions_record "$NTL_ROOT/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n%s\n\n## Done\n' '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md' > "$NTL_ROOT/todo.md"
+cp "$NTL_ROOT/todo.md" "$NTL_ROOT/todo.orig"
+ntl_rc=0
+( cd "$NTL_ROOT" && TMPDIR="$NTL_TMP" TEAM_TODO="$NTL_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
+  >"$NTL_ROOT/out" 2>"$NTL_ROOT/err" </dev/null || ntl_rc=$?
+[ "$ntl_rc" -eq 1 ] || fail "closeout-sourceline-no-temp-leftovers: expected exit 1, got $ntl_rc"
+cmp -s "$NTL_ROOT/todo.md" "$NTL_ROOT/todo.orig" || fail "closeout-sourceline-no-temp-leftovers: board must stay byte-identical"
+[ -z "$(ls -A "$NTL_TMP")" ] || fail "closeout-sourceline-no-temp-leftovers: leftover file(s) in private \$TMPDIR: $(ls -A "$NTL_TMP")"
+pass "closeout-sourceline-no-temp-leftovers — a private \$TMPDIR is left with zero files after a source-line refusal (the gate's temp file joins the existing single trap)"
+
+# ============================================================================
+# T-1022 (#98/D9/D10): the differential-testing harness that enumerates the
+# escape surface mechanically rather than by inspection. Every corpus line
+# begins `- [ ] **T-901** ` (so pass 1 locates it) except a small
+# deliberately-not-located set (D10's checkbox/id-shape axis). For each
+# line: build a full board carrying it as T-901's only Active entry, run
+# the REAL close-out.sh, and classify the outcome as notlocated (pass 1
+# never finds T-901), refused, or accepted. For every located line the
+# independently-computed oracle (bin/check-handoff.sh run live against a
+# synthesized single-entry board — never a hardcoded verdict) must agree:
+# oracle-reject implies close-out exits non-zero with the board
+# byte-identical; oracle-accept implies close-out exits 0 with the entry
+# moved. A disagreement increments `mismatches`.
+# ============================================================================
+printf '\n--- T-1022 differential harness (closeout-lineshape-differential) ---\n'
+
+LS_ROOT="$TMP/lineshape"
+mkdir -p "$LS_ROOT"
+
+# LF-terminated lines. Axes named per D10: title shape (normal / padded /
+# whitespace-only spaces / whitespace-only tab / empty), flag token (allowed /
+# lowercase / near-miss / a token with spaces), trailing whitespace after the
+# path (none / space), title content (plain / backticked token / decoy
+# separator), path shape (x.md / docs/specs/ / .shell-team/specs/ / no .md),
+# separator shape (em-dash with spaces / hyphen-minus / missing surrounding
+# space), checkbox/id shape (the deliberately-not-located set).
+# shellcheck disable=SC2016  # every backtick below is literal board grammar, not expansion
+LS_LINES=(
+  '- [ ] **T-901** demo title — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-901**   padded title   — `READY_FOR_ENG` — spec: x.md'
+  '- [ ] **T-901** has a `token` inside — `BLOCKED` — spec: z.md'
+  '- [ ] **T-901** legacy path — `READY_FOR_MERGE` — spec: docs/specs/y.md'
+  '- [ ] **T-901** default layout path — `REWORK` — spec: .shell-team/specs/y.md'
+  '- [ ] **T-901** trailing space var — `READY_FOR_QA` — spec: x.md '
+  '- [ ] **T-901** decoy separator — `x` — spec: y.md but continues — `READY_FOR_REVIEW` — spec: real.md'
+  '- [ ] **T-901** arch flag — `READY_FOR_ARCH` — spec: x.md'
+  '- [ ] **T-901** merge flag — `READY_FOR_MERGE` — spec: x.md'
+  '- [ ] **T-901** review flag — `READY_FOR_REVIEW` — spec: x.md'
+  '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-901**  — `READY_FOR_QA` — spec: x.md'
+  $'- [ ] **T-901** \t — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-901** demo — `ready_for_qa` — spec: x.md'
+  '- [ ] **T-901** demo — `READY_FOR_MERGED` — spec: x.md'
+  '- [ ] **T-901** demo — `READY FOR QA` — spec: x.md'
+  '- [ ] **T-901** demo — `READY_FOR_QA` — spec: x'
+  '- [ ] **T-901** demo - `READY_FOR_QA` - spec: x.md'
+  '- [ ] **T-901** demo—`READY_FOR_QA`— spec: x.md'
+  '- [ ] **T-901** demo — `readyforqa` — spec: x.md'
+  '- [ ] **T-901** demo — `REWORK ` — spec: x.md'
+  '- [x] **T-901** demo — `READY_FOR_QA` — spec: x.md'
+  '  - [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md'
+  '- [ ]  **T-901** demo — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-902** demo — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-901** qa flag plain — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-901** default path variant — `READY_FOR_QA` — spec: .shell-team/specs/x.md'
+)
+
+ls_corpus=0 ls_refused=0 ls_accepted=0 ls_notlocated=0 ls_mismatches=0
+
+lineshape_case() {
+  # $1 = case dir name, $2 = the line, $3 = crlf (1) or lf (0)
+  local dir="$LS_ROOT/$1" line="$2" crlf="$3" got=0
+  mkdir -p "$dir"
+  write_conformant_interventions_record "$dir/.shell-team/interventions/T-901.md" T-901
+  if [ "$crlf" = "1" ]; then
+    printf -- '# Tasks\n\n## Active\n\n%s\n\n## Done\n' "$line" > "$dir/plain.md"
+    awk '{ printf "%s\r\n", $0 }' "$dir/plain.md" > "$dir/todo.md"
+  else
+    printf -- '# Tasks\n\n## Active\n\n%s\n\n## Done\n' "$line" > "$dir/todo.md"
+  fi
+  cp "$dir/todo.md" "$dir/todo.orig"
+
+  ( cd "$dir" && TEAM_TODO="$dir/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
+    >"$dir/out" 2>"$dir/err" </dev/null || got=$?
+
+  ls_corpus=$((ls_corpus + 1))
+  if grep -qF -- 'not found as a top-level entry' "$dir/err" 2>/dev/null; then
+    ls_notlocated=$((ls_notlocated + 1))
+    return 0
+  fi
+
+  # Oracle: bin/check-handoff.sh run live against an independently-built
+  # single-entry synthesized board — never a hardcoded verdict.
+  if [ "$crlf" = "1" ]; then
+    printf -- '## Active\n\n%s\n' "$line" > "$dir/oracle-plain.md"
+    awk '{ printf "%s\r\n", $0 }' "$dir/oracle-plain.md" > "$dir/oracle.md"
+  else
+    printf -- '## Active\n\n%s\n' "$line" > "$dir/oracle.md"
+  fi
+  local oracle_rc=0
+  bash "$REPO_ROOT/bin/check-handoff.sh" "$dir/oracle.md" >/dev/null 2>&1 || oracle_rc=$?
+
+  if [ "$oracle_rc" -ne 0 ]; then
+    ls_refused=$((ls_refused + 1))
+    if [ "$got" = "0" ] || ! cmp -s "$dir/todo.md" "$dir/todo.orig"; then
+      ls_mismatches=$((ls_mismatches + 1))
+      printf 'MISMATCH (oracle rejects, expected close-out to refuse): %s (got exit %s)\n' "$line" "$got" >&2
+    fi
+  else
+    ls_accepted=$((ls_accepted + 1))
+    if [ "$got" != "0" ] || ! grep -q '^- \[x\] \*\*T-901\*\*' "$dir/todo.md"; then
+      ls_mismatches=$((ls_mismatches + 1))
+      printf 'MISMATCH (oracle accepts, expected close-out to complete): %s (got exit %s)\n' "$line" "$got" >&2
+    fi
+  fi
+}
+
+ls_i=0
+for l in "${LS_LINES[@]}"; do
+  ls_i=$((ls_i + 1))
+  lineshape_case "case$ls_i" "$l" 0
+done
+# Line-terminator axis: the same shapes, CRLF-terminated throughout.
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+lineshape_case "crlf-accepted" '- [ ] **T-901** crlf accepted — `READY_FOR_QA` — spec: x.md' 1
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+lineshape_case "crlf-refused"  '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md' 1
+
+printf 'closeout-lineshape-differential corpus=%d refused=%d accepted=%d notlocated=%d mismatches=%d\n' \
+  "$ls_corpus" "$ls_refused" "$ls_accepted" "$ls_notlocated" "$ls_mismatches"
+
+[ "$ls_corpus" -ge 24 ]     || fail "closeout-lineshape-differential: corpus floor not met ($ls_corpus < 24)"
+[ "$ls_refused" -ge 6 ]     || fail "closeout-lineshape-differential: refused floor not met ($ls_refused < 6)"
+[ "$ls_accepted" -ge 8 ]    || fail "closeout-lineshape-differential: accepted floor not met ($ls_accepted < 8)"
+[ "$ls_notlocated" -ge 3 ]  || fail "closeout-lineshape-differential: notlocated floor not met ($ls_notlocated < 3)"
+[ "$ls_mismatches" -eq 0 ]  || fail "closeout-lineshape-differential: $ls_mismatches mismatch(es) between the live oracle and close-out's real behavior"
+pass "closeout-lineshape-differential — the escape surface is enumerated mechanically (D9/D10), never transcribed: corpus=$ls_corpus refused=$ls_refused accepted=$ls_accepted notlocated=$ls_notlocated mismatches=$ls_mismatches"
+
+# --- closeout-unrelated-active-line-interlock-unchanged / closeout-done-section-loose-entry-unaffected ---
+# D2's correction and Non-goals' `## Done` boundary lock, given their own
+# assertion ids per AC13, distinct from AC16/AC17's inline checks above (the
+# M5-adjacent interlock section) — both preservation locks, expected green
+# before AND after this task.
+UAL_ROOT="$TMP/unrelated-active-line"
+mkdir -p "$UAL_ROOT"
+write_conformant_interventions_record "$UAL_ROOT/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n- [ ] **T-902** broken line with no separator at all\n\n## Done\n' > "$UAL_ROOT/todo.md"
+cp "$UAL_ROOT/todo.md" "$UAL_ROOT/todo.orig"
+ual_rc=0
+( cd "$UAL_ROOT" && TEAM_TODO="$UAL_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
+  >"$UAL_ROOT/out" 2>"$UAL_ROOT/err" </dev/null || ual_rc=$?
+[ "$ual_rc" -eq 1 ] || fail "closeout-unrelated-active-line-interlock-unchanged: expected exit 1, got $ual_rc"
+cmp -s "$UAL_ROOT/todo.md" "$UAL_ROOT/todo.orig" || fail "closeout-unrelated-active-line-interlock-unchanged: board must stay byte-identical"
+grep -qF -- 'rewritten board would fail check-handoff.sh' "$UAL_ROOT/err" \
+  || fail "closeout-unrelated-active-line-interlock-unchanged: the pre-write interlock's own reason must still fire"
+pass "closeout-unrelated-active-line-interlock-unchanged — D2's correction: an unrelated malformed Active line still refuses via the UNCHANGED pre-write interlock, at the same exit 1, not the source-line gate"
+
+DSL_ROOT="$TMP/done-loose-entry"
+mkdir -p "$DSL_ROOT"
+write_conformant_interventions_record "$DSL_ROOT/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n\n- [x] T-800 an old loose entry with no spec path\n' > "$DSL_ROOT/todo.md"
+dsl_rc=0
+( cd "$DSL_ROOT" && TEAM_TODO="$DSL_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
+  >"$DSL_ROOT/out" 2>"$DSL_ROOT/err" </dev/null || dsl_rc=$?
+[ "$dsl_rc" -eq 0 ] || fail "closeout-done-section-loose-entry-unaffected: expected exit 0, got $dsl_rc"
+grep -q '^- \[x\] \*\*T-901\*\*' "$DSL_ROOT/todo.md" || fail "closeout-done-section-loose-entry-unaffected: T-901 must move to Done"
+grep -qxF -- '- [x] T-800 an old loose entry with no spec path' "$DSL_ROOT/todo.md" \
+  || fail "closeout-done-section-loose-entry-unaffected: the pre-existing loose Done entry must survive byte-identically"
+pass "closeout-done-section-loose-entry-unaffected — no check is widened to ## Done and no existing ## Done entry is repaired"
+
 printf '\nAll close-out assertions passed.\n'

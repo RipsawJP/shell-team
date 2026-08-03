@@ -21,19 +21,25 @@
 #      status file or its markers are absent, e.g. a host that never adopted
 #      the generated block).
 #
-# Before any of the above runs, two fail-closed gates must pass, in order:
-# T-068's pending fast-follow disposition gate, then T-1017's interventions
-# gate —
+# Before any of the above runs, fail-closed gates must pass, in order: T-068's
+# pending fast-follow disposition gate, then T-1017's interventions gate,
+# then T-1022's source-line gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
+#   a source line the hand-off lint would reject refuses the close-out before any board write.
 # The interventions record is resolved from $TEAM_INTERVENTIONS_DIR (same
 # override precedence as $TEAM_TODO below) or else the sibling team-paths.sh,
 # then verified with the sibling check-interventions.sh --task T-NNN. The
 # gate reads ONE path for the task being closed — no other task's record, no
 # ## Done history, no backfill or migration.
 #
-# T-1022 (#101): a sibling screen sits ahead of the check-handoff.sh
-# invocation below — a missing or unreadable check-handoff.sh sibling is
-# exit 2 (it was exit 1 before this change).
+# T-1022's source-line gate (#98) judges the task's Active source line the
+# same way check-handoff.sh would, by feeding it a synthesized single-entry
+# board rather than keeping a second copy of the line grammar here — so
+# the Active line's status flag must be in the allowed vocabulary — an
+# invalid flag is no longer silently rewritten. A single sibling screen sits
+# ahead of the FIRST check-handoff.sh invocation (this gate) and covers the
+# pre-write interlock below too: a missing or unreadable check-handoff.sh
+# sibling is exit 2 (it was exit 1 before this change).
 #
 # The board path comes from $TEAM_TODO if set, else the sibling team-paths.sh
 # resolves it from cwd (.shell-team/todo.md by default, tasks/todo.md in a
@@ -55,9 +61,10 @@
 #   --note   free-text closure note (single line; control chars rejected)
 #
 # Exit: 0 = board updated; 1 = task not in Active (missing or already Done),
-#       board shape error, an unresolved fast-follow disposition, or a
-#       missing/unreadable/non-conformant interventions record; 2 = usage /
-#       validation / resolver error, or an unusable interventions checker,
+#       board shape error, an unresolved fast-follow disposition, a
+#       missing/unreadable/non-conformant interventions record, or a source
+#       line the hand-off lint would reject; 2 = usage / validation /
+#       resolver error, or an unusable interventions checker,
 #       interventions-directory resolver, or check-handoff.sh sibling. On any
 #       non-zero exit the board file is byte-untouched. In one line:
 #   a missing, unreadable or non-conformant interventions record is exit 1; an unusable checker or resolver is exit 2.
@@ -321,7 +328,53 @@ if [ -n "$NOTE" ];  then CLOSURE="${CLOSURE} — ${NOTE}"; fi
 ENTRY_FILE="$(mktemp "${TMPDIR:-/tmp}/close-out-entry.XXXXXX")"
 TMP_BOARD="$(mktemp "${TMPDIR:-/tmp}/close-out-board.XXXXXX")"
 GATE_ERR="$(mktemp "${TMPDIR:-/tmp}/close-out-gate-err.XXXXXX")"
-trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD" "$GATE_ERR"' EXIT
+SYN_BOARD="$(mktemp "${TMPDIR:-/tmp}/close-out-synboard.XXXXXX")"
+trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD" "$GATE_ERR" "$SYN_BOARD"' EXIT
+
+# --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh
+# invocation below (the source-line gate) — covers the pre-write interlock
+# further down too, so there is exactly one of it. A missing or unreadable
+# sibling is an install problem, not a board defect, and must not surface as
+# a lint failure at exit 1. Modelled on the check-interventions.sh screen
+# above: an -f/-r test, die (exit 2), a named reason, no remedy block.
+HANDOFF_LINT="$SCRIPT_DIR/check-handoff.sh"
+if [ ! -f "$HANDOFF_LINT" ] || [ ! -r "$HANDOFF_LINT" ]; then
+  die "cannot run the hand-off lint (check-handoff.sh missing or unreadable next to close-out.sh)"
+fi
+
+# --- fail-closed gate: the Active source line must pass the hand-off lint
+# (T-1022 #98/D1/D3). Judged by feeding a synthesized single-entry board to
+# the sibling check-handoff.sh itself — no local copy of LINE_RE or the flag
+# vocabulary — so a flag outside ALLOWED_FLAGS is refused instead of being
+# silently rewritten to READY_FOR_MERGE (D1's declared additional refusal
+# class). The synthesized board carries one `## Active` heading, one blank
+# line, and MAIN_LINE verbatim (trailing CR included, per the Terms table) —
+# no other `- [ ]` line anywhere in that section.
+printf '## Active\n\n%s\n' "$MAIN_LINE" > "$SYN_BOARD"
+SL_ERR="$(bash "$HANDOFF_LINT" "$SYN_BOARD" 2>&1 >/dev/null)" && SL_RC=0 || SL_RC=$?
+case "$SL_RC" in
+  0)
+    : # the synthesized board is clean — nothing to refuse
+    ;;
+  1)
+    # Row (i): a violation on the synthesized board (format mismatch, or an
+    # unknown status flag). D4's three-part frozen order: the
+    # synthesized-board note, then the checker's own stderr verbatim (never
+    # rewritten or filtered), then reason F carrying the REAL board path and
+    # the real source-line number — never the temp file's.
+    printf 'close-out: the file:line below refers to a synthesized single-entry board, not the real board\n' >&2 || true
+    printf '%s\n' "$SL_ERR" >&2 || true
+    printf '%s:%s: would be rejected by the hand-off lint — refusing to move a malformed line into ## Done\n' "$BOARD" "$A_START" >&2 || true
+    exit 1
+    ;;
+  *)
+    # Rows (ii)/(iii): the fail-closed floor. An unusable checker — it was
+    # just handed a file this script created, so "cannot read it" is an
+    # environment failure, not a board defect — is NEVER guessed into row
+    # (i)'s board-defect message, whatever its exit status turned out to be.
+    die "cannot verify the Active line (check-handoff.sh exited $SL_RC)"
+    ;;
+esac
 
 {
   printf '%s\n' "$DONE_MAIN"
@@ -350,19 +403,11 @@ awk -v a_start="$A_START" -v a_end="$A_END" -v entry_file="$ENTRY_FILE" '
   END { if (pending && !inserted) { print ""; emit_entry() } }
 ' "$BOARD" > "$TMP_BOARD"
 
-# --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh
-# invocation below — a missing or unreadable sibling is an install problem,
-# not a board defect, and must not surface as a lint failure at exit 1.
-# Modelled on the check-interventions.sh screen above: an -f/-r test, die
-# (exit 2), a named reason, no remedy block (the problem is the install).
-HANDOFF_LINT="$SCRIPT_DIR/check-handoff.sh"
-if [ ! -f "$HANDOFF_LINT" ] || [ ! -r "$HANDOFF_LINT" ]; then
-  die "cannot run the hand-off lint (check-handoff.sh missing or unreadable next to close-out.sh)"
-fi
-
 # --- fail-closed gate: the rewritten board must still pass the hand-off lint ---
 # D6 (T-1016): capture+print the checker's stderr before refusing (exit 1 and
-# the no-write guarantee are unchanged).
+# the no-write guarantee are unchanged). $HANDOFF_LINT and its screen sit
+# above, ahead of the FIRST check-handoff.sh invocation (the source-line
+# gate) — this is the second invocation and is covered by that same screen.
 if ! bash "$HANDOFF_LINT" "$TMP_BOARD" >/dev/null 2>"$GATE_ERR"; then
   cat "$GATE_ERR" >&2 || true
   fail "rewritten board would fail check-handoff.sh — board left untouched"
