@@ -319,3 +319,21 @@ that file's order.
   arithmetic-shifting a previously-written-down value, and confirm
   `sed -n "${N}p" bin/close-out.sh` is byte-identical to the pinned content
   before updating the number.
+- T-1024: a delta on the T-112 entry above, not a restatement of it. WHY a
+  spec's `- check:` line needs the guard: `bin/check-acs.sh` runs every
+  check through `bash -c "$cmd"` with `set +e` immediately before it and
+  no `set -e` inside the executed shell, so errexit never rescues an
+  unguarded `d=$(mktemp ...); rc=0; ...` assignment the way it would in a
+  normal `set -e` script — on failure `$d` is empty and every path
+  composed from it (`"$d/x"`) expands root-anchored. The guard: use
+  `d=$(mktemp -d "${TMPDIR:-/tmp}/<slug>.XXXXXX") || exit 1`, with the
+  failure exit before the first composed path is used (T-1023's own
+  `check:` lines already use this idiom; T-1024's audit inventories every
+  other spec's site instead of editing them). Two rules travel with the
+  idiom: reflect a write/`sort`/`comm`/`git` failure explicitly into
+  `rc=1` rather than letting it disappear, and let `|| true` absorb only a
+  `grep -c`'s "no match" exit status, never a producer's failure — a
+  counted value that could be zero because the file was never written
+  needs its own positive control beside it (`test -s`, or a known-present
+  anchor), the exact AC11-shape gap `docs/loop-engineering/
+  check-line-mktemp-guard-audit.md` measured.
