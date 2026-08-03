@@ -281,8 +281,19 @@ counted_total="$(awk '/^[[:space:]]+- check:/{n++} END{print n+0}' "$tmp_region"
 # shellcheck disable=SC2016
 TOP_RE='^- \[[ xX]\] \*\*(T-[0-9]+)\*\*'
 HASH_LINE_RE='^[[:space:]]+- intent-hash'
+# T-1021 (D4, Codex round1 Major): hash_version is fed straight into a `10#`
+# arithmetic expansion (`declared_n=$((10#$hash_version))`,
+# `version_int=$((10#$hash_version))`) with no width bound on the capture
+# itself before this change, so a grammar-conformant huge digit string
+# silently wrapped through bash's signed 64-bit range instead of being
+# refused. Bounded to `{1,4}` (max 9999) at the grammar side (D6): a spec's
+# intent block is re-frozen at most a handful of times per rework round in
+# this repository's own history (T-1018's own most-reworked spec reached
+# v1), so 9999 is 100-1000x headroom over any real ceiling; stale-at is a
+# single spec being re-frozen ten thousand times, which would break this
+# repository's own board/PR conventions long before the digit width does.
 # shellcheck disable=SC2016
-HASH_FULL_RE='^[[:space:]]+- intent-hash \(v([0-9]+)\): ([0-9a-f]{40})$'
+HASH_FULL_RE='^[[:space:]]+- intent-hash \(v([0-9]{1,4})\): ([0-9a-f]{40})$'
 RATIFIED_LINE_RE='^[[:space:]]+- intent-ratified'
 # shellcheck disable=SC2016
 RATIFIED_FULL_RE='^[[:space:]]+- intent-ratified \([0-9]{4}-[0-9]{2}-[0-9]{2}\): v([0-9]+)→v([0-9]+) — .+ — .+$'
@@ -295,9 +306,23 @@ RATIFIED_FULL_RE='^[[:space:]]+- intent-ratified \([0-9]{4}-[0-9]{2}-[0-9]{2}\):
 # `v0`, no leading zero) so an out-of-grammar version is malformed rather
 # than a separate case. `owner=` requires a non-space first character
 # (D5: shape only, no enum, no language rule) then anything to end of line.
+#
+# T-1021 (D4, Codex round1 Major): the version capture and the four count
+# captures (`lines=<ran>/<total>`, `verdict=<P>P/<F>F`) all feed `10#`
+# arithmetic (`av`/`ar`/`at`/`ap`/`af` at check-intent.sh:616-623, plus
+# `$((ap + af))`) with no width bound, so an oversized value wrapped
+# silently instead of refusing. Bounded to `{1,4}` (max 9999) at the
+# grammar side (D6), same reasoning as HASH_FULL_RE above: `ran`/`total`
+# count `- check:` lines inside one spec's intent block (this task's own
+# spec, the largest measured, carries 24), and `P`/`F` are a partition of
+# that same `ran` count, so all four share the same real ceiling — dozens
+# today, hundreds in an extreme future spec, nowhere near four digits.
+# Stale-at: a single spec's intent block carrying ten thousand acceptance
+# criteria, which no `check:`-line-driven spec in this repository has ever
+# approached by two orders of magnitude.
 ATTEST_LINE_RE='^[[:space:]]+- freeze-attestation'
 # shellcheck disable=SC2016
-ATTEST_FULL_RE='^[[:space:]]+- freeze-attestation \(v([1-9][0-9]*), ([0-9]{4}-[0-9]{2}-[0-9]{2})\): lines=([0-9]+)/([0-9]+) sweep=mutual-satisfiability verdict=([0-9]+)P/([0-9]+)F owner=([^[:space:]].*)$'
+ATTEST_FULL_RE='^[[:space:]]+- freeze-attestation \(v([1-9][0-9]{0,3}), ([0-9]{4}-[0-9]{2}-[0-9]{2})\): lines=([0-9]{1,4})/([0-9]{1,4}) sweep=mutual-satisfiability verdict=([0-9]{1,4})P/([0-9]{1,4})F owner=([^[:space:]].*)$'
 
 # Board parser state machine (T-071 rework3 canonical, re-grounded for T-1016
 # D2 — spec "## 形式文法 / 状態機械" § "board パース状態機械の正典（rework3

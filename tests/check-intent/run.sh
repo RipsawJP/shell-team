@@ -1072,6 +1072,159 @@ if grep -q '^check-intent: attestation: ' <<< "$ERR"; then
 fi
 pass "attestation-leading-zero-consistent-numeric-pass: a freeze-attestation whose leading-zero counts are internally consistent (lines=01/01 verdict=01P/00F, 01 treated as the numeral 1) passes the attestation judgment and reaches the bootstrap structural, not refused merely for the leading zero"
 
+# ============================================================================
+# T-1021 (Codex round1 Major): hash_version / av / ar / at / ap / af are fed
+# into `10#` arithmetic with no width bound before this fix, so a
+# grammar-conformant 20-digit digit string silently wrapped through bash's
+# signed 64-bit range instead of being refused (measured:
+# `bash -c 'echo $((10#18446744073709551626))'` -> 10). Each capture is now
+# bounded to `{1,4}` (max 9999) directly in HASH_FULL_RE / ATTEST_FULL_RE,
+# so an oversized value fails the grammar and is refused at check-intent's
+# existing malformed-record path (hash_bad_count / attest_bad_count) — no
+# new stderr write site, D6 fail-closed at the grammar side. Fixtures use a
+# 20-digit value (width-fixture=20digit), matching AC12's own overflow
+# probe shape rather than a merely-large-but-still-narrow number.
+# ============================================================================
+
+HUGE='99999999999999999999'
+
+# --- T-1021-check-intent-hash-version-overflow ------------------------------
+# A 20-digit hash_version must refuse structurally (HASH_FULL_RE's now-bounded
+# version capture fails to match), never silently wrap and be treated as a
+# huge-but-valid version.
+C="$TMP/case-t1021-hashver-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" "$HUGE" "0000000000000000000000000000000000000000"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-hash-version-overflow: expected exit 2, got $RC: $ERR"
+grep -q '^check-intent: structural: ' <<< "$ERR" \
+  || fail "T-1021-check-intent-hash-version-overflow: expected the 'structural' token (malformed intent-hash, bounded grammar refuses the huge version), got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-hash-version-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-hash-version-overflow: a 20-digit intent-hash version (width-fixture=20digit) is refused structurally by the bounded HASH_FULL_RE, never wrapped through 64-bit arithmetic"
+
+# --- T-1021-check-intent-attest-version-overflow ----------------------------
+# A 20-digit freeze-attestation version (av) must refuse as attestation
+# (ATTEST_FULL_RE's now-bounded version capture fails to match).
+C="$TMP/case-t1021-attestver-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")" \
+  "  - freeze-attestation (v${HUGE}, 2026-08-03): lines=1/1 sweep=mutual-satisfiability verdict=1P/0F owner=coordinating session"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-version-overflow: expected exit 2, got $RC: $ERR"
+grep -qF 'malformed freeze-attestation record' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-version-overflow: expected the grammar-rejection message 'malformed freeze-attestation record' (not merely any 'attestation:'-prefixed message, which a downstream ran==total mismatch after a silent wrap could also produce) — bounded grammar must refuse the huge version at the match itself, got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-attest-version-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-attest-version-overflow: a 20-digit freeze-attestation version (width-fixture=20digit) is refused as attestation by the bounded ATTEST_FULL_RE, never wrapped through 64-bit arithmetic"
+
+# --- T-1021-check-intent-attest-counts-overflow ------------------------------
+# All four count captures (lines=<ran>/<total>, verdict=<P>P/<F>F) oversized
+# at once must also refuse as attestation — proving every captured counter
+# in this judgment is bounded, not only the first one a reviewer might spot.
+C="$TMP/case-t1021-attestcounts-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")" \
+  "  - freeze-attestation (v1, 2026-08-03): lines=${HUGE}/${HUGE} sweep=mutual-satisfiability verdict=${HUGE}P/${HUGE}F owner=coordinating session"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-counts-overflow: expected exit 2, got $RC: $ERR"
+grep -qF 'malformed freeze-attestation record' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-counts-overflow: expected the grammar-rejection message 'malformed freeze-attestation record' (not merely any 'attestation:'-prefixed message) — bounded grammar must refuse all four huge counts at the match itself, got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-attest-counts-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-attest-counts-overflow: all four freeze-attestation count captures (lines=/verdict=, width-fixture=20digit) are refused as attestation by the bounded ATTEST_FULL_RE, never wrapped through 64-bit arithmetic"
+
+# --- T-1021-check-intent-attest-count-{ran,total,p,f}-overflow --------------
+# Producer mutation self-check found a blind spot in the combined test above:
+# because ATTEST_FULL_RE requires ALL four count captures to match, oversizing
+# all four at once cannot distinguish "every capture is bounded" from "at
+# least one still is" — reverting only one capture's width quantifier still
+# passed the combined fixture (the other three still failed to match). Each
+# of the four count fields is oversized ALONE below (the other three stay
+# small and internally consistent, `1`), independently proving each one's
+# own bound is load-bearing — not merely masked by a sibling's. Four explicit
+# blocks (not a `for` loop over a variable id) so AC13's `grep -qF -- "$id"`
+# finds each `T-1021-…` id as LITERAL text in this file — a loop-interpolated
+# id (`T-1021-…-${FIELD}-…`) is invisible to a fixed-string grep against the
+# suite's own source text (a second gap this same round found, before it
+# ever reached the audit document's `lock:` fields).
+#
+# 'malformed freeze-attestation record' is the grammar-rejection message
+# (attest_bad_count path) — NOT merely any 'attestation:'-prefixed message.
+# A weaker check here would pass for the wrong reason: with the other three
+# fields small and consistent (1/1, verdict=1P/0F), an unbounded sibling
+# capture could still match, silently 10#-wrap the huge digit string, and
+# get caught downstream by the UNRELATED "ran == total" (or "P + F == ran")
+# arithmetic cross-check instead of by this field's own width bound.
+
+C="$TMP/case-t1021-attestcount-ran-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")" \
+  "  - freeze-attestation (v1, 2026-08-03): lines=${HUGE}/1 sweep=mutual-satisfiability verdict=1P/0F owner=coordinating session"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-count-ran-overflow: expected exit 2, got $RC: $ERR"
+grep -qF 'malformed freeze-attestation record' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-count-ran-overflow: expected the grammar-rejection message 'malformed freeze-attestation record' — the ran capture alone must be bounded at the grammar, not merely caught downstream by an unrelated consistency check after a silent wrap, got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-attest-count-ran-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-attest-count-ran-overflow: the ran count capture alone (width-fixture=20digit, siblings small) is refused at the grammar, independently of the other three counts"
+
+C="$TMP/case-t1021-attestcount-total-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")" \
+  "  - freeze-attestation (v1, 2026-08-03): lines=1/${HUGE} sweep=mutual-satisfiability verdict=1P/0F owner=coordinating session"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-count-total-overflow: expected exit 2, got $RC: $ERR"
+grep -qF 'malformed freeze-attestation record' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-count-total-overflow: expected the grammar-rejection message 'malformed freeze-attestation record' — the total capture alone must be bounded at the grammar, not merely caught downstream by an unrelated consistency check after a silent wrap, got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-attest-count-total-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-attest-count-total-overflow: the total count capture alone (width-fixture=20digit, siblings small) is refused at the grammar, independently of the other three counts"
+
+C="$TMP/case-t1021-attestcount-p-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")" \
+  "  - freeze-attestation (v1, 2026-08-03): lines=1/1 sweep=mutual-satisfiability verdict=${HUGE}P/0F owner=coordinating session"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-count-p-overflow: expected exit 2, got $RC: $ERR"
+grep -qF 'malformed freeze-attestation record' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-count-p-overflow: expected the grammar-rejection message 'malformed freeze-attestation record' — the p capture alone must be bounded at the grammar, not merely caught downstream by an unrelated consistency check after a silent wrap, got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-attest-count-p-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-attest-count-p-overflow: the p count capture alone (width-fixture=20digit, siblings small) is refused at the grammar, independently of the other three counts"
+
+C="$TMP/case-t1021-attestcount-f-overflow"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+write_board "$C/board.md" 1 "$(compute_hash "$C/spec.md")" \
+  "  - freeze-attestation (v1, 2026-08-03): lines=1/1 sweep=mutual-satisfiability verdict=1P/${HUGE}F owner=coordinating session"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-count-f-overflow: expected exit 2, got $RC: $ERR"
+grep -qF 'malformed freeze-attestation record' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-count-f-overflow: expected the grammar-rejection message 'malformed freeze-attestation record' — the f capture alone must be bounded at the grammar, not merely caught downstream by an unrelated consistency check after a silent wrap, got: $ERR"
+grep -qi 'value too great for base' <<< "$ERR" \
+  && fail "T-1021-check-intent-attest-count-f-overflow: leaked bash's raw arithmetic error instead of the grammar-side refusal"
+pass "T-1021-check-intent-attest-count-f-overflow: the f count capture alone (width-fixture=20digit, siblings small) is refused at the grammar, independently of the other three counts"
+
+# --- T-1021-check-intent-attest-counts-bounded-pass --------------------------
+# Positive control: a record whose count fields are written at the new
+# bound's own maximum WIDTH (4 characters: `0001`/`0000`, value 1/0 — same
+# leading-zero-is-decimal discipline T-1018 already locks at 2 digits, now
+# exercised at the bound's own edge) must still pass the attestation
+# judgment numerically — the bound must not reject a legitimate value
+# merely for having more digits than the common case.
+C="$TMP/case-t1021-attestcounts-bounded"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing." "" $'- [ ] AC1 x\n  - check: true'
+printf -- '- [ ] **%s** fixture task\n' "$TASK_ID" > "$C/none.md"
+printf '  - freeze-attestation (v1, 2026-08-03): lines=0001/0001 sweep=mutual-satisfiability verdict=0001P/0000F owner=coordinating session\n' >> "$C/none.md"
+run_checker "$C/spec.md" "$C/none.md"
+[ "$RC" -eq 2 ] || fail "T-1021-check-intent-attest-counts-bounded-pass: expected exit 2 (bootstrap structural, no hash record present), got $RC: $ERR"
+grep -q '^check-intent: structural: ' <<< "$ERR" \
+  || fail "T-1021-check-intent-attest-counts-bounded-pass: expected the 'structural' token (attestation judgment passed, bootstrap has no hash record), got: $ERR"
+if grep -q '^check-intent: attestation: ' <<< "$ERR"; then
+  fail "T-1021-check-intent-attest-counts-bounded-pass: a 4-character-wide (0001/0000) count at the bound's own maximum width must not be refused as attestation, got: $ERR"
+fi
+pass "T-1021-check-intent-attest-counts-bounded-pass: 4-character-wide freeze-attestation counts (width-fixture=4char, at the bound's own edge) are not rejected by the new width bound"
+
 # --- self-check: this suite's own script is shellcheck clean (soft-skip) ---
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$CHECKER" "$HERE/run.sh" || fail "shellcheck: check-intent.sh / run.sh must be clean"
