@@ -16,12 +16,15 @@
 # consumer's own "only a failing span is surfaced" behavior cannot make a
 # skipped-vs-counted difference invisible (D1).
 #
-# Each of D4's six classes is asserted three times: the frozen expected answer
-# against bin/rollup-runs.sh, the frozen expected answer against
-# bin/cluster-failures.sh, and a parity comparison between the two. A
-# divergence names the drifted script and the fixture's basename (D5); an
-# observation that is neither "counted" nor "skipped" (unexpected stdout, or a
-# non-zero exit) is a failure of that consumer, never a skip.
+# Each of D4's six classes is asserted twice: the frozen expected answer
+# against bin/rollup-runs.sh, and the frozen expected answer against
+# bin/cluster-failures.sh. A third comparison of the two consumers'
+# classifications against each other would be dead by transitivity under
+# fail-fast (both already equalling the same frozen value already implies
+# they equal each other) — do not add one; see issue #108. A divergence
+# names the drifted script and the fixture's basename (D5); an observation
+# that is neither "counted" nor "skipped" (unexpected stdout, or a non-zero
+# exit) is a failure of that consumer, never a skip.
 #
 # This task changes no `bin/` file (Non-goals) — proving the two existing
 # copies still agree is the whole point, not making them agree via a shared
@@ -82,10 +85,11 @@ classify_cluster() {
 
 # assert_parity <id> <fixture-basename> <expected: counted|skipped>
 #
-# Three checks per D4/D5: the frozen expected answer against each consumer
-# independently, then a parity comparison between the two. A divergence names
-# the drifted script and the fixture; disagreement between the two consumers
-# names both.
+# Two checks per D4/D5: the frozen expected answer against each consumer
+# independently. A direct parity comparison between the two consumers is not
+# present — it would be dead by transitivity, since both already agreeing
+# with the same frozen value already implies they agree with each other. A
+# divergence names the drifted script and the fixture (D5).
 assert_parity() {
   local id="$1" fixture="$2" expected="$3"
   local file="$FIX/$fixture" rc_class cc_class
@@ -93,7 +97,6 @@ assert_parity() {
   cc_class="$(classify_cluster "$file")"
   [ "$rc_class" = "$expected" ] || fail "$id: bin/rollup-runs.sh $fixture: expected $expected, got $rc_class"
   [ "$cc_class" = "$expected" ] || fail "$id: bin/cluster-failures.sh $fixture: expected $expected, got $cc_class"
-  [ "$rc_class" = "$cc_class" ] || fail "$id: parity divergence on $fixture: bin/rollup-runs.sh=$rc_class bin/cluster-failures.sh=$cc_class"
   pass "$id ($expected, bin/rollup-runs.sh and bin/cluster-failures.sh agree)"
 }
 

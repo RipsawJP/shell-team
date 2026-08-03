@@ -464,7 +464,7 @@ for role in "${ROLES_ARR[@]}"; do
       line_count=$((line_count + 1))
     fi
     if [ "$line_count" -gt "$LINE_WARN_THRESHOLD" ]; then
-      printf 'gen-playbook-blocks: warning: playbook-%s.md is %d lines (threshold %d) — consider superseding stale entries\n' \
+      printf 'gen-playbook-blocks: warning: playbook-%s.md is %d lines (threshold %d) — do not launch a supersede sweep on this signal alone; the judgment inputs are recorded in the shell-team repository at docs/loop-engineering/playbook-block-size-deferral.md\n' \
         "$role" "$line_count" "$LINE_WARN_THRESHOLD" >&2
     fi
   } > "$CONTENT_FILE"

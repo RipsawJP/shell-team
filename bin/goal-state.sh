@@ -57,8 +57,18 @@ write_state() {
 }
 
 require_int() {
-  [[ "$1" =~ ^[0-9]+$ ]] || { printf 'goal-state.sh: corrupt state (%s is not an integer: %q)\n' "$2" "$1" >&2 || true; exit 1; }
+  local re="${3:-^[0-9]+$}"
+  [[ "$1" =~ $re ]] || { printf 'goal-state.sh: corrupt state (%s is not an integer: %q)\n' "$2" "$1" >&2 || true; exit 1; }
 }
+
+# T-1021 (D4): width bounds for the two quantities this script feeds into
+# arithmetic. ITER_RE mirrors bin/loop-guard.sh:88's bound on the same
+# quantity arriving as --iteration, so the two ends of one pipe agree.
+# EPOCH_RE is {1,11} rather than {1,9}: a Unix epoch is already 10 digits
+# and will be 11 from the year 2286, so a {1,9} bound would reject a real
+# start_epoch/now value this script itself writes.
+ITER_RE='^[0-9]{1,9}$'
+EPOCH_RE='^[0-9]{1,11}$'
 
 [[ "$#" -ge 1 ]] || usage
 cmd="$1"; shift
@@ -70,8 +80,12 @@ case "$cmd" in
     ;;
   elapsed-min)
     [[ "$#" -eq 1 ]] || usage
-    start="$(read_key "$1" start_epoch)"; require_int "$start" start_epoch
-    n="$(now)"; require_int "$n" now
+    start="$(read_key "$1" start_epoch)"; require_int "$start" start_epoch "$EPOCH_RE"
+    n="$(now)"; require_int "$n" now "$EPOCH_RE"
+    # T-1021: normalize once, immediately after the width bound proves the
+    # value is a bounded digit string, so a leading-zero epoch (`01000000000`)
+    # is read as decimal rather than re-based as octal by the subtraction.
+    start=$((10#$start)); n=$((10#$n))
     delta=$(( n - start ))
     (( delta < 0 )) && delta=0   # floor clock-skew to 0 rather than emit a negative (loop-guard would guard_error)
     printf '%s\n' "$(( delta / 60 ))"
@@ -83,9 +97,13 @@ case "$cmd" in
     ;;
   bump)
     [[ "$#" -eq 1 ]] || usage
-    start="$(read_key "$1" start_epoch)"; require_int "$start" start_epoch
-    it="$(read_key "$1" iteration)"; require_int "$it" iteration
+    start="$(read_key "$1" start_epoch)"; require_int "$start" start_epoch "$EPOCH_RE"
+    it="$(read_key "$1" iteration)"; require_int "$it" iteration "$ITER_RE"
     sig="$(read_key "$1" prev_sig)"
+    # T-1021: normalize once, immediately after the width bound, then use the
+    # normalized local for the increment (10#$it, not $it) — the leading-zero
+    # hole this closes: `iteration=010` incrementing to `9` instead of `11`.
+    start=$((10#$start)); it=$((10#$it))
     it=$(( it + 1 ))
     write_state "$1" "$start" "$it" "$sig"
     printf '%s\n' "$it"
