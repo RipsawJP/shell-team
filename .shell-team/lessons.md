@@ -491,11 +491,12 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Category**: verification-discipline
 - **Applies-to**: pm-spec, engineer, qa-verifier
 - **Scope**: loop
-- **Status**: active
+- **Status**: superseded
 - **Source**: n/a
 - **Rule**: When a same-class bulk-fix inventory (an apply/not-apply table) is produced, attach the actual repository-wide grep command string and its hit count to the hand-off, not just a prose claim of "checked everywhere." QA should independently re-run the same grep to audit completeness.
 - **Why**: Even after an engineer reported "the whole scope was inventoried," a reviewer's own repository-wide grep and a cross-provider review's independent pass both caught the same two missed sites — one of which was inside a file already claimed as inventoried. A prose claim of completeness alone does not guarantee it.
 - **How to apply**: When building an inventory table (whether as the engineer or as pm-spec), write "grep run: <command> → N hits, all listed in the table" directly under the table. QA should re-run the identical grep during verification and confirm the count matches the table's row count before trusting the apply/not-apply judgment.
+- **Superseded-by**: 2026-08-03 — A completeness claim attaches its accounting: population total, selection method, and exclusion reasons (supersedes the bulk-fix inventory entry)
 
 ## 2026-07-19 — A change to a completion gate's condition count needs an AC covering downstream consumers of the gate's result
 - **Category**: verification-discipline
@@ -874,3 +875,24 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: Inside a spec, keep a prescriptive statement (what this project will do from now on) distinct from a descriptive grounding claim (what the project's practice has demonstrably been), and re-measure any descriptive claim against the primary artifacts before relying on it — an inherited descriptive claim is trusted by every later reader and re-checked by none of them.
 - **Why**: A spec's rationale line asserted an established tagging practice as grounding for a design decision, and the claim was already stale at the moment it was first written down — the practice it described had not held for the most recent release. The shipped document happened not to mislead, but the claim survived two sprints of review unchallenged until a QA round re-measured the actual tags and found the mismatch; nothing in the pipeline re-checks a descriptive claim once it sits inside a frozen spec.
 - **How to apply**: When drafting or reviewing a spec, for each claim of the form 'X is this project's practice', either re-measure it against the primary artifacts (the actual tags, branches, or files — never an earlier spec's assertion) and cite the measurement, or rewrite it prescriptively as 'from this task on, X' so it grounds nothing historical. QA treats an unmeasured descriptive claim used as grounding as a finding.
+
+## 2026-08-03 — A completeness claim attaches its accounting: population total, selection method, and exclusion reasons (supersedes the bulk-fix inventory entry)
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, engineer, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/reviews/T-1020.md
+- **Rule**: Any claim that a set of items is complete — "all N sites inventoried", "these candidates exhaust the space", "checked everywhere" — attaches its accounting at the claim site: the population total, the selection or search method actually used (the literal command where one exists), and the reason each excluded item is out; the verifying role re-derives the accounting independently from the raw population instead of re-checking the producer's arithmetic.
+- **Why**: The narrower form of this rule (bulk-fix inventories attach the grep command and hit count) was already in this corpus when a candidate-set completeness claim shipped with no accounting at all: a companion document asserted 24 candidates exhausted an 80-entry space with no selection method stated, QA passed it, and only two independent cross-provider review passes caught the gap. The defect class is the completeness claim itself, not the bulk-fix special case — any unaccounted "exhaustive" survives every gate that only samples it.
+- **How to apply**: pm-spec writes the accounting into the spec or companion document at the point the claim is made; the engineer keeps it current when the set changes; QA re-derives the total and the partition from the raw population (not from the producer's table) and confirms zero overlap and zero gap before treating the claim as verified.
+
+## 2026-08-03 — Code feeding a regex-captured digit string into bash arithmetic follows the file's existing base-10 normalization convention
+- **Category**: verification-discipline
+- **Applies-to**: engineer, qa-verifier
+- **Scope**: maintainer
+- **Bound-in**: CONTRIBUTING.md
+- **Status**: active
+- **Source**: .shell-team/reviews/T-1018.md
+- **Rule**: When new or edited code in a bin/ script feeds a regex-captured digit string into bash arithmetic ($(( )) or a numeric test), verify it applies the same base-10 normalization (10#) the file's existing code already uses; a missing prefix is a defect even when every current fixture passes, because a leading-zero input crashes the expansion inside an if-condition, a position set -e does not cover, so the failure is silent and the check is skipped.
+- **Why**: A new attestation cross-check crashed on a grammar-conformant leading-zero count (bash reads 08 as invalid octal) inside an if-condition exempt from set -e, silently skipping the check and accepting a self-contradictory record — a fail-open inside a fail-closed gate. The same file already normalized another captured value with 10#; the new code did not follow its own file's convention, and the execution-based QA round missed it because no fixture carried a leading zero.
+- **How to apply**: At review and QA time for any bin/ diff, grep the touched file for 10# and for arithmetic over captured variables; every captured digit string entering arithmetic gets 10# at first use. When the input grammar admits [0-9]+, add at least one leading-zero fixture to the owning suite.
