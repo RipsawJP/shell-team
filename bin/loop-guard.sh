@@ -87,6 +87,11 @@ done
 # signed 64-bit arithmetic, wrap negative, and slip past a `>= cap` test.
 [[ "$ITERATION"   =~ ^[0-9]{1,9}$ ]] || guard_error "missing or out-of-range --iteration: '${ITERATION}'"
 [[ "$ELAPSED_MIN" =~ ^[0-9]{1,9}$ ]] || guard_error "missing or out-of-range --elapsed-min: '${ELAPSED_MIN}'"
+# T-1021: normalize once, immediately after the width bound proves the value
+# a bounded digit string, so a leading-zero value (`08`) is read as decimal
+# rather than re-based as (invalid) octal by the comparisons below.
+ITERATION=$((10#$ITERATION))
+ELAPSED_MIN=$((10#$ELAPSED_MIN))
 # If --usd is supplied it MUST be a non-negative number; a malformed value must
 # not silently disable billing enforcement.
 if [[ -n "$USD" && ! "$USD" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
@@ -133,6 +138,13 @@ read_value STOP_NOPROG stop   no_progress
 # The two integer budget levers are required and must parse (fail-closed).
 [[ "$MAX_ITER" =~ ^[0-9]{1,9}$ ]] || guard_error "budget.max_iterations missing/out-of-range: '${MAX_ITER}'"
 [[ "$MAX_WALL" =~ ^[0-9]{1,9}$ ]] || guard_error "budget.max_wallclock_min missing/out-of-range: '${MAX_WALL}'"
+# T-1021: normalize once, immediately after the width bound. This is the
+# measured fail-open close: `max_iterations: 08` used to make `(( MAX_ITER >
+# 0 ))` below fail with an arithmetic error INSIDE the `if` condition — a
+# position `set -e` does not cover — which silently disabled the runaway
+# guard entirely rather than aborting.
+MAX_ITER=$((10#$MAX_ITER))
+MAX_WALL=$((10#$MAX_WALL))
 # max_usd is best-effort: empty or 0 = untracked, a positive number enforces.
 # A non-empty NON-numeric value is a corrupt contract — fail closed rather than
 # silently disabling billing enforcement.

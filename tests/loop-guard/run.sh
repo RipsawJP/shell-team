@@ -10,7 +10,10 @@
 #   - unreadable contract / bad input    -> STOP:guard_error           (exit 2, fail-closed)
 #
 # Asserts exact stdout AND exit code. Avoids mktemp so it runs in restricted
-# sandboxes.
+# sandboxes — the T-1021 leading-zero scratch contracts below are written
+# under $HERE/tmp (rm -rf + trap-cleaned, same pattern tests/check-acs/run.sh
+# uses) rather than checked in as new fixture files under
+# tests/loop-guard/fixtures/, which T-1021's diff allow-list does not cover.
 
 set -euo pipefail
 
@@ -21,6 +24,10 @@ FIX="$HERE/fixtures"
 GUARD="$FIX/guard-contract.yaml"
 USDC="$FIX/usd-contract.yaml"
 NOPROG_OFF="$FIX/noprog-off-contract.yaml"
+TMP="$HERE/tmp"
+rm -rf "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP"
 
 fail() {
   printf 'FAIL: %s\n' "$1" >&2
@@ -114,6 +121,45 @@ assert "no_progress opt-out -> CONTINUE" "CONTINUE" 0 -- \
 # iteration 0 (no cycles completed) is below any positive cap -> CONTINUE
 assert "iteration 0 -> CONTINUE" "CONTINUE" 0 -- \
   "$GUARD" --iteration 0
+
+# --- T-1021: leading-zero contract/flag values must not silently re-base --
+# Scratch contracts are written under $TMP (never checked in as fixture
+# files under tests/loop-guard/fixtures/, which the spec's diff allow-list
+# does not cover — only tests/loop-guard/run.sh itself is in scope).
+ZERO010="$TMP/zero-padded-010-contract.yaml"
+printf 'budget:\n  max_iterations: 010\n  max_wallclock_min: 30\n  max_usd: 0\nstop:\n  no_progress: false\n' > "$ZERO010"
+ZERO08="$TMP/zero-padded-08-contract.yaml"
+printf 'budget:\n  max_iterations: 08\n  max_wallclock_min: 30\n  max_usd: 0\nstop:\n  no_progress: false\n' > "$ZERO08"
+CAP9="$TMP/cap9-contract.yaml"
+printf 'budget:\n  max_iterations: 9\n  max_wallclock_min: 30\n  max_usd: 0\nstop:\n  no_progress: false\n' > "$CAP9"
+
+# `max_iterations: 010` (valid octal 8, decimal 10 — the two values genuinely
+# differ) must not shrink the cap to 8: with --iteration 9 (under 10, over
+# the wrongly-shrunk 8) the guard must not fire.
+assert "T-1021-loop-guard-contract (zero-fixture=010) -> CONTINUE" "CONTINUE" 0 -- \
+  "$ZERO010" --iteration 9
+
+# `max_iterations: 08` is invalid as an octal literal — the measured
+# fail-open: the arithmetic error used to occur INSIDE the `if (( MAX_ITER >
+# 0 ))` condition (a position `set -e` does not cover), which silently
+# disabled the runaway guard and let --iteration 999 keep CONTINUE-ing past
+# a cap of 8.
+assert "T-1021-loop-guard-contract (zero-fixture=08) -> STOP" "STOP:max_iterations_reached" 3 -- \
+  "$ZERO08" --iteration 999
+
+# The same leading-zero shape on the --iteration FLAG (not the contract)
+# must not re-base either: 010 is decimal 10, so against an unpadded cap of
+# 9 it must STOP (10 >= 9) — a misread-as-octal-8 comparison against 9 would
+# silently CONTINUE instead.
+assert "T-1021-loop-guard-iteration-flag (zero-fixture=010) -> STOP" "STOP:max_iterations_reached" 3 -- \
+  "$CAP9" --iteration 010
+
+# `--iteration 08` (decimal 8) against the top-of-file $GUARD fixture's cap
+# of 3 must STOP — pre-fix, the second `(( ITERATION >= MAX_ITER ))`
+# arithmetic errored inside the `if` and silently disabled the guard
+# (CONTINUE instead of STOP).
+assert "T-1021-loop-guard-iteration-flag (zero-fixture=08) -> STOP" "STOP:max_iterations_reached" 3 -- \
+  "$GUARD" --iteration 08
 
 printf 'OK\n'
 exit 0

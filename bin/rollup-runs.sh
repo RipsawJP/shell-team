@@ -152,10 +152,16 @@ for rid in "${RUN_IDS[@]}"; do
       REQUEST_CHANGES) v_reqchg=$((v_reqchg + 1)) ;;
     esac
 
+    # T-1021: 10# normalizes the captured digit string to base 10 before it
+    # enters arithmetic — the `-n` guard above is sufficient (not merely
+    # non-emptiness against an arbitrary grammar) because field_num's own
+    # capture is `([0-9]+)`, so non-empty already implies at least one digit
+    # (D5). Without this, `"tokens":010` summed as octal 8 instead of 10, and
+    # `"tokens":08` was an invalid octal literal.
     tk="$(field_num "$line" tokens)"
-    if [[ -n "$tk" ]]; then tok_sum=$((tok_sum + tk)); else tok_partial=1; fi
+    if [[ -n "$tk" ]]; then tok_sum=$((tok_sum + 10#$tk)); else tok_partial=1; fi
     dm="$(field_num "$line" duration_ms)"
-    if [[ -n "$dm" ]]; then dur_sum=$((dur_sum + dm)); else dur_partial=1; fi
+    if [[ -n "$dm" ]]; then dur_sum=$((dur_sum + 10#$dm)); else dur_partial=1; fi
 
     ts="$(field_str "$line" ts)"
     if [[ -n "$ts" ]]; then
