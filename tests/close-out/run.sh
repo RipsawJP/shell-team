@@ -722,4 +722,66 @@ cmp -s "$BU_ROOT/todo.md" "$BU_ROOT/todo.orig" \
   || fail "interventions-board-untouched-on-refusal: the board must be byte-identical after any interventions refusal"
 pass "interventions-board-untouched-on-refusal — every interventions-gate refusal leaves the board byte-identical (checked directly, not only inferred from the other assertions above)"
 
+# ============================================================================
+# T-1022 (#101): the check-handoff.sh sibling screen, ahead of the FIRST
+# check-handoff.sh invocation. Against a scratch bin/ copy whose
+# check-handoff.sh is (a) absent, (b) a non-regular file (a directory of
+# that name), (c) a dangling symlink, (d) unreadable (mode 000, skipped when
+# running as root, which ignores the read bit) — close-out exits 2 with
+# reason E and leaves the board byte-identical. Positive control, last
+# because it writes: restoring the real checker into the same scratch copy
+# lets close-out complete.
+# ============================================================================
+HS_ROOT="$TMP/handoff-sibling"
+mkdir -p "$HS_ROOT/root"
+cp -R "$REPO_ROOT/bin" "$HS_ROOT/bin"
+write_conformant_interventions_record "$HS_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$HS_ROOT/root/todo.md"
+cp "$HS_ROOT/root/todo.md" "$HS_ROOT/root/todo.orig"
+HS_SIBLING="$HS_ROOT/bin/check-handoff.sh"
+
+run_hs() {
+  # $1 = expected exit code
+  local want="$1" got=0
+  ( cd "$HS_ROOT/root" && TEAM_TODO="$HS_ROOT/root/todo.md" bash "$HS_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) \
+    >"$HS_ROOT/out" 2>"$HS_ROOT/err" || got=$?
+  [ "$got" -eq "$want" ]
+}
+
+rm -f "$HS_SIBLING"
+run_hs 2 || fail "closeout-handoff-sibling-absent-exit2: expected exit 2 for an absent check-handoff.sh"
+cmp -s "$HS_ROOT/root/todo.md" "$HS_ROOT/root/todo.orig" || fail "closeout-handoff-sibling-absent-exit2: board must stay byte-identical"
+grep -qF -- 'cannot run the hand-off lint (check-handoff.sh missing or unreadable next to close-out.sh)' "$HS_ROOT/err" \
+  || fail "closeout-handoff-sibling-absent-exit2: reason E must be printed"
+pass "closeout-handoff-sibling-absent-exit2 — an absent check-handoff.sh sibling refuses with exit 2, reason E, board untouched"
+
+mkdir -p "$HS_SIBLING"
+run_hs 2 || fail "closeout-handoff-sibling-nonregular-exit2: expected exit 2 for a directory named check-handoff.sh"
+cmp -s "$HS_ROOT/root/todo.md" "$HS_ROOT/root/todo.orig" || fail "closeout-handoff-sibling-nonregular-exit2: board must stay byte-identical"
+pass "closeout-handoff-sibling-nonregular-exit2 — a non-regular (directory) check-handoff.sh refuses with exit 2, board untouched"
+rmdir "$HS_SIBLING"
+
+ln -s "$HS_ROOT/nowhere-at-all" "$HS_SIBLING"
+run_hs 2 || fail "closeout-handoff-sibling-dangling-symlink-exit2: expected exit 2 for a dangling symlink"
+cmp -s "$HS_ROOT/root/todo.md" "$HS_ROOT/root/todo.orig" || fail "closeout-handoff-sibling-dangling-symlink-exit2: board must stay byte-identical"
+pass "closeout-handoff-sibling-dangling-symlink-exit2 — a dangling symlink named check-handoff.sh refuses with exit 2, board untouched"
+rm -f "$HS_SIBLING"
+
+cp "$REPO_ROOT/bin/check-handoff.sh" "$HS_SIBLING"
+if [ "$(id -u)" != "0" ]; then
+  chmod 000 "$HS_SIBLING"
+  run_hs 2 || fail "closeout-handoff-sibling-unreadable-exit2: expected exit 2 for a mode-000 check-handoff.sh"
+  cmp -s "$HS_ROOT/root/todo.md" "$HS_ROOT/root/todo.orig" || fail "closeout-handoff-sibling-unreadable-exit2: board must stay byte-identical"
+  grep -qF -- 'cannot run the hand-off lint' "$HS_ROOT/err" || fail "closeout-handoff-sibling-unreadable-exit2: reason E must be printed"
+  pass "closeout-handoff-sibling-unreadable-exit2 — an unreadable (mode 000) check-handoff.sh refuses with exit 2, board untouched"
+  chmod 644 "$HS_SIBLING"
+else
+  printf 'SKIP: closeout-handoff-sibling-unreadable-exit2 running as root; the read bit is ignored\n'
+fi
+
+run_hs 0 || fail "closeout-handoff-sibling-positive-control: expected exit 0 once the real checker is restored"
+grep -q '^- \[x\] \*\*T-901\*\*' "$HS_ROOT/root/todo.md" || fail "closeout-handoff-sibling-positive-control: T-901 must move to Done"
+pass "closeout-handoff-sibling-positive-control — restoring the real check-handoff.sh into the same scratch copy lets close-out complete"
+
 printf '\nAll close-out assertions passed.\n'

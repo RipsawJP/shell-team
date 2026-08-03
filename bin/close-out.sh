@@ -31,6 +31,10 @@
 # gate reads ONE path for the task being closed — no other task's record, no
 # ## Done history, no backfill or migration.
 #
+# T-1022 (#101): a sibling screen sits ahead of the check-handoff.sh
+# invocation below — a missing or unreadable check-handoff.sh sibling is
+# exit 2 (it was exit 1 before this change).
+#
 # The board path comes from $TEAM_TODO if set, else the sibling team-paths.sh
 # resolves it from cwd (.shell-team/todo.md by default, tasks/todo.md in a
 # legacy layout). Unlike telemetry there is NO guessed fallback: if the
@@ -53,9 +57,9 @@
 # Exit: 0 = board updated; 1 = task not in Active (missing or already Done),
 #       board shape error, an unresolved fast-follow disposition, or a
 #       missing/unreadable/non-conformant interventions record; 2 = usage /
-#       validation / resolver error, or an unusable interventions checker or
-#       interventions-directory resolver. On any non-zero exit the board file
-#       is byte-untouched. In one line:
+#       validation / resolver error, or an unusable interventions checker,
+#       interventions-directory resolver, or check-handoff.sh sibling. On any
+#       non-zero exit the board file is byte-untouched. In one line:
 #   a missing, unreadable or non-conformant interventions record is exit 1; an unusable checker or resolver is exit 2.
 
 set -euo pipefail
@@ -346,10 +350,20 @@ awk -v a_start="$A_START" -v a_end="$A_END" -v entry_file="$ENTRY_FILE" '
   END { if (pending && !inserted) { print ""; emit_entry() } }
 ' "$BOARD" > "$TMP_BOARD"
 
+# --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh
+# invocation below — a missing or unreadable sibling is an install problem,
+# not a board defect, and must not surface as a lint failure at exit 1.
+# Modelled on the check-interventions.sh screen above: an -f/-r test, die
+# (exit 2), a named reason, no remedy block (the problem is the install).
+HANDOFF_LINT="$SCRIPT_DIR/check-handoff.sh"
+if [ ! -f "$HANDOFF_LINT" ] || [ ! -r "$HANDOFF_LINT" ]; then
+  die "cannot run the hand-off lint (check-handoff.sh missing or unreadable next to close-out.sh)"
+fi
+
 # --- fail-closed gate: the rewritten board must still pass the hand-off lint ---
 # D6 (T-1016): capture+print the checker's stderr before refusing (exit 1 and
 # the no-write guarantee are unchanged).
-if ! bash "$SCRIPT_DIR/check-handoff.sh" "$TMP_BOARD" >/dev/null 2>"$GATE_ERR"; then
+if ! bash "$HANDOFF_LINT" "$TMP_BOARD" >/dev/null 2>"$GATE_ERR"; then
   cat "$GATE_ERR" >&2 || true
   fail "rewritten board would fail check-handoff.sh — board left untouched"
 fi
