@@ -198,13 +198,13 @@ Sorted by file, then by line number, then by context. `n10:` is the number of op
 - site: bin/check-intent.sh:612 — context: $(( )) — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
 - site: bin/check-intent.sh:641 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 versions, same reasoning as hash_version — ATTEST_FULL_RE now bounds the capture to [1-9][0-9]{0,3}, stale-at: a single spec accumulating ten thousand freeze-attestation records) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-version-overflow
 - site: bin/check-intent.sh:641 — context: array subscript — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
-- site: bin/check-intent.sh:645 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (this task's own spec, the largest measured, carries 24) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-ran-overflow
+- site: bin/check-intent.sh:645 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (the true maximum, measured at a865ec0, is 35 (T-1011) — a floor of over 285x; T-1032 corrects the false superlative this parenthetical previously carried, see ## Check-line ceiling measurement (T-1032)) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-ran-overflow
 - site: bin/check-intent.sh:645 — context: array subscript — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
-- site: bin/check-intent.sh:646 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (this task's own spec, the largest measured, carries 24) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-total-overflow
+- site: bin/check-intent.sh:646 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (the true maximum, measured at a865ec0, is 35 (T-1011) — a floor of over 285x; T-1032 corrects the false superlative this parenthetical previously carried, see ## Check-line ceiling measurement (T-1032)) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-total-overflow
 - site: bin/check-intent.sh:646 — context: array subscript — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
-- site: bin/check-intent.sh:647 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (this task's own spec, the largest measured, carries 24) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-p-overflow
+- site: bin/check-intent.sh:647 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (the true maximum, measured at a865ec0, is 35 (T-1011) — a floor of over 285x; T-1032 corrects the false superlative this parenthetical previously carried, see ## Check-line ceiling measurement (T-1032)) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-p-overflow
 - site: bin/check-intent.sh:647 — context: array subscript — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
-- site: bin/check-intent.sh:648 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (this task's own spec, the largest measured, carries 24) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-f-overflow
+- site: bin/check-intent.sh:648 — context: $(( )) — class: NEEDS-WIDTH-BOUND — width: bound (headroom: 9999 against a real ceiling of dozens of check: lines per spec's intent block (the true maximum, measured at a865ec0, is 35 (T-1011) — a floor of over 285x; T-1032 corrects the false superlative this parenthetical previously carried, see ## Check-line ceiling measurement (T-1032)) — ATTEST_FULL_RE now bounds the capture to {1,4}, stale-at: a single spec's intent block carrying ten thousand acceptance criteria) — n10: 1 — lock: tests/check-intent/run.sh:T-1021-check-intent-attest-count-f-overflow
 - site: bin/check-intent.sh:648 — context: array subscript — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
 - site: bin/check-intent.sh:654 — context: $(( )) — class: NORMALIZED — width: none (reason: operands are each individually bounded to {1,4} by ATTEST_FULL_RE/HASH_FULL_RE, so this derived value cannot approach 64-bit overflow — the width bound lives upstream, at the capture, not at this occurrence) — n10: 0 — lock: none
 - site: bin/check-intent.sh:664 — context: $(( )) — class: NOT-REACHABLE — width: none (reason: the operand is the script's own loop/pass/fail counter, never fed by untrusted digits, so no bound is a decision needed) — n10: 0 — lock: none
@@ -465,3 +465,28 @@ Both forms were run against the identical `010 -eq 8` operand. `[[ 010 -eq 8 ]]`
 - **7** `NEEDS-WIDTH-BOUND` sites (Codex round1 rework, Major finding) close a silent 64-bit-overflow gap in `bin/check-intent.sh`'s freeze-attestation/hash-version counters (`hash_version` ×2, `av`, `ar`, `at`, `ap`, `af`) — `HASH_FULL_RE`/`ATTEST_FULL_RE`'s numeric captures are now bounded to `{1,4}`/`[1-9][0-9]{0,3}`, matching `bin/loop-guard.sh`'s own convention.
 - **0** `test`/`[ … -eq … ]` comparisons were touched (Non-goals; AC18's diff-side arm).
 - **0** `source`/`.` directives and **0** new files under `bin/` (D3; AC20).
+
+## Check-line ceiling measurement (T-1032)
+
+The four bounded-width site rows above (`bin/check-intent.sh:645/646/647/648`)
+and `bin/check-intent.sh`'s own comment block previously named a superlative —
+naming T-1021's own spec as the largest spec intent block by `- check:` line
+count — as the real ceiling grounding the `{1,4}` bound. That superlative was
+never measured: T-1021's own spec does carry 24 such lines, but eight specs
+exceed it. This section records the correction (issue #119; `T-1032`).
+
+- measuring command: `for s in .shell-team/specs/*.md; do n=$(awk '/BEGIN intent-block/{inb=1;next} /END intent-block/{inb=0} inb' "$s" | grep -c '^[[:space:]]*- check:'); printf '%s %s\n' "$n" "$s"; done | sort -rn | head -1`
+- measured at `a865ec0` (this document's own accounting ref): `35 .shell-team/specs/T-1011-telemetry-event-rows.md`
+- measured at `7deb02a` (T-1032's merge point): `35 .shell-team/specs/T-1011-telemetry-event-rows.md`
+- both refs agree on the same holder and the same count: T-1011 (35) is the
+  true maximum, at both refs.
+- re-grounded head-room: `9999 / 35 = 285.7`, stated as a floor — over two
+  hundred eighty-five times — never a ceiling-rounded 286, which would
+  overstate the bound's real head-room. The four corrected site rows above
+  and `bin/check-intent.sh`'s own comment carry the frozen tokens for this
+  maximum and this floor.
+- corrected by `T-1032`: the four site rows above and `bin/check-intent.sh`'s
+  comment now state the true maximum and floor in place of the false
+  superlative. The `{1,4}` / `[1-9][0-9]{0,3}` grammar itself is unchanged —
+  9999 against 35 is still enormous head-room either way; only the stated
+  ground for the bound was false.

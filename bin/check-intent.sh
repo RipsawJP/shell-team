@@ -313,13 +313,13 @@ RATIFIED_FULL_RE='^[[:space:]]+- intent-ratified \([0-9]{4}-[0-9]{2}-[0-9]{2}\):
 # `$((ap + af))`) with no width bound, so an oversized value wrapped
 # silently instead of refusing. Bounded to `{1,4}` (max 9999) at the
 # grammar side (D6), same reasoning as HASH_FULL_RE above: `ran`/`total`
-# count `- check:` lines inside one spec's intent block (this task's own
-# spec, the largest measured, carries 24), and `P`/`F` are a partition of
-# that same `ran` count, so all four share the same real ceiling — dozens
-# today, hundreds in an extreme future spec, nowhere near four digits.
-# Stale-at: a single spec's intent block carrying ten thousand acceptance
-# criteria, which no `check:`-line-driven spec in this repository has ever
-# approached by two orders of magnitude.
+# count `- check:` lines inside one spec's intent block — measured at
+# 7deb02a, the true maximum is 35 (T-1011), over 285x headroom against
+# 9999 — T-1032 corrects this comment's prior false claim; `P`/`F` are a
+# partition of that same `ran` count, so all four share the same real
+# ceiling, nowhere near four digits. Stale-at: ten thousand acceptance
+# criteria inside one spec's intent block, never approached by two orders
+# of magnitude.
 ATTEST_LINE_RE='^[[:space:]]+- freeze-attestation'
 # shellcheck disable=SC2016
 ATTEST_FULL_RE='^[[:space:]]+- freeze-attestation \(v([1-9][0-9]{0,3}), ([0-9]{4}-[0-9]{2}-[0-9]{2})\): lines=([0-9]{1,4})/([0-9]{1,4}) sweep=mutual-satisfiability verdict=([0-9]{1,4})P/([0-9]{1,4})F owner=([^[:space:]].*)$'
