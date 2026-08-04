@@ -102,6 +102,40 @@ Naming it is a discipline the operator imposes on themselves, not a rule the loo
 
 **The trap: file extension is not the signal.** In a repository whose product is prompt content, "it's only docs" is not a safe test — the criterion is whether the content executes, not what the file is called. `templates/prompt-blocks/playbook-*.md` files are `.md`, they are generated artefacts, they read like documentation, and they are spliced into `agents/*.md`, which ship; `bin/check-prompt-sync.sh` enforces that splice, so this is a mechanism you can verify rather than a warning to take on faith.
 
+## Who may re-freeze a frozen intent block
+
+A frozen intent block is the record the loop is judged against, so by default it never moves without a per-instance human GO — whatever changed. That default is unconditional out of the box and stays exactly what it is today unless you opt into the exception below.
+
+Two classes of re-freeze exist, and only one of them is delegable. A **class-B** re-freeze — any delta touching the Goal sentence, Non-goals, a criterion's prose, or Input space — always needs your GO, because the frozen intent is a record of your own decisions, and only you can amend what it says you want. A **class-M** (mechanics repair) re-freeze — a delta confined to `- check:` lines, repairing a line that is broken as a command, vacuous, or measured-contradictory with another frozen criterion or with its own prose — may instead cite a standing grant recorded in your own `CLAUDE.local.md`. With no grant recorded there, the shipped default is unchanged: every re-freeze, of either class, is a per-instance human GO.
+
+The class-M boundary is machine-checked by `bin/check-refreeze-class.sh`: it reports `mechanics` only when the two intent blocks have the same line count, at least one line differs, and every differing line is a `- check:` line on both sides — anything else is `class-b` (or a structural error), and routes to the ordinary per-instance procedure. Grant it below, in your own checkout's `CLAUDE.local.md` (never in a shipped file — this project does not ship a transcription of your grant, and never invents one on your behalf):
+
+```markdown
+# Local overrides
+
+Re-freezing a frozen intent block: you hold a standing grant for class-M
+(mechanics repair) re-freezes only — a delta confined to `- check:` lines,
+repairing a line that is broken as a command, vacuous, or measured-contradictory
+with another frozen criterion or with its own prose.
+
+- Take the class-M path only when `check-refreeze-class.sh` reports `mechanics`.
+  Record the class, the trigger, the superseded hash, both lines verbatim, and
+  this grant on the board, and attest before you freeze.
+- Class B — anything touching the Goal sentence, Non-goals, a criterion's prose,
+  or Input space — still stops and asks me, every time.
+- Tell the cross-provider reviewer that a class-M re-freeze happened. If it
+  rejects the delta, restore the superseded block and treat this grant as
+  suspended until I say otherwise.
+```
+
+Record the class, the trigger (`broken-as-command` / `vacuous` / `contradictory`), the superseded hash, both lines verbatim, and the grant itself in the board's own `- refreeze-class` sub-bullet — `CONTRIBUTING.md`'s "Re-freezing a frozen intent block" section carries the exact shapes this repository uses. Tell the cross-provider reviewer a class-M re-freeze happened: its mandatory review item can revert one, restoring the superseded block byte-for-byte as a new ratified version and suspending the grant pending your own review.
+
+### The class-M boundary is mechanical; the trigger is not
+
+`bin/check-refreeze-class.sh` proves a delta is confined to `- check:` lines. That much is genuinely mechanical, and it is also the whole of what it proves. It never proves the replacement line still means what its criterion's prose says — that reading judgment stays with the cross-provider reviewer's mandatory item and, at the loop level, with S4. And it never proves the loop actually consulted it before taking the class-M path at all: whether that branch is taken is carried by an operator instruction file, which is context, not enforcement — the same odds-not-mechanism limit this document's own [Limits](#limits) section already applies to a `CLAUDE.md`.
+
+One limitation is disclosed rather than fixed: a pure **swap** of two `- check:` lines between two different criteria classifies as `mechanics` (test case `crc-blindspot-swapped-checks`), even though it changes which criterion each line belongs to — a meaning change the checker cannot see, because it never parses which criterion a check line is nested under. Closing it would need a second, criterion-structure-aware parser this project does not build; it is pinned as known behavior instead. Three things stay human regardless of the grant: **the grant itself** (transferring authority is yours to give), **the residual-risk acceptance** the swap case above is the concrete instance of, and **the decision to revoke the grant**.
+
 ## Limits
 
 A `CLAUDE.md` is context, not configuration Claude must obey — loosening or

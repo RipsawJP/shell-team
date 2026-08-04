@@ -88,6 +88,40 @@ Do not add conversational gates on top of it:
 
 **罠: 拡張子は signal ではありません。** 成果物が prompt content であるこのリポジトリでは、「ドキュメントに過ぎない」は安全な判定になりません — 基準は内容が実行されるかどうかであって、ファイルの呼び名ではありません。`templates/prompt-blocks/playbook-*.md` は `.md` で、生成された成果物で、ドキュメントのように読めますが、出荷される `agents/*.md` にスプライスされます。`bin/check-prompt-sync.sh` がそのスプライスを強制しているので、これは信じるしかない警告ではなく検証できる機構です。
 
+## 凍結された intent block を誰が再凍結してよいか
+
+凍結された intent block はループが判定される正典なので、既定では**何が変わったかに関わらず**、都度の人間 GO なしには動きません。この既定は箱出しのまま無条件で、下の例外を自分から選び取らない限り今日のままです。
+
+再凍結には 2 つのクラスがあり、委譲できるのは片方だけです。**class-B** の再凍結——Goal 文・Non-goals・criterion の prose・Input space のいずれかに触れるデルタ——は常にあなた自身の GO が要ります。凍結 intent はあなた自身の決定の記録であり、それが望むことを書き換えられるのはあなただけだからです。**class-M**（mechanics repair）の再凍結——`- check:` 行だけに閉じたデルタで、コマンドとして壊れている・空虚・別の凍結済み criterion や自分自身の prose と測定済みで矛盾している行の修復——だけは、代わりにあなた自身の `CLAUDE.local.md` に記録された standing grant を根拠にできます。そこに grant の記録が無ければ、出荷時の既定は変わりません: どちらのクラスの再凍結も都度の人間 GO のままです。
+
+class-M の境界は `bin/check-refreeze-class.sh` が機械判定します: 2 つの intent block の行数が同じで、少なくとも 1 行が異なり、異なる行すべてが両側とも `- check:` 行である場合にのみ `mechanics` を報告します——それ以外は `class-b`（または structural エラー）で、通常の都度手続きに戻ります。grant は以下を、あなた自身の checkout の `CLAUDE.local.md` に置いてください（出荷ファイルには絶対に置きません——このプロジェクトはあなたの grant の転記を出荷しませんし、あなたに代わって捏造することもありません）:
+
+```markdown
+# Local overrides
+
+Re-freezing a frozen intent block: you hold a standing grant for class-M
+(mechanics repair) re-freezes only — a delta confined to `- check:` lines,
+repairing a line that is broken as a command, vacuous, or measured-contradictory
+with another frozen criterion or with its own prose.
+
+- Take the class-M path only when `check-refreeze-class.sh` reports `mechanics`.
+  Record the class, the trigger, the superseded hash, both lines verbatim, and
+  this grant on the board, and attest before you freeze.
+- Class B — anything touching the Goal sentence, Non-goals, a criterion's prose,
+  or Input space — still stops and asks me, every time.
+- Tell the cross-provider reviewer that a class-M re-freeze happened. If it
+  rejects the delta, restore the superseded block and treat this grant as
+  suspended until I say otherwise.
+```
+
+クラス、トリガー（`broken-as-command` / `vacuous` / `contradictory`）、置き換えられたハッシュ、両方の行の逐語コピー、そして grant 自体を、board 自身の `- refreeze-class` sub-bullet に記録してください——このリポジトリが使う正確な形は `CONTRIBUTING.md` の「Re-freezing a frozen intent block」節にあります。class-M の再凍結が起きたことをクロスプロバイダのレビュアーに伝えてください: レビュアーの必須項目がそれを差し戻すことができ、置き換えられたブロックをバイト単位で新しい ratified バージョンとして復元し、あなた自身のレビューが済むまで grant を停止します。
+
+### class-M の境界は機械的、発火条件はそうではない
+
+`bin/check-refreeze-class.sh` はデルタが `- check:` 行だけに閉じていることを証明します。それは確かに機械的で、そしてそれが証明するものの全てでもあります。置き換えた行がその criterion の prose の意味をまだ保っているかは証明しません——その読み取り判断はクロスプロバイダのレビュアーの必須項目、そしてループのレベルでは S4 に残ります。そして、そもそも class-M の path をループが本当に踏んだかも証明しません: その分岐を取るかどうかは運用者の instruction ファイルが担っており、それは context であって強制ではありません——この文書自身の[限界](#限界)節がすでに `CLAUDE.md` に適用している「確率を変えるだけで機構を変えない」という限界と同じです。
+
+1 つの限界は修正されずに開示されています: 2 つの異なる criterion の間で `- check:` 行を 2 本純粋に**入れ替える**と `mechanics`（テストケース `crc-blindspot-swapped-checks`）に分類されます——どの criterion にその行が属するかが変わっているにも関わらずです。これはこのチェッカーが見えない意味の変化です。check 行がどの criterion にネストしているかを一切パースしないためです。これを閉じるには、このプロジェクトが作らない 2 つ目の criterion-structure-aware なパーサが要ります。既知の挙動として固定してあります。grant があっても人間に残る 3 つのことがあります: **grant 自体**（権限の委譲はあなたが与えるものです）、上の swap のケースが具体例である**残余リスクの受容**、そして**grant を取り消す決定**です。
+
 ## 限界
 
 `CLAUDE.md` は context であって Claude が従わなければならない設定ではありません。これを通じた緩和も強化も、**確率を変えるだけで機構を変えません**。確実に成立させたいものは CI（このリポジトリ自身の check がそうしています）か hook に属します。
