@@ -294,15 +294,25 @@ derive_candidates "$BIN" > "$CAND_FILE"
 # produces today, with its not-apply reason letter (a)-(e) from the spec's
 # "not-apply 判定基準" recorded in the surrounding comment (not in the line
 # itself — the line must stay byte-identical to the real source line for the
-# content-aware match to work). check-handoff.sh is the ONLY (a) — the single
-# inviolable, byte-unchanged file (DP-1); everything else here is (d): a
-# stderr write that CONTINUES (no immediate `exit N` tied to that specific
-# write — an accumulator `emit()`/warning/note, decided/exited elsewhere,
-# decoupled from this write's own success/failure).
+# content-aware match to work). check-handoff.sh's two candidate lines
+# (the "cannot read file" exit-2 path and the emit() write) are (a): each
+# sits inside the checker's own frozen, byte-locked observable contract —
+# its exit codes, classification strings and message format — which T-1031
+# (.shell-team/specs/T-1031-check-handoff-flag-anchor.md, D7/AC11) restates
+# and re-freezes rather than hardening. That is a narrower grounds than the
+# T-110-era framing this comment used to carry — "check-handoff.sh is the
+# single inviolable, byte-unchanged file" — which T-1031 makes false at the
+# file level (T-1031 edits a different region of this same file, the
+# flag-extraction block, on purpose); only these two specific lines, and the
+# frozen contract they encode, stay untouched by any task working on this
+# file, T-1031 included. Everything else here is (d): a stderr write that
+# CONTINUES (no immediate `exit N` tied to that specific write — an
+# accumulator `emit()`/warning/note, decided/exited elsewhere, decoupled
+# from this write's own success/failure).
 NOT_APPLY_FILE="$TMP/not-apply.txt"
 cat > "$NOT_APPLY_FILE" <<'EOF'
 check-handoff.sh:27:  printf '%s: cannot read file\n' "$FILE" >&2
-check-handoff.sh:77:  printf '%s:%s: %s: %s\n' "$FILE" "$1" "$2" "$3" >&2
+check-handoff.sh:79:  printf '%s:%s: %s: %s\n' "$FILE" "$1" "$2" "$3" >&2
 check-acs.sh:234:      printf 'check-acs: ignoring invalid CHECK_ACS_TIMEOUT=%s, using 120\n' "$acs_timeout" >&2
 check-acs.sh:260:    printf 'AC%s: FAIL (check: sub-bullet is present but its value is empty or whitespace-only — write a real command, or remove the check: line entirely if this AC is runtime-only)\n' "$acnum" >&2
 check-acs.sh:294:    printf 'AC%s: FAIL (check: value is wrapped in a single matching backtick pair, which bash would run as command substitution and misevaluate — write a raw command with no wrapping backticks, per the T-044/T-045 convention; see bin/check-acs.sh TRUST BOUNDARY note)\n' "$acnum" >&2
