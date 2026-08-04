@@ -240,17 +240,29 @@ NEW_END_LN="$END_LN"
 
 # --- 5. extract + normalize each region into a guarded mktemp file ----------
 extract_region() {  # $1 = path, $2 = begin_ln, $3 = end_ln; prints the temp file path
+  # NOTE: this function is called via command substitution ($(...)) by every
+  # caller, which runs it in a SUBSHELL — registering "$tmp" into TMP_FILES
+  # here would only mutate the subshell's own copy of the array and never
+  # reach the parent shell's EXIT trap. The caller is responsible for adding
+  # the printed path to TMP_FILES itself, immediately after each call.
   local path="$1" b="$2" e="$3" tmp
   tmp="$(mktemp "${TMPDIR:-/tmp}/check-refreeze-class-region.XXXXXX")" \
     || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
-  TMP_FILES+=("$tmp")
   awk -v b="$b" -v e="$e" 'NR > b && NR < e' "$path" | normalize_stdin > "$tmp" \
     || fail_usage "failed to extract+normalize the intent block from $path into a temp file (possible causes: disk full, a file-size quota such as ulimit -f, or an awk/sed failure in the extraction pipeline)"
   printf '%s\n' "$tmp"
 }
 
 OLD_REGION="$(extract_region "$OLD_SPEC" "$OLD_BEGIN_LN" "$OLD_END_LN")"
+# extract_region is invoked via command substitution above, which runs in a
+# SUBSHELL — any TMP_FILES+=() done inside the function only mutates that
+# subshell's own copy of the array and is discarded when the subshell exits,
+# so the parent shell's TMP_FILES (and therefore the EXIT trap's cleanup)
+# never sees it. Register the returned path in the PARENT shell's array here,
+# once per call, so cleanup_tmp_files actually has something to remove.
+TMP_FILES+=("$OLD_REGION")
 NEW_REGION="$(extract_region "$NEW_SPEC" "$NEW_BEGIN_LN" "$NEW_END_LN")"
+TMP_FILES+=("$NEW_REGION")
 
 # --- 6. hash each region; validate any supplied --old-hash/--new-hash ------
 OLD_HASH_COMPUTED="$(git hash-object --stdin < "$OLD_REGION")" \
@@ -323,6 +335,10 @@ if [ -n "$first_bad_index" ]; then
 fi
 
 # --- 8. mechanics: print task id, both hashes, and the differing-line count.
-printf 'check-refreeze-class: mechanics: %s old=%s new=%s diff-lines=%s\n' \
+# This shape is load-bearing, not cosmetic (T-1028 F3/F4/CONTRIBUTING.md): the
+# documented recording procedure reads <n> off `differing=<n>` to fill the
+# board record's `lines=<n>` field and to know how many `old[i]:`/`new[i]:`
+# pairs to write, rather than counting by hand.
+printf 'check-refreeze-class: mechanics: %s %s -> %s differing=%s\n' \
   "$TASK_ID" "$OLD_HASH_COMPUTED" "$NEW_HASH_COMPUTED" "$diff_count" || true
 exit 0
