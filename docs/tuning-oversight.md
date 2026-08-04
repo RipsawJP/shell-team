@@ -118,9 +118,10 @@ Re-freezing a frozen intent block: you hold a standing grant for class-M
 repairing a line that is broken as a command, vacuous, or measured-contradictory
 with another frozen criterion or with its own prose.
 
-- Take the class-M path only when `check-refreeze-class.sh` reports `mechanics`.
-  Record the class, the trigger, the superseded hash, both lines verbatim, and
-  this grant on the board, and attest before you freeze.
+- Take the class-M path only when `check-refreeze-class.sh` reports `mechanics`
+  (it needs both spec files as positional arguments). Record the class, the
+  trigger, the superseded hash, the differing-line count, and every replaced
+  line with its replacement verbatim on the board, and attest before you freeze.
 - Class B — anything touching the Goal sentence, Non-goals, a criterion's prose,
   or Input space — still stops and asks me, every time.
 - Tell the cross-provider reviewer that a class-M re-freeze happened. If it
@@ -128,7 +129,7 @@ with another frozen criterion or with its own prose.
   suspended until I say otherwise.
 ```
 
-Record the class, the trigger (`broken-as-command` / `vacuous` / `contradictory`), the superseded hash, both lines verbatim, and the grant itself in the board's own `- refreeze-class` sub-bullet — `CONTRIBUTING.md`'s "Re-freezing a frozen intent block" section carries the exact shapes this repository uses. Tell the cross-provider reviewer a class-M re-freeze happened: its mandatory review item can revert one, restoring the superseded block byte-for-byte as a new ratified version and suspending the grant pending your own review.
+Record the class, the trigger (`broken-as-command` / `vacuous` / `contradictory`), the superseded hash, the differing-line count as `lines=<n>`, and exactly `<n>` numbered `old[i]:`/`new[i]:` pairs — one pair per replaced line, never a single pair standing in for several — plus the grant itself in the board's own `- refreeze-class` sub-bullet — `CONTRIBUTING.md`'s "Re-freezing a frozen intent block" section carries the exact shapes this repository uses. Tell the cross-provider reviewer a class-M re-freeze happened: its mandatory review item can revert one, restoring the superseded block byte-for-byte as a new ratified version and suspending the grant pending your own review.
 
 ### The class-M boundary is mechanical; the trigger is not
 

@@ -104,9 +104,10 @@ Re-freezing a frozen intent block: you hold a standing grant for class-M
 repairing a line that is broken as a command, vacuous, or measured-contradictory
 with another frozen criterion or with its own prose.
 
-- Take the class-M path only when `check-refreeze-class.sh` reports `mechanics`.
-  Record the class, the trigger, the superseded hash, both lines verbatim, and
-  this grant on the board, and attest before you freeze.
+- Take the class-M path only when `check-refreeze-class.sh` reports `mechanics`
+  (it needs both spec files as positional arguments). Record the class, the
+  trigger, the superseded hash, the differing-line count, and every replaced
+  line with its replacement verbatim on the board, and attest before you freeze.
 - Class B — anything touching the Goal sentence, Non-goals, a criterion's prose,
   or Input space — still stops and asks me, every time.
 - Tell the cross-provider reviewer that a class-M re-freeze happened. If it
@@ -114,7 +115,7 @@ with another frozen criterion or with its own prose.
   suspended until I say otherwise.
 ```
 
-クラス、トリガー（`broken-as-command` / `vacuous` / `contradictory`）、置き換えられたハッシュ、両方の行の逐語コピー、そして grant 自体を、board 自身の `- refreeze-class` sub-bullet に記録してください——このリポジトリが使う正確な形は `CONTRIBUTING.md` の「Re-freezing a frozen intent block」節にあります。class-M の再凍結が起きたことをクロスプロバイダのレビュアーに伝えてください: レビュアーの必須項目がそれを差し戻すことができ、置き換えられたブロックをバイト単位で新しい ratified バージョンとして復元し、あなた自身のレビューが済むまで grant を停止します。
+クラス、トリガー（`broken-as-command` / `vacuous` / `contradictory`）、置き換えられたハッシュ、差分行数を `lines=<n>` として、そして番号付きの `old[i]:`/`new[i]:` ペアをちょうど `<n>` 組——置き換えられた行 1 本につき 1 組で、複数行の代表を 1 組だけで済ませない——、そして grant 自体を、board 自身の `- refreeze-class` sub-bullet に記録してください——このリポジトリが使う正確な形は `CONTRIBUTING.md` の「Re-freezing a frozen intent block」節にあります。class-M の再凍結が起きたことをクロスプロバイダのレビュアーに伝えてください: レビュアーの必須項目がそれを差し戻すことができ、置き換えられたブロックをバイト単位で新しい ratified バージョンとして復元し、あなた自身のレビューが済むまで grant を停止します。
 
 ### class-M の境界は機械的、発火条件はそうではない
 
