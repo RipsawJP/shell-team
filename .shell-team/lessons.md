@@ -896,3 +896,33 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When new or edited code in a bin/ script feeds a regex-captured digit string into bash arithmetic ($(( )) or a numeric test), verify it applies the same base-10 normalization (10#) the file's existing code already uses; a missing prefix is a defect even when every current fixture passes, because a leading-zero input crashes the expansion inside an if-condition, a position set -e does not cover, so the failure is silent and the check is skipped.
 - **Why**: A new attestation cross-check crashed on a grammar-conformant leading-zero count (bash reads 08 as invalid octal) inside an if-condition exempt from set -e, silently skipping the check and accepting a self-contradictory record — a fail-open inside a fail-closed gate. The same file already normalized another captured value with 10#; the new code did not follow its own file's convention, and the execution-based QA round missed it because no fixture carried a leading zero.
 - **How to apply**: At review and QA time for any bin/ diff, grep the touched file for 10# and for arithmetic over captured variables; every captured digit string entering arithmetic gets 10# at first use. When the input grammar admits [0-9]+, add at least one leading-zero fixture to the owning suite.
+
+## 2026-08-04 — A summary of another document preserves the source's own distinctions, checked against the source and not the summary
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-04.md
+- **Rule**: When a spec or any other frozen prose summarizes facts stated in another document — a count and its breakdown, a contract's per-case requiredness, which outcomes a mechanism can reach — the summary preserves the distinctions the source itself draws, and the verifying role confirms that by opening the source document and matching it clause by clause, never by re-reading the summary's own paraphrase.
+- **Why**: Two tasks in one cycle shipped frozen prose that flattened a distinction its source document made: a scored population and its excluded remainder collapsed into a single total, and a per-case requiredness contract restated as uniformly optional. Both passed the engineer's self-check and an execution-based verification round that re-derived numbers independently but compared them against the spec's own wording, and both were caught only by the cross-provider round, where the source itself was opened. A distinction that exists only in the source is invisible to every gate that reads the summary.
+- **How to apply**: pm-spec names the source document and the specific distinction being carried over at the point the summary is written, and writes an acceptance criterion requiring the verifying role to open that source rather than re-derive the claim from the spec's wording. QA treats a summary it has not compared against the source as unverified, and reports a flattened distinction as a finding rather than as a wording nit.
+
+## 2026-08-04 — A byte-identity blanket rationale does not cover a step that scans a directory
+- **Category**: verification-discipline
+- **Applies-to**: engineer, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-04.md
+- **Rule**: A blanket rationale of the form "every remaining step is inapplicable because its inputs are byte-identical to the base ref" must exclude any step that enumerates a directory, a glob or a resolved path set, and treat each of those individually — byte-identity of the files a step reads says nothing about the set of files it reads, and a newly added record file changes that set.
+- **Why**: Two tasks in one cycle disclosed which wired verification steps they had run by declaring every remaining step inapplicable on byte-identity grounds. In one the disclosure was missing outright and the verification round failed on it; in the other the blanket reason genuinely did not cover two live steps that walk a directory on every run, and the task had added new files to exactly those directories. The gap closed only because the verifying role re-ran both steps itself instead of accepting the rationale.
+- **How to apply**: When writing the completion disclosure, split the step list in two — steps whose inputs are named files, which byte-identity settles, and steps that enumerate a directory or a glob, which are run and whose result is reported. QA re-runs any directory-scanning step that a blanket rationale covers only by inference before accepting the disclosure.
+
+## 2026-08-04 — A factual claim is re-measured against the primary artifact before it is written down, inherited or relayed (supersedes the descriptive grounding claim entry)
+- **Category**: verification-discipline
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-04.md
+- **Rule**: A claim about what is or has been the case reaches a durable artifact only after it has been re-measured against the primary artifact it describes: a descriptive grounding claim inherited from an earlier document is kept distinct from a prescriptive statement about future practice and is either re-measured or rewritten so it grounds nothing historical, and a summary of facts relayed by a coordinating layer is hearsay until the receiving role opens the artifact itself.
+- **Why**: A spec's rationale line asserted an established practice as grounding for a design decision and was already stale when it was first written; it survived two sprints of review because nothing in the pipeline re-checks a descriptive claim once it sits inside a frozen document. The same hazard arrived from the other direction when a cycle summary handed to a reporting role proved, on measurement, to be wrong in both of its factual claims — the role re-derived them from the specs and from the tool's real output and corrected them before writing. Inherited and relayed claims fail the same way: both arrive pre-formed, both are trusted by every later reader, and neither is re-checked by any of them.
+- **How to apply**: For each claim of the form "X is this project's practice" or "X happened this cycle", either re-measure it against the primary artifacts — the actual files, commits, tags or tool output, never an earlier document's assertion or a relayed summary — and cite the measurement, or rewrite it so it grounds nothing historical. State which claims were re-measured and which were taken on trust; a role that cannot run the measurement itself says so explicitly instead of transcribing the claim silently. QA treats an unmeasured claim used as grounding as a finding.
