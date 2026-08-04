@@ -57,20 +57,22 @@ active_block="$(awk '
 ' "$FILE")"
 
 # Top-level task line shape. Em-dash separator is U+2014.
-# The flag token is intentionally widened to `[^`]+` (any non-empty backtick
-# content); flag_allowed() is the source of truth for the vocabulary, so a
-# shape-valid line with a typo'd / lowercase flag is reported as
-# "unknown status flag" rather than misclassified as "format mismatch".
+# The flag token is captured (`([^`]+)`, any non-empty backtick content) by
+# this SAME grammar rather than re-extracted by a second regex (T-1031 /
+# GitHub #122): a decoy `` — `<token>` — spec: <path>.md `` sequence quoted
+# inside the title is resolved identically for shape and for flag, because
+# POSIX greedy-subexpression assignment under bash's `=~` binds the capture
+# group to the LAST (rightmost) occurrence the overall match can still
+# satisfy — the same disambiguation `bin/close-out.sh:319`'s rewrite regex
+# already relies on. flag_allowed() is the source of truth for the
+# vocabulary, so a shape-valid line with a typo'd / lowercase flag is
+# reported as "unknown status flag" rather than misclassified as "format
+# mismatch".
 # The title slot is `.*[^[:space:]].*` — at least one non-whitespace char must
 # appear somewhere in the title, but leading/trailing padding is tolerated
 # (e.g. `  hello world  ` passes; `   ` (whitespace-only) does not).
 # shellcheck disable=SC2016
-LINE_RE='^- \[ \] \*\*T-[0-9]+\*\* .*[^[:space:]].* — `[^`]+` — spec: [^[:space:]]+\.md$'
-# Flag extraction is anchored to the documented separator (` — `<flag>` — spec:`)
-# so a backtick-wrapped token in the task title (e.g. `API`, `URL`) cannot be
-# mistaken for the status flag.
-# shellcheck disable=SC2016
-FLAG_RE='— `([^`]+)` — spec:'
+LINE_RE='^- \[ \] \*\*T-[0-9]+\*\* .*[^[:space:]].* — `([^`]+)` — spec: [^[:space:]]+\.md$'
 
 violations=0
 emit() {
@@ -157,16 +159,20 @@ while IFS= read -r raw; do
   # hand-off grammar.
   [[ "$content" != "- [ ]"* ]] && continue
 
+  # The flag is bound from the match array here, in the else branch of the
+  # SAME conditional whose test performed the LINE_RE match, with no
+  # intervening command — never carried across statements to a second
+  # extraction site (T-1031 D1; the fail-open "if match, then check" shape
+  # this replaced is gone along with the second grammar it existed to serve).
   if [[ ! "$content" =~ $LINE_RE ]]; then
     emit "$lineno" "format mismatch" "$content"
     continue
+  else
+    flag="${BASH_REMATCH[1]}"
   fi
 
-  if [[ "$content" =~ $FLAG_RE ]]; then
-    flag="${BASH_REMATCH[1]}"
-    if ! flag_allowed "$flag"; then
-      emit "$lineno" "unknown status flag '$flag'" "$content"
-    fi
+  if ! flag_allowed "$flag"; then
+    emit "$lineno" "unknown status flag '$flag'" "$content"
   fi
 done <<< "$active_block"
 
