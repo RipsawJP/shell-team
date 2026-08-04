@@ -50,7 +50,11 @@ strand_crlf_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-strand-crlf-err.XXXXXX"
 strand_crlf_fix="$(mktemp "${TMPDIR:-/tmp}/check-handoff-strand-crlf-fix.XXXXXX")"
 strand_clean_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-strand-clean-out.XXXXXX")"
 strand_clean_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-strand-clean-err.XXXXXX")"
-trap 'rm -f "$valid_out" "$valid_err" "$bf_out" "$bf_err" "$flag_out" "$flag_err" "$crlf_out" "$crlf_err" "$ws_out" "$ws_err" "$tab_out" "$tab_err" "$strand_top_out" "$strand_top_err" "$strand_bound_out" "$strand_bound_err" "$strand_tol_out" "$strand_tol_err" "$strand_crlf_out" "$strand_crlf_err" "$strand_crlf_fix" "$strand_clean_out" "$strand_clean_err"' EXIT
+decoy_bad_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-bad-out.XXXXXX")"
+decoy_bad_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-bad-err.XXXXXX")"
+decoy_good_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-good-out.XXXXXX")"
+decoy_good_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-good-err.XXXXXX")"
+trap 'rm -f "$valid_out" "$valid_err" "$bf_out" "$bf_err" "$flag_out" "$flag_err" "$crlf_out" "$crlf_err" "$ws_out" "$ws_err" "$tab_out" "$tab_err" "$strand_top_out" "$strand_top_err" "$strand_bound_out" "$strand_bound_err" "$strand_tol_out" "$strand_tol_err" "$strand_crlf_out" "$strand_crlf_err" "$strand_crlf_fix" "$strand_clean_out" "$strand_clean_err" "$decoy_bad_out" "$decoy_bad_err" "$decoy_good_out" "$decoy_good_err"' EXIT
 
 # AC4: valid fixture exits 0. The fixture also includes T-103 with a
 # backtick-wrapped uppercase token in the title (`API`/`URL`) — that line
@@ -248,6 +252,49 @@ strand_clean_rc=$?
 set -e
 [[ "$strand_clean_rc" -eq 0 ]] || fail "strand-clean-board-positive-control: expected the shipped template to lint clean, got $strand_clean_rc (stderr: $(cat "$strand_clean_err"))"
 printf 'PASS: strand-clean-board-positive-control — the shipped board template still lints clean under the strengthened linter\n'
+
+# ============================================================================
+# T-1031 (GitHub #122): decoy-separator resolution (D1) — a title carrying a
+# full decoy `` — `<token>` — spec: <path>.md `` sequence is judged, for BOTH
+# shape and flag, against the LAST such slot on the line — the same slot
+# bin/close-out.sh's rewrite regex already resolves.
+# ============================================================================
+
+# decoy-real-flag-invalid: false-PASS direction closed. The title's decoy
+# slot holds a valid-looking flag token; the REAL (last) slot holds an
+# unknown one. That unknown flag is what gets reported — not the decoy, and
+# not a format mismatch — with exactly one violation on the whole fixture.
+decoy_bad_line="$(grep -nF -- 'T1031_DECOY_BAD' "$FIX/decoy-real-flag-invalid.md" | cut -d: -f1)"
+[[ -n "$decoy_bad_line" ]] || fail "decoy-real-flag-invalid.md missing the T1031_DECOY_BAD marker"
+set +e
+bash "$SCRIPT" "$FIX/decoy-real-flag-invalid.md" >"$decoy_bad_out" 2>"$decoy_bad_err"
+decoy_bad_rc=$?
+set -e
+[[ "$decoy_bad_rc" -eq 1 ]] || fail "decoy-real-flag-invalid: expected exit 1, got $decoy_bad_rc (stderr: $(cat "$decoy_bad_err"))"
+grep -qF -- "unknown status flag 'T1031_DECOY_BAD'" "$decoy_bad_err" \
+  || fail "decoy-real-flag-invalid: stderr missing \"unknown status flag 'T1031_DECOY_BAD'\" (got: $(cat "$decoy_bad_err"))"
+grep -Eq ":${decoy_bad_line}:" "$decoy_bad_err" \
+  || fail "decoy-real-flag-invalid: stderr missing line number ${decoy_bad_line} (got: $(cat "$decoy_bad_err"))"
+if grep -q 'format mismatch' "$decoy_bad_err"; then
+  fail "decoy-real-flag-invalid: the false-PASS direction must not also report a format mismatch, got: $(cat "$decoy_bad_err")"
+fi
+decoy_bad_count="$(grep -c . "$decoy_bad_err")"
+[[ "$decoy_bad_count" -eq 1 ]] \
+  || fail "decoy-real-flag-invalid: expected exactly 1 violation total, got $decoy_bad_count: $(cat "$decoy_bad_err")"
+printf 'PASS: T-1031 decoy-real-flag-invalid — false-PASS direction closed (the decoy title token lints clean; the real last slot'"'"'s unknown flag is reported; exactly one violation total)\n'
+
+# decoy-real-flag-valid: false-FAIL direction closed. The title's decoy slot
+# holds an invalid-looking flag token; the REAL (last) slot holds an allowed
+# one. The line lints clean — the decoy is not mistaken for the flag.
+grep -qF -- 'T1031_DECOY_BAD' "$FIX/decoy-real-flag-valid.md" \
+  || fail "decoy-real-flag-valid.md missing the T1031_DECOY_BAD decoy token"
+set +e
+bash "$SCRIPT" "$FIX/decoy-real-flag-valid.md" >"$decoy_good_out" 2>"$decoy_good_err"
+decoy_good_rc=$?
+set -e
+[[ "$decoy_good_rc" -eq 0 ]] || fail "decoy-real-flag-valid: expected exit 0, got $decoy_good_rc (stderr: $(cat "$decoy_good_err"))"
+[[ ! -s "$decoy_good_err" ]] || fail "decoy-real-flag-valid: expected empty stderr, got: $(cat "$decoy_good_err")"
+printf 'PASS: T-1031 decoy-real-flag-valid — false-FAIL direction closed (a decoy title token does not block a well-formed real slot; lints clean)\n'
 
 printf 'OK\n'
 exit 0

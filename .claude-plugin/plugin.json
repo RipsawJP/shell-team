@@ -1,7 +1,7 @@
 {
   "name": "shell-team",
   "displayName": "shell-team",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Spec-driven AI dev team for Claude Code — Tech-Lead, PM, Engineer, QA, and a Codex cross-provider Reviewer (+ a UI Designer for UI work and a Scrum-Master) — evolving toward Loop Engineering: loop contracts (BUDGET/STOP), model routing, and an operating loop.",
   "author": { "name": "RipsawJP" },
   "homepage": "https://github.com/RipsawJP/shell-team",

@@ -33,7 +33,8 @@ The pinned command's hit list was read by eye, in full, for a `mktemp` invocatio
 
 DP2's ladder is ordered and first-match-wins, applied once per population line: (1) is every invocation on the line guarded? → **(a)**. (2) Otherwise, does an unguarded invocation's result get composed into a later path? → **(b)**. (3) Otherwise, is `mktemp` present (invocation or mention) with no unguarded invocation composed into a path? → **(c)**. (4) Otherwise → **(d)**, enumerated site by site. Tie-break: a line carrying more than one invocation classifies by its weakest invocation (severity order for the tie-break only: (b) worse than (c) worse than (a)).
 
-Live finding: no population line in this corpus carries more than one real invocation, so the tie-break never actually fires here — checked directly (every classified line has at most one non-mention `mktemp` occurrence).
+Live finding, corrected by `T-1032`: the tie-break was **never exercised, not never needed** — four population lines in this corpus do carry more than one real invocation, `.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md` lines `270/283/291/298` (2/4/4/4 invocations respectively). Every invocation on those four lines is `&&`-guarded, so each line's weakest invocation is still (a), the tie-break resolves all four to class (a), and none of the corpus counts above moves.
+- measurement: `for n in 270 283 291 298; do git show 1e31600:.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md | sed -n "${n}p" | grep -o 'mktemp' | wc -l; done` — reads ref `1e31600` (this document's own base ref) directly via `git show`, never the working tree → `2`, `4`, `4`, `4`.
 
 - class-a-guarded: 36
 - class-b-unguarded-path-composed: 168

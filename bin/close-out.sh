@@ -314,8 +314,8 @@ fi
 MAIN_LINE="$(sed -n "${A_START}p" "$BOARD")"
 # Rewrite `— \`<FLAG>\` — spec:` to READY_FOR_MERGE, keeping everything else.
 # The greedy prefix group anchors on the LAST ` — \`…\` — spec: ` separator, so
-# backticked tokens inside the title cannot be mistaken for the flag (same
-# disambiguation as check-handoff.sh's FLAG_RE).
+# backticked tokens inside the title cannot be mistaken for the flag — the
+# same rightmost slot check-handoff.sh's line grammar resolves too (T-1031).
 if [[ "$MAIN_LINE" =~ ^(.+)\ —\ \`[^\`]+\`\ —\ spec:\ ([^[:space:]]+\.md)[[:space:]]*$ ]]; then
   DONE_MAIN="${BASH_REMATCH[1]} — \`READY_FOR_MERGE\` — spec: ${BASH_REMATCH[2]}"
   DONE_MAIN="- [x] ${DONE_MAIN#- \[ \] }"
