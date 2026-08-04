@@ -319,6 +319,21 @@ that file's order.
   arithmetic-shifting a previously-written-down value, and confirm
   `sed -n "${N}p" bin/close-out.sh` is byte-identical to the pinned content
   before updating the number.
+- T-1028: `bash tests/check-refreeze-class/run.sh` is `bin/check-refreeze-class.sh`'s
+  fixture suite (the M1 classifier for the class-M/class-B re-freeze split —
+  see `docs/tuning-oversight.md`'s "Who may re-freeze a frozen intent block"
+  section and `CONTRIBUTING.md`'s "Re-freezing a frozen intent block"
+  section). No new prerequisite: pure bash + coreutils + git, same
+  synthetic-fixture-in-a-temp-dir convention as `tests/check-intent/run.sh`
+  and `tests/check-provenance/run.sh` (no static `fixtures/` directory).
+  Every one of its 30 cases runs through a single `assert_case` helper that
+  asserts exit code AND classification token together — when adding a new
+  case, route it through that helper (never call the classifier directly),
+  or the suite's own AC7-shaped self-count (`grep -c 'assert_case '`) and the
+  both-assert discipline both silently degrade. The classifier's own bash-3.2
+  compatibility bar (indexed arrays only — no associative arrays, no
+  `mapfile`) applies to this suite too, since it is invoked with the same
+  `bash` this repository's other `tests/*/run.sh` files are.
 - T-1024: a delta on the T-112 entry above, not a restatement of it. WHY a
   spec's `- check:` line needs the guard: `bin/check-acs.sh` runs every
   check through `bash -c "$cmd"` with `set +e` immediately before it and
