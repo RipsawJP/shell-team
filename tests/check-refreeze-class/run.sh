@@ -152,6 +152,15 @@ awk '{
   else print
 }' "$BASE" > "$TWO_LINES"
 assert_case "crc-mechanics-two-lines" 0 "check-refreeze-class: mechanics:" "$BASE" "$TWO_LINES"
+# Strengthened assertion (T-1028 rework): a two-line mechanics repair must
+# report `differing=2` on its own mechanics line — the count D4's board
+# record shape reads as `lines=<n>` to know how many `old[i]:`/`new[i]:`
+# pairs to write, never counted by hand. Not counted toward assert_case's
+# tally (it re-derives an independent check on the same fixture, it does not
+# add a new case id).
+TWO_LINES_OUT="$(bash "$CLASSIFIER" "$BASE" "$TWO_LINES" 2>&1)"
+printf '%s\n' "$TWO_LINES_OUT" | grep -qF -- 'differing=2' \
+  || fail "crc-mechanics-two-lines: expected 'differing=2' in output, got: $TWO_LINES_OUT"
 
 BASE_CRLF="$TMP/base-crlf.md"
 ONE_LINE_CRLF="$TMP/one-line-crlf.md"
