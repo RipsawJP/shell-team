@@ -475,16 +475,20 @@ count — as the real ceiling grounding the `{1,4}` bound. That superlative was
 never measured: T-1021's own spec does carry 24 such lines, but eight specs
 exceed it. This section records the correction (issue #119; `T-1032`).
 
-- measuring command: `for s in .shell-team/specs/*.md; do n=$(awk '/BEGIN intent-block/{inb=1;next} /END intent-block/{inb=0} inb' "$s" | grep -c '^[[:space:]]*- check:'); printf '%s %s\n' "$n" "$s"; done | sort -rn | head -1`
-- measured at `a865ec0` (this document's own accounting ref): `35 .shell-team/specs/T-1011-telemetry-event-rows.md`
-- measured at `7deb02a` (T-1032's merge point): `35 .shell-team/specs/T-1011-telemetry-event-rows.md`
+- measuring command (per ref — reads the named ref's own committed blobs via
+  `git ls-tree`/`git show`, never the working tree, per D1):
+  `for f in $(git ls-tree -r --name-only <ref> -- .shell-team/specs | grep '\.md$'); do n=$(git show <ref>:"$f" | awk '/BEGIN intent-block/{inb=1;next} /END intent-block/{inb=0} inb' | grep -c '^[[:space:]]*- check:'); printf '%s %s\n' "$n" "$f"; done | sort -rn | head -1`
+- measured at `a865ec0` (this document's own accounting ref, `<ref>` substituted
+  above): `35 .shell-team/specs/T-1011-telemetry-event-rows.md`
+- measured at `7deb02a` (T-1032's merge point, `<ref>` substituted above):
+  `35 .shell-team/specs/T-1011-telemetry-event-rows.md`
 - both refs agree on the same holder and the same count: T-1011 (35) is the
   true maximum, at both refs.
-- re-grounded head-room: `9999 / 35 = 285.7`, stated as a floor — over two
-  hundred eighty-five times — never a ceiling-rounded 286, which would
-  overstate the bound's real head-room. The four corrected site rows above
-  and `bin/check-intent.sh`'s own comment carry the frozen tokens for this
-  maximum and this floor.
+- re-grounded head-room: `9999 / 35 ≈ 285.6857`, stated as a floor — over two
+  hundred eighty-five times, never the rounded `285.7` and never the
+  ceiling-rounded 286, either of which would overstate the bound's real
+  head-room. The four corrected site rows above and `bin/check-intent.sh`'s
+  own comment carry the frozen tokens for this maximum and this floor.
 - corrected by `T-1032`: the four site rows above and `bin/check-intent.sh`'s
   comment now state the true maximum and floor in place of the false
   superlative. The `{1,4}` / `[1-9][0-9]{0,3}` grammar itself is unchanged —
