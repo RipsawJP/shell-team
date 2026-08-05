@@ -93,6 +93,10 @@
 #       classification token — see below).
 #
 # an unattested, malformed or miscounted freeze-attestation is exit 2 with the attestation classification, and the hash is never recorded.
+#
+# Signal exits (T-1034 DP11): 129, 130 and 143 mean SIGHUP, SIGINT and
+# SIGTERM terminated the run; they carry no classification and never
+# collide with the 0/1/2 classification contract above.
 
 set -euo pipefail
 
@@ -164,8 +168,17 @@ self_name="$(basename "$script_path")" \
   || fail_usage "basename failed to resolve this script's own file name for: $script_path"
 SELF="$SCRIPT_DIR/$self_name"
 
+# shellcheck disable=SC2329  # invoked indirectly via the signal traps below
+on_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
+  printf '%s: interrupted by SIG%s (a signal, not a classification)\n' "$self_name" "$1" >&2 || true
+  exit "$2"
+}
+trap 'on_signal HUP 129' HUP
+trap 'on_signal INT 130' INT
+trap 'on_signal TERM 143' TERM
+
 print_help() {
-  sed -n '2,95p' "$SELF" | sed 's/^# \{0,1\}//' \
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}' "$SELF" \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -253,7 +266,13 @@ fi
 # --- 3. extract + normalize + hash the intent block (marker lines excluded) -
 tmp_region="$(mktemp "${TMPDIR:-/tmp}/check-intent-region.XXXXXX")" \
   || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
-trap 'rm -f "$tmp_region"' EXIT
+# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
+cleanup_tmp_region() {
+  _exit_rc=$?
+  rm -f "$tmp_region" || true
+  exit "$_exit_rc"
+}
+trap cleanup_tmp_region EXIT
 # The extraction pipeline's WRITE (not just mktemp's earlier file creation)
 # must be fail-closed too: a write failure here (disk full, `ulimit -f`
 # quota, or a failure inside normalize_stdin's own sed/awk) would otherwise
