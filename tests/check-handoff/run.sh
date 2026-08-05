@@ -264,8 +264,12 @@ printf 'PASS: strand-clean-board-positive-control — the shipped board template
 # slot holds a valid-looking flag token; the REAL (last) slot holds an
 # unknown one. That unknown flag is what gets reported — not the decoy, and
 # not a format mismatch — with exactly one violation on the whole fixture.
-decoy_bad_line="$(grep -nF -- 'T1031_DECOY_BAD' "$FIX/decoy-real-flag-invalid.md" | cut -d: -f1)"
-[[ -n "$decoy_bad_line" ]] || fail "decoy-real-flag-invalid.md missing the T1031_DECOY_BAD marker"
+# shellcheck disable=SC2016  # the backticks and the trailing dollar in the invalid-fixture anchor below are literal board grammar and an ERE anchor, not expansions
+decoy_bad_anchor='^- \[ \] \*\*T-900\*\* [^`]* — `[A-Z_]+` — spec: [^ ]+ — `T1031_DECOY_BAD` — spec: [^ ]+$'
+[[ "$(grep -cE -- "$decoy_bad_anchor" "$FIX/decoy-real-flag-invalid.md")" -eq 1 ]] \
+  || fail "decoy-real-flag-invalid.md: T1031_DECOY_BAD must sit in the LAST of exactly two decoy-separator slots on exactly one line — the fixture has been de-shaped and no longer tests last-slot resolution"
+decoy_bad_line="$(grep -nE -- "$decoy_bad_anchor" "$FIX/decoy-real-flag-invalid.md" | cut -d: -f1)"
+[[ -n "$decoy_bad_line" ]] || fail "decoy-real-flag-invalid.md: could not derive the line number of the T1031_DECOY_BAD slot"
 set +e
 bash "$SCRIPT" "$FIX/decoy-real-flag-invalid.md" >"$decoy_bad_out" 2>"$decoy_bad_err"
 decoy_bad_rc=$?
@@ -286,8 +290,10 @@ printf 'PASS: T-1031 decoy-real-flag-invalid — false-PASS direction closed (th
 # decoy-real-flag-valid: false-FAIL direction closed. The title's decoy slot
 # holds an invalid-looking flag token; the REAL (last) slot holds an allowed
 # one. The line lints clean — the decoy is not mistaken for the flag.
-grep -qF -- 'T1031_DECOY_BAD' "$FIX/decoy-real-flag-valid.md" \
-  || fail "decoy-real-flag-valid.md missing the T1031_DECOY_BAD decoy token"
+# shellcheck disable=SC2016  # the backticks and the trailing dollar in the valid-fixture anchor below are literal board grammar and an ERE anchor, not expansions
+decoy_good_anchor='^- \[ \] \*\*T-902\*\* [^`]* — `T1031_DECOY_BAD` — spec: [^ ]+ — `[A-Z_]+` — spec: [^ ]+$'
+[[ "$(grep -cE -- "$decoy_good_anchor" "$FIX/decoy-real-flag-valid.md")" -eq 1 ]] \
+  || fail "decoy-real-flag-valid.md: T1031_DECOY_BAD must sit in the FIRST of exactly two decoy-separator slots on exactly one line — the fixture has been de-shaped and no longer tests decoy rejection"
 set +e
 bash "$SCRIPT" "$FIX/decoy-real-flag-valid.md" >"$decoy_good_out" 2>"$decoy_good_err"
 decoy_good_rc=$?
