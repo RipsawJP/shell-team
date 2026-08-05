@@ -58,11 +58,20 @@ count_non_100755() {
 # =============================================================================
 # The real population, re-derived here (never inherited from a caller):
 # `git ls-files -s -- bin/`. Empty/unavailable output fails closed (DP2).
+#
+# T-1034 rework round 1 (Codex round-1 Major 1): the exit status is captured
+# explicitly, the same idiom bin/check-refreeze-class.sh's DP9 `cmp_rc`
+# capture already uses — a bare `|| true` here discarded git's own exit
+# status and judged the population solely by whether stdout was non-empty,
+# so a `git` that printed a plausible (even fully clean) listing and then
+# exited non-zero read as a valid, passing population instead of failing
+# closed.
 # =============================================================================
 printf '\n--- rule: every tracked bin/ entry is index mode 100755 (population source: git ls-files -s) ---\n'
-POP="$(git -C "$REPO_ROOT" ls-files -s -- bin/ 2>/dev/null || true)"
-if [ -z "$POP" ]; then
-  fail "population source: git ls-files -s -- bin/ produced empty/unavailable output — fails closed, never read as a clean zero-violation result"
+git_rc=0
+POP="$(git -C "$REPO_ROOT" ls-files -s -- bin/ 2>/dev/null)" || git_rc=$?
+if [ "$git_rc" -ne 0 ] || [ -z "$POP" ]; then
+  fail "population source: git ls-files -s -- bin/ produced empty/unavailable output or exited non-zero (rc=$git_rc) — fails closed, never read as a clean zero-violation result"
 else
   n_total="$(printf '%s\n' "$POP" | grep -c . || true)"
   n_bad="$(count_non_100755 "$POP")"
