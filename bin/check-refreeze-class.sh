@@ -144,6 +144,25 @@ cleanup_tmp_files() {
 }
 trap cleanup_tmp_files EXIT
 
+# block_signals_for_registration / restore_signal_traps (T-1034 rework round
+# 1, Codex round-1 Major 2): closes the mktemp-to-TMP_FILES-registration
+# signal window. `mktemp`'s result is only appended to TMP_FILES on the line
+# immediately after the call returns; a HUP/INT/TERM delivered while `mktemp`
+# itself is still running (bash defers a pending trap until the current
+# foreground command — here, the command substitution — returns) fires the
+# already-installed on_signal handler right after the assignment completes
+# but before TMP_FILES ever names the path, so cleanup_tmp_files's
+# `rm -f "${TMP_FILES[@]}"` never reaches it: a real, live-reproducible leak.
+# HUP/INT/TERM are ignored for this narrow create+register window and
+# restored immediately after — this never reorders or edits the frozen SIG
+# block above; it only wraps the two mktemp+register sites below with it.
+block_signals_for_registration() { trap '' HUP INT TERM; }
+restore_signal_traps() {
+  trap 'on_signal HUP 129' HUP
+  trap 'on_signal INT 130' INT
+  trap 'on_signal TERM 143' TERM
+}
+
 # --- argument parsing (positional; -- ends option parsing) ------------------
 HEX40_RE='^[0-9a-f]{40}$'
 OLD_HASH=""
@@ -274,14 +293,18 @@ extract_region() {  # $1 = path, $2 = begin_ln, $3 = end_ln, $4 = dest tmp file 
     || fail_usage "failed to extract+normalize the intent block from $path into a temp file (possible causes: disk full, a file-size quota such as ulimit -f, or an awk/sed failure in the extraction pipeline)"
 }
 
+block_signals_for_registration
 OLD_REGION="$(mktemp "${TMPDIR:-/tmp}/check-refreeze-class-region.XXXXXX")" \
   || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
 TMP_FILES+=("$OLD_REGION")
+restore_signal_traps
 extract_region "$OLD_SPEC" "$OLD_BEGIN_LN" "$OLD_END_LN" "$OLD_REGION"
 
+block_signals_for_registration
 NEW_REGION="$(mktemp "${TMPDIR:-/tmp}/check-refreeze-class-region.XXXXXX")" \
   || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
 TMP_FILES+=("$NEW_REGION")
+restore_signal_traps
 extract_region "$NEW_SPEC" "$NEW_BEGIN_LN" "$NEW_END_LN" "$NEW_REGION"
 
 # --- 6. hash each region; validate any supplied --old-hash/--new-hash ------

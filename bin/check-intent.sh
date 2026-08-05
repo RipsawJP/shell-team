@@ -264,6 +264,28 @@ if [ "$begin_ln" -ge "$end_ln" ]; then
 fi
 
 # --- 3. extract + normalize + hash the intent block (marker lines excluded) -
+# block_signals_for_registration / restore_signal_traps (T-1034 rework round
+# 1, Codex round-1 Major 2): closes the mktemp-to-EXIT-trap-registration
+# signal window, symmetrically with bin/check-refreeze-class.sh's
+# TMP_FILES-registration fix. The HUP/INT/TERM traps are installed early
+# (DP10), but tmp_region's EXIT-trap cleanup isn't registered until the
+# `trap cleanup_tmp_region EXIT` line below — a signal delivered while
+# `mktemp` itself is still running (bash defers a pending trap until the
+# current foreground command, the command substitution, returns) fires
+# on_signal's `exit "$2"` with no EXIT trap yet installed, leaking the temp
+# file mktemp already created: a real, live-reproducible leak. HUP/INT/TERM
+# are ignored for this narrow create+register window and restored
+# immediately after the EXIT trap is installed — this never reorders the
+# frozen SIG block above, nor moves the EXIT-trap installation from its
+# position immediately after tmp_region is assigned (DP12).
+block_signals_for_registration() { trap '' HUP INT TERM; }
+restore_signal_traps() {
+  trap 'on_signal HUP 129' HUP
+  trap 'on_signal INT 130' INT
+  trap 'on_signal TERM 143' TERM
+}
+
+block_signals_for_registration
 tmp_region="$(mktemp "${TMPDIR:-/tmp}/check-intent-region.XXXXXX")" \
   || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
@@ -273,6 +295,7 @@ cleanup_tmp_region() {
   exit "$_exit_rc"
 }
 trap cleanup_tmp_region EXIT
+restore_signal_traps
 # The extraction pipeline's WRITE (not just mktemp's earlier file creation)
 # must be fail-closed too: a write failure here (disk full, `ulimit -f`
 # quota, or a failure inside normalize_stdin's own sed/awk) would otherwise
