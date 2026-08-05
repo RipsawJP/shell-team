@@ -451,15 +451,22 @@ derive_candidates "$BIN" > "$PRE_MUTATION_FILE"
 # of bin/, locate its content line by EXACT WHOLE-LINE comparison in awk
 # ($0 == old) — never a regex/sed substitution, since the contents carry
 # '.', '*', '[', '$', '%' and quote characters a regex would misparse —
-# assert the match count is exactly 1 before rewriting, rewrite that one
-# line to an unsafe P1-shaped form, and assert the match count is exactly 0
-# after. The re-derived counted set must then differ from the registry in
-# BOTH directions: forward, because the rewritten text is an unregistered
-# key; reverse, because the registered key's measured count fell to zero.
+# assert the match count equals the RECORD'S OWN DECLARED count before
+# rewriting (never a hard-coded 1: a declared count of 2 — two byte-
+# identical, individually-reviewed exempt sites collapsed to one key — is a
+# legitimate, spec-anticipated registry state, not a synthetic extreme; see
+# this task's spec, "Loss 2" / Input-space "Reachable input classes"), rewrite
+# every matching line to an unsafe P1-shaped form (the awk program below
+# already rewrites ALL lines equal to the old text, not just the first),
+# and assert the match count is exactly 0 after. The re-derived counted set
+# must then differ from the registry in BOTH directions: forward, because
+# the rewritten text is an unregistered key; reverse, because the
+# registered key's measured count fell to zero.
 content_rewrite_fails=0
 content_rewrite_checked=0
 while IFS= read -r rec; do
   [ -n "$rec" ] || continue
+  n_decl=${rec%% *}
   key=${rec#* }
   rw_file=${key%%:*}
   rw_content=${key#*:}
@@ -473,7 +480,7 @@ while IFS= read -r rec; do
     continue
   fi
   before_n=$(rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]} $0==o{n++} END{print n+0}' "$target")
-  if [ "$before_n" != "1" ]; then
+  if [ "$before_n" != "$n_decl" ]; then
     content_rewrite_fails=$((content_rewrite_fails + 1))
     rm -rf "$probe_dir"
     continue
