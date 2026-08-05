@@ -334,6 +334,17 @@ that file's order.
   compatibility bar (indexed arrays only — no associative arrays, no
   `mapfile`) applies to this suite too, since it is invoked with the same
   `bash` this repository's other `tests/*/run.sh` files are.
+- T-1034: `bash tests/bin-exec-bit/run.sh` is the lock suite proving every
+  tracked file under `bin/` ships at git index mode `100755` (judged via
+  `git ls-files -s -- bin/`, never a working-tree `test -x` — a
+  `core.fileMode=false` checkout would lie). No new prerequisite: pure bash
+  + git, no static fixtures. When editing `bin/check-refreeze-class.sh` or
+  `bin/check-intent.sh`'s `EXIT`/signal/`print_help` machinery, also run
+  `tests/check-intent/run.sh` and re-derive `check-acs.sh`'s shape against
+  any spec whose intent block is extracted by either script — a change to
+  the shared `on_signal`/`cleanup_tmp_*`/`print_help` fragments touches both
+  scripts at once by design (T-1028 AC5's "one definition, two consumers"
+  discipline, reused here for the signal handler).
 - T-1024: a delta on the T-112 entry above, not a restatement of it. WHY a
   spec's `- check:` line needs the guard: `bin/check-acs.sh` runs every
   check through `bash -c "$cmd"` with `set +e` immediately before it and
