@@ -8,7 +8,7 @@
 # same discipline tests/check-intent/run.sh and tests/check-provenance/run.sh
 # already follow).
 #
-# 30 frozen case ids (T-1028 AC7 — present-in-file-and-in-output shape, the
+# 35 frozen case ids (T-1028 AC7 — present-in-file-and-in-output shape, the
 # same T-1019/T-1025 convention: every id below must appear both in this
 # file's source AND in a normal run's own stdout, so a deleted/renamed/
 # silently-skipped case fails the acceptance criterion, not just this file):
@@ -50,6 +50,24 @@
 #                                      accepted by this classifier as
 #                                      --old-hash (T-1028 AC5's "one
 #                                      number, two consumers" parity)  -> mechanics
+#
+# Five ids added by T-1034 (#139), pinning what T-1028's 30 covered only
+# implicitly — normalize_stdin strips TRAILING whitespace only, so a leading-
+# indent or internal-whitespace change on a `- check:` line is a real
+# differing line whose both-sides check-line match still holds (mechanics),
+# while dropping the indent entirely makes that line no longer match
+# CHECK_LINE_RE on the new side (class-b); a tail addition (after the last
+# content line, before the END marker) shifts no earlier index, so only the
+# line-count clause can reject it — and it must be NON-EMPTY, since a blank
+# appended line is normalized away and would report structural instead:
+#
+#   crc-mechanics-indent-widened    — one check line's indent 2->4 spaces -> mechanics
+#   crc-mechanics-internal-whitespace — a second space after the colon    -> mechanics
+#   crc-classb-indent-dropped       — that line's indent removed entirely -> class-b
+#   crc-classb-tail-check-added     — a non-empty check line appended
+#                                      at the block's tail               -> class-b
+#   crc-classb-tail-prose-added     — a non-empty plain bullet appended
+#                                      at the block's tail               -> class-b
 #
 # Fixtures use synthetic task id T-900 (not a real board task), built fresh
 # in a temp dir per case — no static fixtures/ directory needed.
@@ -283,6 +301,33 @@ assert_case "crc-usage-unreadable" 2 "check-refreeze-class: usage:" "$TMP/does-n
 assert_case "crc-usage-bad-hash-arg" 2 "check-refreeze-class: usage:" --old-hash zz "$BASE" "$ONE_LINE"
 
 # =============================================================================
+# T-1034 (#139): indent/internal-whitespace and tail-addition cases
+# =============================================================================
+
+INDENT_WIDENED="$TMP/indent-widened.md"
+awk '{ if ($0 == "  - check: true") print "    - check: true"; else print }' "$BASE" > "$INDENT_WIDENED"
+assert_case "crc-mechanics-indent-widened" 0 "check-refreeze-class: mechanics:" "$BASE" "$INDENT_WIDENED"
+
+INTERNAL_WS="$TMP/internal-whitespace.md"
+awk '{ if ($0 == "  - check: true") print "  - check:  true"; else print }' "$BASE" > "$INTERNAL_WS"
+assert_case "crc-mechanics-internal-whitespace" 0 "check-refreeze-class: mechanics:" "$BASE" "$INTERNAL_WS"
+
+INDENT_DROPPED="$TMP/indent-dropped.md"
+awk '{ if ($0 == "  - check: true") print "- check: true"; else print }' "$BASE" > "$INDENT_DROPPED"
+assert_case "crc-classb-indent-dropped" 1 "check-refreeze-class: class-b:" "$BASE" "$INDENT_DROPPED"
+
+# Both tail additions are NON-EMPTY on purpose (D14): normalize_stdin drops
+# leading/trailing BLANK lines, so a blank appended line would normalize
+# away and yield structural (byte-identical), testing nothing.
+TAIL_CHECK_ADDED="$TMP/tail-check-added.md"
+awk '{ print; if ($0 == "- Out-of-scope: o") print "  - check: true" }' "$BASE" > "$TAIL_CHECK_ADDED"
+assert_case "crc-classb-tail-check-added" 1 "check-refreeze-class: class-b:" "$BASE" "$TAIL_CHECK_ADDED"
+
+TAIL_PROSE_ADDED="$TMP/tail-prose-added.md"
+awk '{ print; if ($0 == "- Out-of-scope: o") print "- Extra: e" }' "$BASE" > "$TAIL_PROSE_ADDED"
+assert_case "crc-classb-tail-prose-added" 1 "check-refreeze-class: class-b:" "$BASE" "$TAIL_PROSE_ADDED"
+
+# =============================================================================
 # parity case (T-1028 AC5's "one number, two consumers" — here as a suite case)
 # =============================================================================
 
@@ -318,4 +363,4 @@ awk '{ if ($0 == "  - check: true") print "  - check: test 9 = 9"; else print }'
 assert_case "crc-parity-hash-vs-check-intent" 0 "check-refreeze-class: mechanics:" \
   --old-hash "$PARITY_HASH" "$PARITY_SPEC" "$PARITY_NEW"
 
-printf '\ncheck-refreeze-class fixture suite: all 30 cases passed\n'
+printf '\ncheck-refreeze-class fixture suite: all 35 cases passed\n'

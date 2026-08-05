@@ -63,6 +63,10 @@
 # territory. It proves a delta is CONFINED to check lines; it never proves
 # the replacement is semantically correct, and it never proves the loop
 # actually consulted it before taking the class-M path (D6's honesty claim).
+#
+# Signal exits (T-1034 DP11): 129, 130 and 143 mean SIGHUP, SIGINT and
+# SIGTERM terminated the run; they carry no classification and never
+# collide with the 0/1/2 classification contract above.
 
 set -euo pipefail
 
@@ -114,8 +118,17 @@ self_name="$(basename "$script_path")" \
   || fail_usage "basename failed to resolve this script's own file name for: $script_path"
 SELF="$SCRIPT_DIR/$self_name"
 
+# shellcheck disable=SC2329  # invoked indirectly via the signal traps below
+on_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
+  printf '%s: interrupted by SIG%s (a signal, not a classification)\n' "$self_name" "$1" >&2 || true
+  exit "$2"
+}
+trap 'on_signal HUP 129' HUP
+trap 'on_signal INT 130' INT
+trap 'on_signal TERM 143' TERM
+
 print_help() {
-  sed -n '2,66p' "$SELF" | sed 's/^# \{0,1\}//' \
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}' "$SELF" \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -123,11 +136,32 @@ print_help() {
 TMP_FILES=()
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
 cleanup_tmp_files() {
+  _exit_rc=$?
   if [ "${#TMP_FILES[@]}" -gt 0 ]; then
-    rm -f "${TMP_FILES[@]}"
+    rm -f "${TMP_FILES[@]}" || true
   fi
+  exit "$_exit_rc"
 }
 trap cleanup_tmp_files EXIT
+
+# block_signals_for_registration / restore_signal_traps (T-1034 rework round
+# 1, Codex round-1 Major 2): closes the mktemp-to-TMP_FILES-registration
+# signal window. `mktemp`'s result is only appended to TMP_FILES on the line
+# immediately after the call returns; a HUP/INT/TERM delivered while `mktemp`
+# itself is still running (bash defers a pending trap until the current
+# foreground command — here, the command substitution — returns) fires the
+# already-installed on_signal handler right after the assignment completes
+# but before TMP_FILES ever names the path, so cleanup_tmp_files's
+# `rm -f "${TMP_FILES[@]}"` never reaches it: a real, live-reproducible leak.
+# HUP/INT/TERM are ignored for this narrow create+register window and
+# restored immediately after — this never reorders or edits the frozen SIG
+# block above; it only wraps the two mktemp+register sites below with it.
+block_signals_for_registration() { trap '' HUP INT TERM; }
+restore_signal_traps() {
+  trap 'on_signal HUP 129' HUP
+  trap 'on_signal INT 130' INT
+  trap 'on_signal TERM 143' TERM
+}
 
 # --- argument parsing (positional; -- ends option parsing) ------------------
 HEX40_RE='^[0-9a-f]{40}$'
@@ -194,6 +228,7 @@ TASK_ID_RE='^\*\*Task ID\*\*: *(T-[0-9]+)[[:space:]]*$'
 
 find_task_id() {  # $1 = spec path; prints the task id on stdout; else return 1
   local path="$1" raw l
+  [ -r "$path" ] || return 1
   while IFS= read -r raw || [ -n "$raw" ]; do
     l="${raw%$'\r'}"
     if [[ "$l" =~ $TASK_ID_RE ]]; then
@@ -239,30 +274,38 @@ NEW_BEGIN_LN="$BEGIN_LN"
 NEW_END_LN="$END_LN"
 
 # --- 5. extract + normalize each region into a guarded mktemp file ----------
-extract_region() {  # $1 = path, $2 = begin_ln, $3 = end_ln; prints the temp file path
-  # NOTE: this function is called via command substitution ($(...)) by every
-  # caller, which runs it in a SUBSHELL — registering "$tmp" into TMP_FILES
-  # here would only mutate the subshell's own copy of the array and never
-  # reach the parent shell's EXIT trap. The caller is responsible for adding
-  # the printed path to TMP_FILES itself, immediately after each call.
-  local path="$1" b="$2" e="$3" tmp
-  tmp="$(mktemp "${TMPDIR:-/tmp}/check-refreeze-class-region.XXXXXX")" \
-    || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
-  awk -v b="$b" -v e="$e" 'NR > b && NR < e' "$path" | normalize_stdin > "$tmp" \
+extract_region() {  # $1 = path, $2 = begin_ln, $3 = end_ln, $4 = dest tmp file path
+  # T-1034 DP8: the dest tmp file is created with `mktemp` and registered
+  # into TMP_FILES by the PARENT shell, BEFORE this function is ever called
+  # — the caller passes the path in as an argument. This function only
+  # writes into that path and prints nothing; it is called as a plain
+  # command (never via `$( )`), so it runs in the PARENT shell, not a
+  # subshell. The prior design invoked this via command substitution, which
+  # ran it in a subshell where a `TMP_FILES+=()` done inside the function
+  # only mutated that subshell's own copy of the array and was discarded on
+  # return — so a write failure after `mktemp` already succeeded (disk full,
+  # a file-size quota such as `ulimit -f 0`) left an unregistered, unreaped
+  # temp file behind. Registering the path before the write, in the parent
+  # shell, closes that leak structurally rather than by moving the
+  # registration a third time.
+  local path="$1" b="$2" e="$3" dest="$4"
+  awk -v b="$b" -v e="$e" 'NR > b && NR < e' "$path" | normalize_stdin > "$dest" \
     || fail_usage "failed to extract+normalize the intent block from $path into a temp file (possible causes: disk full, a file-size quota such as ulimit -f, or an awk/sed failure in the extraction pipeline)"
-  printf '%s\n' "$tmp"
 }
 
-OLD_REGION="$(extract_region "$OLD_SPEC" "$OLD_BEGIN_LN" "$OLD_END_LN")"
-# extract_region is invoked via command substitution above, which runs in a
-# SUBSHELL — any TMP_FILES+=() done inside the function only mutates that
-# subshell's own copy of the array and is discarded when the subshell exits,
-# so the parent shell's TMP_FILES (and therefore the EXIT trap's cleanup)
-# never sees it. Register the returned path in the PARENT shell's array here,
-# once per call, so cleanup_tmp_files actually has something to remove.
+block_signals_for_registration
+OLD_REGION="$(mktemp "${TMPDIR:-/tmp}/check-refreeze-class-region.XXXXXX")" \
+  || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
 TMP_FILES+=("$OLD_REGION")
-NEW_REGION="$(extract_region "$NEW_SPEC" "$NEW_BEGIN_LN" "$NEW_END_LN")"
+restore_signal_traps
+extract_region "$OLD_SPEC" "$OLD_BEGIN_LN" "$OLD_END_LN" "$OLD_REGION"
+
+block_signals_for_registration
+NEW_REGION="$(mktemp "${TMPDIR:-/tmp}/check-refreeze-class-region.XXXXXX")" \
+  || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
 TMP_FILES+=("$NEW_REGION")
+restore_signal_traps
+extract_region "$NEW_SPEC" "$NEW_BEGIN_LN" "$NEW_END_LN" "$NEW_REGION"
 
 # --- 6. hash each region; validate any supplied --old-hash/--new-hash ------
 OLD_HASH_COMPUTED="$(git hash-object --stdin < "$OLD_REGION")" \
@@ -280,8 +323,12 @@ fi
 # --- 7. classify: identical -> structural; different line counts -> class-b;
 # otherwise walk the lines and require every differing index to be a
 # `- check:` line on both sides.
-if cmp -s "$OLD_REGION" "$NEW_REGION"; then
+cmp_rc=0
+cmp -s "$OLD_REGION" "$NEW_REGION" || cmp_rc=$?
+if [ "$cmp_rc" -eq 0 ]; then
   fail_structural "old-spec and new-spec intent blocks are byte-identical after normalization (no delta) for $TASK_ID — a re-freeze with no change is a bookkeeping error, never a pass"
+elif [ "$cmp_rc" -gt 1 ]; then
+  fail_usage "cmp failed while comparing the two extracted intent blocks ($OLD_REGION, $NEW_REGION) — an I/O error is not a comparison result and is never read as 'the blocks differ'"
 fi
 
 OLD_LINES="$(awk 'END{print NR}' "$OLD_REGION")" \
@@ -308,6 +355,9 @@ new_arr=()
 while IFS= read -r line || [ -n "$line" ]; do
   new_arr+=("$line")
 done < "$NEW_REGION"
+
+[ "${#old_arr[@]}" -eq "$OLD_LINES" ] || fail_usage "read ${#old_arr[@]} of $OLD_LINES lines from the old-spec's extracted intent block ($OLD_REGION) — refusing to classify a partially-read block"
+[ "${#new_arr[@]}" -eq "$NEW_LINES" ] || fail_usage "read ${#new_arr[@]} of $NEW_LINES lines from the new-spec's extracted intent block ($NEW_REGION) — refusing to classify a partially-read block"
 
 diff_count=0
 first_bad_index=""

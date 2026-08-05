@@ -93,6 +93,10 @@
 #       classification token — see below).
 #
 # an unattested, malformed or miscounted freeze-attestation is exit 2 with the attestation classification, and the hash is never recorded.
+#
+# Signal exits (T-1034 DP11): 129, 130 and 143 mean SIGHUP, SIGINT and
+# SIGTERM terminated the run; they carry no classification and never
+# collide with the 0/1/2 classification contract above.
 
 set -euo pipefail
 
@@ -164,8 +168,17 @@ self_name="$(basename "$script_path")" \
   || fail_usage "basename failed to resolve this script's own file name for: $script_path"
 SELF="$SCRIPT_DIR/$self_name"
 
+# shellcheck disable=SC2329  # invoked indirectly via the signal traps below
+on_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
+  printf '%s: interrupted by SIG%s (a signal, not a classification)\n' "$self_name" "$1" >&2 || true
+  exit "$2"
+}
+trap 'on_signal HUP 129' HUP
+trap 'on_signal INT 130' INT
+trap 'on_signal TERM 143' TERM
+
 print_help() {
-  sed -n '2,95p' "$SELF" | sed 's/^# \{0,1\}//' \
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}' "$SELF" \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -251,9 +264,38 @@ if [ "$begin_ln" -ge "$end_ln" ]; then
 fi
 
 # --- 3. extract + normalize + hash the intent block (marker lines excluded) -
+# block_signals_for_registration / restore_signal_traps (T-1034 rework round
+# 1, Codex round-1 Major 2): closes the mktemp-to-EXIT-trap-registration
+# signal window, symmetrically with bin/check-refreeze-class.sh's
+# TMP_FILES-registration fix. The HUP/INT/TERM traps are installed early
+# (DP10), but tmp_region's EXIT-trap cleanup isn't registered until the
+# `trap cleanup_tmp_region EXIT` line below — a signal delivered while
+# `mktemp` itself is still running (bash defers a pending trap until the
+# current foreground command, the command substitution, returns) fires
+# on_signal's `exit "$2"` with no EXIT trap yet installed, leaking the temp
+# file mktemp already created: a real, live-reproducible leak. HUP/INT/TERM
+# are ignored for this narrow create+register window and restored
+# immediately after the EXIT trap is installed — this never reorders the
+# frozen SIG block above, nor moves the EXIT-trap installation from its
+# position immediately after tmp_region is assigned (DP12).
+block_signals_for_registration() { trap '' HUP INT TERM; }
+restore_signal_traps() {
+  trap 'on_signal HUP 129' HUP
+  trap 'on_signal INT 130' INT
+  trap 'on_signal TERM 143' TERM
+}
+
+block_signals_for_registration
 tmp_region="$(mktemp "${TMPDIR:-/tmp}/check-intent-region.XXXXXX")" \
   || fail_usage "mktemp failed to create a temp file for extracting the intent block (check that TMPDIR=${TMPDIR:-/tmp} is writable)"
-trap 'rm -f "$tmp_region"' EXIT
+# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
+cleanup_tmp_region() {
+  _exit_rc=$?
+  rm -f "$tmp_region" || true
+  exit "$_exit_rc"
+}
+trap cleanup_tmp_region EXIT
+restore_signal_traps
 # The extraction pipeline's WRITE (not just mktemp's earlier file creation)
 # must be fail-closed too: a write failure here (disk full, `ulimit -f`
 # quota, or a failure inside normalize_stdin's own sed/awk) would otherwise
