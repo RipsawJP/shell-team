@@ -26,14 +26,17 @@
 #         one-liner grep, part (iii)'s completeness self-audit, and part
 #         (iv)'s protected-content lock.
 #   (iii) completeness self-audit — mechanically re-derives every
-#         errexit-unsafe CANDIDATE site left in bin/ (by exact file:line:
-#         CONTENT, not file:line alone — a content-blind audit would let a
-#         mutation that rewrites an exempted line's TEXT to something unsafe,
-#         while keeping its line number, slip through unnoticed), subtracts
-#         the documented NOT_APPLY set, and loud-fails if anything new is
-#         left unaccounted for. Includes an inline mutation self-check
-#         proving the content-aware match actually catches such a rewrite
-#         (non-vacuity of the audit itself, same spirit as part (i)).
+#         errexit-unsafe CANDIDATE site left in bin/, keyed by exact
+#         <file>:<content> WITH AN EXPLICIT DECLARED OCCURRENCE COUNT, never
+#         by position — a count-blind (deduplicated) key would let a second
+#         byte-identical unguarded line in an already-registered file
+#         collapse into its existing key and slip through unnoticed;
+#         subtracts the documented NOT_APPLY set by that counted key, and
+#         loud-fails if any candidate's measured count is unaccounted for or
+#         out of sync with its declaration. Includes an inline mutation
+#         self-check proving the counted match actually catches both a
+#         content rewrite and a duplicated line (non-vacuity of the audit
+#         itself, same spirit as part (i)).
 #   (iv)  protected content locks — a small number of one-liner sites (an
 #         `emit()`/`log_err()` helper whose `|| true`-guarded write is
 #         followed, on the SAME line, by more code that is neither a literal
@@ -248,7 +251,8 @@ check loop-guard-guard-error    loop-guard.sh            2
 check rework-digest-usage       rework-digest.sh         2
 
 # =============================================================================
-# (iii) completeness self-audit (content-aware).
+# (iii) completeness self-audit (position-free, multiplicity-aware content
+# keys).
 #
 # Mechanically re-derives every remaining errexit-unsafe CANDIDATE site in
 # bin/ using the three shapes this task fixes:
@@ -257,24 +261,43 @@ check rework-digest-usage       rework-digest.sh         2
 #       shape every multiline die()/fail()/usage()/emit()-then-exit fix in
 #       this task removed by appending ` || true`)
 #   P3  heredoc-opener:   `>&2 <<...` WITHOUT a trailing `|| true` guard
-# then subtracts the documented NOT_APPLY set by exact file:line:CONTENT —
-# NOT by file:line alone. Matching on file:line alone would let a mutation
-# that rewrites an EXEMPTED line's TEXT to an unsafe form, while leaving its
-# line number unchanged, silently continue to "match" the old NOT_APPLY
-# record and vanish from the audit — the mutation self-check right below
-# proves this concretely. If a NEW file:line:CONTENT combination shows up in
-# CANDIDATES but not in NOT_APPLY, this is either a regression (a `|| true`
-# guard removed, or an exempted line rewritten to something unsafe) or a
-# brand-new checker shipped with the same unsafe shape — either way,
-# IN_SCOPE below is non-empty and this suite loud-fails.
+# then subtracts the documented NOT_APPLY set — keyed on <file>:<content>
+# with an explicit DECLARED occurrence count, never a line number. The raw
+# derivation (derive_candidates, below) keeps `grep -n`'s line numbers
+# THROUGH its own `sort -u`; the line field is stripped only afterwards, by
+# counted_keys, when the counted key is formed. Two byte-identical candidate
+# lines in one file differ only in their line numbers, so dropping that
+# field before sort -u would collapse them at the source with no way for any
+# downstream count to recover them.
+#
+# One mechanism produces both judgments: `comm -23` (forward/completeness)
+# surfaces a measured candidate key the registry does not account for at
+# all, or whose measured count no longer equals its declared count; `comm
+# -13` (reverse/staleness) surfaces a registered key whose measured count in
+# bin/ no longer equals its declared count, including a fall to zero (fixed,
+# removed, or reworded). A count that merely moves surfaces on BOTH sides at
+# once — informative, not redundant — and that is exactly what lets a second
+# byte-identical unguarded line added to an already-registered file fail
+# loudly instead of being silently absorbed by a deduplicated set
+# difference (the mutation self-check below reproduces this live). Position
+# never enters the judgment: moving a registered line within its own file no
+# longer, by itself, fires the reverse check — see "the two honest losses"
+# in this task's spec for why that is the correct behaviour, not a
+# regression.
 # =============================================================================
-printf '\n--- (iii) completeness self-audit (content-aware NOT_APPLY subtraction) ---\n'
+printf '\n--- (iii) completeness self-audit (position-free, multiplicity-aware content keys) ---\n'
 
 derive_candidates() {
-  # $1 = bin dir to scan. Prints file:line:content candidate lines, sorted.
+  # $1 = bin dir to scan. Prints raw <file>:<line-number>:<content>
+  # candidate lines, sorted. The line-number field passes THROUGH this
+  # sort -u untouched (the load-bearing derivation constraint) — it is
+  # stripped only by counted_keys, below, after this function has already
+  # de-duplicated exact <file>:<line-number>:<content> repeats. Two byte-
+  # identical CONTENT lines at two different line numbers survive this
+  # function as two distinct rows.
   local dir="$1"
   {
-    # P1: one-liner unsafe (same shape AC7 locks statically).
+    # P1: one-liner unsafe (same shape part (ii)'s die()/fail() rows exercise).
     grep -rnE '>&2; *exit [0-9]+' "$dir" || true
     # P2: bare-line-ending unsafe (multiline die/fail/usage/emit-then-exit,
     # before the next line's `exit N` — this is what every multiline fix in
@@ -286,59 +309,89 @@ derive_candidates() {
   } | sed -E "s|^${dir}/||" | sort -u
 }
 
+counted_keys() {
+  # $1 = a <file>:<line-number>:<content> stream (derive_candidates' output
+  # shape). Strips the line-number field NOW — after derive_candidates' own
+  # sort -u, never before — counts occurrences per resulting <file>:<content>
+  # key, and
+  # prints `<count> <file>:<content>`, one per key, sorted. This is the ONLY
+  # place the line field is dropped; the count it leaves behind is what
+  # lets a byte-identical duplicate be told apart from a plain rename.
+  sed -E 's|^([^:]+):[0-9]+:|\1:|' "$1" | sort | awk '{c[$0]++} END{for (k in c) printf "%d %s\n", c[k], k}' | sort
+}
+
 CAND_FILE="$TMP/candidates.txt"
 derive_candidates "$BIN" > "$CAND_FILE"
+MEASURED_FILE="$TMP/measured.txt"
+counted_keys "$CAND_FILE" > "$MEASURED_FILE"
 
 # NOT_APPLY — every candidate site this task INTENTIONALLY leaves unfixed,
-# as the EXACT file:line:content triple a fresh derive_candidates() run
-# produces today, with its not-apply reason letter (a)-(e) from the spec's
-# "not-apply 判定基準" recorded in the surrounding comment (not in the line
-# itself — the line must stay byte-identical to the real source line for the
-# content-aware match to work). check-handoff.sh's two candidate lines
-# (the "cannot read file" exit-2 path and the emit() write) are (a): each
-# sits inside the checker's own frozen, byte-locked observable contract —
-# its exit codes, classification strings and message format — which T-1031
-# (.shell-team/specs/T-1031-check-handoff-flag-anchor.md, D7/AC11) restates
-# and re-freezes rather than hardening. That is a narrower grounds than the
-# T-110-era framing this comment used to carry — "check-handoff.sh is the
-# single inviolable, byte-unchanged file" — which T-1031 makes false at the
-# file level (T-1031 edits a different region of this same file, the
-# flag-extraction block, on purpose); only these two specific lines, and the
-# frozen contract they encode, stay untouched by any task working on this
-# file, T-1031 included. Everything else here is (d): a stderr write that
-# CONTINUES (no immediate `exit N` tied to that specific write — an
-# accumulator `emit()`/warning/note, decided/exited elsewhere, decoupled
-# from this write's own success/failure).
+# keyed as `<count> <file>:<content>`: an unpadded decimal DECLARED
+# occurrence count, one space, the bin/-relative file, a colon, and the
+# source line byte for byte (leading whitespace included) — never a line
+# number. Every record below was produced by running derive_candidates() and
+# counted_keys() against the real bin/ and pasting the output as-is; not one
+# entry was hand-typed or hand-edited afterwards — a transcription is
+# exactly what would silently mangle gen-playbook-blocks.sh's eight-space
+# continuation record below. The not-apply reason letter (a)-(e) from the
+# spec's "not-apply 判定基準" is recorded in the surrounding comment, not in
+# the record itself — the record must stay byte-identical to the real
+# source line for the declared count to mean what it says. check-handoff.sh's
+# two candidate lines (the "cannot read file" exit-2 path and the emit()
+# write) are (a): each sits inside the checker's own frozen, byte-locked
+# observable contract — its exit codes, classification strings and message
+# format — which T-1031 (.shell-team/specs/T-1031-check-handoff-flag-anchor.md,
+# D7/AC11) restates and re-freezes rather than hardening. That is a narrower
+# grounds than the T-110-era framing this comment used to carry — "check-
+# handoff.sh is the single inviolable, byte-unchanged file" — which T-1031
+# makes false at the file level (T-1031 edits a different region of this
+# same file, the flag-extraction block, on purpose); only these two specific
+# lines, and the frozen contract they encode, stay untouched by any task
+# working on this file, T-1031 included. Everything else here is (d): a
+# stderr write that CONTINUES (no immediate `exit N` tied to that specific
+# write — an accumulator `emit()`/warning/note, decided/exited elsewhere,
+# decoupled from this write's own success/failure).
 NOT_APPLY_FILE="$TMP/not-apply.txt"
 cat > "$NOT_APPLY_FILE" <<'EOF'
-check-handoff.sh:27:  printf '%s: cannot read file\n' "$FILE" >&2
-check-handoff.sh:79:  printf '%s:%s: %s: %s\n' "$FILE" "$1" "$2" "$3" >&2
-check-acs.sh:234:      printf 'check-acs: ignoring invalid CHECK_ACS_TIMEOUT=%s, using 120\n' "$acs_timeout" >&2
-check-acs.sh:260:    printf 'AC%s: FAIL (check: sub-bullet is present but its value is empty or whitespace-only — write a real command, or remove the check: line entirely if this AC is runtime-only)\n' "$acnum" >&2
-check-acs.sh:294:    printf 'AC%s: FAIL (check: value is wrapped in a single matching backtick pair, which bash would run as command substitution and misevaluate — write a raw command with no wrapping backticks, per the T-044/T-045 convention; see bin/check-acs.sh TRUST BOUNDARY note)\n' "$acnum" >&2
-check-contract.sh:37:  printf '%s:%s: %s\n' "$FILE" "$1" "$2" >&2
-check-board-headings.sh:319:    printf '%s: note: no resolvable base (first commit and no --base/--base-file/env default) — skipping the deletion/replacement (structural) check; the duplicate check still runs\n' "$BOARD" >&2
-check-board-headings.sh:329:  printf '%s: %s: %s\n' "$BOARD" "$1" "$2" >&2
-close-out.sh:444:  printf 'close-out: note: project_status generated block not refreshed (file or markers absent) — see gen-project-status.sh\n' >&2
-gen-playbook-blocks.sh:468:        "$role" "$line_count" "$LINE_WARN_THRESHOLD" >&2
+1 check-acs.sh:      printf 'check-acs: ignoring invalid CHECK_ACS_TIMEOUT=%s, using 120\n' "$acs_timeout" >&2
+1 check-acs.sh:    printf 'AC%s: FAIL (check: sub-bullet is present but its value is empty or whitespace-only — write a real command, or remove the check: line entirely if this AC is runtime-only)\n' "$acnum" >&2
+1 check-acs.sh:    printf 'AC%s: FAIL (check: value is wrapped in a single matching backtick pair, which bash would run as command substitution and misevaluate — write a raw command with no wrapping backticks, per the T-044/T-045 convention; see bin/check-acs.sh TRUST BOUNDARY note)\n' "$acnum" >&2
+1 check-board-headings.sh:    printf '%s: note: no resolvable base (first commit and no --base/--base-file/env default) — skipping the deletion/replacement (structural) check; the duplicate check still runs\n' "$BOARD" >&2
+1 check-board-headings.sh:  printf '%s: %s: %s\n' "$BOARD" "$1" "$2" >&2
+1 check-contract.sh:  printf '%s:%s: %s\n' "$FILE" "$1" "$2" >&2
+1 check-handoff.sh:  printf '%s: cannot read file\n' "$FILE" >&2
+1 check-handoff.sh:  printf '%s:%s: %s: %s\n' "$FILE" "$1" "$2" "$3" >&2
+1 close-out.sh:  printf 'close-out: note: project_status generated block not refreshed (file or markers absent) — see gen-project-status.sh\n' >&2
+1 gen-playbook-blocks.sh:        "$role" "$line_count" "$LINE_WARN_THRESHOLD" >&2
 EOF
 sort -u "$NOT_APPLY_FILE" -o "$NOT_APPLY_FILE"
 
-# comm requires both inputs already sorted (which CAND_FILE and NOT_APPLY_FILE
-# both are, above) — a real failure here (missing file, permission, a stray
-# unsorted line) must FAIL CLOSED, not be swallowed by `|| true` into a
-# silently-empty (and therefore falsely "clean") result. `set +e`/`set -e`
-# bracketing (not `|| true`, which would overwrite comm's own exit status
-# with 0 before `comm_rc=$?` ever sees it, and not a bare `cmd; comm_rc=$?`,
-# which under this script's own `set -e` would abort the WHOLE harness on a
-# non-zero comm before that assignment ever ran) — comm is a plain external
-# command here, not a `(...)` subshell, so this bracketing is unaffected by
-# the errexit-suppression quirk documented in part (i)'s NOTE (that quirk is
-# specific to bash subshells, not external processes).
+# A separate snapshot of the registry, used only as the STDIN source for
+# the mutation-self-check loops below — a distinct path from $NOT_APPLY_FILE
+# (which those loops also read via `comm`) purely so a static scanner cannot
+# mistake the two independent reads of the same content for a read/write
+# conflict; nothing here writes to either path.
+NOT_APPLY_ITER_FILE="$TMP/not-apply-iter.txt"
+cp "$NOT_APPLY_FILE" "$NOT_APPLY_ITER_FILE"
+
+# Both comm inputs are sorted in the same process, under the same collation
+# (MEASURED_FILE by counted_keys' own `sort`, NOT_APPLY_FILE by the `sort -u`
+# immediately above) — comm's sortedness precondition holds by construction
+# and no cross-host sort comparison ever occurs. A real failure here
+# (missing file, permission, a stray unsorted line) must FAIL CLOSED, not be
+# swallowed by `|| true` into a silently-empty (and therefore falsely
+# "clean") result. `set +e`/`set -e` bracketing (not `|| true`, which would
+# overwrite comm's own exit status with 0 before `comm_rc=$?` ever sees it,
+# and not a bare `cmd; comm_rc=$?`, which under this script's own `set -e`
+# would abort the WHOLE harness on a non-zero comm before that assignment
+# ever ran) — comm is a plain external command here, not a `(...)` subshell,
+# so this bracketing is unaffected by the errexit-suppression quirk
+# documented in part (i)'s NOTE (that quirk is specific to bash subshells,
+# not external processes).
 IN_SCOPE_FILE="$TMP/in-scope.txt"
 COMM_ERR_FILE="$TMP/comm.err"
 set +e
-comm -23 "$CAND_FILE" "$NOT_APPLY_FILE" > "$IN_SCOPE_FILE" 2>"$COMM_ERR_FILE"
+comm -23 "$MEASURED_FILE" "$NOT_APPLY_FILE" > "$IN_SCOPE_FILE" 2>"$COMM_ERR_FILE"
 comm_rc=$?
 set -e
 if [ "$comm_rc" -ne 0 ]; then
@@ -346,22 +399,25 @@ if [ "$comm_rc" -ne 0 ]; then
 else
   IN_SCOPE="$(cat "$IN_SCOPE_FILE")"
   if [ -z "$IN_SCOPE" ]; then
-    ok "completeness self-audit: every remaining errexit-unsafe candidate is accounted for, by exact content, in NOT_APPLY (check-handoff.sh (a) + 9 (d) accumulator/warning sites; T-110's 2 check-acs.sh unrecognized-label diagnostics are now \`|| true\`-guarded and covered by a dedicated (ii) behavioral row instead of a NOT_APPLY entry — T-110 rework1); zero unfixed, undocumented apply sites"
+    ok "completeness self-audit: every remaining errexit-unsafe candidate's measured occurrence count is accounted for in NOT_APPLY, by exact content key and declared count (check-handoff.sh (a) + 9 (d) accumulator/warning sites; T-110's 2 check-acs.sh unrecognized-label diagnostics are now \`|| true\`-guarded and covered by a dedicated (ii) behavioral row instead of a NOT_APPLY entry — T-110 rework1); zero unfixed, undocumented apply sites"
   else
-    bad "completeness self-audit: found errexit-unsafe candidate site(s) NOT in NOT_APPLY, by exact content (regression — a \`|| true\` guard removed, an exempted line rewritten to something unsafe, or a new checker shipped unfixed) — fix with \`|| true\` or add to NOT_APPLY with a (a)-(e) reason:
+    bad "completeness self-audit: found an unregistered content key, or a registered key whose measured occurrence count no longer equals its declared count (regression — a \`|| true\` guard removed, an exempted line rewritten to something unsafe, a second byte-identical unguarded line added, or a new checker shipped unfixed) — fix with \`|| true\` or add/update NOT_APPLY with a (a)-(e) reason:
 ${IN_SCOPE}"
   fi
 fi
 
-# Reverse check: every NOT_APPLY entry must still actually exist, byte-for-
-# byte, as a real candidate line (an entry whose line has since been fixed /
-# removed / renumbered / reworded would silently stop matching and over-
-# subtract nothing useful, but would also mean this list has gone stale and
-# may no longer describe the real file — keep it honest).
+# Reverse check: every NOT_APPLY entry's DECLARED count must still equal its
+# MEASURED count in bin/ today, including a fall to zero (an entry whose
+# line has since been fixed, removed, or reworded would silently stop
+# contributing to its old key's count — over-subtracting nothing useful —
+# but would also mean this registry has gone stale and may no longer
+# describe the real file; keep it honest). Renumbering ALONE no longer fires
+# this check, by design (see "the two honest losses" in this task's spec):
+# position was never the reviewed property, only the file and the text were.
 STALE_ERR_FILE="$TMP/comm-stale.err"
 STALE_FILE="$TMP/stale.txt"
 set +e
-comm -13 "$CAND_FILE" "$NOT_APPLY_FILE" > "$STALE_FILE" 2>"$STALE_ERR_FILE"
+comm -13 "$MEASURED_FILE" "$NOT_APPLY_FILE" > "$STALE_FILE" 2>"$STALE_ERR_FILE"
 stale_comm_rc=$?
 set -e
 if [ "$stale_comm_rc" -ne 0 ]; then
@@ -369,29 +425,139 @@ if [ "$stale_comm_rc" -ne 0 ]; then
 else
   STALE_NOT_APPLY="$(cat "$STALE_FILE")"
   if [ -z "$STALE_NOT_APPLY" ]; then
-    ok "completeness self-audit: every NOT_APPLY entry still matches a real candidate line byte-for-byte (no stale/over-subtracting entries)"
+    ok "completeness self-audit: every NOT_APPLY entry's declared occurrence count still matches its measured count in bin/ (no stale/moved/renumbered-away entries)"
   else
-    bad "completeness self-audit: NOT_APPLY entry no longer matches any real candidate line byte-for-byte (stale — update the file:line:content or drop the entry):
+    bad "completeness self-audit: a registered content key's measured occurrence count in its file no longer equals its declared count (including 0) — update the declared count/content or drop the entry:
 ${STALE_NOT_APPLY}"
   fi
 fi
 
-# --- mutation self-check (non-vacuity of the CONTENT-aware match itself) ----
-# Proves the fix for the file:line-only blind spot: take a real, currently-
-# exempted NOT_APPLY line (close-out.sh:444) and simulate REWRITING its TEXT
-# to an unsafe form while KEEPING THE SAME FILE:LINE — entirely in a private
-# copy; bin/close-out.sh itself is never touched. A file:line-ONLY audit
-# would still "match" this mutated candidate against the old NOT_APPLY record
-# (same key) and miss it; the content-aware audit above must NOT.
-MUTATED_CAND_FILE="$TMP/mutated-candidates.txt"
-sed 's|^close-out\.sh:444:.*$|close-out.sh:444:  printf '"'"'MUTATED: this text simulates an exempted line rewritten unsafe'"'"' >&2; exit 42|' \
-  "$CAND_FILE" > "$MUTATED_CAND_FILE"
-MUTATION_IN_SCOPE_FILE="$TMP/mutation-in-scope.txt"
-comm -23 "$MUTATED_CAND_FILE" "$NOT_APPLY_FILE" > "$MUTATION_IN_SCOPE_FILE" 2>/dev/null || true
-if grep -qF 'close-out.sh:444:' "$MUTATION_IN_SCOPE_FILE"; then
-  ok "mutation self-check: rewriting the close-out.sh:444 NOT_APPLY line's TEXT (same file:line) to an unsafe form IS caught by the content-aware audit (would NOT have been caught by a file:line-only match)"
+# --- mutation self-check (D3): three directions, over every registered
+# record, against private copies of bin/ only — there is no chosen probe
+# target: every probe iterates the registry's own records at run time, which
+# removes both the selection question and the last reason to name a site
+# literally (AC7's one-canonical-definition lock is what makes a re-
+# hardcoded site structurally impossible in the first place). ------------
+BIN_TEMPLATE="$TMP/bin-template"
+cp -R "$BIN" "$BIN_TEMPLATE"
+
+# A pristine, pre-mutation derivation of the REAL bin/, taken before any
+# probe runs, so the hygiene invariant below can prove the real bin/ never
+# moved — a final-state cmp, never a restore that merely "reported success".
+PRE_MUTATION_FILE="$TMP/pre-mutation.txt"
+derive_candidates "$BIN" > "$PRE_MUTATION_FILE"
+
+# (i) content rewrite: for every registered record, in its own private copy
+# of bin/, locate its content line by EXACT WHOLE-LINE comparison in awk
+# ($0 == old) — never a regex/sed substitution, since the contents carry
+# '.', '*', '[', '$', '%' and quote characters a regex would misparse —
+# assert the match count equals the RECORD'S OWN DECLARED count before
+# rewriting (never a hard-coded 1: a declared count of 2 — two byte-
+# identical, individually-reviewed exempt sites collapsed to one key — is a
+# legitimate, spec-anticipated registry state, not a synthetic extreme; see
+# this task's spec, "Loss 2" / Input-space "Reachable input classes"), rewrite
+# every matching line to an unsafe P1-shaped form (the awk program below
+# already rewrites ALL lines equal to the old text, not just the first),
+# and assert the match count is exactly 0 after. The re-derived counted set
+# must then differ from the registry in BOTH directions: forward, because
+# the rewritten text is an unregistered key; reverse, because the
+# registered key's measured count fell to zero.
+content_rewrite_fails=0
+content_rewrite_checked=0
+while IFS= read -r rec; do
+  [ -n "$rec" ] || continue
+  n_decl=${rec%% *}
+  key=${rec#* }
+  rw_file=${key%%:*}
+  rw_content=${key#*:}
+  content_rewrite_checked=$((content_rewrite_checked + 1))
+  probe_dir=$(mktemp -d "$TMP/rewrite.XXXXXX") || { content_rewrite_fails=$((content_rewrite_fails + 1)); continue; }
+  cp -R "$BIN_TEMPLATE"/. "$probe_dir"/
+  target="$probe_dir/$rw_file"
+  if [ ! -f "$target" ]; then
+    content_rewrite_fails=$((content_rewrite_fails + 1))
+    rm -rf "$probe_dir"
+    continue
+  fi
+  before_n=$(rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]} $0==o{n++} END{print n+0}' "$target")
+  if [ "$before_n" != "$n_decl" ]; then
+    content_rewrite_fails=$((content_rewrite_fails + 1))
+    rm -rf "$probe_dir"
+    continue
+  fi
+  rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]; p="  printf \"T1038 REWRITE PROBE\" >&2; exit 42"} $0==o{print p; next} {print}' "$target" > "$probe_dir/.rewritten.tmp" && mv "$probe_dir/.rewritten.tmp" "$target"
+  after_n=$(rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]} $0==o{n++} END{print n+0}' "$target")
+  if [ "$after_n" != "0" ]; then
+    content_rewrite_fails=$((content_rewrite_fails + 1))
+    rm -rf "$probe_dir"
+    continue
+  fi
+  derive_candidates "$probe_dir" > "$TMP/rewrite-cand.txt"
+  counted_keys "$TMP/rewrite-cand.txt" > "$TMP/rewrite-measured.txt"
+  fwd_n=$(comm -23 "$TMP/rewrite-measured.txt" "$NOT_APPLY_FILE" | grep -c . || true)
+  rev_n=$(comm -13 "$TMP/rewrite-measured.txt" "$NOT_APPLY_FILE" | grep -c . || true)
+  if [ "$fwd_n" -lt 1 ] || [ "$rev_n" -lt 1 ]; then
+    content_rewrite_fails=$((content_rewrite_fails + 1))
+  fi
+  rm -rf "$probe_dir"
+done < "$NOT_APPLY_ITER_FILE"
+if [ "$content_rewrite_checked" -ge 1 ] && [ "$content_rewrite_fails" -eq 0 ]; then
+  ok "content-rewrite self-check: rewriting a registered line's text to an unsafe form is caught in BOTH directions — forward as an unregistered key, reverse as a count mismatch"
 else
-  bad "mutation self-check: rewriting the close-out.sh:444 NOT_APPLY line's TEXT to an unsafe form was NOT caught — the content-aware audit is not actually content-aware; every completeness result above is suspect"
+  bad "content-rewrite self-check: $content_rewrite_fails of $content_rewrite_checked registered record(s) failed to be caught in BOTH directions when rewritten unsafe — the mechanism has collapsed to a one-way (or non-) check"
+fi
+
+# (ii) duplicate site: for every registered record, append a BYTE-IDENTICAL
+# duplicate of its content line to the same file in a private copy of bin/,
+# then re-run the WHOLE derivation from that copy — the mutation is applied
+# to the candidate-derivation INPUT, not to an already-counted output, so
+# this exercises the real derivation including its own sort -u. This is the
+# non-vacuity proof for the rejected deduplicated-set-difference
+# alternative: that design would show no difference at all here, and only
+# here.
+duplicate_fails=0
+duplicate_checked=0
+while IFS= read -r rec; do
+  [ -n "$rec" ] || continue
+  key=${rec#* }
+  dup_file=${key%%:*}
+  dup_content=${key#*:}
+  duplicate_checked=$((duplicate_checked + 1))
+  probe_dir=$(mktemp -d "$TMP/dup.XXXXXX") || { duplicate_fails=$((duplicate_fails + 1)); continue; }
+  cp -R "$BIN_TEMPLATE"/. "$probe_dir"/
+  target="$probe_dir/$dup_file"
+  if [ ! -f "$target" ]; then
+    duplicate_fails=$((duplicate_fails + 1))
+    rm -rf "$probe_dir"
+    continue
+  fi
+  printf '%s\n' "$dup_content" >> "$target"
+  derive_candidates "$probe_dir" > "$TMP/dup-cand.txt"
+  counted_keys "$TMP/dup-cand.txt" > "$TMP/dup-measured.txt"
+  fwd_n=$(comm -23 "$TMP/dup-measured.txt" "$NOT_APPLY_FILE" | grep -c . || true)
+  rev_n=$(comm -13 "$TMP/dup-measured.txt" "$NOT_APPLY_FILE" | grep -c . || true)
+  if [ "$fwd_n" -lt 1 ] || [ "$rev_n" -lt 1 ]; then
+    duplicate_fails=$((duplicate_fails + 1))
+  fi
+  rm -rf "$probe_dir"
+done < "$NOT_APPLY_ITER_FILE"
+if [ "$duplicate_checked" -ge 1 ] && [ "$duplicate_fails" -eq 0 ]; then
+  ok "duplicate-site self-check: a second byte-identical unguarded line in the same file changes the measured occurrence count and IS caught — the dedup blind spot is closed"
+else
+  bad "duplicate-site self-check: $duplicate_fails of $duplicate_checked registered record(s) failed to change the measured occurrence count when duplicated — a deduplicating set difference would have absorbed this silently"
+fi
+
+# (iii) probe hygiene, as an invariant rather than a restore: every probe
+# above wrote only inside private copies under $TMP; the real bin/ was
+# never opened for writing. Proved by re-deriving from the REAL bin/ now
+# and requiring it byte-identical to the derivation taken before any probe
+# ran — final-state identity, not "the restore reported success".
+POST_MUTATION_FILE="$TMP/post-mutation.txt"
+derive_candidates "$BIN" > "$POST_MUTATION_FILE"
+if cmp -s "$PRE_MUTATION_FILE" "$POST_MUTATION_FILE"; then
+  ok "probe hygiene: every probe ran against a private copy of bin/, and a fresh derivation from the real bin/ is byte-identical to the one taken before the probes"
+else
+  bad "probe hygiene: the real bin/ derivation changed across the mutation self-check — a probe wrote outside its scratch copy"
 fi
 
 # =============================================================================
@@ -402,7 +568,7 @@ fi
 # literal `exit N` (P1) nor end-of-line (P2) nor a heredoc opener (P3): if
 # stripped, the reverted line would match NONE of P1/P2/P3 and would be
 # completely invisible to part (iii)'s static sweep — confirmed empirically
-# (grep 'file:line' entries below is the full, exhaustive result of scanning
+# (the two protected sites named below are the full, exhaustive result of scanning
 # every `|| true` site in bin/ for this shape; see the T-096 rework hand-off
 # for the derivation):
 #   - check-design-note.sh's emit() — followed by `; violations=$((...))`

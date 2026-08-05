@@ -225,37 +225,44 @@ that file's order.
   bullet in that shape would satisfy the same substring and produce a false
   positive, since `grep -F` matches anywhere in the file, fenced content
   included.
-- T-1008: any edit to `bin/gen-playbook-blocks.sh` above its line-count
-  warning (`LINE_WARN_THRESHOLD`) shifts the exact line `tests/errexit-safe/
-  run.sh`'s `NOT_APPLY` registry pins by `file:line:content` — re-measure the
-  line number with the grep in that suite's own registry-building logic
-  (never trust a previously-written-down number, including one recorded in a
-  spec) and confirm the quoted source text is byte-identical before updating
-  only the line-number token. This is the same class of hazard T-1006 and
-  T-1007 each hit once on the identical pin. Separately: a `check:` command
+- T-1008: **superseded by T-1038** — editing `bin/gen-playbook-blocks.sh`
+  above its line-count warning (`LINE_WARN_THRESHOLD`) no longer touches
+  `tests/errexit-safe/run.sh`'s `NOT_APPLY` registry at all: since T-1038 the
+  registry keys on `<file>:<content>` with an explicit declared occurrence
+  count, never a line number, so nothing above a registered line can shift
+  its key. What DOES still affect the registry: rewording or re-indenting the
+  registered line's TEXT itself (the `printf` continuation this entry used
+  to name), deleting it, or adding a second byte-identical unguarded line to
+  the same file — any of those changes the declared-vs-measured count and
+  the suite's own completeness/staleness self-audit says so loudly, printing
+  the up-to-date record. Re-derive by re-running `tests/errexit-safe/run.sh`
+  and reading that output, never by hand-editing a count or a line — this is
+  the same class of hazard T-1006 and T-1007 each hit once on the identical
+  pin before T-1038 closed it structurally. Separately: a `check:` command
   that scans the whole working tree (for example `check-pii-shapes.sh
   --all`, or any acceptance-criteria checker invocation that runs a suite
   covering the entire repository) can take tens of seconds — long enough to
   look hung through a tool with a short default timeout. Run it in the
   background, or raise the timeout, rather than treating the wait itself as
   a failure signal.
-- T-1016: `tests/errexit-safe/run.sh`'s `NOT_APPLY` registry byte-exact
-  `file:line:content` pins are not specific to `bin/gen-playbook-blocks.sh`
-  (T-1008's case) — editing the header comment or any code above the pinned
-  line in **any** of the files it names (`check-handoff.sh`, `close-out.sh`,
-  `check-board-headings.sh`, `check-acs.sh`, `check-contract.sh`, …) shifts
-  that file's pins the same way. Before editing one of those files, grep
-  `tests/errexit-safe/run.sh`'s `NOT_APPLY_FILE` block for that filename
-  first. If the task's own scope lock does **not** list `tests/errexit-safe/
-  run.sh` as an editable file (a same-task collateral fix would then trip
-  that lock's own "no extra files changed" criterion), do not edit it to
-  chase the drift — leave it untouched, record the resulting suite failure
-  as a documented finding in the hand-off/board entry instead, and let a
-  human-ratified scope widening (or a dedicated fast-follow) update the
-  registry. Chasing an exact zero net line-count in the edited file to avoid
-  the shift is not a reliable workaround either: it is brittle by
-  construction (any future one-line edit reopens the same drift) and not
-  worth trading against clear, adequately-commented code.
+- T-1016: **superseded by T-1038** — `tests/errexit-safe/run.sh`'s
+  `NOT_APPLY` registry no longer has a position field, so the class this
+  entry used to describe (editing the header comment or any code above a
+  pinned line in `check-handoff.sh`, `close-out.sh`, `check-board-
+  headings.sh`, `check-acs.sh`, `check-contract.sh`, or any other file the
+  registry names) no longer shifts anything: the key is `<file>:<content>`
+  plus a declared occurrence count, and position never enters the judgment.
+  There is no `NOT_APPLY_FILE` filename grep to run before editing one of
+  those files, and no drift to chase. The registry only reacts if a
+  registered line's TEXT changes (a rewrite, a deletion, or a second byte-
+  identical duplicate added to the same file), and the suite's own `comm
+  -23`/`comm -13` judgment over the counted key sets surfaces that on both
+  sides at once — run the suite and read its failure output for the correct
+  record rather than editing the registry by hand. This retires the older
+  "grep the registry first, or record a documented finding and let a
+  human-ratified scope widening update it" workaround this entry used to
+  prescribe; there is no drift left for a same-task collateral fix to chase
+  scope around.
 - T-1019: `bash tests/is-span-row-parity/run.sh` is the dedicated parity
   suite proving `bin/rollup-runs.sh`'s and `bin/cluster-failures.sh`'s
   independently-maintained `is_span_row()` copies (T-1011 hazard H4) still
@@ -305,20 +312,25 @@ that file's order.
   budget for it if invoking `tests/close-out/run.sh` through a tool with a
   tight default timeout, same caution as the T-1008 entry above for
   whole-tree scans.
-- T-1022: editing `bin/close-out.sh` above `tests/errexit-safe/run.sh`'s
-  `close-out.sh:<N>` pin (T-1016's entry above already covers this class;
-  recorded again here because the site count itself was undercounted once)
-  shifts **six lines / seven occurrences** of that pin in
-  `tests/errexit-safe/run.sh`: the `NOT_APPLY` heredoc entry, the
-  explanatory comment above the mutation self-check, the mutation `sed`
-  pattern (twice on one line — the escaped match pattern `close-out\.sh:<N>`
-  AND its literal replacement `close-out.sh:<N>`, both need updating), the
-  `grep -qF`, and the `ok`/`bad` message strings. Re-derive `N` with
-  `grep -oE 'close-out\.sh:[0-9]+' tests/errexit-safe/run.sh | sed
-  's/^.*://' | sort -u` (must print exactly one number) rather than
-  arithmetic-shifting a previously-written-down value, and confirm
-  `sed -n "${N}p" bin/close-out.sh` is byte-identical to the pinned content
-  before updating the number.
+- T-1022: **superseded by T-1038** — `tests/errexit-safe/run.sh`'s
+  `close-out.sh` pin used to couple **six lines / seven occurrences**: the
+  `NOT_APPLY` heredoc entry, the explanatory comment above the mutation
+  self-check, the mutation `sed` pattern (twice on one line), the
+  `grep -qF`, and the `ok`/`bad` message strings, all keyed on a re-derived
+  line number `N`. T-1038 collapsed that to **one**: the registry record is
+  now the sole occurrence of its key anywhere in the file (the suite's own
+  one-canonical-definition lock enforces this — re-hardcoding a key into a
+  message or a comment fails it), and every message that used to name the
+  key literally now reads it out of the registry at run time. Editing
+  `bin/close-out.sh`'s registered line therefore touches nothing in the
+  suite except that one record, and only if the line's TEXT changed — a
+  pure re-line-numbering does nothing at all, by design, since position is
+  not part of the key. There is no `N` to re-derive with a `close-out\.sh:
+  [0-9]+` grep (that command cannot be run after T-1038; the pattern no
+  longer matches anything in the file). Instead, re-run
+  `tests/errexit-safe/run.sh` — if the line's text changed, its completeness
+  or staleness self-audit fails and prints the correct up-to-date record —
+  and paste that output into the registry as-is, never hand-typed.
 - T-1028: `bash tests/check-refreeze-class/run.sh` is `bin/check-refreeze-class.sh`'s
   fixture suite (the M1 classifier for the class-M/class-B re-freeze split —
   see `docs/tuning-oversight.md`'s "Who may re-freeze a frozen intent block"
@@ -334,6 +346,17 @@ that file's order.
   compatibility bar (indexed arrays only — no associative arrays, no
   `mapfile`) applies to this suite too, since it is invoked with the same
   `bash` this repository's other `tests/*/run.sh` files are.
+- T-1034: `bash tests/bin-exec-bit/run.sh` is the lock suite proving every
+  tracked file under `bin/` ships at git index mode `100755` (judged via
+  `git ls-files -s -- bin/`, never a working-tree `test -x` — a
+  `core.fileMode=false` checkout would lie). No new prerequisite: pure bash
+  + git, no static fixtures. When editing `bin/check-refreeze-class.sh` or
+  `bin/check-intent.sh`'s `EXIT`/signal/`print_help` machinery, also run
+  `tests/check-intent/run.sh` and re-derive `check-acs.sh`'s shape against
+  any spec whose intent block is extracted by either script — a change to
+  the shared `on_signal`/`cleanup_tmp_*`/`print_help` fragments touches both
+  scripts at once by design (T-1028 AC5's "one definition, two consumers"
+  discipline, reused here for the signal handler).
 - T-1024: a delta on the T-112 entry above, not a restatement of it. WHY a
   spec's `- check:` line needs the guard: `bin/check-acs.sh` runs every
   check through `bash -c "$cmd"` with `set +e` immediately before it and
@@ -352,3 +375,36 @@ that file's order.
   needs its own positive control beside it (`test -s`, or a known-present
   anchor), the exact AC11-shape gap `docs/loop-engineering/
   check-line-mktemp-guard-audit.md` measured.
+- T-1038: `tests/errexit-safe/run.sh`'s `NOT_APPLY` registry is re-keyed to
+  `<count><SP><file>:<content>` — an unpadded declared occurrence count, one
+  space, the `bin/`-relative file, a colon, and the source line byte for
+  byte — with no line number in any key, record or assertion (T-1008,
+  T-1016 and T-1022 above are rewritten in this same change to describe the
+  new invariant instead of the retired one). One mechanism produces both
+  judgments: `comm -23` over the counted key sets is the forward
+  (completeness) failure — an unregistered key, or a registered key whose
+  measured count moved — and `comm -13` is the reverse (staleness) failure —
+  a registered key whose measured count no longer equals its declaration,
+  including a fall to zero. A registered line's position moving within its
+  own file no longer fires anything, by design; only its TEXT (a rewrite, a
+  deletion, or a second byte-identical duplicate appearing in the same
+  file) does. When the registry needs updating, run
+  `tests/errexit-safe/run.sh` itself and paste its completeness/staleness
+  failure output into the heredoc as-is — never hand-type or hand-edit a
+  record; that is exactly the failure mode the pinned eight-space
+  `gen-playbook-blocks.sh` continuation record exists to make loud. Three
+  quoting hazards apply to any future edit of this suite: **(1)** `awk -v`
+  processes backslash escapes in the assigned value, so passing a registry
+  content (every one carries a literal two-character `\n`) through `-v`
+  silently turns it into a real newline and the comparison never matches —
+  pass content through `ENVIRON[...]` instead. **(2)** never locate a
+  registry content with `sed` or a regex — the contents carry `.`, `*`,
+  `[`, `$`, `%` and quote characters — use an exact whole-line comparison in
+  `awk` (`$0 == old`) and assert the match count before and after
+  substituting. **(3)** do not build the counts with `uniq -c` unless its
+  padding is normalized first (GNU and BSD pad differently); an
+  `awk '{c[$0]++} END{...}'` counter avoids the question. `derive_candidates()`
+  keeps `grep -n`'s line numbers through its own `sort -u`; `counted_keys()`
+  strips the line field only afterward, when the count is formed — the one
+  ordering that lets two byte-identical candidate lines in a file survive as
+  two distinct rows instead of collapsing at the source.
