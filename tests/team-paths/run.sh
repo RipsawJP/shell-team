@@ -2,7 +2,7 @@
 # run.sh — drive bin/team-paths.sh and assert the resolver's precedence chain
 # (T-025):
 #   - default mode      : empty root -> base=.shell-team, specs=.shell-team/specs
-#   - legacy mode       : root with tasks/loops/ -> base=tasks, specs=docs/specs
+#   - legacy mode       : root with tasks/loops/shell-team.contract.yaml -> base=tasks, specs=docs/specs
 #                         (split-root lock: specs MUST stay at docs/specs)
 #   - explicit override : $TEAM_RUN_BASE wins even when a legacy layout exists
 #   - --export is eval-safe, including roots / bases containing a space
