@@ -50,7 +50,7 @@ TEMPLATES_DIR="$REPO_ROOT/templates"
 # I/O helpers.
 # ---------------------------------------------------------------------------
 log_err()  { printf '%s\n' "$*" >&2 || true; }
-log_warn() { printf 'WARN: %s\n' "$*" >&2; }
+log_warn() { printf 'WARN: %s\n' "$*" >&2 || true; }
 die()      { log_err "ERROR: $*"; exit 2; }
 
 # ---------------------------------------------------------------------------
