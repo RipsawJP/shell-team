@@ -207,6 +207,31 @@ printf '%s\n' "$ign1_err" | grep -qF -- "$IGN_NOTICE_BODY" \
   || fail "ignored-base notice: fires on stderr for a base dir a repo-level ignore rule matches"
 pass "ignored-base notice: fires on stderr for a base dir a repo-level ignore rule matches"
 
+# Codex round-1 M1 (non-frozen regression lock): a pathspec-metacharacter
+# base name must not defeat either git predicate. `validate_base` permits
+# glob-shaped names like `a*` (safe for shell word-splitting, not for a git
+# pathspec) -- this repo's real target is a literal two-character directory
+# NAMED `a*` (built with `mkdir --`, not a glob), ignored via an escaped
+# `.gitignore` rule; an UNRELATED tracked file under a directory whose name
+# also glob-matches the pattern `a*` (here: `abc/file.txt`) is the exact
+# confounder the reviewer's live repro used to defeat the un-fixed
+# `ls-files -- "$base"` (false silence) and `check-ignore -q -- "$base"`
+# (false "not ignored") calls.
+IGNM1="$GTMP/glob-base-repo"
+mkdir -p "$IGNM1"
+git -C "$IGNM1" init -q
+git -C "$IGNM1" config core.excludesFile /dev/null
+mkdir -- "$IGNM1/a*"
+printf 'x' > "$IGNM1/a*/untracked.txt"
+mkdir -p "$IGNM1/abc"
+printf 'x' > "$IGNM1/abc/file.txt"
+git -C "$IGNM1" add abc/file.txt
+printf 'a\\*/\n' > "$IGNM1/.gitignore"
+ignm1_err="$(env TEAM_RUN_BASE='a*' bash "$PATHS" --root "$IGNM1" --print 2>&1 1>/dev/null)"
+printf '%s\n' "$ignm1_err" | grep -qF -- "$IGN_NOTICE_BODY" \
+  || fail "ignored-base notice: a pathspec-metacharacter base name does not defeat the tracked-file or ignore predicates"
+pass "ignored-base notice: a pathspec-metacharacter base name does not defeat the tracked-file or ignore predicates"
+
 # LA2: silent for a base dir no ignore rule matches.
 IGN2="$GTMP/not-ignored-repo"
 mkdir -p "$IGN2/.shell-team"
@@ -250,6 +275,23 @@ printf '.shell-team/\n' > "$IGN4_DIR/.gitignore"
 ign4_dir_err="$(env -u TEAM_RUN_BASE bash "$PATHS" --root "$IGN4_DIR" --print 2>&1 1>/dev/null)"
 printf '%s\n' "$ign4_dir_err" | grep -qF -- "$IGN_NOTICE_BODY" \
   || fail "ignored-base notice: fires for the bare and the trailing-slash ignore-rule forms alike (directory form)"
+
+# Codex round-1 M3: the directory-form rule must still fire when the base
+# dir does not exist on disk yet -- `--print` has no scaffolding step (D9's
+# after-scaffolding ordering only protects team-init.sh), so an operator
+# inspecting a fresh clone can genuinely invoke --print before the base dir
+# is ever created. Deliberately NO `mkdir -p ".../.shell-team"` here, unlike
+# every other case in this suite.
+IGN4_DIR_ABSENT="$GTMP/ignore-dir-form-absent"
+mkdir -p "$IGN4_DIR_ABSENT"
+git -C "$IGN4_DIR_ABSENT" init -q
+git -C "$IGN4_DIR_ABSENT" config core.excludesFile /dev/null
+printf '.shell-team/\n' > "$IGN4_DIR_ABSENT/.gitignore"
+[ ! -e "$IGN4_DIR_ABSENT/.shell-team" ] \
+  || fail "ignored-base notice: fires for the bare and the trailing-slash ignore-rule forms alike (absent-dir fixture is invalid: .shell-team already exists)"
+ign4_dir_absent_err="$(env -u TEAM_RUN_BASE bash "$PATHS" --root "$IGN4_DIR_ABSENT" --print 2>&1 1>/dev/null)"
+printf '%s\n' "$ign4_dir_absent_err" | grep -qF -- "$IGN_NOTICE_BODY" \
+  || fail "ignored-base notice: fires for the bare and the trailing-slash ignore-rule forms alike (directory form, base dir absent on disk)"
 pass "ignored-base notice: fires for the bare and the trailing-slash ignore-rule forms alike"
 
 # LA5: fires when only a global excludes file ignores the base dir -- proves
