@@ -435,7 +435,7 @@ Every normative directive in the body above maps to an acceptance criterion or c
 This section is outside the intent block and is an ordinary-edit region, in the same class as `T-1036`'s `## Same-class inventory tables`. AC16 asserts its grammar and its totals; AC17 asserts its blast-radius rows against a machine-derived population. `<verdict-summary>` and `<judgment>` fields marked `TBM` are **to be measured by the freeze run and the engineer round** — a `TBM` surviving into the review round is itself a finding.
 
 - ledger-total: 34
-- blast-population: TBM
+- blast-population: 22
 
 ### Site ledger — one line per site, disposition from a closed token set
 
@@ -490,7 +490,28 @@ Each cell records whether the boundary-closing norm is already present at that s
 
 `- affected:` rows are written by the freeze run and the engineer round from AC20 (d)'s two measurements. The population is derived by AC17's own command, not by this list.
 
-- affected: TBM — at-base: TBM — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1001-retro-input-acquisition.md — at-base: PASS=AC1,AC4,AC5,AC7,AC8,AC9,AC11,AC12,AC15,AC17,AC19,AC20,AC22,AC24,AC27,AC28,AC29,AC30;FAIL=AC2,AC3,AC6,AC10,AC13,AC14,AC16,AC18,AC21,AC23,AC25,AC26; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1003-retro-reads-interventions.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC11,AC13,AC14,AC15,AC16,AC17,AC18,AC19,AC21,AC22;FAIL=AC12,AC20; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1004-optin-hook-sample.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC11,AC12,AC13,AC14,AC15,AC16;FAIL=AC17,AC18; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1006-lessons-resolver-key.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC12,AC13,AC14,AC15,AC16,AC19,AC20,AC21;FAIL=AC8,AC9,AC10,AC11,AC17,AC18; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1008-lessons-corpus-import.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC9,AC11,AC14,AC15,AC16,AC17,AC18,AC19,AC20,AC21,AC22,AC23,AC25;SKIP=AC12,AC13;FAIL=AC8,AC10,AC24,AC26,AC27; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1010-operator-language-boundary.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC11,AC12,AC13,AC14,AC15,AC16,AC17,AC18,AC19,AC20,AC21,AC22,AC23,AC24,AC25,AC26,AC28;SKIP=AC29;FAIL=AC27; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1017-close-out-interventions-gate.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC11,AC12,AC13,AC14,AC18;SKIP=AC19;FAIL=AC15,AC16,AC17; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1018-freeze-attestation-gate.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC11,AC12,AC13,AC14,AC15,AC16,AC17,AC19,AC20,AC23;SKIP=AC24;FAIL=AC18,AC21,AC22; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1024-check-line-mktemp-guard.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC8;SKIP=AC11,AC12;FAIL=AC7,AC9,AC10; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5;SKIP=AC8;FAIL=AC6,AC7; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1026-skill-md-doc-completeness.md — at-base: PASS=AC1,AC2,AC3,AC4,AC6;SKIP=AC9,AC10;FAIL=AC5,AC7,AC8; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — at-base: PASS=AC1,AC2,AC3,AC4,AC6,AC8,AC9,AC11;SKIP=AC13;FAIL=AC5,AC7,AC10,AC12; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1028-class-m-refreeze.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC12,AC13;SKIP=AC16;FAIL=AC11,AC14,AC15; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — at-base: PASS=AC1,AC2,AC3,AC4,AC6,AC9,AC10;SKIP=AC11;FAIL=AC5,AC7,AC8; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC10,AC11;SKIP=AC12;FAIL=AC8,AC9; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1032-audit-prose-accuracy.md — at-base: PASS=AC1,AC2,AC3,AC4,AC6,AC9,AC10,AC12;SKIP=AC15,AC16;FAIL=AC5,AC7,AC8,AC11,AC13,AC14; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC9,AC12;SKIP=AC15;FAIL=AC6,AC7,AC8,AC10,AC11,AC13,AC14; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC9,AC10,AC11,AC12,AC13,AC14,AC17;SKIP=AC18;FAIL=AC15,AC16; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1035-spec-template-staleness-locks.md — at-base: PASS=AC1,AC2,AC5,AC6,AC8,AC9;SKIP=AC14;FAIL=AC3,AC4,AC7,AC10,AC11,AC12,AC13; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1036-wording-batch-141-143-144.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC10,AC11;SKIP=AC14;FAIL=AC9,AC12,AC13; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-1037-checker-retro-precision.md — at-base: PASS=AC1,AC2,AC3,AC4,AC5,AC6,AC7,AC8,AC11;SKIP=AC14;FAIL=AC9,AC10,AC12,AC13; — at-head: TBM — judgment: TBM
+- affected: .shell-team/specs/T-113-lessons-deidentification.md — at-base: PASS=AC1,AC2,AC4,AC5,AC7,AC8,AC10,AC11,AC12;FAIL=AC3,AC6,AC9; — at-head: TBM — judgment: TBM
 
 Known members and the expectation each one's measurement will confirm or refute, stated so a surprise is itself a finding: `T-1035`'s AC4 and AC5 go red because this pass edits ten specs and changes `T-1024`'s numstat; `T-1036`'s AC9 and AC13 concern the board's own diff against `5a5c09b`, which the ten deletions move, and the tech-lead's measurement suggests AC9 may already be red at base from `T-1037`'s own re-freeze — **measure it, do not assert it**; `T-1029`'s AC7 and AC8 already resolve `2570d68` and additionally see `agents/scrum-master.md` change; `T-1024`'s AC7 sees ten spec files change against `1e31600`; `T-1037`'s AC4/AC5/AC6 compare `T-1027` against `8d47eed` and must stay class-b and confined; `T-1027`'s own merge-point criteria against `96acd96` are unchanged in kind.
 
