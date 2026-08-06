@@ -435,31 +435,36 @@ that file's order.
   under `CHECK_ACS_TIMEOUT`'s 120s default, so no elevation was needed. A
   later task extending this suite further should re-measure rather than
   assume the same headroom still holds.
-- T-1042: the T-1001 entry above ("a fixture suite that needs a real
-  throwaway `git init` repository ... must NOT create it under $HERE/tmp
-  inside this repo's own working tree") is not limited to
-  `tests/retro-inputs/run.sh` — it hit `tests/team-paths/run.sh` and
-  `tests/team-init/run.sh` too the first time either suite needed a real
-  `git init`-ed fixture (both previously used only plain, non-git
-  directories under `$HERE/tmp-roots` / `$HERE/tmp-targets`). Both suites
-  now carry a second, `$TMPDIR`-backed root (`GTMP`, same
-  `${TMPDIR:+...}`-falls-back-to-`$HERE/git-tmp` idiom, its own trap)
-  reserved for git-needing fixtures, alongside the pre-existing plain `$TMP`
-  root left untouched for everything else. Before adding a NEW fixture to
-  either suite that calls `git init`/`git config` against a path this
-  suite builds, use the `GTMP` root, not `$TMP` — a fixture built under
-  `$TMP` will fail with `Operation not permitted` copying `.git/`'s hook
-  templates (or, with `--template=`, writing `.git/config` itself) in a
-  sandboxed run, even though plain non-git file writes to the same
-  directory succeed. Separately: pinning `git check-ignore`'s
-  `core.excludesFile` input for an assertion that exercises code which
-  itself calls `git` internally (rather than the test calling
-  `check-ignore` directly, the shape `tests/rollup-track/run.sh` and
-  `tests/gitignore-raw-dumps/run.sh` already show) needs the fixture
-  repo's OWN **persisted** `core.excludesFile` config
+- T-1042 (Half A, descoped 2026-08-07 to successor task T-1046 — this
+  entry is retained as generic knowledge for whoever picks that work up,
+  NOT a description of what `tests/team-paths/run.sh` or
+  `tests/team-init/run.sh` currently carry; the Half A fixtures that once
+  lived in both were reverted with the rest of that surface, and both
+  files are byte-identical to `6439eb6` again): the T-1001 entry above ("a
+  fixture suite that needs a real throwaway `git init` repository ... must
+  NOT create it under $HERE/tmp inside this repo's own working tree") is
+  not limited to `tests/retro-inputs/run.sh` — it also hit
+  `tests/team-paths/run.sh` and `tests/team-init/run.sh` the first time
+  either needed a real `git init`-ed fixture (both previously used only
+  plain, non-git directories under `$HERE/tmp-roots` / `$HERE/tmp-targets`,
+  and are back to that today). Whoever adds git-needing fixtures to either
+  suite next should reach for a second, `$TMPDIR`-backed root (the same
+  `${TMPDIR:+...}`-falls-back-to-`$HERE/<name>-tmp` idiom, its own trap)
+  reserved for git-needing fixtures, kept separate from the pre-existing
+  plain `$TMP` root — a fixture built under `$TMP` fails with
+  `Operation not permitted` copying `.git/`'s hook templates (or, with
+  `--template=`, writing `.git/config` itself) in a sandboxed run, even
+  though plain non-git file writes to the same directory succeed.
+  Separately: pinning `git check-ignore`'s `core.excludesFile` input for an
+  assertion that exercises code which itself calls `git` internally
+  (rather than the test calling `check-ignore` directly, the shape
+  `tests/rollup-track/run.sh` and `tests/gitignore-raw-dumps/run.sh`
+  already show) needs the fixture repo's OWN **persisted**
+  `core.excludesFile` config
   (`git -C "$dir" config core.excludesFile <path-or-/dev/null>`), not a
   transient `git -c core.excludesFile=... <cmd>` on the outer invocation —
   a `-c` flag on the test's own command never reaches a git call made
   inside the script under test, while a persisted repo-local config value
   is read by every subsequent git invocation against that repo regardless
-  of who makes it.
+  of who makes it. T-1046 (Half A's successor) is the most likely
+  consumer of both points.
