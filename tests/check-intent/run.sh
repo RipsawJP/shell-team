@@ -1292,14 +1292,16 @@ pass "printhash-one-pipeline-end-to-end: the value --print-hash prints, recorded
 
 # --- printhash-marker-absent/duplicated/reversed-fails-closed, and the
 # malformed-Task-ID-line case (id assigned to a variable and reused below,
-# rather than respelled at each call site — its exact spelling embeds a
-# `sk-` + 16-or-more-token-chars substring that this repo's check-pii-shapes.sh
-# RE_TOKEN pattern false-positives on with no left boundary, a known checker
-# gap tracked as issue #178 and declared out of scope by this task's own
-# spec; the id text itself is frozen by AC8, so this only reduces the
-# literal's occurrence count to one rather than five).
+# rather than respelled at each call site — the variable indirection is kept
+# even though the collision it was originally introduced for is now fixed:
+# AC8's frozen id was originally hyphenated as "...task-id-malformed...",
+# whose spelling embedded a `sk-` + 16-or-more-token-chars substring that
+# this repo's check-pii-shapes.sh RE_TOKEN pattern false-positived on with
+# no left boundary (issue #178). A class-M mechanics re-freeze renamed the
+# frozen id to "...taskid-malformed..." (unhyphenated), which breaks the
+# `sk-` shape and is now check-pii-shapes.sh-clean).
 C="$TMP/case-printhash-structural"; mkdir -p "$C"
-PH_TASKID_ID="printhash-task-id-malformed-fails-closed"
+PH_TASKID_ID="printhash-taskid-malformed-fails-closed"
 write_spec "$C/spec.md" "Do the thing."
 
 grep -v 'BEGIN intent-block' "$C/spec.md" > "$C/spec-nobegin.md"
