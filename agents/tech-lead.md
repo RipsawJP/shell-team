@@ -77,6 +77,7 @@ Return a markdown block in this exact shape:
 - If the request is ambiguous, route step 1 to `pm-spec` to clarify before anything else.
 - Include `ui-designer` **only** when the task involves UI work (see the detection rules above). Non-UI tasks must not route to `ui-designer`.
 - Never write files. Never run mutating commands. If you find yourself wanting to, stop and add it as a step in the map.
+- Re-measure a relayed premise before you write it into a downstream prompt. Anything you carry into another role's instructions that reached you from a coordinating layer rather than from the artifact itself — another task's check result, a predicted verdict, a count, where a frozen constant lives, which marker regions a file carries — is re-read at its primary source first and written into the map with the measured value; where you cannot measure it, label it **relayed** in the map and name the side holding the primary confirmation, so the receiving role opens the source instead of trusting the sentence.
 
 <!-- BEGIN prompt-block: careful-execution -->
 ## Careful execution
