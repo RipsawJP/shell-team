@@ -48,19 +48,6 @@ re-include it in a single repo, add `!.shell-team/` to that repo's root
 carries that line for exactly that reason, so its own base dir stays tracked
 even for an operator who ignores `.shell-team/` globally.
 
-Since T-1042, `team-init` and `bin/team-paths.sh --print` surface this choice
-themselves instead of leaving it to a quiet `git status`: when the resolved
-base dir is matched by an ignore rule and holds no tracked file, both print a
-one-line notice on stderr saying so, once, without changing their exit
-status — the "commit this immediately" disciplines this loop depends on
-(provenance, interventions, the board) cannot hold when the destination is a
-no-op for `git add`. The notice is built on the same `git check-ignore` this
-doc already tells you to pin explicitly in a test, and it honors your
-machine's global excludes the same way: if only your global file — not the
-repo's own `.gitignore` — hides the base dir, the notice still fires. If a
-tracked file already exists under the base dir, or no rule matches at all,
-both stay silent.
-
 That global file has a second consequence. Anything that asks git whether a
 path is ignored — `git check-ignore`, and checks built on it — reads it too, so
 such a check can fail on your machine while passing in CI, where no global

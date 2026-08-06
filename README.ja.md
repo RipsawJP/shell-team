@@ -59,8 +59,6 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 - **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）
 - **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。ただし global 側はマシン全体に効くため、後から「この repo ではボードを追跡したい」と決めた repo でも base dir が隠れる。その 1 repo だけ復帰させるには root の `.gitignore` に `!.shell-team/` を書く（repo 側のパターンが global ファイルより優先される）。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
 
-git に載せない選択をした場合、解決済みの base dir が ignore ルールに一致し、かつ追跡中のファイルを 1 つも持たない瞬間に、`team-init` と `bin/team-paths.sh --print` が一度だけ stderr にその旨を出します。ループの「即座にコミットする」規律（provenance・interventions・board）は、`git add` が no-op になる宛先では成立し得ないため、`git status` の静かな沈黙に委ねる代わりにその帰結を可視化しています。
-
 詳細・更新・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
 ## 使い方

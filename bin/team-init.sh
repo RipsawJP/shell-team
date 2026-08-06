@@ -50,141 +50,8 @@ TEMPLATES_DIR="$REPO_ROOT/templates"
 # I/O helpers.
 # ---------------------------------------------------------------------------
 log_err()  { printf '%s\n' "$*" >&2 || true; }
-log_warn() { printf 'WARN: %s\n' "$*" >&2 || true; }
+log_warn() { printf 'WARN: %s\n' "$*" >&2; }
 die()      { log_err "ERROR: $*"; exit 2; }
-
-# ---------------------------------------------------------------------------
-# Ignored-base notice (T-1042): a resolved base dir that a git ignore rule
-# matches and holds no tracked file voids the loop's "commit this
-# immediately" disciplines (provenance, interventions, the board) while
-# every other gate — seam checkers, the T-073 uncommitted-diff guard, `git
-# status` itself — stays green, because staging an ignored path is a no-op.
-# Advisory only (D2): this script is a scaffolder, not a checker, and the
-# README / docs/adopting.md both declare ignoring the base dir a supported
-# adopter choice — this notice only makes that choice visible. Emitted AFTER
-# scaffolding (D9): a directory-form ignore rule (<base>/) cannot match a
-# path that does not exist yet, so probing before the base dir is created
-# would be silently vacuous in the common case. D8: this probe and its three
-# message bodies are duplicated byte-for-byte in bin/team-paths.sh rather
-# than shared, per this repo's zero-dependency, standalone-bin-script
-# convention.
-#
-# Codex round-1 review (M1-M3, .shell-team/reviews/T-1042.md), all fixed in
-# the same round without touching frozen text:
-#   M1 — `$base` can contain pathspec metacharacters (`validate_base` allows
-#        e.g. `a*`, safe for shell word-splitting but not for git). `ls-files`
-#        gets `:(literal)$base` (verified live: the config-based
-#        core.literalPathspecs does NOT suppress `ls-files`'s own glob
-#        expansion in this git version, but `:(literal)` magic does);
-#        `check-ignore` gets `-c core.literalPathspecs=true` (the only
-#        mechanism it accepts at all — it rejects `:(literal)` outright with
-#        "pathspec magic not supported by this command").
-#   M2 — `rev-parse --is-inside-work-tree`'s exit status ALONE is not a safe
-#        N2/N3 discriminator: a bare repo exits 0 while printing "false" (was
-#        falling through to a `check-ignore` failure -> wrongly N3), and a
-#        dubious-ownership/permission/corruption failure is not the same
-#        thing as "outside a work tree" (was always wrongly landing on N2).
-#        Now: capture stdout+stderr together (they are mutually exclusive —
-#        success prints only a boolean, failure prints only a message) and
-#        classify by (rc, output) rather than rc alone. The "genuinely no
-#        git repository anywhere" case is preserved as N2 by matching git's
-#        own "not a git repository" fatal text — a bare exit code alone
-#        cannot distinguish it from an ownership/permission failure, which
-#        correctly stays N3. (`team-init.sh` never reaches this branch in
-#        the symmetry table's own fixtures, since every call site here is
-#        given a real, `git init`-ed target — but the classification stays
-#        byte-identical to `bin/team-paths.sh`'s per D8.)
-#   M3 — `check-ignore` queried the resolved base with no trailing slash,
-#        so a directory-form rule (`<base>/` — the form docs/adopting.md
-#        recommends) silently misses whenever the base dir does not yet
-#        exist on disk. D9's after-scaffolding ordering already makes this
-#        script immune in practice (the base dir always exists by the time
-#        this runs), but the query is normalized here too (`"${base%/}/"`)
-#        for the byte-identical-probe guarantee D8 requires between the two
-#        scripts.
-#   Minor #1 (ls-files error-swallowing) closed as a side effect of the M2
-#   restructuring rather than deferred: `ls-files`'s own exit status is now
-#   reflected into the undeterminable class instead of being discarded via
-#   `|| true`, since the restructuring needed a single classify-then-emit
-#   shape anyway and this was the same shape of check.
-# ---------------------------------------------------------------------------
-warn_ignored_base() {
-  local root="$1" base="$2" msg class="" wt_out="" wt_rc=0 tracked="" tracked_rc=0 rc
-
-  if ! command -v git >/dev/null 2>&1; then
-    class="undeterminable"
-  else
-    # Capture stdout+stderr together: a successful rev-parse prints only the
-    # boolean on stdout with nothing on stderr, and a failing one prints
-    # only a fatal message on stderr with nothing on stdout — the two never
-    # overlap, so merging them into one variable loses no information.
-    if wt_out="$(git -C "$root" rev-parse --is-inside-work-tree 2>&1)"; then
-      wt_rc=0
-    else
-      wt_rc=$?
-    fi
-
-    if [ "$wt_rc" -eq 0 ] && [ "$wt_out" = "true" ]; then
-      # Inside a work tree: probe the tracked-file and ignore state below.
-      if tracked="$(git -C "$root" ls-files -- ":(literal)$base" 2>/dev/null)"; then
-        tracked_rc=0
-      else
-        tracked_rc=$?
-      fi
-      if [ "$tracked_rc" -ne 0 ]; then
-        # ls-files itself failed (e.g. an unreadable/corrupt index) — its
-        # own answer cannot be trusted either way, so this is undeterminable
-        # rather than a silent (false) empty read.
-        class="undeterminable"
-      elif [ -n "$tracked" ]; then
-        # Silent when at least one file under the base dir is already
-        # tracked (D6): an adopter who has tracked part of the base dir has
-        # decided to track it, and warning anyway would be a false positive.
-        class=""
-      else
-        if git -C "$root" -c core.literalPathspecs=true check-ignore -q -- "${base%/}/"; then
-          rc=0
-        else
-          rc=$?
-        fi
-        case "$rc" in
-          0) class="ignored" ;;
-          1) class="" ;;
-          *) class="undeterminable" ;;
-        esac
-      fi
-    elif [ "$wt_rc" -eq 0 ] && [ "$wt_out" = "false" ]; then
-      # A bare repository (or cwd inside .git itself): a real work-tree
-      # answer, just a negative one.
-      class="outside"
-    elif printf '%s' "$wt_out" | grep -qF -- 'not a git repository'; then
-      # Genuinely outside any git repository at all (no .git found walking
-      # up from $root) — git's own diagnostic names this specific reason.
-      class="outside"
-    else
-      # Any other rev-parse failure (dubious ownership, permission denied,
-      # a corrupted repository, or any future message this does not
-      # recognize) is NOT "outside a work tree" — it is undeterminable.
-      class="undeterminable"
-    fi
-  fi
-
-  case "$class" in
-    ignored)
-      printf -v msg 'the resolved base dir %s is matched by a git ignore rule and holds no tracked file, so everything the loop writes under it — the board, provenance, interventions and review records among them — cannot be committed and survives only in this working tree. Ignoring the base dir is a supported choice (see the README section on deciding whether the base dir belongs in git); if you meant these records to be versioned, remove or override the ignore rule that matches this path.' "$base"
-      log_warn "$msg"
-      ;;
-    outside)
-      printf -v msg 'the resolved base dir %s is not inside a git work tree, so whether it can be committed could not be determined and nothing written there is under version control.' "$base"
-      log_warn "$msg"
-      ;;
-    undeterminable)
-      printf -v msg 'whether the resolved base dir %s is matched by a git ignore rule could not be determined (git did not answer), so treat the durability of anything written there as unknown rather than as fine.' "$base"
-      log_warn "$msg"
-      ;;
-    *) : ;;
-  esac
-}
 
 print_help() {
   cat <<'EOF'
@@ -370,10 +237,6 @@ copy_template "$AGENTS_TPL"   "$TEAM_RUN_BASE/AGENTS.md"
 # first and extend across tasks — protected: never overwritten, even by --force.
 copy_template_protected "$RECIPE_TPL" "$TEAM_RUN_BASE/test-recipe.md"
 copy_template "$GITIGNORE_TPL" "$TEAM_RUN_BASE/.gitignore"
-
-# Ignored-base notice (T-1042): run AFTER scaffolding above, once the base
-# dir actually exists on disk (D9) — see warn_ignored_base()'s header note.
-warn_ignored_base "$TARGET" "$TEAM_RUN_BASE"
 
 # ---------------------------------------------------------------------------
 # Summary + adoption nudge. The host's CLAUDE.md and root .gitignore are

@@ -59,8 +59,6 @@ Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir w
 - **Track it** — the board, specs, and review artifacts become versioned project records (that is how this repo dogfoods itself).
 - **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore` (scoped to that repo, trivially reversed), or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in. The global route is machine-wide, so it also hides the base dir in a repo where you later *do* want the board tracked; `!.shell-team/` in that repo's root `.gitignore` brings it back, because repo-level patterns outrank the global file. This repo carries that line for exactly that reason. [docs/adopting.md](docs/adopting.md) covers one further consequence, for tooling that asks git whether a path is ignored.
 
-If you choose to keep it out of git, `team-init` and `bin/team-paths.sh --print` say so once, on stderr, the moment the resolved base dir is both ignored and holds no tracked file yet — the loop's "commit this immediately" disciplines (provenance, interventions, the board) cannot survive a destination `git add` treats as a no-op, so this surfaces that consequence instead of leaving it to a quiet `git status`.
-
 Full details, updates, and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
 
 ## Usage

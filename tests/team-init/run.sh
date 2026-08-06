@@ -16,13 +16,6 @@
 #
 # Avoids mktemp (writes under $HERE/tmp-targets, cleaned via trap) so the suite
 # runs in restricted sandboxes.
-#
-# The ignored-base notice cases (T-1042) below are the one exception: two of
-# them need a REAL `git init`-ed work tree (D12), and sandboxed runs deny
-# writes to a nested .git/ inside this repo's own tree — the same constraint
-# tests/retro-inputs/run.sh's header already documents and works around.
-# Those fixtures therefore live under $TMPDIR (falling back to $HERE/git-tmp
-# on plain CI runners) instead of $TMP, with their own trap.
 
 set -euo pipefail
 
@@ -33,12 +26,6 @@ CHECK_HANDOFF="$REPO_ROOT/bin/check-handoff.sh"
 CHECK_CONTRACT="$REPO_ROOT/bin/check-contract.sh"
 TMP="$HERE/tmp-targets"
 
-if [ -n "${TMPDIR:-}" ]; then
-  GTMP="${TMPDIR%/}/team-init-ignore-fixtures"
-else
-  GTMP="$HERE/git-tmp"
-fi
-
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
@@ -46,9 +33,9 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # assertions are not perturbed by the caller's environment.
 init() { env -u TEAM_RUN_BASE bash "$INIT" "$@"; }
 
-rm -rf "$TMP" "$GTMP"
-trap 'rm -rf "$TMP" "$GTMP"' EXIT
-mkdir -p "$TMP" "$GTMP"
+rm -rf "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP"
 
 # --- AC1: fresh target -> scaffold under .shell-team/ -------------------------
 T1="$TMP/fresh"
@@ -280,73 +267,6 @@ init "$T_SYM_KEEP" >/dev/null 2>&1 || fail "T-061 AC3: team-init exited non-zero
 [ -L "$T_SYM_KEEP/.shell-team/runs/.gitkeep" ] \
   || fail "T-061 AC3: the pre-existing dangling symlink at runs/.gitkeep should be preserved untouched"
 pass "T-061 AC3: ensure_gitkeep() skips a dangling symlink at the destination (no write-through, no base escape)"
-
-# --- ignored-base notice (T-1042) -------------------------------------------
-# `git check-ignore` consults the operator's global core.excludesFile, so
-# every fixture below pins that input explicitly (D12) via the fixture
-# repo's OWN core.excludesFile config (persists across every subsequent git
-# invocation against that repo, including the ones team-init.sh itself
-# makes) rather than a transient `-c` flag on a single command.
-
-# LA9: team-init emits the identical notice body for an ignored base dir.
-# The .gitignore is written BEFORE team-init runs, matching a directory-form
-# rule against a base dir that does not exist yet -- exactly the case D9
-# exists for: the notice must still fire once team-init has created it.
-LA9="$GTMP/la9-ignored"
-mkdir -p "$LA9"
-git -C "$LA9" init -q
-git -C "$LA9" config core.excludesFile /dev/null
-printf '.shell-team/\n' > "$LA9/.gitignore"
-la9_err=""
-init "$LA9" >/dev/null 2> "$TMP/la9.err" || fail "LA9: team-init exited non-zero"
-la9_err="$(cat "$TMP/la9.err")"
-printf '%s\n' "$la9_err" | grep -qF -- 'is matched by a git ignore rule and holds no tracked file' \
-  || fail "ignored-base notice: team-init emits the identical notice body for an ignored base dir"
-printf '%s\n' "$la9_err" | grep -qF -- '.shell-team' \
-  || fail "ignored-base notice: team-init emits the identical notice body for an ignored base dir (base dir not named)"
-pass "ignored-base notice: team-init emits the identical notice body for an ignored base dir"
-
-# LA10: team-init stays silent and unchanged for a base dir no rule matches.
-# Compared against a plain (non-git) control target: both scaffold the same
-# templates, so their created/skipped counts must match even though one ran
-# inside a git-init-ed, not-ignored work tree and the other did not.
-LA10_CONTROL="$TMP/la10-control"
-mkdir -p "$LA10_CONTROL"
-rc_control=0
-init "$LA10_CONTROL" > "$TMP/la10-control.out" 2> "$TMP/la10-control.err" || rc_control=$?
-
-LA10_GIT="$GTMP/la10-not-ignored"
-mkdir -p "$LA10_GIT"
-git -C "$LA10_GIT" init -q
-git -C "$LA10_GIT" config core.excludesFile /dev/null
-rc_git=0
-init "$LA10_GIT" > "$TMP/la10-git.out" 2> "$TMP/la10-git.err" || rc_git=$?
-
-[ "$rc_control" -eq 0 ] || fail "ignored-base notice: team-init stays silent and unchanged for a base dir no rule matches (control exited $rc_control)"
-[ "$rc_git" -eq "$rc_control" ] \
-  || fail "ignored-base notice: team-init stays silent and unchanged for a base dir no rule matches (exit status differs: $rc_git vs $rc_control)"
-[ ! -s "$TMP/la10-git.err" ] \
-  || fail "ignored-base notice: team-init stays silent and unchanged for a base dir no rule matches (unexpected stderr: $(cat "$TMP/la10-git.err"))"
-la10_control_summary="$(grep -oE -- '[0-9]+ created/updated, [0-9]+ skipped' "$TMP/la10-control.out")"
-la10_git_summary="$(grep -oE -- '[0-9]+ created/updated, [0-9]+ skipped' "$TMP/la10-git.out")"
-[ -n "$la10_control_summary" ] || fail "ignored-base notice: team-init stays silent and unchanged for a base dir no rule matches (control summary not found)"
-[ "$la10_control_summary" = "$la10_git_summary" ] \
-  || fail "ignored-base notice: team-init stays silent and unchanged for a base dir no rule matches (summary differs: '$la10_git_summary' vs '$la10_control_summary')"
-pass "ignored-base notice: team-init stays silent and unchanged for a base dir no rule matches"
-
-# LA11: team-init reports an undeterminable ignore status for a non-git
-# target. Must be built OUTSIDE this repository's own tree (a plain
-# subdirectory under $TMP/$GTMP would still be inside THIS repo's work tree,
-# walking up to its .git), so this one fixture uses a guarded mktemp under
-# $TMPDIR instead -- mirrors tests/team-paths/run.sh's LA6.
-LA11="$(mktemp -d "${TMPDIR:-/tmp}/team-init-nongit-target.XXXXXX")"
-rc_la11=0
-init "$LA11" >/dev/null 2> "$TMP/la11.err" || rc_la11=$?
-[ "$rc_la11" -eq 0 ] || fail "ignored-base notice: team-init reports an undeterminable ignore status for a non-git target (exited $rc_la11)"
-grep -qF -- 'is not inside a git work tree' "$TMP/la11.err" \
-  || fail "ignored-base notice: team-init reports an undeterminable ignore status for a non-git target"
-pass "ignored-base notice: team-init reports an undeterminable ignore status for a non-git target"
-rm -rf "$LA11"
 
 # --- argument handling -----------------------------------------------------
 set +e
