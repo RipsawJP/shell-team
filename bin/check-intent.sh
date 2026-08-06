@@ -85,6 +85,21 @@
 #
 # Usage:
 #   check-intent.sh [--] <spec.md> <board.md>
+#   check-intent.sh --print-hash <spec.md>
+#
+# --print-hash (T-1041): prints the frozen intent block's 40-hex hash and one
+# trailing LF on stdout, and NOTHING else — no board argument, no ledger
+# judgment of any kind. It shares every judgment upstream of hashing with the
+# two-argument mode (spec type/readability, Task ID derivation, marker
+# structural checks, extraction, normalization, hashing) — the SAME pipeline,
+# not a second implementation of the same normalization — so the value this
+# prints is byte-identical to the value the two-argument mode itself computes
+# and verifies. Every refusal in this mode writes zero bytes to stdout and
+# reuses the SAME classified exit paths (die/fail_usage/fail_structural)
+# documented below. Mode flags are mutually exclusive: a repeated or
+# conflicting mode flag is a usage(2) error, following bin/team-paths.sh:81's
+# `set_mode` precedent (a typo should be a clear error, not a silent
+# honouring of whichever flag came last).
 #
 # Exit: 0 = aligned; 1 = drift-detected (hash mismatch or broken version
 #       chain); 2 = usage / structural error (bad args, unreadable files,
@@ -185,9 +200,20 @@ print_help() {
 # --- argument parsing (positional; -- ends option parsing) ------------------
 SPEC=""
 BOARD=""
+PRINT_HASH=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) print_help; exit 0 ;;
+    --print-hash)
+      # T-1041 D1: mode flags are mutually exclusive, following
+      # bin/team-paths.sh:81's `set_mode` precedent — a repeated or
+      # conflicting mode flag is a usage(2) error rather than last-one-wins,
+      # so a typo is a clear error instead of a silent honouring of
+      # whichever flag came last.
+      [ "$PRINT_HASH" -eq 0 ] || fail_usage "specify --print-hash at most once (mode flags are mutually exclusive)"
+      PRINT_HASH=1
+      shift
+      ;;
     --) shift; break ;;
     -*) fail_usage "unknown flag: $1" ;;
     *)  break ;;
@@ -195,11 +221,16 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$#" -ge 1 ]; then SPEC="$1"; shift; fi
-if [ "$#" -ge 1 ]; then BOARD="$1"; shift; fi
+# T-1041 D1: a board argument in print mode is a usage(2) error rather than
+# optional-and-ignored — accepting one would invite a caller to believe the
+# board was validated when nothing about it was ever read (D2 below).
+if [ "$PRINT_HASH" -eq 0 ] && [ "$#" -ge 1 ]; then BOARD="$1"; shift; fi
 [ "$#" -eq 0 ] || fail_usage "unexpected extra argument: $1"
 
-[ -n "$SPEC" ]  || fail_usage "missing required <spec.md> (usage: check-intent.sh <spec.md> <board.md>)"
-[ -n "$BOARD" ] || fail_usage "missing required <board.md> (usage: check-intent.sh <spec.md> <board.md>)"
+[ -n "$SPEC" ] || fail_usage "missing required <spec.md> (usage: check-intent.sh [--print-hash] <spec.md> [<board.md>])"
+if [ "$PRINT_HASH" -eq 0 ]; then
+  [ -n "$BOARD" ] || fail_usage "missing required <board.md> (usage: check-intent.sh <spec.md> <board.md>)"
+fi
 # Type + readability validation happens HERE, before either read loop below
 # is ever reached (T-071 rework2 "引数の型・健全性検証"). A directory or FIFO
 # is rejected as usage(2) rather than being handed to a `while read` loop —
@@ -209,8 +240,10 @@ if [ "$#" -ge 1 ]; then BOARD="$1"; shift; fi
 # (readable) so a directory is classified by its TYPE, not its permissions.
 [ -f "$SPEC" ]  || fail_usage "spec path is not a regular file (directories/FIFOs/etc. are rejected): $SPEC"
 [ -r "$SPEC" ]  || fail_usage "cannot read spec file: $SPEC"
-[ -f "$BOARD" ] || fail_usage "board path is not a regular file (directories/FIFOs/etc. are rejected): $BOARD"
-[ -r "$BOARD" ] || fail_usage "cannot read board file: $BOARD"
+if [ "$PRINT_HASH" -eq 0 ]; then
+  [ -f "$BOARD" ] || fail_usage "board path is not a regular file (directories/FIFOs/etc. are rejected): $BOARD"
+  [ -r "$BOARD" ] || fail_usage "cannot read board file: $BOARD"
+fi
 
 # --- normalization: identical to check-prompt-sync.sh's normalize_stdin ----
 normalize_stdin() {
@@ -308,6 +341,24 @@ awk -v b="$begin_ln" -v e="$end_ln" 'NR > b && NR < e' "$SPEC" | normalize_stdin
   || fail_usage "failed to extract+normalize the intent block from $SPEC into a temp file (possible causes: disk full, a file-size quota such as ulimit -f, or an awk/sed failure in the extraction pipeline)"
 computed_hash="$(git hash-object --stdin < "$tmp_region")" \
   || fail_usage "git hash-object failed while hashing the intent block extracted from $SPEC"
+
+# --- print mode (T-1041 D2/D3): exit HERE, before the board is ever
+# required. Everything above this point — spec type/readability, Task ID
+# derivation, marker structural checks, extraction, normalization, hashing —
+# is shared verbatim with the two-argument mode below; this sharing IS the
+# one-pipeline property this mode exists to establish (AC2). The stdout
+# write is deliberately NOT `|| true`-guarded (D3): unlike the courtesy
+# `aligned:` line further down, the printed value here IS the deliverable, so
+# swallowing a write failure would let a caller record an empty string as a
+# hash — precisely the class of defect this task removes. A write failure is
+# therefore a classified usage(2) exit through the existing `die`, adding no
+# new stderr write site. The EXIT trap installed above (cleanup_tmp_region)
+# still fires on this `exit 0`, so the temp file this mode created is never
+# leaked.
+if [ "$PRINT_HASH" -eq 1 ]; then
+  printf '%s\n' "$computed_hash" || fail_usage "failed to write the computed hash to stdout"
+  exit 0
+fi
 
 # T-1018 D4: "the counted total" — the number of physical lines matching
 # `^[[:space:]]+- check:` inside the ALREADY-EXTRACTED, ALREADY-NORMALIZED
@@ -623,8 +674,14 @@ else
   # D2 rule 1 — malformed first: ANY attestation-shaped line that fails the
   # full grammar is a refusal, whatever else is true. A record this checker
   # cannot parse is never treated as absent, and never as present.
+  # T-1041 D4b: this is the one refusal path measured to print an abstract
+  # grammar and no spec-derived count — a record this checker cannot parse
+  # is, by definition, not something it can name a per-field measured value
+  # for. It additionally names the count IT measured against this spec's own
+  # intent block, and the conformant shape that count implies, so a writer
+  # is not left to guess what a well-formed record for THIS spec would say.
   [ "$attest_bad_count" -eq 0 ] \
-    || fail_attestation "$attest_bad_count malformed freeze-attestation record(s) for $TASK_ID in $BOARD (expected '- freeze-attestation (vN, YYYY-MM-DD): lines=<ran>/<total> sweep=mutual-satisfiability verdict=<P>P/<F>F owner=<value>')"
+    || fail_attestation "$attest_bad_count malformed freeze-attestation record(s) for $TASK_ID in $BOARD (expected '- freeze-attestation (vN, YYYY-MM-DD): lines=<ran>/<total> sweep=mutual-satisfiability verdict=<P>P/<F>F owner=<value>'; the intent block being checked carries $counted_total '- check:' line(s), so a conformant record for it reads lines=${counted_total}/${counted_total})"
 
   # D2 rule 3 — the pace rule: exactly one well-formed attestation for each
   # version 1..N, and none outside that range. A missing, duplicated or
@@ -646,10 +703,14 @@ else
       # never has to guess (AC3). Deliberately NOT a valid record: the
       # YYYY-MM-DD / <P> / <F> / <who ran them> placeholders make a
       # verbatim paste refuse again rather than silently pass (D4).
+      # T-1041 D4a: the measured substitution and the placeholders were
+      # typographically indistinguishable on this one line — a measured
+      # `lines=12/12` read exactly like an example. The trailing sentence
+      # below says, in words, which of these fields is which.
       remedy="  - freeze-attestation (v${v}, YYYY-MM-DD): lines=${counted_total}/${counted_total} sweep=mutual-satisfiability verdict=<P>P/<F>F owner=<who ran them>"
       fail_attestation "expected exactly one freeze-attestation record for $TASK_ID v$v in $BOARD (found $count_v; a freeze is refused unless the board carries a conformant freeze-attestation record for the version being recorded — write:
 $remedy
-)"
+— the lines= counts above are measured, not an example: they already equal what this checker counted in $SPEC's intent block, so copy them as-is and replace only YYYY-MM-DD, <P>P/<F>F and <who ran them> with what you actually measured.)"
     fi
     v=$((v + 1))
   done
