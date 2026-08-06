@@ -49,6 +49,18 @@ base dir を git に載せない場合、その方法 2 つは効く範囲が違
 その行を持っており、`.shell-team/` を global に無視している操作者の環境でも自分の
 base dir は追跡されたままになります。
 
+T-1042 以降、`team-init` と `bin/team-paths.sh --print` はこの選択を `git status`
+の静かな沈黙に委ねず、自ら可視化します。解決済みの base dir が ignore ルールに
+一致し、かつ追跡中のファイルを 1 つも持たない場合、両方が終了ステータスを変えずに
+一度だけ stderr に 1 行の notice を出します——このループが依存する「即座にコミット
+する」規律（provenance・interventions・board）は、宛先が `git add` に対して no-op
+になる場所では成立し得ないからです。この notice は、このドキュメントがすでに
+テストで明示的に pin するよう案内している同じ `git check-ignore` の上に構築されて
+おり、あなたのマシンの global excludes も同様に尊重します——repo 自身の
+`.gitignore` ではなく global ファイルだけが base dir を隠している場合でも notice
+は発火します。base dir 配下に追跡中のファイルが既にある場合、またはどのルールにも
+一致しない場合は、両方とも沈黙したままです。
+
 global ファイルにはもう 1 つ影響があります。あるパスが無視されるかを git に
 問い合わせるもの——`git check-ignore` や、それを土台にしたチェック——もその
 ファイルを読みます。したがってそうしたチェックは、global excludes の無い CI では

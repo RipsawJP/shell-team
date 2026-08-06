@@ -11,11 +11,13 @@
 #
 # Precedence (highest wins), evaluated against a repo ROOT (default: cwd):
 #   1. $TEAM_RUN_BASE env  — explicit operator/CI/host override (repo-relative).
-#   2. legacy layout       — if ROOT/tasks/loops/ exists, use the historical
-#                            split layout (base=tasks, specs=docs/specs). The
-#                            marker is `tasks/loops/` (plugin-unique), NOT a bare
-#                            `tasks/todo.md`, so an unrelated host `tasks/` dir
-#                            is never misdetected as a shell-team install.
+#   2. legacy layout       — if ROOT/tasks/loops/shell-team.contract.yaml
+#                            exists, use the historical split layout
+#                            (base=tasks, specs=docs/specs). The marker is
+#                            the contract file itself (plugin-unique), NOT a
+#                            bare `tasks/loops/` directory or a bare
+#                            `tasks/todo.md`, so an unrelated host `tasks/`
+#                            dir is never misdetected as a shell-team install.
 #   3. default             — base=.shell-team (specs=.shell-team/specs).
 #
 # Derived paths (all ROOT-relative):
@@ -50,6 +52,61 @@ set -euo pipefail
 
 die() { printf 'team-paths: %s\n' "$*" >&2 || true; exit 2; }
 
+# ---------------------------------------------------------------------------
+# Ignored-base notice (T-1042): a resolved base dir that a git ignore rule
+# matches and holds no tracked file voids the loop's "commit this
+# immediately" disciplines (provenance, interventions, the board) while
+# every other gate — seam checkers, the T-073 uncommitted-diff guard, `git
+# status` itself — stays green, because staging an ignored path is a no-op.
+# Advisory only (D2): this script is a resolver, not a checker, and the
+# README / docs/adopting.md both declare ignoring the base dir a supported
+# adopter choice — this notice only makes that choice visible. Fires on
+# --print only (AC10: --export and --get never probe or warn). D8: this
+# probe and its three message bodies are duplicated byte-for-byte in
+# bin/team-init.sh rather than shared, per this repo's zero-dependency,
+# standalone-bin-script convention.
+# ---------------------------------------------------------------------------
+warn_ignored_base() {
+  local root="$1" base="$2" rc msg tracked git_ok=1
+
+  if ! command -v git >/dev/null 2>&1; then
+    git_ok=0
+  elif ! git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf -v msg 'the resolved base dir %s is not inside a git work tree, so whether it can be committed could not be determined and nothing written there is under version control.' "$base"
+    printf 'team-paths: %s\n' "$msg" >&2 || true
+    return 0
+  fi
+
+  if [ "$git_ok" -eq 1 ]; then
+    # Silent when at least one file under the base dir is already tracked
+    # (D6): an adopter who has tracked part of the base dir has decided to
+    # track it, and warning anyway would be a false positive.
+    tracked="$(git -C "$root" ls-files -- "$base" 2>/dev/null || true)"
+    if [ -n "$tracked" ]; then
+      return 0
+    fi
+    if git -C "$root" check-ignore -q -- "$base"; then
+      rc=0
+    else
+      rc=$?
+    fi
+  else
+    rc=99   # sentinel: git absent -> fall straight into the undeterminable branch
+  fi
+
+  case "$rc" in
+    0)
+      printf -v msg 'the resolved base dir %s is matched by a git ignore rule and holds no tracked file, so the board, specs, provenance, interventions and review records written there cannot be committed and survive only in this working tree. Ignoring the base dir is a supported choice (see the README section on deciding whether the base dir belongs in git); if you meant these records to be versioned, remove or override the ignore rule that matches this path.' "$base"
+      printf 'team-paths: %s\n' "$msg" >&2 || true
+      ;;
+    1) : ;;
+    *)
+      printf -v msg 'whether the resolved base dir %s is matched by a git ignore rule could not be determined (git did not answer), so treat the durability of anything written there as unknown rather than as fine.' "$base"
+      printf 'team-paths: %s\n' "$msg" >&2 || true
+      ;;
+  esac
+}
+
 print_help() {
   cat <<'EOF'
 Usage: team-paths.sh [--root DIR] (--export | --get KEY | --print)
@@ -58,7 +115,7 @@ Resolve where the shell-team loop's per-repo operating files live.
 
 Precedence (highest first), against ROOT (default: current directory):
   1. $TEAM_RUN_BASE env   explicit override (repo-relative)
-  2. legacy layout        if ROOT/tasks/loops/ exists -> base=tasks, specs=docs/specs
+  2. legacy layout        if ROOT/tasks/loops/shell-team.contract.yaml exists -> base=tasks, specs=docs/specs
   3. default              base=.shell-team, specs=.shell-team/specs
 
 Modes:
@@ -204,6 +261,7 @@ case "$MODE" in
     printf '  %-13s %s\n' "provenance"    "$PROVENANCE"
     printf '  %-13s %s\n' "interventions" "$INTERVENTIONS"
     printf '  %-13s %s\n' "lessons"       "$LESSONS"
+    warn_ignored_base "$ROOT" "$BASE"
     ;;
 esac
 exit 0

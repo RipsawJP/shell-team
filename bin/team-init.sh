@@ -53,6 +53,63 @@ log_err()  { printf '%s\n' "$*" >&2 || true; }
 log_warn() { printf 'WARN: %s\n' "$*" >&2; }
 die()      { log_err "ERROR: $*"; exit 2; }
 
+# ---------------------------------------------------------------------------
+# Ignored-base notice (T-1042): a resolved base dir that a git ignore rule
+# matches and holds no tracked file voids the loop's "commit this
+# immediately" disciplines (provenance, interventions, the board) while
+# every other gate — seam checkers, the T-073 uncommitted-diff guard, `git
+# status` itself — stays green, because staging an ignored path is a no-op.
+# Advisory only (D2): this script is a scaffolder, not a checker, and the
+# README / docs/adopting.md both declare ignoring the base dir a supported
+# adopter choice — this notice only makes that choice visible. Emitted AFTER
+# scaffolding (D9): a directory-form ignore rule (<base>/) cannot match a
+# path that does not exist yet, so probing before the base dir is created
+# would be silently vacuous in the common case. D8: this probe and its three
+# message bodies are duplicated byte-for-byte in bin/team-paths.sh rather
+# than shared, per this repo's zero-dependency, standalone-bin-script
+# convention.
+# ---------------------------------------------------------------------------
+warn_ignored_base() {
+  local root="$1" base="$2" rc msg tracked git_ok=1
+
+  if ! command -v git >/dev/null 2>&1; then
+    git_ok=0
+  elif ! git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf -v msg 'the resolved base dir %s is not inside a git work tree, so whether it can be committed could not be determined and nothing written there is under version control.' "$base"
+    log_warn "$msg"
+    return 0
+  fi
+
+  if [ "$git_ok" -eq 1 ]; then
+    # Silent when at least one file under the base dir is already tracked
+    # (D6): an adopter who has tracked part of the base dir has decided to
+    # track it, and warning anyway would be a false positive.
+    tracked="$(git -C "$root" ls-files -- "$base" 2>/dev/null || true)"
+    if [ -n "$tracked" ]; then
+      return 0
+    fi
+    if git -C "$root" check-ignore -q -- "$base"; then
+      rc=0
+    else
+      rc=$?
+    fi
+  else
+    rc=99   # sentinel: git absent -> fall straight into the undeterminable branch
+  fi
+
+  case "$rc" in
+    0)
+      printf -v msg 'the resolved base dir %s is matched by a git ignore rule and holds no tracked file, so the board, specs, provenance, interventions and review records written there cannot be committed and survive only in this working tree. Ignoring the base dir is a supported choice (see the README section on deciding whether the base dir belongs in git); if you meant these records to be versioned, remove or override the ignore rule that matches this path.' "$base"
+      log_warn "$msg"
+      ;;
+    1) : ;;
+    *)
+      printf -v msg 'whether the resolved base dir %s is matched by a git ignore rule could not be determined (git did not answer), so treat the durability of anything written there as unknown rather than as fine.' "$base"
+      log_warn "$msg"
+      ;;
+  esac
+}
+
 print_help() {
   cat <<'EOF'
 Usage: bin/team-init.sh [--force] <target_path>
@@ -237,6 +294,10 @@ copy_template "$AGENTS_TPL"   "$TEAM_RUN_BASE/AGENTS.md"
 # first and extend across tasks — protected: never overwritten, even by --force.
 copy_template_protected "$RECIPE_TPL" "$TEAM_RUN_BASE/test-recipe.md"
 copy_template "$GITIGNORE_TPL" "$TEAM_RUN_BASE/.gitignore"
+
+# Ignored-base notice (T-1042): run AFTER scaffolding above, once the base
+# dir actually exists on disk (D9) — see warn_ignored_base()'s header note.
+warn_ignored_base "$TARGET" "$TEAM_RUN_BASE"
 
 # ---------------------------------------------------------------------------
 # Summary + adoption nudge. The host's CLAUDE.md and root .gitignore are
