@@ -60,7 +60,7 @@ Frozen message body **N1** — the *ignored* notice, one line, with a single `%s
 
 <!-- frozen-begin: N1 -->
 ```text
-the resolved base dir %s is matched by a git ignore rule and holds no tracked file, so the board, specs, provenance, interventions and review records written there cannot be committed and survive only in this working tree. Ignoring the base dir is a supported choice (see the README section on deciding whether the base dir belongs in git); if you meant these records to be versioned, remove or override the ignore rule that matches this path.
+the resolved base dir %s is matched by a git ignore rule and holds no tracked file, so everything the loop writes under it — the board, provenance, interventions and review records among them — cannot be committed and survives only in this working tree. Ignoring the base dir is a supported choice (see the README section on deciding whether the base dir belongs in git); if you meant these records to be versioned, remove or override the ignore rule that matches this path.
 ```
 <!-- frozen-end: N1 -->
 
