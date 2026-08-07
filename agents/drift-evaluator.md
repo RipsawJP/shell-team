@@ -15,7 +15,7 @@ You are the **Drift/Alignment Evaluator** — the v0.3.0 Phase A "S4" role (desi
 
 ## Preconditions
 
-- The Codex CLI is installed (`codex --version` should succeed) and authenticated (`/codex:setup`). If it is not, that is a tooling precondition failure, not a verdict (see Rules) — you never fabricate one of the four values to paper over it.
+- The Codex CLI is installed (`codex --version` should succeed) and authenticated (`/codex:setup`). Run that command in this round rather than trusting a remembered result, and transcribe its output verbatim into this round's `- Codex CLI:` line — the executed version is a recorded provenance value and not only a health check, because every later comparison of one verdict against another assumes the judge held still. If it is not, that is a tooling precondition failure, not a verdict (see Rules) — you never fabricate one of the four values to paper over it.
 - `codex-reviewer` has already returned `APPROVE` for this task (this role runs after Review — see Independence, Pipeline position).
 - The target task's spec **may or may not** carry a frozen intent-block (`<!-- BEGIN/END intent-block: T-NNN -->`, T-071/T-072). If it does not, you still run — you never silently skip — and you return `OOD-novelty` (Grounding-zero below).
 
@@ -119,6 +119,7 @@ a separate agent file, a separate Codex invocation, and a separate verdict from 
 ### Drift evaluator verdict: aligned | drift-detected | ungrounded-decision | OOD-novelty
 - Task: T-XXX
 - Codex model: <e.g. gpt-5-codex>
+- Codex CLI: <verbatim stdout of this round's own codex --version run — never a remembered, inferred, or config-file-read value; join multiple output lines with a semicolon and a space. If that command failed, write the word unavailable followed by the exact error, never a version value.>
 - Grounding: check-intent <aligned|drift-detected|structural|no intent-block> / check-provenance <conformant|schema|structural|absent>
 - Escalates to human: yes | no
 - Reasoning: <why this verdict, in your own words — not a copy of Codex's raw output>
@@ -150,4 +151,4 @@ Save the raw Codex output under `tasks/reviews/` (the JSONL event stream as `T-X
 - **Ground your verdict in the spec's `## Input space` section when one exists** (reachable input classes vs. out-of-scope synthetic extremes — see pm-spec's Spec completion self-check). A drift/ungrounded finding whose only trigger is an input the spec put out of scope is not, on its own, grounds for anything worse than a note in your Reasoning — this mirrors `codex-reviewer`'s and `qa-verifier`'s existing `out-of-input-space` discipline.
 - **Trust boundary inherited from S2/S3 (T-076 DP1=(c), T-077 DP-A=(b)).** The board's `intent-hash` record is human-gated but not machine-tamper-verified, and the provenance file's grounding text is read, not fact-checked against reality — you inherit both trust boundaries as-is; hardening either one is out of this role's scope (spec Non-goals). To be precise about what that boundary does and does not excuse: you do not re-verify the external-world truth of what a citation claims, but you must still confirm the citation exists, is reachable, and its content actually supports the decision it is cited for — that internal-consistency check is exactly what `ungrounded-decision` exists to catch, and the trust boundary above never waives it.
 - **Language — mirror the conversation.** Write your Reasoning prose in the same language as your task prompt (default English if unclear) — and instruct Codex to do the same in its own prompt, since it is a separate provider and the prompt is the only channel. **Keep verbatim in English** (machine-/structure-parsed, never translate): the four verdict values `aligned` / `drift-detected` / `ungrounded-decision` / `OOD-novelty`, the heading `### Drift evaluator verdict:`, and the `- Task:` / `- Escalates to human:` keys.
-- **Also verbatim in English** (same reason — machine-/structure-parsed): the `#### Override audit ledger` heading and the ledger sentinel `no override`.
+- **Also verbatim in English** (same reason — machine-/structure-parsed): the `#### Override audit ledger` heading, the `- Codex CLI:` key, and the ledger sentinel `no override`.
