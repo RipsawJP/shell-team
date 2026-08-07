@@ -112,6 +112,17 @@
 # Signal exits (T-1034 DP11): 129, 130 and 143 mean SIGHUP, SIGINT and
 # SIGTERM terminated the run; they carry no classification and never
 # collide with the 0/1/2 classification contract above.
+#
+# Signal-blocking window (issue #153, adjudicated — behaviour unchanged): the
+# HUP/INT/TERM traps installed above are ignored for the few instructions
+# between `mktemp` creating a temp file and this script registering that path
+# for cleanup. POSIX carries an ignored disposition across exec, so `mktemp`
+# itself is uninterruptible for that window too: if `mktemp` blocks rather
+# than returns, only SIGKILL stops the run, and a SIGKILL there bypasses the
+# EXIT trap and can leave the created file behind. A `mktemp` that hangs
+# rather than fails is the same external-command liveness class this checker
+# has never protected against, so the window is kept and its residue is
+# documented here rather than traded away for a leak.
 
 set -euo pipefail
 
