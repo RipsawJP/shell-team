@@ -55,17 +55,33 @@ excludes exist. Pin it explicitly (`git -c core.excludesFile=/dev/null …`) in
 any assertion about ignore behavior rather than inheriting whatever the operator
 has configured.
 
-`team-init` itself checks this for you: after scaffolding, if `git check-ignore`
-reports the resolved base dir as ignored, it prints an advisory warning to
-stderr naming the dir and explaining that a record the loop newly creates there
-will not be staged by an ordinary `git add`, so the loop's commit steps can
-report success having committed nothing. A file already tracked under that dir
-is unaffected, because a gitignore rule does not apply to tracked paths. This is
-not an error — an ignored base dir is a supported configuration, per the above —
-and `team-init` exits 0 either way. That one warning is the only thing this
-check ever prints: in every other case, including a bare repository, a directory
-with no repository at all, and a repository git cannot read, it stays silent
-rather than guessing.
+`team-init` does not check this for you. Whether the base dir is ignored is a
+question about your repository rather than about the plugin, so what the plugin
+ships is the question rather than an answer to it. Run it yourself, once, from
+the repo root after adopting:
+
+    git check-ignore -v -- "./$(team-paths.sh --get base)/"
+
+If `team-paths.sh` is not on your `PATH`, write the base dir's own name in
+place of the substitution: `.shell-team` by default, `tasks` on the legacy
+layout, or whatever you set `TEAM_RUN_BASE` to. Three answers are possible.
+It prints a line naming a file, a line number and the pattern that matched —
+read that pattern, because a plain one such as `.shell-team/` means the base
+dir is ignored, while a negated one beginning with `!` is a re-include and
+means it is not. It prints nothing at all — no pattern matches the base dir,
+so nothing is ignoring it and there is nothing to do. Or it fails with a
+`fatal:` message — git could not answer the question at all, because there is
+no repository here, or it is a bare repository, or git cannot read it, and in
+that case nothing was determined either way.
+
+If the base dir turns out to be ignored and that was not deliberate, re-include
+it before the loop writes its first record. A record the loop newly creates
+under an ignored dir is an untracked ignored file, so an ordinary `git add`
+will not stage it, and the loop's commit steps can then report success having
+committed nothing. A file already tracked under that dir is unaffected,
+because a gitignore rule does not apply to tracked paths. If it was
+deliberate, this is not an error: an ignored base dir is a supported
+configuration, per the above.
 
 How often the session stops to check with you is your call too, and it is set
 per-checkout rather than shipped: see

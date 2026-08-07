@@ -468,20 +468,3 @@ that file's order.
   is read by every subsequent git invocation against that repo regardless
   of who makes it. T-1046 (Half A's successor) is the most likely
   consumer of both points.
-- T-1046: a fixture that stubs `git` on `PATH` to force one specific
-  subcommand's exit status (a fatal 128 for `rev-parse` or `check-ignore`,
-  for instance) must match the subcommand by scanning every element of
-  `"$@"`, never by testing `"$1"` alone — the code under test almost
-  certainly calls `git -C "$target" <subcommand> ...`, so `"$1"` is `-C`,
-  not the subcommand name, and a `"$1" = "rev-parse"` shim silently never
-  fires (falls through to the real `git` every time, defeating the stub
-  without any error). `tests/team-init/run.sh`'s `make_git_shim()` shows
-  the working pattern (`for a in "$@"; do [ "$a" = "$sub" ] && ...; done`).
-  Also: verifying a "genuinely separate streams, plus an `env -u`
-  neutralization chain" invocation hygiene design needs BOTH elements
-  broken together in a mutation self-check when either one alone would
-  independently defeat the same hazard (confirmed for the `GIT_TRACE`
-  class here) — breaking only one and seeing green is not evidence the
-  lock is weak; it is evidence of intentional belt-and-suspenders defense,
-  and the honest self-check result is "both together reproduce the
-  historical defect", not a single-element break.
