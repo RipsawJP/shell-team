@@ -50,7 +50,7 @@ TEMPLATES_DIR="$REPO_ROOT/templates"
 # I/O helpers.
 # ---------------------------------------------------------------------------
 log_err()  { printf '%s\n' "$*" >&2 || true; }
-log_warn() { printf 'WARN: %s\n' "$*" >&2; }
+log_warn() { printf 'WARN: %s\n' "$*" >&2 || true; }
 die()      { log_err "ERROR: $*"; exit 2; }
 
 print_help() {
@@ -219,6 +219,114 @@ ensure_gitkeep() {
 }
 
 # ---------------------------------------------------------------------------
+# Ignored-base verdict (T-1046, GitHub issue #167): after scaffolding
+# completes, report whether the resolved base dir is git-ignored — an
+# adopter in that state gets a loop that reports success while committing
+# nothing, because every record the loop writes lands in a directory git
+# refuses to stage. This is advisory only (see docs/adopting.md: ignoring
+# the base dir is the adopter's own call); team-init never fails because of
+# a verdict, an undeterminable read, or a missing git.
+#
+# The classification below is a direct transcription of the nine-row
+# decision table frozen in this task's spec
+# (.shell-team/specs/T-1046-ignored-base-verdict.md, "The frozen decision
+# table") — DT0 through DT8. Only two channels are read, both admissible
+# under that spec's rule (a documented contract, read as a machine value):
+#   - `git rev-parse --is-inside-work-tree`, read as rc + a stdout boolean.
+#   - `git check-ignore -q -- "./<base>/"` (normalized: `./`-prefixed, one
+#     trailing slash, no explicit pathspec-magic annotation), read as its
+#     documented exit status 0/1/128.
+# No git diagnostic text is ever read for any purpose. stdout and stderr are
+# always sent to genuinely separate destinations, never merged onto one fd.
+# ---------------------------------------------------------------------------
+
+# git_probe <args...>
+# Every git call this mechanism makes goes through here: LC_ALL=C pinned,
+# and every GIT_* variable whose ambient value could redirect or pollute the
+# read is unset for the duration of the call (belt-and-suspenders hygiene —
+# stream separation below is what actually neutralizes GIT_TRACE; this closes
+# the ambient-environment class on top of it). Always scoped to $TARGET via
+# `-C`, since this script never `cd`s into it.
+git_probe() {
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_LITERAL_PATHSPECS \
+      -u GIT_GLOB_PATHSPECS -u GIT_ICASE_PATHSPECS -u GIT_NOGLOB_PATHSPECS \
+      -u GIT_TRACE -u GIT_TRACE2 -u GIT_TRACE2_EVENT -u GIT_CONFIG_GLOBAL \
+      -u GIT_CONFIG_SYSTEM LC_ALL=C git -C "$TARGET" "$@"
+}
+
+# emit_ignored_base_v1 — DT5. The resolved base dir is git-ignored.
+emit_ignored_base_v1() {
+  log_warn "shell-team: git reports the resolved base dir as ignored: $TEAM_RUN_BASE"
+  log_warn "shell-team: everything the loop writes under it (the board, provenance,"
+  log_warn "shell-team: interventions and review records among them) cannot be"
+  log_warn "shell-team: committed while that rule matches, so the loop's commit steps"
+  log_warn "shell-team: will report success having committed nothing."
+  log_warn "shell-team: If that is deliberate this is not an error. If it is not,"
+  log_warn "shell-team: re-include the base dir before the loop writes its first"
+  log_warn "shell-team: record (see docs/adopting.md)."
+}
+
+# emit_ignored_base_v2 — DT7 / DT8. check-ignore did not return a documented
+# ignored/not-ignored answer, so no verdict is reported.
+emit_ignored_base_v2() {
+  log_warn "shell-team: could not determine whether the resolved base dir is ignored:"
+  log_warn "shell-team: $TEAM_RUN_BASE"
+  log_warn "shell-team: this is a git work tree, but git check-ignore did not return"
+  log_warn "shell-team: one of its documented ignored / not-ignored answers, so no"
+  log_warn "shell-team: verdict is reported here. If the loop's records have to be"
+  log_warn "shell-team: committable, check the dir against your ignore rules yourself."
+}
+
+# report_ignored_base_verdict — the whole nine-row classification, DT0-DT8.
+# Rows are evaluated in id order; the first row whose measured input matches
+# decides the outcome, and this function always returns 0 (D2: advisory, no
+# fail-closed exit anywhere in this mechanism).
+report_ignored_base_verdict() {
+  # DT0: no git channel exists to read.
+  command -v git >/dev/null 2>/dev/null || return 0
+
+  # Read the work-tree channel with stdout and stderr captured to genuinely
+  # separate destinations (stderr discarded — its diagnostic text is never
+  # read, only its absence-of-content matters, and discarding satisfies
+  # that trivially without merging streams). `if var=$(...)` is the guard
+  # that keeps a nonzero git exit from tripping this script's own errexit.
+  local wt_out wt_rc=0
+  if wt_out="$(git_probe rev-parse --is-inside-work-tree 2>/dev/null)"; then
+    wt_rc=0
+  else
+    wt_rc=$?
+  fi
+
+  if [ "$wt_rc" -eq 0 ] && [ "$wt_out" = "true" ]; then
+    : # DT1 — inside a work tree; continue to the check-ignore probe below.
+  elif [ "$wt_rc" -eq 0 ] && [ "$wt_out" = "false" ]; then
+    return 0 # DT2 — a bare repository; no work-tree ignore answer exists.
+  elif [ "$wt_rc" -eq 0 ]; then
+    return 0 # DT3 — outside the documented print contract; unreachable in practice.
+  else
+    return 0 # DT4 — at least five fatal causes collapse to this exit alone.
+  fi
+
+  local ci_rc=0
+  if git_probe check-ignore -q -- "./${TEAM_RUN_BASE%/}/" >/dev/null 2>/dev/null; then
+    ci_rc=0
+  else
+    ci_rc=$?
+  fi
+
+  if [ "$ci_rc" -eq 0 ]; then
+    emit_ignored_base_v1 # DT5
+  elif [ "$ci_rc" -eq 1 ]; then
+    : # DT6 — none of the provided paths are ignored; stay silent.
+  elif [ "$ci_rc" -eq 128 ]; then
+    emit_ignored_base_v2 # DT7
+  else
+    emit_ignored_base_v2 # DT8 — outside the documented exit-status set; unreachable in practice.
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # Scaffold the instance files under the resolved base dir. No host-root file is
 # ever touched — telemetry is ignored via a self-contained <base>/.gitignore.
 # ---------------------------------------------------------------------------
@@ -237,6 +345,11 @@ copy_template "$AGENTS_TPL"   "$TEAM_RUN_BASE/AGENTS.md"
 # first and extend across tasks — protected: never overwritten, even by --force.
 copy_template_protected "$RECIPE_TPL" "$TEAM_RUN_BASE/test-recipe.md"
 copy_template "$GITIGNORE_TPL" "$TEAM_RUN_BASE/.gitignore"
+
+# Scaffolding is complete (the base dir now exists on disk, whatever it
+# contained before) — only now is it meaningful to ask git whether that dir
+# is ignored. See the ignored-base verdict block above for the mechanism.
+report_ignored_base_verdict
 
 # ---------------------------------------------------------------------------
 # Summary + adoption nudge. The host's CLAUDE.md and root .gitignore are

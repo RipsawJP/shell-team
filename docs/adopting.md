@@ -55,6 +55,17 @@ excludes exist. Pin it explicitly (`git -c core.excludesFile=/dev/null …`) in
 any assertion about ignore behavior rather than inheriting whatever the operator
 has configured.
 
+`team-init` itself checks this for you: after scaffolding, if git reports the
+resolved base dir as ignored, it prints an advisory warning to stderr naming
+the dir and explaining that the loop's commit steps will report success
+without having committed anything while that rule matches. This is not an
+error — an ignored base dir is a supported configuration, per the above — and
+`team-init` still exits 0 either way; the warning is only there so you notice
+before the loop's first record silently goes uncommitted. If git itself can't
+give a documented ignored/not-ignored answer (a corrupt or unreachable
+repository, for instance), `team-init` says so rather than guessing, and stays
+silent when there is nothing to report at all.
+
 How often the session stops to check with you is your call too, and it is set
 per-checkout rather than shipped: see
 [tuning-oversight.md](tuning-oversight.md).

@@ -563,20 +563,24 @@ fi
 # =============================================================================
 # (iv) protected content locks (regex-invisible guards).
 #
-# Exactly two known sites have a `|| true`-guarded stderr write where MORE
-# CODE follows on the SAME line after the guard, and that code is neither a
+# Three known sites have a `|| true`-guarded stderr write where MORE CODE
+# follows on the SAME line after the guard, and that code is neither a
 # literal `exit N` (P1) nor end-of-line (P2) nor a heredoc opener (P3): if
 # stripped, the reverted line would match NONE of P1/P2/P3 and would be
 # completely invisible to part (iii)'s static sweep — confirmed empirically
-# (the two protected sites named below are the full, exhaustive result of scanning
-# every `|| true` site in bin/ for this shape; see the T-096 rework hand-off
-# for the derivation):
+# (the sites named below are the full, exhaustive result of scanning every
+# `|| true` site in bin/ for this shape; see the T-096 rework hand-off for
+# the original derivation, and T-1046's hand-off for the third site added
+# there):
 #   - check-design-note.sh's emit() — followed by `; violations=$((...))`
 #   - install / team-init.sh's log_err() — followed by `; }` (end of the
 #     one-line function body, not an exit)
-# Both are locked here by an exact substring assertion (independent of, and
-# in addition to, part (ii)'s exit-code rows for their call sites, which are
-# themselves vacuous-if-N=1 for exactly this reason).
+#   - team-init.sh's log_warn() — followed by `; }` (T-1046: this task makes
+#     the helper reachable on a normal `team-init` run via the new ignored-
+#     base notice, so a closed stderr must not abort the whole scaffolder)
+# All three are locked here by an exact substring assertion (independent of,
+# and in addition to, part (ii)'s exit-code rows for their call sites, which
+# are themselves vacuous-if-N=1 for exactly this reason).
 # =============================================================================
 printf '\n--- (iv) protected content locks (P1/P2/P3-invisible guards) ---\n'
 
@@ -595,10 +599,13 @@ protect() {
 check_design_note_emit_guarded='printf '"'"'%s: %s\n'"'"' "$PATH_ARG" "$1" >&2 || true; violations=$((violations + 1))'
 # shellcheck disable=SC2016  # same as above — literal $* token, not expanded.
 log_err_guarded='printf '"'"'%s\n'"'"' "$*" >&2 || true; }'
+# shellcheck disable=SC2016  # same as above — literal $* token, not expanded.
+log_warn_guarded='printf '"'"'WARN: %s\n'"'"' "$*" >&2 || true; }'
 
 protect check-design-note-emit-guard check-design-note.sh "$check_design_note_emit_guarded"
 protect install-log-err-guard         install               "$log_err_guarded"
 protect team-init-log-err-guard       team-init.sh           "$log_err_guarded"
+protect team-init-log-warn-guard      team-init.sh           "$log_warn_guarded"
 
 # --- mutation self-check (non-vacuity of the protected content lock itself) -
 # Proves the lock actually discriminates: build the GUARD-STRIPPED text (what
