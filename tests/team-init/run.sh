@@ -55,11 +55,6 @@ assert_v1_fired() {
   grep -qxF "WARN: shell-team: git reports the resolved base dir as ignored: $2" "$1"
 }
 
-# assert_v2_fired <stderr-file> — V2's anchor line occurs at least once.
-assert_v2_fired() {
-  grep -qxF 'WARN: shell-team: could not determine whether the resolved base dir is ignored:' "$1"
-}
-
 # make_git_shim <dir> <intercepted-subcommand> — a `git` on PATH that answers
 # a fatal 128 (non-English message, never compared by the code under test)
 # for any invocation naming <intercepted-subcommand> among its arguments,
@@ -334,16 +329,17 @@ init "$T_SYM_KEEP" >/dev/null 2>&1 || fail "T-061 AC3: team-init exited non-zero
 pass "T-061 AC3: ensure_gitkeep() skips a dangling symlink at the destination (no write-through, no base escape)"
 
 # =============================================================================
-# T-1046: the ignored-base notice, transcribed from the nine-row decision
-# table DT0-DT8 (.shell-team/specs/T-1046-ignored-base-verdict.md). DT0 (no
-# git on PATH) is statically guarded (`command -v git`) rather than exercised
-# behaviourally here — removing git from PATH would also remove the POSIX
-# tools this suite itself needs, and AC4 locks the guard's presence in
-# bin/team-init.sh instead. DT3 (rev-parse rc=0, stdout neither "true" nor
-# "false") and DT8 (check-ignore rc outside {0,1,128}) are unreachable
-# through any documented git behaviour; both rows exist only so the
-# classification has no fall-through (spec D1) and no fixture exercises
-# either — this comment is their only occurrence in this suite (AC19).
+# T-1046 v2: the ignored-base notice, transcribed from the five-row decision
+# table DT0, DT5-DT8 (.shell-team/specs/T-1046-ignored-base-verdict.md). DT0
+# (no git on PATH) is statically guarded (`command -v git`) rather than
+# exercised behaviourally here — removing git from PATH would also remove the
+# POSIX tools this suite itself needs, and AC4 locks the guard's presence in
+# bin/team-init.sh instead. DT8 (check-ignore rc outside {0,1,128}) is
+# unreachable through any documented git behaviour; it exists only so the
+# classification has no fall-through (spec D1) and no fixture exercises it —
+# this comment is its only occurrence in this suite (AC19). The retired rows
+# DT1-DT4 (the deleted rev-parse channel) no longer exist; every state they
+# once classified now reaches DT7 with the identical silent outcome.
 # =============================================================================
 
 # --- LX01: DT5 M1 -- a glob-shaped base beside a tracked glob-colliding path
@@ -360,26 +356,26 @@ assert_v1_fired "$GTMP/lx01.err" 'a*' \
 [ -f "$D_LX01/a*/todo.md" ] || fail "LX01: scaffold did not complete"
 pass "case: DT5 M1 — a glob-shaped base beside a tracked glob-colliding path is still reported ignored"
 
-# --- LX02: DT2 DT4 M2 -- a bare repository and a stubbed git fatal ----------
+# --- LX02: DT7 M2 -- a bare repository and a stubbed git fatal -------------
 D_LX02_BARE="$GTMP/lx02-bare"
 mkdir -p "$D_LX02_BARE"
 git init --bare -q "$D_LX02_BARE" >/dev/null 2>&1
 init "$D_LX02_BARE" >"$GTMP/lx02-bare.out" 2>"$GTMP/lx02-bare.err" \
   || fail "LX02: team-init exited non-zero (bare repository)"
 [ "$(count_warn_lines "$GTMP/lx02-bare.err")" = "0" ] \
-  || fail "LX02: expected silence inside a bare repository (DT2)"
+  || fail "LX02: expected silence inside a bare repository (DT7)"
 
 SHIM_LX02="$GTMP/lx02-shim"
-make_git_shim "$SHIM_LX02" rev-parse
+make_git_shim "$SHIM_LX02" check-ignore
 D_LX02_STUB="$GTMP/lx02-stub"
 new_git_repo "$D_LX02_STUB"
 printf '%s\n' '.shell-team/' > "$D_LX02_STUB/.gitignore"
 PATH="$SHIM_LX02:$PATH" init "$D_LX02_STUB" >"$GTMP/lx02-stub.out" 2>"$GTMP/lx02-stub.err" \
   || fail "LX02: team-init exited non-zero (stubbed git fatal)"
 [ "$(count_warn_lines "$GTMP/lx02-stub.err")" = "0" ] \
-  || fail "LX02: expected silence under a stubbed rev-parse fatal (DT4), even with an otherwise-ignored base dir"
+  || fail "LX02: expected silence under a stubbed check-ignore fatal (DT7), even with an otherwise-ignored base dir"
 [ -f "$D_LX02_STUB/.shell-team/todo.md" ] || fail "LX02: scaffold did not complete under a stubbed git"
-pass "case: DT2 DT4 M2 — a bare repository and a stubbed git fatal both stay silent"
+pass "case: DT7 M2 — a bare repository and a stubbed git fatal both stay silent"
 
 # --- LX03: DT5 M3 -- a directory-form rule written before scaffolding ------
 D_LX03="$GTMP/lx03"
@@ -478,30 +474,22 @@ bash "$INIT" "$D_LX08_REINCLUDE" >"$GTMP/lx08b.out" 2>"$GTMP/lx08b.err" \
   || fail "LX08: a repo-level re-include should silence the hostile global excludes rule (the documented remedy, D4)"
 pass "case: D9 — a hostile global excludes file is honoured, and a repo-level re-include silences it"
 
-# --- LX09: DT1 DT2 DT5 DT6 DT7 -- the admissible channels' own contracts ---
+# --- LX09: DT5 DT6 DT7 -- the check-ignore exit contract itself ------------
 D_LX09_IGNORED="$GTMP/lx09-ignored"
 new_git_repo "$D_LX09_IGNORED"
 printf '%s\n' '.shell-team/' > "$D_LX09_IGNORED/.gitignore"
 bash "$INIT" "$D_LX09_IGNORED" >"$GTMP/lx09i.out" 2>"$GTMP/lx09i.err" \
-  || fail "LX09: team-init exited non-zero (DT1/DT5 case)"
+  || fail "LX09: team-init exited non-zero (DT5 case)"
 assert_v1_fired "$GTMP/lx09i.err" '.shell-team' \
-  || fail "LX09: DT1 (rc=0/true) + DT5 (check-ignore rc=0) contract not honoured"
+  || fail "LX09: DT5 (check-ignore rc=0) contract not honoured"
 
 D_LX09_NOTIGNORED="$GTMP/lx09-notignored"
 new_git_repo "$D_LX09_NOTIGNORED"
 printf '%s\n' 'build/' > "$D_LX09_NOTIGNORED/.gitignore"
 bash "$INIT" "$D_LX09_NOTIGNORED" >"$GTMP/lx09n.out" 2>"$GTMP/lx09n.err" \
-  || fail "LX09: team-init exited non-zero (DT1/DT6 case)"
+  || fail "LX09: team-init exited non-zero (DT6 case)"
 [ "$(count_warn_lines "$GTMP/lx09n.err")" = "0" ] \
-  || fail "LX09: DT1 (rc=0/true) + DT6 (check-ignore rc=1) contract not honoured"
-
-D_LX09_BARE="$GTMP/lx09-bare"
-mkdir -p "$D_LX09_BARE"
-git init --bare -q "$D_LX09_BARE" >/dev/null 2>&1
-bash "$INIT" "$D_LX09_BARE" >"$GTMP/lx09b.out" 2>"$GTMP/lx09b.err" \
-  || fail "LX09: team-init exited non-zero (DT2 case)"
-[ "$(count_warn_lines "$GTMP/lx09b.err")" = "0" ] \
-  || fail "LX09: DT2 (rc=0/false) contract not honoured"
+  || fail "LX09: DT6 (check-ignore rc=1) contract not honoured"
 
 # DT7's underlying documented contract, checked directly against git itself
 # (independently of team-init): `git check-ignore -q` with no pathname is
@@ -513,22 +501,9 @@ else
 fi
 [ "$dt7_rc" -eq 128 ] \
   || fail "LX09: DT7's underlying git-check-ignore(1) 128 contract did not reproduce (got rc=$dt7_rc) -- environment assumption stale"
-pass "case: DT1 DT2 DT5 DT6 DT7 — the admissible channels still honour their documented contracts"
+pass "case: DT5 DT6 DT7 — the check-ignore exit contract still holds: 0 ignored, 1 not ignored, 128 fatal"
 
-# --- LX10: DT7 -- the undeterminable class is reachable and exits 0 --------
-SHIM_LX10="$GTMP/lx10-shim"
-make_git_shim "$SHIM_LX10" check-ignore
-D_LX10="$GTMP/lx10"
-new_git_repo "$D_LX10"
-lx10_rc=0
-PATH="$SHIM_LX10:$PATH" bash "$INIT" "$D_LX10" >"$GTMP/lx10.out" 2>"$GTMP/lx10.err" || lx10_rc=$?
-[ "$lx10_rc" -eq 0 ] || fail "LX10: team-init must still exit 0 in the UNDETERMINABLE class (got $lx10_rc)"
-assert_v2_fired "$GTMP/lx10.err" \
-  || fail "LX10: expected the undeterminable-class notice when check-ignore returns an out-of-contract 128"
-[ -f "$D_LX10/.shell-team/todo.md" ] || fail "LX10: scaffold did not complete alongside the undeterminable notice"
-pass "case: DT7 — the undeterminable class is reachable, emits its frozen body, and still exits 0"
-
-# --- LX11: D2 -- exit 0 in every outcome class, including 2>&- -------------
+# --- LX11: D2 -- exit 0 in both outcome classes, including 2>&- ------------
 D_LX11_IGNORED="$GTMP/lx11-ignored"
 new_git_repo "$D_LX11_IGNORED"
 printf '%s\n' '.shell-team/' > "$D_LX11_IGNORED/.gitignore"
@@ -543,16 +518,72 @@ printf '%s\n' 'build/' > "$D_LX11_SILENT/.gitignore"
 lx11s_rc=0
 bash "$INIT" "$D_LX11_SILENT" >"$GTMP/lx11s.out" 2>&- || lx11s_rc=$?
 [ "$lx11s_rc" -eq 0 ] || fail "LX11: the SILENCE class must exit 0 with stderr closed (got $lx11s_rc)"
+pass "case: D2 — team-init exits 0 in both outcome classes, including with stderr closed"
 
-SHIM_LX11="$GTMP/lx11-shim"
-make_git_shim "$SHIM_LX11" check-ignore
-D_LX11_UNDET="$GTMP/lx11-undeterminable"
-new_git_repo "$D_LX11_UNDET"
-lx11u_rc=0
-PATH="$SHIM_LX11:$PATH" bash "$INIT" "$D_LX11_UNDET" >"$GTMP/lx11u.out" 2>&- || lx11u_rc=$?
-[ "$lx11u_rc" -eq 0 ] || fail "LX11: the UNDETERMINABLE class must exit 0 with stderr closed (got $lx11u_rc)"
-[ -f "$D_LX11_UNDET/.shell-team/todo.md" ] || fail "LX11: UNDETERMINABLE-class scaffold incomplete with stderr closed"
-pass "case: D2 — team-init exits 0 in every outcome class, including with stderr closed"
+# --- LX12: D8 -- GIT_CONFIG_COUNT/KEY_0/VALUE_0 cannot inject an excludes --
+D_LX12="$GTMP/lx12"
+new_git_repo "$D_LX12"
+printf '%s\n' 'build/' > "$D_LX12/.gitignore"
+HOSTILE_LX12="$GTMP/lx12-hostile-excludes"
+printf '%s\n' '.shell-team/' > "$HOSTILE_LX12"
+if env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0="$HOSTILE_LX12" \
+    git -C "$D_LX12" check-ignore -q -- './.shell-team/' >/dev/null 2>/dev/null; then
+  :
+else
+  fail "LX12: the injection channel itself did not flip a bare check-ignore in this environment -- fixture assumption stale"
+fi
+env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0="$HOSTILE_LX12" \
+  bash "$INIT" "$D_LX12" >"$GTMP/lx12.out" 2>"$GTMP/lx12.err" \
+  || fail "LX12: team-init exited non-zero under a GIT_CONFIG_COUNT injection"
+[ "$(count_warn_lines "$GTMP/lx12.err")" = "0" ] \
+  || fail "LX12: GIT_CONFIG_COUNT/KEY_0/VALUE_0 injected an excludes file and flipped the verdict"
+pass "case: D8 — GIT_CONFIG_COUNT and its KEY/VALUE pairs cannot inject an excludes file or flip the verdict"
+
+# --- LX13: D8 -- GIT_CONFIG_PARAMETERS cannot inject an excludes file ------
+D_LX13="$GTMP/lx13"
+new_git_repo "$D_LX13"
+printf '%s\n' 'build/' > "$D_LX13/.gitignore"
+HOSTILE_LX13="$GTMP/lx13-hostile-excludes"
+printf '%s\n' '.shell-team/' > "$HOSTILE_LX13"
+if env GIT_CONFIG_PARAMETERS="'core.excludesFile=$HOSTILE_LX13'" \
+    git -C "$D_LX13" check-ignore -q -- './.shell-team/' >/dev/null 2>/dev/null; then
+  :
+else
+  fail "LX13: the injection channel itself did not flip a bare check-ignore in this environment -- fixture assumption stale"
+fi
+env GIT_CONFIG_PARAMETERS="'core.excludesFile=$HOSTILE_LX13'" \
+  bash "$INIT" "$D_LX13" >"$GTMP/lx13.out" 2>"$GTMP/lx13.err" \
+  || fail "LX13: team-init exited non-zero under a GIT_CONFIG_PARAMETERS injection"
+[ "$(count_warn_lines "$GTMP/lx13.err")" = "0" ] \
+  || fail "LX13: GIT_CONFIG_PARAMETERS injected an excludes file and flipped the verdict"
+pass "case: D8 — GIT_CONFIG_PARAMETERS cannot inject an excludes file or flip the verdict"
+
+# --- LX14: D9 -- a legitimate global core.excludesFile reached through HOME
+# No repo-local core.excludesFile is pinned for either fixture below, on
+# purpose (D9): that is the only shape in which the allow-list's HOME
+# membership is actually exercised.
+D_LX14="$GTMP/lx14"
+mkdir -p "$D_LX14"
+git init -q "$D_LX14" >/dev/null 2>&1
+LX14_HOME="$GTMP/lx14-home"
+LX14_EMPTYHOME="$GTMP/lx14-emptyhome"
+mkdir -p "$LX14_HOME" "$LX14_EMPTYHOME"
+LX14_GEXCL="$GTMP/lx14-global-excludes"
+printf '%s\n' '.shell-team/' > "$LX14_GEXCL"
+printf '[core]\n\texcludesFile = %s\n' "$LX14_GEXCL" > "$LX14_HOME/.gitconfig"
+env HOME="$LX14_HOME" bash "$INIT" "$D_LX14" >"$GTMP/lx14.out" 2>"$GTMP/lx14.err" \
+  || fail "LX14: team-init exited non-zero under a legitimate global excludes file reached through HOME"
+assert_v1_fired "$GTMP/lx14.err" '.shell-team' \
+  || fail "LX14: a legitimate global core.excludesFile reached through HOME was not honoured"
+
+D_LX14_EMPTY="$GTMP/lx14-empty"
+mkdir -p "$D_LX14_EMPTY"
+git init -q "$D_LX14_EMPTY" >/dev/null 2>&1
+env HOME="$LX14_EMPTYHOME" bash "$INIT" "$D_LX14_EMPTY" >"$GTMP/lx14e.out" 2>"$GTMP/lx14e.err" \
+  || fail "LX14: team-init exited non-zero under an empty scratch HOME"
+[ "$(count_warn_lines "$GTMP/lx14e.err")" = "0" ] \
+  || fail "LX14: expected silence under an empty scratch HOME (negative control)"
+pass "case: D9 — a legitimate global core.excludesFile reached through HOME is still honoured"
 
 # --- argument handling -----------------------------------------------------
 set +e
