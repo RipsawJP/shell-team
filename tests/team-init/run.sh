@@ -24,7 +24,11 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 INIT="$REPO_ROOT/bin/team-init.sh"
 CHECK_HANDOFF="$REPO_ROOT/bin/check-handoff.sh"
 CHECK_CONTRACT="$REPO_ROOT/bin/check-contract.sh"
-TMP="$HERE/tmp-targets"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/team-init-test-targets.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp-targets.XXXXXX")"
+fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
@@ -33,9 +37,7 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # assertions are not perturbed by the caller's environment.
 init() { env -u TEAM_RUN_BASE bash "$INIT" "$@"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 # --- AC1: fresh target -> scaffold under .shell-team/ -------------------------
 T1="$TMP/fresh"

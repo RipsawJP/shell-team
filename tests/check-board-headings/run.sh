@@ -25,8 +25,7 @@ FIX="$HERE/fixtures"
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-TMP="${TMPDIR:-/tmp}/check-board-headings-test-$$"
-mkdir -p "$TMP"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-board-headings-test.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 out="$TMP/out"

@@ -16,14 +16,16 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 PATHS="$REPO_ROOT/bin/team-paths.sh"
-TMP="$HERE/tmp-roots"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/team-paths-test-roots.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 # get <root> <key> [env-assignment...] -> prints the resolved path
 get() {

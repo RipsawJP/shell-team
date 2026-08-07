@@ -13,12 +13,15 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 GS="$REPO_ROOT/bin/goal-state.sh"
-TMP="$HERE/tmp"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/goal-state-test.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"; mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
 ST="$TMP/state"

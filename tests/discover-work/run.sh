@@ -18,15 +18,17 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 DISCOVER="$REPO_ROOT/bin/discover-work.sh"
 CHECK_HANDOFF="$REPO_ROOT/bin/check-handoff.sh"
 STUB="$HERE/fixtures/gh"
-TMP="$HERE/tmp"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/discover-work-test.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+fi
 ORIG_PATH="$PATH"
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 chmod +x "$STUB"
 
