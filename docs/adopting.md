@@ -55,35 +55,6 @@ excludes exist. Pin it explicitly (`git -c core.excludesFile=/dev/null …`) in
 any assertion about ignore behavior rather than inheriting whatever the operator
 has configured.
 
-`team-init` does not check this for you. Whether the base dir is ignored is a
-question about your repository rather than about the plugin, so what the plugin
-ships is the question rather than an answer to it. Run it yourself, once, from
-the repo root after adopting:
-
-    git check-ignore -v -- "./$(team-paths.sh --get base)/"
-
-If `team-paths.sh` is not on your `PATH`, write the base dir's own name in
-place of the substitution: `.shell-team` by default, `tasks` on the legacy
-layout, or whatever you set `TEAM_RUN_BASE` to. Three answers are possible.
-It prints a line naming a file, a line number and the pattern that matched —
-the base dir is ignored, and that line is the rule to change. It prints
-nothing at all — the base dir is not ignored, and there is nothing to do; note
-that this is also what a re-include looks like, because for a directory query
-git reports no matching pattern once a negated rule such as `!.shell-team/`
-has won, rather than printing that rule. Or it fails with a `fatal:` message —
-git could not answer the question at all, because there is no repository here,
-or it is a bare repository, or git cannot read it, and in that case nothing was
-determined either way.
-
-If the base dir turns out to be ignored and that was not deliberate, re-include
-it before the loop writes its first record. A record the loop newly creates
-under an ignored dir is an untracked ignored file, so an ordinary `git add`
-will not stage it, and the loop's commit steps can then report success having
-committed nothing. A file already tracked under that dir is unaffected,
-because a gitignore rule does not apply to tracked paths. If it was
-deliberate, this is not an error: an ignored base dir is a supported
-configuration, per the above.
-
 How often the session stops to check with you is your call too, and it is set
 per-checkout rather than shipped: see
 [tuning-oversight.md](tuning-oversight.md).
