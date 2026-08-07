@@ -44,6 +44,13 @@
 # written as one contiguous matching line in this file's own source) so
 # this suite's own source text never trips the rule it is proving —
 # self-hosting, since this file is itself a tracked file under tests/.
+#
+# A fifth control, added in round 2, extends the same idiom to a trailing
+# `# comment` that happens to mention "mktemp": that must NOT exempt a
+# genuinely fixed root (round-2 fix: Codex Major, round 1). This one is not
+# among the four AC9 pins verbatim, and adding it does not disturb them —
+# AC9's check greps for each pinned label's presence, not for an exact
+# count, so a fifth control label is additive.
 
 set -euo pipefail
 
@@ -63,10 +70,19 @@ FSR_TMPDIR='^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="\$\{TMPDIR[^"]*\}/[A-Za-z0-9._-
 # count_scratch_violations <listing> — <listing> is a text blob, one
 # candidate source line per input line. Prints the count of lines that are
 # NOT full-line comments, match either frozen signature above, and do NOT
-# also contain the substring "mktemp" — or the literal string "EMPTY" if
-# the listing itself has no content at all (empty/unavailable population,
-# fail-closed — never read as a clean zero-violation result by any caller
-# of this helper).
+# also contain the substring "mktemp" in their CODE portion — or the literal
+# string "EMPTY" if the listing itself has no content at all (empty/
+# unavailable population, fail-closed — never read as a clean zero-violation
+# result by any caller of this helper).
+#
+# The mktemp check strips each line's trailing `# comment` (from the first
+# whitespace-preceded `#` onward) before testing for "mktemp", so a line such
+# as `TMP="$HERE/tmp-fixed" # migrated away from mktemp` is NOT exempted
+# merely because the word "mktemp" appears inside a trailing comment — the
+# compliant two-arm idiom's own `mktemp -d "$HERE/tmp…"` line still passes,
+# since there the word sits in the CODE portion the comment-strip never
+# touches (round-2 fix: a Codex Major finding on round 1, an unanchored
+# whole-line substring test, exempted exactly this shape).
 count_scratch_violations() {
   local listing="$1"
   if [ -z "$listing" ]; then
@@ -76,6 +92,7 @@ count_scratch_violations() {
   printf '%s\n' "$listing" \
     | grep -vE '^[[:space:]]*#' \
     | grep -E -- "$FSR_HERE|$FSR_TMPDIR" \
+    | sed -E 's/[[:space:]]+#.*$//' \
     | grep -vc 'mktemp' || true
 }
 
@@ -93,21 +110,33 @@ if [ "$git_rc" -ne 0 ] || [ -z "$POP_FILES" ]; then
 else
   n_total=0
   n_bad=0
+  n_unreadable=0
   while IFS= read -r rel; do
     [ -n "$rel" ] || continue
     n_total=$((n_total + 1))
     f="$REPO_ROOT/$rel"
-    [ -r "$f" ] || continue
+    # Fail closed, never silently skip: a tracked entry that is missing,
+    # not a regular file (a locally-deleted-but-unstaged file, a
+    # submodule/gitlink-as-directory), or unreadable on disk must not be
+    # counted toward n_total while contributing an uninspected 0 to n_bad —
+    # that was a real fail-open path (round-2 fix: Codex Major, round 1).
+    # This is about readability of the working tree, not a switch to index
+    # reads (T-1043 K1 / DP8 both still read the working tree on purpose).
+    if [ ! -f "$f" ] || [ ! -r "$f" ]; then
+      n_unreadable=$((n_unreadable + 1))
+      fail "population file unreadable: $rel (tracked by 'git ls-files -- tests/' but missing, not a regular file, or unreadable on disk) — fails closed instead of silently skipping a file whose content cannot be scanned for the fixed-scratch-root rule"
+      continue
+    fi
     content="$(cat "$f" 2>/dev/null)" || true
     c="$(count_scratch_violations "$content")"
     [ "$c" = "EMPTY" ] && c=0
     n_bad=$((n_bad + c))
   done <<<"$POP_FILES"
 
-  if [ "$n_bad" -eq 0 ]; then
+  if [ "$n_bad" -eq 0 ] && [ "$n_unreadable" -eq 0 ]; then
     pass "rule: none of $n_total tracked files under tests/ (population source: git ls-files -- tests/, working tree read) has a fixed scratch root without mktemp"
   else
-    fail "rule: $n_bad line(s) across the $n_total tracked files under tests/ violate the fixed-scratch-root shape lint"
+    fail "rule: $n_bad line(s) across the $n_total tracked files under tests/ violate the fixed-scratch-root shape lint ($n_unreadable file(s) unreadable, counted as failures rather than skipped)"
   fi
 fi
 
@@ -125,6 +154,20 @@ if [ "$n_bad" != "EMPTY" ] && [ "$n_bad" -ge 1 ]; then
   pass "control: a fixed \$HERE scratch root is rejected (the rule applied to a synthetic \$HERE/tmp… line reports $n_bad violation(s), not zero)"
 else
   fail "control: a fixed \$HERE scratch root is rejected — the rule did NOT flag a synthetic \$HERE/tmp… line (n_bad=$n_bad); this lock could pass while measuring nothing"
+fi
+
+# A fifth control (round 2): a trailing `# comment` that happens to mention
+# "mktemp" must NOT exempt a genuinely fixed root — this is the exact shape
+# Codex's round-1 Major finding demonstrated (`TMP="$HERE/tmp-fixed" #
+# migrated away from mktemp`). Assembled the same way as SYN_HERE_LINE above
+# (a separate literal '$' argument) so this file's own source line never
+# contains the contiguous `"$HERE/tmp` text it is proving the rule catches.
+SYN_TRAILING_COMMENT_LINE="$(printf 'TMP="%sHERE/tmp-y" # mktemp' '$')"
+n_bad="$(count_scratch_violations "$SYN_TRAILING_COMMENT_LINE")"
+if [ "$n_bad" != "EMPTY" ] && [ "$n_bad" -ge 1 ]; then
+  pass "control: a fixed \$HERE scratch root with a trailing comment mentioning mktemp is still rejected (the rule applied to a synthetic \$HERE/tmp… line whose trailing comment says mktemp reports $n_bad violation(s), not exempted)"
+else
+  fail "control: a fixed \$HERE scratch root with a trailing comment mentioning mktemp is still rejected — the rule was fooled by the trailing comment and did NOT flag the line (n_bad=$n_bad); this is exactly the round-1 Major finding"
 fi
 
 SYN_TMPDIR_LINE="$(printf 'TMP="%s{TMPDIR%%/}/fixed-example-roots"' '$')"
