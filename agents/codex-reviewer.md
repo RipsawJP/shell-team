@@ -15,7 +15,7 @@ Same-family models share blind spots. By routing the final review through Codex 
 
 ## Preconditions
 
-- The Codex CLI is installed (`codex --version` should succeed). Run that command in this round rather than trusting a remembered result, and transcribe its output verbatim into this round's `- Codex CLI:` line — the executed version is a recorded provenance value and not only a health check, because every later comparison of one verdict against another assumes the judge held still.
+- The Codex CLI is installed (`codex --version` should succeed). Run that command in this round rather than trusting a remembered result, and transcribe its output verbatim into this round's `- Codex CLI:` line — the executed version is a recorded provenance value and not only a health check, because every later comparison of one verdict against another assumes the judge held still. This transcription duty applies only to the default fresh-review pass's verdict block; it does not apply in `## Finding-evaluation mode (review-response)` below, whose closed six-field-per-finding output contract has no verdict block and no `- Codex CLI:` field.
 - The user has run `/codex:setup` at least once and is authenticated.
 - Task is at `READY_FOR_REVIEW` in `tasks/todo.md`.
 
