@@ -468,3 +468,42 @@ that file's order.
   is read by every subsequent git invocation against that repo regardless
   of who makes it. T-1046 (Half A's successor) is the most likely
   consumer of both points.
+- T-1044: two lock suites, both pure bash + git + coreutils, no new
+  prerequisite. `bash tests/bin-exec-bit/run.sh` (extended, not renamed —
+  same suite T-1034 shipped) now also enforces a BIDIRECTIONAL rule over
+  every tracked file under `tests/`: the committed blob begins `#!` iff
+  the index mode is `100755`, judged from `git ls-files -s -- tests/` plus
+  `git cat-file blob` (index-read both halves, same discipline as the
+  `bin/` half above — never a working-tree `test -x`). `bash
+  tests/scratch-root-hygiene/run.sh` is a NEW suite, deliberately not
+  folded into `tests/bin-exec-bit/run.sh` (whose name/header/output tokens
+  are pinned to the exec-bit rule by three of T-1034's frozen criteria):
+  it is a shape lint proving no tracked `tests/` file builds a scratch
+  root at a fixed, guessable path (a `$HERE/tmp…` or a literal
+  `${TMPDIR}/<name>` line without also using `mktemp`) — and unlike the
+  exec-bit rule, it reads the WORKING TREE, because its subject is file
+  content a developer is about to commit rather than an index mode a
+  `core.fileMode=false` checkout could misreport. When adding a new
+  `tests/<suite>/run.sh`: it must be committed at index mode `100755`
+  (the bidirectional rule now catches a `100644` shebang script under
+  `tests/` exactly as loudly as it always did under `bin/`), and its
+  scratch root must be built with `mktemp -d ... XXXXXX` — the two-arm
+  `TMPDIR`-then-`$HERE`-fallback idiom at
+  `tests/check-refreeze-class/run.sh:82-87` is the shape to copy, UNLESS
+  the new suite either (a) builds throwaway `git init` repos under its
+  scratch root, in which case keep the root under `${TMPDIR:-/tmp}` only
+  and never add a `$HERE` fallback (a fallback would put a nested `.git`
+  inside this checkout's own tree, which sandboxed runs deny — see
+  `tests/check-board-headings/run.sh` and
+  `tests/codex-skeleton-hygiene/run.sh`), or (b) depends on its scratch
+  root sitting at a FIXED DEPTH under the repo root for a relative-symlink
+  launch-path case, in which case keep a single `$HERE` arm only and never
+  add a `$TMPDIR` arm that would relocate the root out of tree and change
+  the hop count (see `tests/rework-digest/run.sh`'s
+  `../../../../bin/rework-digest.sh` case). Separately,
+  `tests/install/run.sh`'s temp files now live under its own already-
+  `mktemp`'d `$WORK` rather than directly under the shared, fixed
+  `/tmp/claude` parent — a cleanup glob over a directory other concurrent
+  runs also write to is its own defect class (DP7), out of both locks'
+  machine scope; a new suite should never `rm -rf` a wildcard over a
+  parent directory anything else might be writing to.
