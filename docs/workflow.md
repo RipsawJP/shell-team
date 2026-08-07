@@ -96,7 +96,8 @@ partially mitigates this by following its task-prompt language on a standalone
 ## Codex CLI quick-reference
 
 ```bash
-# Health check (codex-reviewer runs this implicitly)
+# Version check — codex-reviewer and drift-evaluator each run this every round
+# and transcribe its output into the verdict's `- Codex CLI:` line
 codex --version
 
 # Structured branch review (preferred, canonical form —
