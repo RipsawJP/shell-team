@@ -262,16 +262,17 @@ Every normative directive stated in this spec's body maps to an acceptance crite
 
 *(Filled in by the engineer during implementation, before any change to `tests/bin-exec-bit/run.sh`. This section is outside the intent block: its content is discovered, not decided in advance. AC8 asserts its shape and AC9 branches on its verdict.)*
 
-- method: *(the exact construction used — the helper invoked, the listing passed, and how it was built)*
-- listing: *(the synthetic listing, in the fenced block below)*
+- method: a two-record git-ls-files-s-shaped listing was built in-suite as a bash `$'...'` string (never committed as a file with a whitespace-named path) — one record whose path field contains ASCII spaces, one whose path field contains embedded literal tab characters (a shape more adversarial than a space alone, and more adversarial than anything real `git ls-files -s` output would carry, since git itself C-quotes a path containing a raw tab). Both `bin/`-rule and `tests/`-rule extraction were exercised directly against it: `count_non_100755`'s own `grep -vcE '^100755 '` line-prefix test (copied verbatim from `tests/bin-exec-bit/run.sh`) was run against the listing as a whole; and `count_tests_violations`'s own three-line field extraction (`mode="${line%% *}"`, `rest="${line#* }"`, `sha="${rest%%[[:space:]]*}"`, copied verbatim) was run per record and its results printed.
+- listing: the synthetic listing, in the fenced block below.
 
 ```text
-(the synthetic git-ls-files-s-shaped listing the parse was exercised with)
+100755 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0	bin/weird file with spaces.sh
+100644 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 0	tests/an	embedded	tab	path.sh
 ```
 
-- fields: *(the observed `mode` and `sha` values per synthetic record, and the observed `n_total` / `tests_n_total` line counts)*
-- verdict: *(exactly one of `reproduced` or `not-reproduced`, on a line of its own, written as `- verdict: reproduced` or `- verdict: not-reproduced`)*
-- disposition: *(if `reproduced`, the transport decision and what happens to a quoted path — fail closed is the repository contract. If `not-reproduced`, the coverage reason and the narrowed or closed disposition proposed for #189, to be filed by whoever holds network access.)*
+- fields: `count_non_100755` over the two-line listing reports `n_bad = 1` — only the literal `100644` line is flagged, exactly as it would be with an ordinary path, because the rule's `grep -vcE '^100755 '` inspects only the fixed six-character mode prefix and never reads past it. `count_tests_violations`'s field extraction, run per record: record 1 (`bin/weird file with spaces.sh`, mode `100755`) extracted `mode=100755` and `sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` — correct on both fields despite the two embedded spaces in the path. Record 2 (`tests/an<TAB>embedded<TAB>tab<TAB>path.sh`, mode `100644`) extracted `mode=100644` and `sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` — correct on both fields despite three embedded tabs in the path, because `mode` is bounded by the first space and `sha` by the first whitespace *after* that, both of which occur well before the record's own separating TAB and therefore before any path content at all. `n_total` for this listing is 2; `tests_n_total` is 2; neither count is affected by either record's path content.
+- verdict: not-reproduced
+- disposition: this role's earlier reading-only measurement (Assumption 4) is confirmed by direct execution rather than superseded by it: `mode` and `sha` are parsed strictly left-to-right from fixed field positions that all sit before the record's separating TAB, so no byte the path field carries — a space, an embedded tab, or (untested here, out of contract per the Input space's out-of-scope list) a quoted control-character path — can reach either variable, and the `bin/` rule never inspects the path field at all. Coverage row for `## Blast radius` purposes: not applicable, no criterion turns red or stays red on this account, since the suite is untouched (AC9's `not-reproduced` branch). Proposed disposition for #189, to be filed by whoever holds network access: close the issue with a comment citing this record's method and fields, rather than narrowing it to a smaller premise — nothing in the suite's actual parsing behavior gives a narrower premise anything to stand on.
 
 ## Blast radius
 
