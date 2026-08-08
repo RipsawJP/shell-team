@@ -53,7 +53,7 @@ Each decision below is resolved; nothing here is left to implementation judgment
 
 <!-- frozen-begin: X1 -->
 ```markdown
-a pull-request number is matchable only where the merge subjects actually carry one (the window is built from merge commits alone, `git log --merges --first-parent`, so a squash-merge or rebase-merge workflow contributes no sub-bullet at all rather than a sub-bullet without a number), and a task ID is matchable only where the merge subjects actually carry one too, which by default they do not — a merge subject is free text, so a workflow that writes task IDs into it surfaces them and one that does not never will; treat a task ID as the label your framing maps a SHA or a pull-request number from unless you have read it in the returned subjects themselves.
+a pull-request number is matchable only where the merge subjects actually carry one (the window is built from first-parent merge commits alone, so a squash-merge or rebase-merge workflow contributes no sub-bullet at all rather than a sub-bullet without a number), and a task ID is matchable only where the merge subjects actually carry one too, which by default they do not — a merge subject is free text, so a workflow that writes task IDs into it surfaces them and one that does not never will; treat a task ID as the label your framing maps a SHA or a pull-request number from unless you have read it in the returned subjects themselves.
 ```
 <!-- frozen-end: X1 -->
 
