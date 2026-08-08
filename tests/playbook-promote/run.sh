@@ -23,17 +23,15 @@ PROMOTE="$REPO_ROOT/bin/playbook-promote.sh"
 CHECKER="$REPO_ROOT/bin/check-playbook.sh"
 BASE="$HERE/fixtures/lessons-base.md"
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/playbook-promote-test-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/playbook-promote-test-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp-roots"
+  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 fresh_lessons() {  # $1 = destination path
   cp "$BASE" "$1"

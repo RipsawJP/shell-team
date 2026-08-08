@@ -30,9 +30,9 @@ STUB_GIT="$HERE/fixtures/git"
 ORIG_PATH="$PATH"
 
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/retro-inputs-test-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/retro-inputs-test-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp"
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
@@ -41,9 +41,7 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # Any 0600-permission directories built below are chmod'd back to 0700 before
 # this runs, so `rm -rf` (which needs traverse permission on every ancestor)
 # can actually clean up the whole tree.
-rm -rf "$TMP" 2>/dev/null || true
 trap 'chmod -R u+rwx "$TMP" 2>/dev/null || true; rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 chmod +x "$STUB_GH" "$STUB_GIT"
 

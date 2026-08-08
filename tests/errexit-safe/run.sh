@@ -70,12 +70,10 @@ bad() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 # file/tree this suite needs (parts ii-iv), removed in full on exit.
 # =============================================================================
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/errexit-safe-fixtures.$$"
+  TMP="$(mktemp -d "${TMPDIR%/}/errexit-safe-fixtures.XXXXXX")"
 else
-  TMP="$HERE/tmp-fixtures.$$"
+  TMP="$(mktemp -d "$HERE/tmp-fixtures.XXXXXX")"
 fi
-rm -rf "$TMP"
-mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
 # --- M1 fixture: a READABLE spec with zero AC headings, so check-acs.sh falls

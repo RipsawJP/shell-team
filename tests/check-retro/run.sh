@@ -90,10 +90,12 @@ grep -qE "unlabelled lesson bullet" <<< "$err" \
 pass "fail-closed: broken TMPDIR still catches fail-bare-lesson.md (exit $rc)"
 
 # --- T-1010 AC9: each of the five markers is individually load-bearing ----
-MUT_TMP="$HERE/tmp-marker-mutation"
-rm -rf "$MUT_TMP"
+if [ -n "${TMPDIR:-}" ]; then
+  MUT_TMP="$(mktemp -d "${TMPDIR%/}/check-retro-marker-mutation.XXXXXX")"
+else
+  MUT_TMP="$(mktemp -d "$HERE/tmp-marker-mutation.XXXXXX")"
+fi
 trap 'rm -rf "$MUT_TMP"' EXIT
-mkdir -p "$MUT_TMP"
 for id in keep problem try traps lessons; do
   d="$MUT_TMP/remove-$id"
   mkdir -p "$d"
@@ -250,10 +252,12 @@ assert_violations "fail-inputs-line-outside-section -> 1" 1 1 "ledger-shaped lin
 assert_violations "fail-inputs-unknown-marker -> 1 (Codex round 1 Major regression)" 1 1 "unrecognised line inside ## Retro inputs" "$FIX/fail-inputs-unknown-marker.md"
 
 # case: removing the interventions line from a COPY of pass-canonical.md adds exactly one violation
-COPY_TMP="$HERE/tmp-mutation-copy"
-rm -rf "$COPY_TMP"
+if [ -n "${TMPDIR:-}" ]; then
+  COPY_TMP="$(mktemp -d "${TMPDIR%/}/check-retro-mutation-copy.XXXXXX")"
+else
+  COPY_TMP="$(mktemp -d "$HERE/tmp-mutation-copy.XXXXXX")"
+fi
 trap 'rm -rf "$COPY_TMP"' EXIT
-mkdir -p "$COPY_TMP"
 no_interventions="$COPY_TMP/pass-canonical-no-interventions.md"
 cp "$FIX/pass-canonical.md" "$no_interventions"
 sed -i.bak '/^- input: interventions /d' "$no_interventions"
@@ -274,10 +278,12 @@ rm -rf "$COPY_TMP"
 # defect v1 shipped. T-1010: the five section markers are included and
 # well-formed (with labelled lesson bullets) so this case isolates rule 4's
 # CR handling exactly, rather than also failing for a marker reason.
-TMP="$HERE/tmp"
-rm -rf "$TMP"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/check-retro-crlf.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+fi
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 malformed="$TMP/malformed.md"
 # shellcheck disable=SC2016  # backticks below are literal markdown code-span syntax, not a subshell.

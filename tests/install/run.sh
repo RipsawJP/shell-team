@@ -28,10 +28,10 @@ mkdir -p "$SCRATCH_ROOT"
 WORK="$(mktemp -d "$SCRATCH_ROOT/install-dogfood-XXXXXX")"
 
 mktmp_file() {
-  mktemp "$SCRATCH_ROOT/install-tmp-XXXXXX"
+  mktemp "$WORK/install-tmp-XXXXXX"
 }
 
-trap 'rm -rf "$WORK" "$SCRATCH_ROOT"/install-tmp-* 2>/dev/null || true' EXIT
+trap 'rm -rf "$WORK" 2>/dev/null || true' EXIT
 
 fail() {
   printf 'FAIL: %s\n' "$1" >&2

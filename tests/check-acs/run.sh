@@ -15,14 +15,16 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 ACS="$REPO_ROOT/bin/check-acs.sh"
 FIX="$HERE/fixtures"
-TMP="$HERE/tmp"
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/check-acs-test.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+fi
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 # assert_rc <desc> <expected_rc> <spec> [stdout_grep]
 assert_rc() {

@@ -24,10 +24,12 @@ FIX="$HERE/fixtures"
 GUARD="$FIX/guard-contract.yaml"
 USDC="$FIX/usd-contract.yaml"
 NOPROG_OFF="$FIX/noprog-off-contract.yaml"
-TMP="$HERE/tmp"
-rm -rf "$TMP"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/loop-guard-test.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+fi
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 fail() {
   printf 'FAIL: %s\n' "$1" >&2
