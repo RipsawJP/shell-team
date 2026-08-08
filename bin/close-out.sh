@@ -23,37 +23,14 @@
 #
 # Before any of the above runs, fail-closed gates must pass, in order: T-068's
 # pending fast-follow disposition gate, then T-1017's interventions gate,
-# then T-1048's durability gate, then T-1022's source-line gate —
+# then T-1022's source-line gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
-#   a task whose close-out-phase records have not durably persisted (or whose durability sibling is unusable) refuses the close-out before any board write.
 #   a source line the hand-off lint would reject refuses the close-out before any board write.
 # The interventions record is resolved from $TEAM_INTERVENTIONS_DIR (same
 # override precedence as $TEAM_TODO below) or else the sibling team-paths.sh,
 # then verified with the sibling check-interventions.sh --task T-NNN. The
 # gate reads ONE path for the task being closed — no other task's record, no
 # ## Done history, no backfill or migration.
-#
-# T-1048's durability gate runs the sibling check-durability.sh --phase
-# close-out --task T-NNN --ref HEAD, which answers a different question from
-# the git-status-based guards elsewhere in this loop: did every record this
-# closing phase requires actually persist as a blob in HEAD's tree, matching
-# the working file — not merely "is anything uncommitted". An adopter who
-# declares the working-tree-only opt-out (DP7 of the T-1048 spec) is
-# unaffected: check-durability.sh itself reports the skip and exits 0.
-#
-# LIMITATION (rework round 1, 2026-08-08): check-durability.sh resolves every
-# record path independently through its OWN team-paths.sh calls and never
-# consults $TEAM_TODO or $TEAM_INTERVENTIONS_DIR — this script is the only
-# place that override precedence is honored. If either override is set to a
-# value that diverges from team-paths.sh's own resolution of the same key,
-# the durability gate cannot observe the file this override actually
-# controls; this script refuses the close-out (exit 2, naming the diverging
-# override) rather than trust a verdict measured against the wrong file, or
-# rather than silently skip the observation — UNLESS the checker's own
-# working-tree-only opt-out (DP7) fires, in which case no file was observed
-# at all and the divergence is moot. An override that is unset, or set to a
-# value that resolves to the SAME file team-paths.sh would pick on its own,
-# is unaffected.
 #
 # T-1022's source-line gate (#98) judges the task's Active source line the
 # same way check-handoff.sh would, by feeding it a synthesized single-entry
@@ -84,15 +61,11 @@
 #
 # Exit: 0 = board updated; 1 = task not in Active (missing or already Done),
 #       board shape error, an unresolved fast-follow disposition, a
-#       missing/unreadable/non-conformant interventions record, a task whose
-#       close-out-phase records are not durable (T-1048), or a source line
-#       the hand-off lint would reject; 2 = usage / validation / resolver
-#       error, an unusable interventions checker, interventions-directory
-#       resolver, check-durability.sh sibling, or check-handoff.sh sibling,
-#       or a $TEAM_TODO / $TEAM_INTERVENTIONS_DIR override that diverges from
-#       team-paths.sh's own resolution while the durability gate performed a
-#       real (non-skip) observation (T-1048 rework round 1).
-#       On any non-zero exit the board file is byte-untouched. In one line:
+#       missing/unreadable/non-conformant interventions record, or a source
+#       line the hand-off lint would reject; 2 = usage / validation /
+#       resolver error, or an unusable interventions checker,
+#       interventions-directory resolver, or check-handoff.sh sibling. On any
+#       non-zero exit the board file is byte-untouched. In one line:
 #   a missing, unreadable or non-conformant interventions record is exit 1; an unusable checker or resolver is exit 2.
 
 set -euo pipefail
@@ -111,31 +84,6 @@ while [ -L "$script_path" ]; do
   esac
 done
 SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
-
-# T-1048 rework round 1 (2026-08-08 codex review Blocker 2): canonicalize a
-# path (relative or absolute) to an absolute string, comparison-only — no
-# symlink resolution (the Threat model's TRUSTED-operator boundary makes
-# that unnecessary here). Used solely to tell whether an override
-# ($TEAM_TODO / $TEAM_INTERVENTIONS_DIR) and team-paths.sh's own independent
-# resolution name the SAME file, regardless of which one is spelled relative
-# (team-paths.sh --get always emits a ROOT-relative path) and which
-# absolute (every override value used in this repository's own fixtures and
-# every realistic caller is absolute). Falls back to a literal cwd-prefix
-# when the parent directory does not exist yet — an override whose parent is
-# missing already fails a later readability check on its own.
-_abspath() {
-  local p="$1" dir base
-  dir="$(dirname -- "$p")"
-  base="$(basename -- "$p")"
-  if [ -d "$dir" ]; then
-    printf '%s/%s\n' "$(cd "$dir" && pwd)" "$base"
-  else
-    case "$p" in
-      /*) printf '%s\n' "$p" ;;
-      *)  printf '%s/%s\n' "$(pwd)" "$p" ;;
-    esac
-  fi
-}
 
 TASK="" ISSUE="" PR="" DATE="" NOTE=""
 
@@ -196,13 +144,6 @@ if [ -n "$NOTE" ]; then
 fi
 
 # --- board resolution ---------------------------------------------------------
-# Divergence-checking $TEAM_TODO against team-paths.sh's own resolution is
-# deferred to the durability gate section below (T-1048 rework round 1) —
-# NOT done here, deliberately: doing it here would call team-paths.sh even
-# when $TEAM_TODO already makes that call unnecessary, changing this
-# resolver's own failure-ordering/messaging ahead of the interventions gate
-# (a pre-existing $TEAM_TODO-set / team-paths.sh-missing fixture depends on
-# that ordering staying exactly as it was).
 if [ -n "${TEAM_TODO:-}" ]; then
   BOARD="$TEAM_TODO"
 else
@@ -275,10 +216,7 @@ fi
 # team-paths.sh; a resolver failure is exit 2 with no guessing fallback (a
 # guessed directory that happens to be empty would misattribute a refusal,
 # and one that happens to hold a same-named file would verify the wrong
-# task's record). Divergence-checking $TEAM_INTERVENTIONS_DIR against
-# team-paths.sh's own resolution is likewise deferred to the durability gate
-# section below (T-1048 rework round 1), for the same failure-ordering
-# reason as $TEAM_TODO above.
+# task's record).
 if [ -n "${TEAM_INTERVENTIONS_DIR:-}" ]; then
   INTERVENTIONS_DIR="$TEAM_INTERVENTIONS_DIR"
 else
@@ -371,99 +309,6 @@ if [ "$CK_RC" -ne 0 ]; then
       ;;
   esac
 fi
-
-# --- fail-closed gate: the task's close-out-phase records are durable ------
-# (T-1048, issue #167). check-durability.sh answers a different question
-# from the git-status-based guards elsewhere in the loop: did every record
-# this closing phase requires actually persist as a blob in HEAD's tree,
-# with the working file matching it — not merely "is anything uncommitted".
-# Same shape as the T-1017 interventions gate immediately above: resolve the
-# sibling, screen it for existence/readability before running it (exit 2 on
-# an unusable sibling), run it, and refuse (exit 1) on a substantive
-# not-durable verdict — all before any board write. An adopter who declares
-# the working-tree-only opt-out (DP7) is unaffected: check-durability.sh
-# itself reports the skip and exits 0.
-#
-# T-1048 rework round 1 (2026-08-08 codex review Blocker 2): check-durability.sh
-# re-resolves EVERY record path independently via its own team-paths.sh
-# calls — it never consults $TEAM_TODO / $TEAM_INTERVENTIONS_DIR at all. If
-# either override diverges from team-paths.sh's own resolution of the same
-# key AND the checker actually PERFORMED an observation (durable or
-# not-durable — anything other than a declared working-tree-only skip, which
-# observes no file at all and so cannot have observed the wrong one), that
-# verdict was measured against a different file than the one this close-out
-# is acting on and cannot be trusted — refuse (exit 2, close-out's existing
-# "checker or resolver unusable" arm) BEFORE any board write, naming the
-# diverging override, rather than silently trusting a verdict about the
-# wrong file. The divergence check itself is deliberately made HERE, after
-# the interventions gate above has already run its own team-paths.sh
-# dependency (or been rescued from it by its own override) — computing it
-# any earlier would call team-paths.sh even when an override already makes
-# that unnecessary, disturbing the interventions gate's own pre-existing
-# failure-ordering/messaging when team-paths.sh itself is unavailable.
-DURABILITY_CHECKER="$SCRIPT_DIR/check-durability.sh"
-if [ ! -f "$DURABILITY_CHECKER" ] || [ ! -r "$DURABILITY_CHECKER" ]; then
-  die "cannot verify hand-off durability (check-durability.sh missing or unreadable next to close-out.sh)"
-fi
-
-OVERRIDE_DIVERGENCE=""
-if [ -n "${TEAM_TODO:-}" ]; then
-  RESOLVED_TODO="$(bash "$SCRIPT_DIR/team-paths.sh" --get todo 2>/dev/null)" \
-    || die "cannot verify hand-off durability (team-paths.sh unavailable while checking \$TEAM_TODO for divergence from its own resolution)"
-  if [ "$(_abspath "$TEAM_TODO")" != "$(_abspath "$RESOLVED_TODO")" ]; then
-    OVERRIDE_DIVERGENCE="\$TEAM_TODO ('$TEAM_TODO') diverges from team-paths.sh's own resolution ('$RESOLVED_TODO')"
-  fi
-fi
-if [ -n "${TEAM_INTERVENTIONS_DIR:-}" ]; then
-  RESOLVED_INTERVENTIONS="$(bash "$SCRIPT_DIR/team-paths.sh" --get interventions 2>/dev/null)" \
-    || die "cannot verify hand-off durability (team-paths.sh unavailable while checking \$TEAM_INTERVENTIONS_DIR for divergence from its own resolution)"
-  if [ "$(_abspath "$TEAM_INTERVENTIONS_DIR")" != "$(_abspath "$RESOLVED_INTERVENTIONS")" ]; then
-    DIVERGE_MSG="\$TEAM_INTERVENTIONS_DIR ('$TEAM_INTERVENTIONS_DIR') diverges from team-paths.sh's own resolution ('$RESOLVED_INTERVENTIONS')"
-    if [ -n "$OVERRIDE_DIVERGENCE" ]; then
-      OVERRIDE_DIVERGENCE="$OVERRIDE_DIVERGENCE; $DIVERGE_MSG"
-    else
-      OVERRIDE_DIVERGENCE="$DIVERGE_MSG"
-    fi
-  fi
-fi
-
-# Stdout is captured here (not discarded straight to /dev/null as before)
-# SOLELY to tell a `skipped:` verdict apart from a `durable:` one; it is
-# still never printed on an ordinary (non-divergent) success — DP6's "says
-# out loud" contract is satisfied by check-durability.sh's own direct
-# invocation, the same convention the T-1017 interventions gate above
-# already uses (round-1 review Finding #2 confirmed this is precedent, not
-# a regression).
-DUR_OUT="$(bash "$DURABILITY_CHECKER" --phase close-out --task "$TASK" --ref HEAD 2>&1)" && DUR_RC=0 || DUR_RC=$?
-case "$DUR_RC" in
-  0)
-    case "$DUR_OUT" in
-      *'check-durability: skipped:'*)
-        : # no observation was made at all; an override divergence names no wrong file to have been observed instead of the right one
-        ;;
-      *)
-        if [ -n "$OVERRIDE_DIVERGENCE" ]; then
-          die "cannot verify hand-off durability ($OVERRIDE_DIVERGENCE — check-durability.sh independently re-resolves every record path via team-paths.sh and never consults this override, so its durable verdict was measured against a different file than the one this close-out is acting on)"
-        fi
-        ;;
-    esac
-    ;;
-  1)
-    if [ -n "$DUR_OUT" ]; then
-      printf '%s\n' "$DUR_OUT" >&2 || true
-    fi
-    if [ -n "$OVERRIDE_DIVERGENCE" ]; then
-      die "cannot verify hand-off durability ($OVERRIDE_DIVERGENCE — check-durability.sh's not-durable verdict above was measured against a different file than the one this override controls)"
-    fi
-    fail "$TASK failed the durability observation — a required close-out record has not durably persisted (see check-durability's reason above)"
-    ;;
-  *)
-    if [ -n "$DUR_OUT" ]; then
-      printf '%s\n' "$DUR_OUT" >&2 || true
-    fi
-    die "cannot verify hand-off durability (check-durability.sh exited $DUR_RC)"
-    ;;
-esac
 
 # --- build the Done entry ------------------------------------------------------
 MAIN_LINE="$(sed -n "${A_START}p" "$BOARD")"
