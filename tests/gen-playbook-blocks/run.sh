@@ -18,17 +18,15 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 GEN="$REPO_ROOT/bin/gen-playbook-blocks.sh"
 FIX="$HERE/fixtures/root"
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/gen-playbook-blocks-test-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/gen-playbook-blocks-test-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp-roots"
+  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 clone_fixture() {  # $1 = destination
   # T-1006 DP-6: the fixture tree carries tasks/lessons.md but NO

@@ -2,7 +2,7 @@
 # run.sh — drive bin/team-paths.sh and assert the resolver's precedence chain
 # (T-025):
 #   - default mode      : empty root -> base=.shell-team, specs=.shell-team/specs
-#   - legacy mode       : root with tasks/loops/ -> base=tasks, specs=docs/specs
+#   - legacy mode       : root with tasks/loops/shell-team.contract.yaml -> base=tasks, specs=docs/specs
 #                         (split-root lock: specs MUST stay at docs/specs)
 #   - explicit override : $TEAM_RUN_BASE wins even when a legacy layout exists
 #   - --export is eval-safe, including roots / bases containing a space
@@ -16,14 +16,16 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 PATHS="$REPO_ROOT/bin/team-paths.sh"
-TMP="$HERE/tmp-roots"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/team-paths-test-roots.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 # get <root> <key> [env-assignment...] -> prints the resolved path
 get() {

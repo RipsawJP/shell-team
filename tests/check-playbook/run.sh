@@ -22,17 +22,15 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 CHECKER="$REPO_ROOT/bin/check-playbook.sh"
 BASE="$HERE/fixtures/valid-base.md"
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/check-playbook-test-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/check-playbook-test-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp-roots"
+  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 run_checker() {  # $1 = file; prints exit code
   local rc=0

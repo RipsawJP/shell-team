@@ -44,6 +44,17 @@
 #   - status: unavailable
 #   empty means the input was consulted and held nothing; unavailable means it could not be consulted at all. Never report one as the other.
 #
+# review-artifacts counts any regular file, not only names ending in .md:
+# bin/codex-capture.sh publishes its own review capture as <stem>.txt and
+# <stem>.jsonl inside the resolved reviews dir (T-1042), so a suffix check
+# that only recognized .md would under-report a reviews dir holding exactly
+# that first-party output as `empty` when it in fact holds material. An
+# extensionless file and an unfamiliar extension both count too -- "any
+# regular file" is the rule, not an enumerated suffix set. Dotfiles (the
+# `.codex-capture.*` pre-publish temps) and subdirectories are still excluded
+# by the existing nullglob-without-dotglob enumeration; the other five
+# directory-backed inputs keep their own `.md` / `.jsonl` suffix rules.
+#
 # Decision-site inventory (AC4): one row per promotion call site, each naming
 # the determination it makes, the precondition(s) it requires, and stating
 # that `unavailable` stands when the determination cannot be made. Every row
@@ -449,7 +460,7 @@ report_dir_input() {
   fi
 }
 
-report_dir_input review-artifacts "${TEAM_REVIEWS_DIR:-}"    ".md"    "review artifacts"
+report_dir_input review-artifacts "${TEAM_REVIEWS_DIR:-}"    ""       "review artifacts"
 report_dir_input provenance       "${TEAM_PROVENANCE_DIR:-}" ".md"    "provenance files"
 report_dir_input specs            "${TEAM_SPECS_DIR:-}"      ".md"    "spec files"
 report_dir_input run-telemetry    "${TEAM_RUNS_DIR:-}"       ".jsonl" "run telemetry files"

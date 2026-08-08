@@ -91,7 +91,8 @@ env も config ファイルも無い）。`codex-reviewer` はスタンドアロ
 ## Codex CLI クイックリファレンス
 
 ```bash
-# ヘルスチェック（codex-reviewer が暗黙に実行する）
+# バージョン確認 — codex-reviewer と drift-evaluator が毎ラウンド実行し、
+# その出力を verdict の `- Codex CLI:` 行に転記する
 codex --version
 
 # 構造化されたブランチレビュー（推奨・正典形。

@@ -23,17 +23,15 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 CLOSEOUT="$REPO_ROOT/bin/close-out.sh"
 GENSTATUS="$REPO_ROOT/bin/gen-project-status.sh"
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/close-out-test-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/close-out-test-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp-roots"
+  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 # Build a legacy-layout root (tasks/ + docs/specs) with a board, markers'd
 # project_status, the sibling-resolvable bin scripts, and a tiny git history.

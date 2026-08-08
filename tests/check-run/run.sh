@@ -21,10 +21,13 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 CHECK="$REPO_ROOT/bin/check-run.sh"
 LOG="$REPO_ROOT/bin/log-run.sh"
 FIX="$HERE/fixtures"
-TMP="$HERE/tmp-runs"
+if [ -n "${TMPDIR:-}" ]; then
+  TMP="$(mktemp -d "${TMPDIR%/}/check-run-test-runs.XXXXXX")"
+else
+  TMP="$(mktemp -d "$HERE/tmp-runs.XXXXXX")"
+fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
-rm -rf "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
 # assert_check <desc> <expected_rc> <file> [stderr_grep]

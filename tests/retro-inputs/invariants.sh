@@ -71,20 +71,18 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 RETRO_INPUTS="$REPO_ROOT/bin/retro-inputs.sh"
 
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/retro-inputs-invariants-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/retro-inputs-invariants-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp-invariants"
+  TMP="$(mktemp -d "$HERE/tmp-invariants.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-rm -rf "$TMP" 2>/dev/null || true
 # The trailing rm -rf tolerates residual noise (issue #70: a background gc
 # recreating files mid-delete failed the step after every invariant passed) —
 # cleanup best-effort by design; the invariants themselves fail loudly above.
 trap 'chmod -R u+rwx "$TMP" 2>/dev/null || true; rm -rf "$TMP" 2>/dev/null || true' EXIT
-mkdir -p "$TMP"
 
 # assert_invariant <description> -- <cmd...>
 # Runs the given command (typically `bash "$RETRO_INPUTS" ...` in a subshell

@@ -1225,6 +1225,333 @@ if grep -q '^check-intent: attestation: ' <<< "$ERR"; then
 fi
 pass "T-1021-check-intent-attest-counts-bounded-pass: 4-character-wide freeze-attestation counts (width-fixture=4char, at the bound's own edge) are not rejected by the new width bound"
 
+# ============================================================================
+# T-1041: `--print-hash` and the two refusal-readability changes.
+#
+# 22 named assertion ids (AC8), across the fixture cases below: 16 for print
+# mode (stdout contract; oracle parity against this suite's own compute_hash;
+# end-to-end one-pipeline; marker absent/duplicated/reversed; malformed task
+# id; directory argument; surplus argument; mode exclusivity; no positional;
+# zero-argument parity; CRLF twin; three-invocation parity; empty-region
+# parity; no temp-file leak) and 6 for the two refusal messages plus the two
+# byte-invariance locks (pace-rule measured-count labelling + counterfactual;
+# malformed-record counted total + counterfactual; the frozen-literal set;
+# the row (10) byte invariant).
+# ============================================================================
+
+# run_print_hash <spec> [extra args...] -- captures PRC (exit code), POUT
+# (stdout text, newline-stripped), PERR (stderr text) and the RAW byte counts
+# POUT_BYTES/PERR_BYTES (via `wc -c` on the underlying temp files, since a
+# command-substitution capture silently strips a trailing LF and would hide
+# a missing/extra-trailing-newline regression in the byte contract itself).
+PRC=0; POUT=""; PERR=""; POUT_BYTES=0; PERR_BYTES=0
+run_print_hash() {
+  local spec="$1"; shift
+  local outfile="$TMP/.ph-out"; local errfile="$TMP/.ph-err"
+  PRC=0
+  bash "$CHECKER" --print-hash "$spec" "$@" > "$outfile" 2> "$errfile" || PRC=$?
+  POUT="$(cat "$outfile")"
+  PERR="$(cat "$errfile")"
+  POUT_BYTES="$(wc -c < "$outfile" | tr -d ' ')"
+  PERR_BYTES="$(wc -c < "$errfile" | tr -d ' ')"
+  rm -f "$outfile" "$errfile"
+}
+
+# --- printhash-stdout-contract -----------------------------------------------
+C="$TMP/case-printhash-stdout"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+run_print_hash "$C/spec.md"
+[ "$PRC" -eq 0 ] || fail "printhash-stdout-contract: expected exit 0, got $PRC: $PERR"
+[ "$POUT_BYTES" -eq 41 ] || fail "printhash-stdout-contract: expected 41 stdout bytes, got $POUT_BYTES"
+[ "$PERR_BYTES" -eq 0 ] || fail "printhash-stdout-contract: expected 0 stderr bytes, got $PERR_BYTES"
+printf '%s' "$POUT" | grep -qE '^[0-9a-f]{40}$' || fail "printhash-stdout-contract: expected exactly 40 lowercase hex chars, got: $POUT"
+pass "printhash-stdout-contract: --print-hash prints exactly 40 lowercase hex chars + one LF (41 bytes) on stdout, zero bytes on stderr, exit 0"
+
+# --- printhash-oracle-parity --------------------------------------------------
+C="$TMP/case-printhash-oracle"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+run_print_hash "$C/spec.md"
+[ "$PRC" -eq 0 ] || fail "printhash-oracle-parity: --print-hash failed unexpectedly, rc=$PRC err=$PERR"
+ORACLE_HASH="$(compute_hash "$C/spec.md")"
+[ "$POUT" = "$ORACLE_HASH" ] || fail "printhash-oracle-parity: expected --print-hash's value ($POUT) to equal this suite's own oracle compute_hash ($ORACLE_HASH)"
+pass "printhash-oracle-parity: --print-hash's value equals this suite's own compute_hash oracle for the same spec"
+
+# --- printhash-one-pipeline-end-to-end ---------------------------------------
+# The value --print-hash produces is recorded on a scratch board with a
+# conformant v1 attestation, then verified `aligned` by the TWO-argument
+# mode — proving one pipeline, not two, end to end.
+C="$TMP/case-printhash-onepipe"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+run_print_hash "$C/spec.md"
+[ "$PRC" -eq 0 ] || fail "printhash-one-pipeline-end-to-end: --print-hash itself failed unexpectedly, rc=$PRC err=$PERR"
+write_board "$C/board.md" 1 "$POUT" \
+  '  - freeze-attestation (v1, 2026-08-06): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=printhash-fixture'
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 0 ] || fail "printhash-one-pipeline-end-to-end: expected the two-argument mode to report aligned (exit 0) for the value --print-hash produced, got $RC: $ERR"
+pass "printhash-one-pipeline-end-to-end: the value --print-hash prints, recorded on a scratch board with a conformant v1 attestation, is verified aligned by the two-argument mode — one pipeline, not two"
+
+# --- printhash-marker-absent/duplicated/reversed-fails-closed, and the
+# malformed-Task-ID-line case (id assigned to a variable and reused below,
+# rather than respelled at each call site — the variable indirection is kept
+# even though the collision it was originally introduced for is now fixed:
+# AC8's frozen id was originally hyphenated as "...task-id-malformed...",
+# whose spelling embedded a `sk-` + 16-or-more-token-chars substring that
+# this repo's check-pii-shapes.sh RE_TOKEN pattern false-positived on with
+# no left boundary (issue #178). A class-M mechanics re-freeze renamed the
+# frozen id to "...taskid-malformed..." (unhyphenated), which breaks the
+# `sk-` shape and is now check-pii-shapes.sh-clean).
+C="$TMP/case-printhash-structural"; mkdir -p "$C"
+PH_TASKID_ID="printhash-taskid-malformed-fails-closed"
+write_spec "$C/spec.md" "Do the thing."
+
+grep -v 'BEGIN intent-block' "$C/spec.md" > "$C/spec-nobegin.md"
+run_print_hash "$C/spec-nobegin.md"
+[ "$PRC" -eq 2 ] || fail "printhash-marker-absent-fails-closed: expected exit 2, got $PRC: $PERR"
+[ "$POUT_BYTES" -eq 0 ] || fail "printhash-marker-absent-fails-closed: expected 0 stdout bytes, got $POUT_BYTES"
+grep -q '^check-intent: structural: ' <<< "$PERR" || fail "printhash-marker-absent-fails-closed: stderr must carry 'structural' token, got: $PERR"
+pass "printhash-marker-absent-fails-closed: a missing BEGIN marker fails closed in print mode (exit 2, structural, zero stdout bytes)"
+
+cp "$C/spec.md" "$C/spec-dup.md"
+printf -- '<!-- BEGIN intent-block: %s -->\n' "$TASK_ID" >> "$C/spec-dup.md"
+run_print_hash "$C/spec-dup.md"
+[ "$PRC" -eq 2 ] || fail "printhash-marker-duplicated-fails-closed: expected exit 2, got $PRC: $PERR"
+[ "$POUT_BYTES" -eq 0 ] || fail "printhash-marker-duplicated-fails-closed: expected 0 stdout bytes, got $POUT_BYTES"
+grep -q '^check-intent: structural: ' <<< "$PERR" || fail "printhash-marker-duplicated-fails-closed: stderr must carry 'structural' token, got: $PERR"
+pass "printhash-marker-duplicated-fails-closed: a duplicated BEGIN marker fails closed in print mode (exit 2, structural, zero stdout bytes)"
+
+awk -v id="$TASK_ID" '
+  $0 == "<!-- BEGIN intent-block: " id " -->" { print "<!-- END intent-block: " id " -->"; next }
+  $0 == "<!-- END intent-block: "   id " -->" { print "<!-- BEGIN intent-block: " id " -->"; next }
+  { print }
+' "$C/spec.md" > "$C/spec-reversed.md"
+run_print_hash "$C/spec-reversed.md"
+[ "$PRC" -eq 2 ] || fail "printhash-marker-reversed-fails-closed: expected exit 2, got $PRC: $PERR"
+[ "$POUT_BYTES" -eq 0 ] || fail "printhash-marker-reversed-fails-closed: expected 0 stdout bytes, got $POUT_BYTES"
+grep -q '^check-intent: structural: ' <<< "$PERR" || fail "printhash-marker-reversed-fails-closed: stderr must carry 'structural' token, got: $PERR"
+pass "printhash-marker-reversed-fails-closed: reversed BEGIN/END markers fail closed in print mode (exit 2, structural, zero stdout bytes)"
+
+sed "s/\\*\\*Task ID\\*\\*: ${TASK_ID}/**Task ID**: ${TASK_ID}junk-trailing-garbage/" "$C/spec.md" > "$C/spec-malformed-taskid.md"
+run_print_hash "$C/spec-malformed-taskid.md"
+[ "$PRC" -eq 2 ] || fail "$PH_TASKID_ID: expected exit 2, got $PRC: $PERR"
+[ "$POUT_BYTES" -eq 0 ] || fail "$PH_TASKID_ID: expected 0 stdout bytes, got $POUT_BYTES"
+grep -q '^check-intent: structural: ' <<< "$PERR" || fail "$PH_TASKID_ID: stderr must carry 'structural' token, got: $PERR"
+pass "$PH_TASKID_ID: a malformed '**Task ID**: ${TASK_ID}junk...' line fails closed in print mode (exit 2, structural, zero stdout bytes)"
+
+# --- printhash-directory-arg-fails-closed; printhash-extra-arg-usage;
+#     printhash-mode-exclusivity-usage; printhash-no-positional-usage
+C="$TMP/case-printhash-usage"; mkdir -p "$C/adir"
+write_spec "$C/spec.md" "Do the thing."
+
+run_print_hash "$C/adir"
+[ "$PRC" -eq 2 ] || fail "printhash-directory-arg-fails-closed: expected exit 2, got $PRC: $PERR"
+[ "$POUT_BYTES" -eq 0 ] || fail "printhash-directory-arg-fails-closed: expected 0 stdout bytes, got $POUT_BYTES"
+grep -q '^check-intent: usage: ' <<< "$PERR" || fail "printhash-directory-arg-fails-closed: stderr must carry 'usage' token, got: $PERR"
+pass "printhash-directory-arg-fails-closed: a directory passed as the spec argument fails closed in print mode (exit 2, usage, zero stdout bytes)"
+
+EXTRA_RC=0
+bash "$CHECKER" --print-hash "$C/spec.md" extra.md > "$C/extra.out" 2> "$C/extra.err" || EXTRA_RC=$?
+EXTRA_OUT_BYTES="$(wc -c < "$C/extra.out" | tr -d ' ')"
+[ "$EXTRA_RC" -eq 2 ] || fail "printhash-extra-arg-usage: expected exit 2, got $EXTRA_RC"
+[ "$EXTRA_OUT_BYTES" -eq 0 ] || fail "printhash-extra-arg-usage: expected 0 stdout bytes, got $EXTRA_OUT_BYTES"
+grep -q '^check-intent: usage: ' "$C/extra.err" || fail "printhash-extra-arg-usage: stderr must carry 'usage' token, got: $(cat "$C/extra.err")"
+pass "printhash-extra-arg-usage: a surplus positional argument after --print-hash <spec> fails closed (exit 2, usage, zero stdout bytes)"
+
+EXCL_RC=0
+bash "$CHECKER" --print-hash --print-hash "$C/spec.md" > "$C/excl.out" 2> "$C/excl.err" || EXCL_RC=$?
+EXCL_OUT_BYTES="$(wc -c < "$C/excl.out" | tr -d ' ')"
+[ "$EXCL_RC" -eq 2 ] || fail "printhash-mode-exclusivity-usage: expected exit 2, got $EXCL_RC"
+[ "$EXCL_OUT_BYTES" -eq 0 ] || fail "printhash-mode-exclusivity-usage: expected 0 stdout bytes, got $EXCL_OUT_BYTES"
+grep -q '^check-intent: usage: ' "$C/excl.err" || fail "printhash-mode-exclusivity-usage: stderr must carry 'usage' token, got: $(cat "$C/excl.err")"
+pass "printhash-mode-exclusivity-usage: a repeated --print-hash flag is a usage(2) error (mode exclusivity, following bin/team-paths.sh's set_mode precedent), zero stdout bytes"
+
+NOPOS_RC=0
+bash "$CHECKER" --print-hash > "$C/nopos.out" 2> "$C/nopos.err" || NOPOS_RC=$?
+NOPOS_OUT_BYTES="$(wc -c < "$C/nopos.out" | tr -d ' ')"
+[ "$NOPOS_RC" -eq 2 ] || fail "printhash-no-positional-usage: expected exit 2, got $NOPOS_RC"
+[ "$NOPOS_OUT_BYTES" -eq 0 ] || fail "printhash-no-positional-usage: expected 0 stdout bytes, got $NOPOS_OUT_BYTES"
+grep -q '^check-intent: usage: ' "$C/nopos.err" || fail "printhash-no-positional-usage: stderr must carry 'usage' token, got: $(cat "$C/nopos.err")"
+pass "printhash-no-positional-usage: --print-hash with no positional argument at all fails closed (exit 2, usage, zero stdout bytes)"
+
+# --- printhash-zero-arg-contract-unchanged -----------------------------------
+# The TWO-argument mode's own bare zero-argument invocation (no flags, no
+# positional args at all — the exact shape tests/errexit-safe/run.sh:217
+# pins under closed stderr) is unaffected by the new mode existing.
+C="$TMP/case-printhash-zeroarg"; mkdir -p "$C"
+ZERO_RC=0
+bash "$CHECKER" > "$C/zero.out" 2> "$C/zero.err" || ZERO_RC=$?
+ZERO_OUT_BYTES="$(wc -c < "$C/zero.out" | tr -d ' ')"
+[ "$ZERO_RC" -eq 2 ] || fail "printhash-zero-arg-contract-unchanged: expected exit 2, got $ZERO_RC"
+[ "$ZERO_OUT_BYTES" -eq 0 ] || fail "printhash-zero-arg-contract-unchanged: expected 0 stdout bytes, got $ZERO_OUT_BYTES"
+grep -q '^check-intent: usage: ' "$C/zero.err" || fail "printhash-zero-arg-contract-unchanged: stderr must carry 'usage' token, got: $(cat "$C/zero.err")"
+pass "printhash-zero-arg-contract-unchanged: a bare zero-argument invocation (no --print-hash, no positional args) is still a usage(2) error, unaffected by the new mode (tests/errexit-safe/run.sh:217 pins this same contract under closed stderr)"
+
+# --- printhash-crlf-twin-same-hash -------------------------------------------
+C="$TMP/case-printhash-crlf"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+sed 's/$/\r/' "$C/spec.md" > "$C/spec-crlf.md"
+run_print_hash "$C/spec.md"
+[ "$PRC" -eq 0 ] || fail "printhash-crlf-twin-same-hash: LF spec failed unexpectedly, rc=$PRC err=$PERR"
+LF_VAL="$POUT"
+run_print_hash "$C/spec-crlf.md"
+[ "$PRC" -eq 0 ] || fail "printhash-crlf-twin-same-hash: CRLF spec failed unexpectedly, rc=$PRC err=$PERR"
+CRLF_VAL="$POUT"
+[ "$LF_VAL" = "$CRLF_VAL" ] || fail "printhash-crlf-twin-same-hash: expected LF ($LF_VAL) and CRLF ($CRLF_VAL) specs to print the same hash"
+pass "printhash-crlf-twin-same-hash: --print-hash prints byte-identical values for an LF spec and its CRLF twin"
+
+# --- printhash-invocation-style-parity ---------------------------------------
+C="$TMP/case-printhash-invocation"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+
+BASH_RC=0
+( cd "$REPO_ROOT" && bash bin/check-intent.sh --print-hash "$C/spec.md" ) > "$C/out-bash.txt" 2>&1 || BASH_RC=$?
+DOT_RC=0
+( cd "$REPO_ROOT" && ./bin/check-intent.sh --print-hash "$C/spec.md" ) > "$C/out-dot.txt" 2>&1 || DOT_RC=$?
+
+PATHBIN2="$TMP/pathbin-printhash"
+mkdir -p "$PATHBIN2"
+ln -sf "$CHECKER" "$PATHBIN2/check-intent.sh"
+BARE_RC=0
+# shellcheck disable=SC2030,SC2031
+( export PATH="$PATHBIN2:$PATH"; cd "$REPO_ROOT" && check-intent.sh --print-hash "$C/spec.md" ) > "$C/out-bare.txt" 2>&1 || BARE_RC=$?
+
+if [ "$BASH_RC" -ne 0 ] || [ "$DOT_RC" -ne 0 ] || [ "$BARE_RC" -ne 0 ]; then
+  fail "printhash-invocation-style-parity: invocation styles disagree or failed — bash=$BASH_RC dot-slash=$DOT_RC PATH-bare=$BARE_RC"
+fi
+if ! cmp -s "$C/out-bash.txt" "$C/out-dot.txt"; then
+  dump_cmp_diag "printhash-invocation-style-parity" "$C/out-bash.txt" "$C/out-dot.txt"
+  fail "printhash-invocation-style-parity: output differs across invocation styles (bash vs ./)"
+fi
+if ! cmp -s "$C/out-dot.txt" "$C/out-bare.txt"; then
+  dump_cmp_diag "printhash-invocation-style-parity" "$C/out-dot.txt" "$C/out-bare.txt"
+  fail "printhash-invocation-style-parity: output differs across invocation styles (./ vs PATH-bare)"
+fi
+pass "printhash-invocation-style-parity: bash / ./ / PATH-bare-name invocations of --print-hash all produce identical behavior (exit 0) and byte-identical output"
+
+# --- printhash-empty-region-parity -------------------------------------------
+# A degenerate spec whose intent block normalizes to zero bytes (adjacent
+# markers) hashes to git's empty-blob value — print mode reports it exactly
+# as the two-argument mode computes it; refusing it in one mode only would
+# break the single-pipeline property this task exists to establish.
+C="$TMP/case-printhash-empty-region"; mkdir -p "$C"
+{
+  printf '# Fixture spec\n\n**Status**: READY_FOR_ARCH\n**Owner**: pm-spec\n**Task ID**: %s\n\n' "$TASK_ID"
+  printf '<!-- BEGIN intent-block: %s -->\n<!-- END intent-block: %s -->\n' "$TASK_ID" "$TASK_ID"
+} > "$C/spec-empty.md"
+EMPTY_BLOB="$(git hash-object --stdin < /dev/null)"
+run_print_hash "$C/spec-empty.md"
+[ "$PRC" -eq 0 ] || fail "printhash-empty-region-parity: expected exit 0 for a degenerate zero-byte intent block, got $PRC: $PERR"
+[ "$POUT" = "$EMPTY_BLOB" ] || fail "printhash-empty-region-parity: expected the printed value to equal git's empty-blob hash ($EMPTY_BLOB), got $POUT"
+write_board "$C/board.md" 1 "$POUT" \
+  '  - freeze-attestation (v1, 2026-08-06): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=printhash-fixture'
+run_checker "$C/spec-empty.md" "$C/board.md"
+[ "$RC" -eq 0 ] || fail "printhash-empty-region-parity: expected the two-argument mode to also report aligned for the same degenerate spec/hash, got $RC: $ERR"
+pass "printhash-empty-region-parity: a degenerate spec whose intent block normalizes to zero bytes (adjacent markers) hashes to git's empty-blob value in BOTH modes — parity, not a one-mode-only refusal"
+
+# --- printhash-no-temp-file-leak ----------------------------------------------
+# The EXIT trap (cleanup_tmp_region) installed before print mode's early
+# return must still fire on that early `exit 0` — proved by pointing TMPDIR
+# at an isolated, otherwise-empty scratch directory and confirming it is
+# still empty afterward.
+C="$TMP/case-printhash-notempleak"; mkdir -p "$C/isolated-tmpdir"
+write_spec "$C/spec.md" "Do the thing."
+NOTMP_RC=0
+TMPDIR="$C/isolated-tmpdir" bash "$CHECKER" --print-hash "$C/spec.md" > "$C/leak.out" 2> "$C/leak.err" || NOTMP_RC=$?
+[ "$NOTMP_RC" -eq 0 ] || fail "printhash-no-temp-file-leak: --print-hash itself failed unexpectedly, rc=$NOTMP_RC: $(cat "$C/leak.err")"
+LEAK_COUNT=$(find "$C/isolated-tmpdir" -mindepth 1 | wc -l | tr -d ' ')
+[ "$LEAK_COUNT" -eq 0 ] || fail "printhash-no-temp-file-leak: expected the isolated TMPDIR to be empty after a successful --print-hash run (the EXIT trap must remove the extraction temp file), found $LEAK_COUNT leftover entry/ies"
+pass "printhash-no-temp-file-leak: a successful --print-hash run leaves no temp file behind in TMPDIR — the EXIT trap (cleanup_tmp_region) still fires on the mode's early exit 0"
+
+# --- refusal-pace-rule-names-measured-counts; refusal-pace-rule-counterfactual
+C="$TMP/case-refusal-pacerule"; mkdir -p "$C"
+T1041_AC_BODY_2CHECK=$'- [ ] AC1 a\n  - check: true\n- [ ] AC2 b\n  - check: true'
+write_spec "$C/spec.md" "Do the thing." "" "$T1041_AC_BODY_2CHECK"
+printf -- '- [ ] **%s** fixture task\n' "$TASK_ID" > "$C/board.md"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "refusal-pace-rule-names-measured-counts: expected exit 2, got $RC: $ERR"
+grep -q '^check-intent: attestation: ' <<< "$ERR" || fail "refusal-pace-rule-names-measured-counts: stderr must carry the 'attestation' token, got: $ERR"
+for lit in 'lines=2/2' 'sweep=mutual-satisfiability' 'YYYY-MM-DD' '<P>P/<F>F' '<who ran them>' 'the lines= counts above are measured, not an example'; do
+  grep -qF -- "$lit" <<< "$ERR" || fail "refusal-pace-rule-names-measured-counts: expected literal '$lit' in stderr, got: $ERR"
+done
+pass "refusal-pace-rule-names-measured-counts: the pace-rule refusal names which of its printed numbers were measured (lines=2/2, sweep=mutual-satisfiability, the three unreplaced placeholders, and the new anchor sentence), for a scratch spec carrying two check: lines and an unattested board"
+
+grep -qF -- 'the lines= counts above are measured, not an example' "$CHECKER" \
+  || fail "refusal-pace-rule-counterfactual: expected the anchor sentence to be present in the live checker before mutating a scratch copy"
+sed 's/the lines= counts above are measured, not an example/REDACTED-FOR-COUNTERFACTUAL/' "$CHECKER" > "$C/old-checker-pacerule.sh"
+if grep -qF -- 'the lines= counts above are measured, not an example' "$C/old-checker-pacerule.sh"; then
+  fail "refusal-pace-rule-counterfactual: the sed mutation did not actually remove the anchor sentence from the scratch copy"
+fi
+OLD_RC=0
+OLD_ERR="$(bash "$C/old-checker-pacerule.sh" "$C/spec.md" "$C/board.md" 2>&1 >/dev/null)" || OLD_RC=$?
+[ "$OLD_RC" -eq 2 ] || fail "refusal-pace-rule-counterfactual: expected the mutated checker to still refuse (exit 2), got $OLD_RC: $OLD_ERR"
+if grep -qF -- 'the lines= counts above are measured, not an example' <<< "$OLD_ERR"; then
+  fail "refusal-pace-rule-counterfactual: expected the mutated refusal to have LOST the anchor sentence, got: $OLD_ERR"
+fi
+grep -qF -- 'sweep=mutual-satisfiability' <<< "$OLD_ERR" || fail "refusal-pace-rule-counterfactual: expected 'sweep=mutual-satisfiability' to still appear in the mutated refusal, got: $OLD_ERR"
+pass "refusal-pace-rule-counterfactual: removing the anchor sentence from a scratch copy of the checker produces a refusal that no longer carries it, while sweep=mutual-satisfiability still appears — the assertion tracks the real change, not an unrelated string"
+
+# --- refusal-malformed-names-counted-total; refusal-malformed-counterfactual
+C="$TMP/case-refusal-malformed"; mkdir -p "$C"
+T1041_AC_BODY_2CHECK_B=$'- [ ] AC1 a\n  - check: true\n- [ ] AC2 b\n  - check: true'
+write_spec "$C/spec.md" "Do the thing." "" "$T1041_AC_BODY_2CHECK_B"
+printf -- '- [ ] **%s** fixture task\n' "$TASK_ID" > "$C/board.md"
+printf '  - freeze-attestation (v1, 2026-08-06): lines=2/2 verdict=2P/0F owner=scratch\n' >> "$C/board.md"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "refusal-malformed-names-counted-total: expected exit 2, got $RC: $ERR"
+grep -q '^check-intent: attestation: ' <<< "$ERR" || fail "refusal-malformed-names-counted-total: stderr must carry the 'attestation' token, got: $ERR"
+for lit in 'malformed freeze-attestation record' 'lines=<ran>/<total>' 'the intent block being checked carries' 'lines=2/2'; do
+  grep -qF -- "$lit" <<< "$ERR" || fail "refusal-malformed-names-counted-total: expected literal '$lit' in stderr, got: $ERR"
+done
+pass "refusal-malformed-names-counted-total: the malformed-freeze-attestation refusal additionally names the count it measured (lines=2/2), anchored on 'the intent block being checked carries', while keeping the grammar string and the existing 'malformed freeze-attestation record' phrase"
+
+grep -qF -- 'the intent block being checked carries' "$CHECKER" \
+  || fail "refusal-malformed-counterfactual: expected the anchor phrase to be present in the live checker before mutating a scratch copy"
+sed 's/the intent block being checked carries/REDACTED-FOR-COUNTERFACTUAL/' "$CHECKER" > "$C/old-checker-malformed.sh"
+OLD_RC=0
+OLD_ERR="$(bash "$C/old-checker-malformed.sh" "$C/spec.md" "$C/board.md" 2>&1 >/dev/null)" || OLD_RC=$?
+[ "$OLD_RC" -eq 2 ] || fail "refusal-malformed-counterfactual: expected the mutated checker to still refuse (exit 2), got $OLD_RC: $OLD_ERR"
+if grep -qF -- 'the intent block being checked carries' <<< "$OLD_ERR"; then
+  fail "refusal-malformed-counterfactual: expected the mutated refusal to have LOST the anchor phrase, got: $OLD_ERR"
+fi
+grep -qF -- 'malformed freeze-attestation record' <<< "$OLD_ERR" || fail "refusal-malformed-counterfactual: expected 'malformed freeze-attestation record' to still appear in the mutated refusal, got: $OLD_ERR"
+pass "refusal-malformed-counterfactual: removing the anchor phrase from a scratch copy of the checker produces a malformed-record refusal that no longer carries it, while 'malformed freeze-attestation record' still appears"
+
+# --- refusal-frozen-literals-intact -------------------------------------------
+# Every frozen element AC9 requires must survive TOGETHER in one refusal —
+# the die() attestation prefix (trailing space included), sweep=, the
+# measured lines=<N>/<N> substitution, and the three unreplaced placeholders.
+C="$TMP/case-refusal-frozenliterals"; mkdir -p "$C"
+T1041_AC_BODY_1CHECK=$'- [ ] AC1 a\n  - check: true'
+write_spec "$C/spec.md" "Do the thing." "" "$T1041_AC_BODY_1CHECK"
+printf -- '- [ ] **%s** fixture task\n' "$TASK_ID" > "$C/board.md"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "refusal-frozen-literals-intact: expected exit 2, got $RC: $ERR"
+FROZEN_OK=1
+for lit in 'check-intent: attestation: ' 'sweep=mutual-satisfiability' 'lines=1/1' 'YYYY-MM-DD' '<P>P/<F>F' '<who ran them>'; do
+  grep -qF -- "$lit" <<< "$ERR" || FROZEN_OK=0
+done
+[ "$FROZEN_OK" -eq 1 ] || fail "refusal-frozen-literals-intact: one or more of AC9's frozen elements are missing from the refusal, got: $ERR"
+pass "refusal-frozen-literals-intact: every frozen element AC9 requires (the die() attestation prefix with its trailing space, sweep=mutual-satisfiability, the measured lines=<N>/<N> substitution, and the three unreplaced placeholders) survives together in one refusal"
+
+# --- refusal-row10-message-byte-invariant -------------------------------------
+# The attested-bootstrap case (row 10 — a conformant v1 attestation on a
+# board with no hash record yet) must still reach the SAME shared
+# row(4)/row(10) message and the 'structural' classification, unchanged from
+# before T-1018/T-1041 (D3) — and fail_hash_structural keeps exactly two
+# call sites.
+C="$TMP/case-refusal-row10"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+printf -- '- [ ] **%s** fixture task\n' "$TASK_ID" > "$C/board.md"
+printf '  - freeze-attestation (v1, 2026-08-06): lines=0/0 sweep=mutual-satisfiability verdict=0P/0F owner=printhash-fixture\n' >> "$C/board.md"
+run_checker "$C/spec.md" "$C/board.md"
+[ "$RC" -eq 2 ] || fail "refusal-row10-message-byte-invariant: expected exit 2 (row 10 — attested bootstrap, still no hash record), got $RC: $ERR"
+grep -qF -- 'expected exactly one well-formed intent-hash record for' <<< "$ERR" || fail "refusal-row10-message-byte-invariant: expected the shared row(4)/row(10) message, got: $ERR"
+grep -q '^check-intent: structural: ' <<< "$ERR" || fail "refusal-row10-message-byte-invariant: row 10 must stay 'structural' (D3), not 'attestation', once the gate is satisfied, got: $ERR"
+MSG_OCCURRENCES=$(grep -cF -- 'expected exactly one well-formed intent-hash record for' <<< "$ERR")
+[ "$MSG_OCCURRENCES" -eq 1 ] || fail "refusal-row10-message-byte-invariant: expected the shared message to occur exactly once, got $MSG_OCCURRENCES"
+SITE_COUNT=$(grep -cE '^[[:space:]]+fail_hash_structural$' "$CHECKER")
+[ "$SITE_COUNT" -eq 2 ] || fail "refusal-row10-message-byte-invariant: expected fail_hash_structural to have exactly two call sites (row 4 and row 10), got $SITE_COUNT"
+pass "refusal-row10-message-byte-invariant: the attested-bootstrap case (row 10) still reaches the shared row(4)/row(10) 'structural' message (D3 — unchanged from before T-1018/T-1041), and fail_hash_structural keeps exactly two call sites"
+
 # --- self-check: this suite's own script is shellcheck clean (soft-skip) ---
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$CHECKER" "$HERE/run.sh" || fail "shellcheck: check-intent.sh / run.sh must be clean"

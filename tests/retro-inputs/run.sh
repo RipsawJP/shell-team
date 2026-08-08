@@ -30,9 +30,9 @@ STUB_GIT="$HERE/fixtures/git"
 ORIG_PATH="$PATH"
 
 if [ -n "${TMPDIR:-}" ]; then
-  TMP="${TMPDIR%/}/retro-inputs-test-roots"
+  TMP="$(mktemp -d "${TMPDIR%/}/retro-inputs-test-roots.XXXXXX")"
 else
-  TMP="$HERE/tmp"
+  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
@@ -41,9 +41,7 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # Any 0600-permission directories built below are chmod'd back to 0700 before
 # this runs, so `rm -rf` (which needs traverse permission on every ancestor)
 # can actually clean up the whole tree.
-rm -rf "$TMP" 2>/dev/null || true
 trap 'chmod -R u+rwx "$TMP" 2>/dev/null || true; rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"
 
 chmod +x "$STUB_GH" "$STUB_GIT"
 
@@ -493,6 +491,89 @@ out="$(cd "$INTERVENTIONS_ABSENT" && bash "$RETRO_INPUTS" --base main)"
 printf '%s\n' "$out" | grep -qE -- '^- input: interventions — status: unavailable — detail: directory not found' \
   || fail "case: an absent interventions directory -> unavailable, never empty"
 pass "case: an absent interventions directory -> unavailable, never empty"
+
+# ---------------------------------------------------------------------------
+# case: review-artifacts counts any regular file, so a reviews dir holding
+# only non-.md artifacts reads (T-1042 D3) -- a .txt and a .jsonl mirror
+# bin/codex-capture.sh's own published output; a .json dump, a file with an
+# unfamiliar extension and an extensionless file are the boundary values an
+# enumerated suffix set would have missed.
+# ---------------------------------------------------------------------------
+LB1_REPO="$TMP/lb1-any-file"
+build_repo "$LB1_REPO" main 1
+mkdir -p "$LB1_REPO/.shell-team/reviews"
+printf 'x' > "$LB1_REPO/.shell-team/reviews/T-1.txt"
+printf 'x' > "$LB1_REPO/.shell-team/reviews/T-1.jsonl"
+printf 'x' > "$LB1_REPO/.shell-team/reviews/dump.json"
+printf 'x' > "$LB1_REPO/.shell-team/reviews/notes.rtf"
+printf 'x' > "$LB1_REPO/.shell-team/reviews/noext"
+out="$(cd "$LB1_REPO" && bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: read — detail: 5 review artifacts in ' \
+  || fail "case: review-artifacts counts any regular file, so a reviews dir holding only non-.md artifacts reads"
+pass "case: review-artifacts counts any regular file, so a reviews dir holding only non-.md artifacts reads"
+
+# ---------------------------------------------------------------------------
+# case: review-artifacts reports empty for a reviews dir holding no regular file
+# ---------------------------------------------------------------------------
+LB2_REPO="$TMP/lb2-empty-reviews"
+build_repo "$LB2_REPO" main 1
+mkdir -p "$LB2_REPO/.shell-team/reviews"
+out="$(cd "$LB2_REPO" && bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: empty — detail: 0 review artifacts in ' \
+  || fail "case: review-artifacts reports empty for a reviews dir holding no regular file"
+pass "case: review-artifacts reports empty for a reviews dir holding no regular file"
+
+# ---------------------------------------------------------------------------
+# case: review-artifacts counts neither a capture-temp dotfile nor a
+# subdirectory -- the open-extension rule widens the suffix match, not the
+# nullglob-without-dotglob enumeration or the -f regular-file test.
+# ---------------------------------------------------------------------------
+LB3_REPO="$TMP/lb3-dotfile-subdir"
+build_repo "$LB3_REPO" main 1
+mkdir -p "$LB3_REPO/.shell-team/reviews/nested"
+printf 'x' > "$LB3_REPO/.shell-team/reviews/.codex-capture.T-1.tmp"
+out="$(cd "$LB3_REPO" && bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: empty — detail: 0 review artifacts in ' \
+  || fail "case: review-artifacts counts neither a capture-temp dotfile nor a subdirectory"
+pass "case: review-artifacts counts neither a capture-temp dotfile nor a subdirectory"
+
+# ---------------------------------------------------------------------------
+# case: the .md and .jsonl suffix rules are unchanged for the other five
+# directory inputs -- each one gets a single non-matching-suffix file, so the
+# open-extension rule review-artifacts just gained must not have leaked into
+# any of the other five.
+# ---------------------------------------------------------------------------
+LB4_REPO="$TMP/lb4-other-five-suffix"
+build_repo "$LB4_REPO" main 1
+mkdir -p "$LB4_REPO/.shell-team/provenance" "$LB4_REPO/.shell-team/specs" \
+         "$LB4_REPO/.shell-team/runs" "$LB4_REPO/.shell-team/retros" \
+         "$LB4_REPO/.shell-team/interventions"
+printf 'x' > "$LB4_REPO/.shell-team/provenance/T-1.txt"
+printf 'x' > "$LB4_REPO/.shell-team/specs/T-1.txt"
+printf 'x' > "$LB4_REPO/.shell-team/runs/T-1.txt"
+printf 'x' > "$LB4_REPO/.shell-team/retros/T-1.txt"
+printf 'x' > "$LB4_REPO/.shell-team/interventions/T-1.txt"
+out="$(cd "$LB4_REPO" && bash "$RETRO_INPUTS" --base main)"
+for id in provenance specs run-telemetry previous-retro interventions; do
+  printf '%s\n' "$out" | grep -qE -- "^- input: $id — status: empty — detail: 0 " \
+    || fail "case: the .md and .jsonl suffix rules are unchanged for the other five directory inputs ($id)"
+done
+pass "case: the .md and .jsonl suffix rules are unchanged for the other five directory inputs"
+
+# ---------------------------------------------------------------------------
+# case: a directory-input detail names the resolved path and never an
+# absolute one (D4) -- the whole detail field is anchored end-of-line against
+# the exact repo-root-relative path, so an absolute-path leak would fail the
+# match rather than merely appending after it.
+# ---------------------------------------------------------------------------
+LB5_REPO="$TMP/lb5-relative-detail"
+build_repo "$LB5_REPO" main 1
+mkdir -p "$LB5_REPO/.shell-team/reviews"
+printf 'x' > "$LB5_REPO/.shell-team/reviews/T-1.md"
+out="$(cd "$LB5_REPO" && bash "$RETRO_INPUTS" --base main)"
+printf '%s\n' "$out" | grep -qE -- '^- input: review-artifacts — status: read — detail: 1 review artifacts in \.shell-team/reviews$' \
+  || fail "case: a directory-input detail names the resolved path and never an absolute one"
+pass "case: a directory-input detail names the resolved path and never an absolute one"
 
 # ---------------------------------------------------------------------------
 # arg handling

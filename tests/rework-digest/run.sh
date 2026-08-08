@@ -12,7 +12,6 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 RD="$REPO_ROOT/bin/rework-digest.sh"
-TMP="$HERE/tmp"
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
@@ -54,7 +53,12 @@ if [ "${REWORK_DIGEST_RUN_CHILD:-0}" != "1" ]; then
   exit 0
 fi
 
-rm -rf "$TMP"; mkdir -p "$TMP"
+# Always under $HERE (never $TMPDIR): the relative-symlink launch-path case
+# below (linkdir/rework-digest-rel.sh -> ../../../../bin/rework-digest.sh)
+# depends on $TMP sitting at a FIXED depth under the repo root
+# (tests/rework-digest/<TMP>/linkdir, 4 levels up to REPO_ROOT) — an
+# out-of-tree $TMPDIR root would break that fixed hop count.
+TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 # --- AC2: happy path — verbatim fixed skeleton (all-distinct classes) -------

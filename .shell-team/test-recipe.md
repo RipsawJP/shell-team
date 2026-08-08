@@ -408,3 +408,97 @@ that file's order.
   strips the line field only afterward, when the count is formed — the one
   ordering that lets two byte-identical candidate lines in a file survive as
   two distinct rows instead of collapsing at the source.
+- T-1041: a fixture/assertion id chosen for a `check:` line or a test suite —
+  or any other hand-authored hyphenated compound — that happens to spell an
+  unboundaried `sk-` followed by 16+ token characters (letters, digits,
+  underscore, hyphen) false-positives `bin/check-pii-shapes.sh`'s `token`
+  pattern with no way to suppress it (the checker carries no path allowlist
+  or inline-allow by design, issue #178). Measured case: an id containing
+  "…task-**id**-malformed…" spells `sk-id-malformed…` as a literal
+  substring. Check a candidate id against `RE_TOKEN` in `bin/check-pii-shapes.sh`
+  BEFORE writing it into a spec's frozen intent block (where it can no
+  longer be renamed without a re-freeze); if the id is already frozen, the
+  only lever left is reducing its occurrence count in the files that must
+  still spell it verbatim (a shell variable in a test script; a paraphrase
+  in prose that avoids re-transcribing the literal, same discipline as the
+  PII-scrub-writing entry above) — the finding itself does not go away and
+  must be disclosed, not silently absorbed.
+- T-1041: `--print-hash`-style "does this leave a temp file behind" fixtures
+  are asserted by pointing `TMPDIR` at a fresh, otherwise-empty scratch
+  directory for the single invocation under test, then confirming that
+  directory is still empty afterward (`find "$dir" -mindepth 1`) — cheaper
+  and less flaky than instrumenting the script itself, and it exercises the
+  real `mktemp`/EXIT-trap code path rather than a mock.
+- T-1041: `tests/check-intent/run.sh` extended past 1300 lines and ~7s
+  standalone runtime; the whole `T-1041-freeze-ux.md` spec (23 `check:`
+  lines, including three whole-suite re-runs) measured ~19s live — well
+  under `CHECK_ACS_TIMEOUT`'s 120s default, so no elevation was needed. A
+  later task extending this suite further should re-measure rather than
+  assume the same headroom still holds.
+- T-1042 (Half A, descoped 2026-08-07 to successor task T-1046 — this
+  entry is retained as generic knowledge for whoever picks that work up,
+  NOT a description of what `tests/team-paths/run.sh` or
+  `tests/team-init/run.sh` currently carry; the Half A fixtures that once
+  lived in both were reverted with the rest of that surface, and both
+  files are byte-identical to `6439eb6` again): the T-1001 entry above ("a
+  fixture suite that needs a real throwaway `git init` repository ... must
+  NOT create it under $HERE/tmp inside this repo's own working tree") is
+  not limited to `tests/retro-inputs/run.sh` — it also hit
+  `tests/team-paths/run.sh` and `tests/team-init/run.sh` the first time
+  either needed a real `git init`-ed fixture (both previously used only
+  plain, non-git directories under `$HERE/tmp-roots` / `$HERE/tmp-targets`,
+  and are back to that today). Whoever adds git-needing fixtures to either
+  suite next should reach for a second, `$TMPDIR`-backed root (the same
+  `${TMPDIR:+...}`-falls-back-to-`$HERE/<name>-tmp` idiom, its own trap)
+  reserved for git-needing fixtures, kept separate from the pre-existing
+  plain `$TMP` root — a fixture built under `$TMP` fails with
+  `Operation not permitted` copying `.git/`'s hook templates (or, with
+  `--template=`, writing `.git/config` itself) in a sandboxed run, even
+  though plain non-git file writes to the same directory succeed.
+  Separately: pinning `git check-ignore`'s `core.excludesFile` input for an
+  assertion that exercises code which itself calls `git` internally
+  (rather than the test calling `check-ignore` directly, the shape
+  `tests/rollup-track/run.sh` and `tests/gitignore-raw-dumps/run.sh`
+  already show) needs the fixture repo's OWN **persisted**
+  `core.excludesFile` config
+  (`git -C "$dir" config core.excludesFile <path-or-/dev/null>`), not a
+  transient `git -c core.excludesFile=... <cmd>` on the outer invocation —
+  a `-c` flag on the test's own command never reaches a git call made
+  inside the script under test, while a persisted repo-local config value
+  is read by every subsequent git invocation against that repo regardless
+  of who makes it. T-1046 (Half A's successor) is the most likely
+  consumer of both points.
+- T-1044: one lock suite, pure bash + git + coreutils, no new
+  prerequisite. `bash tests/bin-exec-bit/run.sh` (extended, not renamed —
+  same suite T-1034 shipped) now also enforces a BIDIRECTIONAL rule over
+  every tracked file under `tests/`: the committed blob begins `#!` iff
+  the index mode is `100755`, judged from `git ls-files -s -- tests/` plus
+  `git cat-file blob` (index-read both halves, same discipline as the
+  `bin/` half above — never a working-tree `test -x`). A second, standing
+  shape lint against a fixed, guessable scratch root under `tests/` was
+  drafted for this task and then descoped after two consecutive
+  cross-provider rework rounds against it; that standing lint is deferred
+  to its own follow-up task and ships nothing here. When adding a new
+  `tests/<suite>/run.sh`: it must be committed at index mode `100755`
+  (the bidirectional rule now catches a `100644` shebang script under
+  `tests/` exactly as loudly as it always did under `bin/`), and its
+  scratch root must be built with `mktemp -d ... XXXXXX` — the two-arm
+  `TMPDIR`-then-`$HERE`-fallback idiom at
+  `tests/check-refreeze-class/run.sh:82-87` is the shape to copy, UNLESS
+  the new suite either (a) builds throwaway `git init` repos under its
+  scratch root, in which case keep the root under `${TMPDIR:-/tmp}` only
+  and never add a `$HERE` fallback (a fallback would put a nested `.git`
+  inside this checkout's own tree, which sandboxed runs deny — see
+  `tests/check-board-headings/run.sh` and
+  `tests/codex-skeleton-hygiene/run.sh`), or (b) depends on its scratch
+  root sitting at a FIXED DEPTH under the repo root for a relative-symlink
+  launch-path case, in which case keep a single `$HERE` arm only and never
+  add a `$TMPDIR` arm that would relocate the root out of tree and change
+  the hop count (see `tests/rework-digest/run.sh`'s
+  `../../../../bin/rework-digest.sh` case). Separately,
+  `tests/install/run.sh`'s temp files now live under its own already-
+  `mktemp`'d `$WORK` rather than directly under the shared, fixed
+  `/tmp/claude` parent — a cleanup glob over a directory other concurrent
+  runs also write to is its own defect class (DP7), out of the lock's
+  machine scope; a new suite should never `rm -rf` a wildcard over a
+  parent directory anything else might be writing to.
