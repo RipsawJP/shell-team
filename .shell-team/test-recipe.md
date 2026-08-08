@@ -408,3 +408,30 @@ that file's order.
   strips the line field only afterward, when the count is formed — the one
   ordering that lets two byte-identical candidate lines in a file survive as
   two distinct rows instead of collapsing at the source.
+- T-1041: a fixture/assertion id chosen for a `check:` line or a test suite —
+  or any other hand-authored hyphenated compound — that happens to spell an
+  unboundaried `sk-` followed by 16+ token characters (letters, digits,
+  underscore, hyphen) false-positives `bin/check-pii-shapes.sh`'s `token`
+  pattern with no way to suppress it (the checker carries no path allowlist
+  or inline-allow by design, issue #178). Measured case: an id containing
+  "…task-**id**-malformed…" spells `sk-id-malformed…` as a literal
+  substring. Check a candidate id against `RE_TOKEN` in `bin/check-pii-shapes.sh`
+  BEFORE writing it into a spec's frozen intent block (where it can no
+  longer be renamed without a re-freeze); if the id is already frozen, the
+  only lever left is reducing its occurrence count in the files that must
+  still spell it verbatim (a shell variable in a test script; a paraphrase
+  in prose that avoids re-transcribing the literal, same discipline as the
+  PII-scrub-writing entry above) — the finding itself does not go away and
+  must be disclosed, not silently absorbed.
+- T-1041: `--print-hash`-style "does this leave a temp file behind" fixtures
+  are asserted by pointing `TMPDIR` at a fresh, otherwise-empty scratch
+  directory for the single invocation under test, then confirming that
+  directory is still empty afterward (`find "$dir" -mindepth 1`) — cheaper
+  and less flaky than instrumenting the script itself, and it exercises the
+  real `mktemp`/EXIT-trap code path rather than a mock.
+- T-1041: `tests/check-intent/run.sh` extended past 1300 lines and ~7s
+  standalone runtime; the whole `T-1041-freeze-ux.md` spec (23 `check:`
+  lines, including three whole-suite re-runs) measured ~19s live — well
+  under `CHECK_ACS_TIMEOUT`'s 120s default, so no elevation was needed. A
+  later task extending this suite further should re-measure rather than
+  assume the same headroom still holds.
