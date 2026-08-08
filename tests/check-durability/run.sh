@@ -160,6 +160,94 @@ else
 fi
 
 # =============================================================================
+# opt-out durability (DP7 rework round 1, 2026-08-08 codex review Blocker 1):
+# the opt-out must ITSELF be durable — presence of some blob at the mode
+# file's path is not enough, since MODE is parsed from the working tree.
+# =============================================================================
+# (d) committed as `tracked`, then edited (uncommitted) to `working-tree-only`
+# — the exact reproduction from the review. Must NOT skip: fail closed with
+# untracked-opt-out (the opt-out DECLARATION was never durably committed,
+# even though a mode file with different content is tracked at that path).
+R3D="$TMP/r3d"
+build_repo "$R3D"
+write_task_records "$R3D" T-900
+printf 'tracked\n' > "$R3D/.shell-team/durability-mode"
+commit_all "$R3D" "initial"
+rm -f "$R3D/.shell-team/provenance/T-900.md"
+printf 'working-tree-only\n' > "$R3D/.shell-team/durability-mode"
+std="$(git -C "$R3D" status --short)"
+[ -n "$std" ] || fail "opt-out-uncommitted-edit-not-honored: fixture control failed — git status --short unexpectedly empty"
+outd="$(cd "$R3D" && bash "$CHECKER" --phase implement --task T-900 --ref refs/heads/main 2>&1)" && rcd=0 || rcd=$?
+[ "$rcd" -eq 1 ] || fail "opt-out-uncommitted-edit-not-honored: expected exit 1, got $rcd"
+printf '%s\n' "$outd" | grep -qF 'check-durability: not-durable: untracked-opt-out:' || fail "opt-out-uncommitted-edit-not-honored: expected the untracked-opt-out reason"
+if printf '%s\n' "$outd" | grep -qF 'check-durability: skipped:'; then
+  fail "opt-out-uncommitted-edit-not-honored: must NOT skip — the opt-out was never durably committed"
+fi
+pass "opt-out-uncommitted-edit-not-honored — a mode file committed as tracked and edited (uncommitted) to working-tree-only does not silently disable the observation (the round-1 review's reproduction)"
+
+# (e) committed as `working-tree-only`, then edited (uncommitted) to `tracked`
+# — MODE parses as tracked from the working copy, so the check simply runs
+# (the fail-closed direction; DP7's opt-out honor logic is not even reached).
+R3E="$TMP/r3e"
+build_repo "$R3E"
+write_task_records "$R3E" T-900
+printf 'working-tree-only\n' > "$R3E/.shell-team/durability-mode"
+commit_all "$R3E" "initial"
+printf 'tracked\n' > "$R3E/.shell-team/durability-mode"
+oute="$(cd "$R3E" && bash "$CHECKER" --phase implement --task T-900 --ref refs/heads/main 2>&1)" && rce=0 || rce=$?
+[ "$rce" -eq 0 ] || fail "opt-out-edited-to-tracked-runs-check: expected exit 0 (all four records are durable), got $rce"
+printf '%s\n' "$oute" | grep -qF 'check-durability: durable:' || fail "opt-out-edited-to-tracked-runs-check: expected a durable: line, not a skip"
+pass "opt-out-edited-to-tracked-runs-check — editing a committed working-tree-only mode file to tracked (uncommitted) makes the check run normally, never a skip"
+
+# (f) committed as `working-tree-only`, then the mode file is deleted from
+# the working tree — absent file means the default mode `tracked` (DP7), so
+# the check runs; never a silent skip of a mode value that no longer applies.
+R3F="$TMP/r3f"
+build_repo "$R3F"
+write_task_records "$R3F" T-900
+printf 'working-tree-only\n' > "$R3F/.shell-team/durability-mode"
+commit_all "$R3F" "initial"
+rm -f "$R3F/.shell-team/durability-mode"
+outf="$(cd "$R3F" && bash "$CHECKER" --phase implement --task T-900 --ref refs/heads/main 2>&1)" && rcf=0 || rcf=$?
+[ "$rcf" -eq 0 ] || fail "opt-out-mode-file-deleted-runs-check: expected exit 0 (all four records are durable), got $rcf"
+printf '%s\n' "$outf" | grep -qF 'check-durability: durable:' || fail "opt-out-mode-file-deleted-runs-check: expected a durable: line, not a skip"
+pass "opt-out-mode-file-deleted-runs-check — deleting a committed working-tree-only mode file from the working tree falls back to the default tracked mode and the check runs"
+
+# (g) committed as `working-tree-only`, working copy byte-identical (AC4(a)'s
+# own happy path, re-asserted here as the round-1 regression's control):
+# the DP3-style content check must still compare equal and honor the skip.
+R3G="$TMP/r3g"
+build_repo "$R3G"
+write_task_records "$R3G" T-900
+printf 'working-tree-only\n' > "$R3G/.shell-team/durability-mode"
+commit_all "$R3G" "initial"
+outg="$(cd "$R3G" && bash "$CHECKER" --phase implement --task T-900 --ref refs/heads/main 2>&1)" && rcg=0 || rcg=$?
+[ "$rcg" -eq 0 ] || fail "opt-out-byte-identical-still-skips: expected exit 0, got $rcg"
+printf '%s\n' "$outg" | grep -qF 'check-durability: skipped:' || fail "opt-out-byte-identical-still-skips: expected a skipped: line"
+pass "opt-out-byte-identical-still-skips — a committed working-tree-only mode file whose working copy is byte-identical still honors the skip under the new content check"
+
+# (h) eol-only difference under a `text` gitattribute (DP4 applied to the
+# mode file): the mode file's committed blob is LF-normalized, the working
+# copy is CRLF — `git hash-object --path=` must still compare them equal.
+R3H="$TMP/r3h"
+build_repo "$R3H"
+printf '*.md text\ndurability-mode text\n' > "$R3H/.gitattributes"
+write_task_records "$R3H" T-900
+printf 'working-tree-only\r\n' > "$R3H/.shell-team/durability-mode"
+commit_all "$R3H" "initial"
+printf 'working-tree-only\r\n' > "$R3H/.shell-team/durability-mode"
+mode_blob="$(git -C "$R3H" rev-parse refs/heads/main:.shell-team/durability-mode)"
+[ -n "$mode_blob" ] || fail "opt-out-eol-only-difference-still-skips: fixture control failed — could not resolve the committed mode-file blob"
+mode_raw_stdin="$(cd "$R3H" && git hash-object --stdin < .shell-team/durability-mode)"
+mode_norm_stdin="$(cd "$R3H" && git hash-object --stdin --path=.shell-team/durability-mode < .shell-team/durability-mode)"
+[ "$mode_raw_stdin" != "$mode_norm_stdin" ] || fail "opt-out-eol-only-difference-still-skips: fixture control failed — this environment performs no eol normalization at all; the criterion would measure nothing"
+[ "$mode_norm_stdin" = "$mode_blob" ] || fail "opt-out-eol-only-difference-still-skips: fixture control failed — --path did not normalize to the committed mode-file blob via --stdin"
+outh="$(cd "$R3H" && bash "$CHECKER" --phase implement --task T-900 --ref refs/heads/main 2>&1)" && rch=0 || rch=$?
+[ "$rch" -eq 0 ] || fail "opt-out-eol-only-difference-still-skips: expected exit 0, got $rch"
+printf '%s\n' "$outh" | grep -qF 'check-durability: skipped:' || fail "opt-out-eol-only-difference-still-skips: expected a skipped: line, not uncommitted-change/untracked-opt-out"
+pass "opt-out-eol-only-difference-still-skips — a CRLF working mode file under a text gitattribute still compares equal to its LF-normalized committed blob (DP4 applied to the opt-out itself)"
+
+# =============================================================================
 # record-set-independence (AC5 shape): no git status / ls-files / check-ignore
 # outside comments; at least one of ls-tree / rev-parse / cat-file IS used;
 # names both the registry file and team-paths.sh; a positive control proves

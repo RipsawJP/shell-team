@@ -29,13 +29,20 @@
 #      (zero commits) is `no-recorded-commit`, checked BEFORE any record is
 #      examined.
 #   2. A `<base>/durability-mode` opt-out (DP7) may declare
-#      `working-tree-only`, honored ONLY if that mode file itself resolves
-#      to a blob in `--ref`'s tree — an UNTRACKED opt-out (an ignored mode
-#      file) is refused as `untracked-opt-out`, because an untracked opt-out
-#      is precisely the silent-disable route this checker exists to close.
-#      Malformed mode-file content is `structural`, never a silent default.
-#      Absent file means the default mode `tracked`, and the observation
-#      runs.
+#      `working-tree-only`, honored ONLY if the opt-out is ITSELF durable:
+#      the mode file must resolve to a blob in `--ref`'s tree AND that
+#      blob's content, compared via `git hash-object --path=`, must match
+#      the working file's content (the same DP3-style content-durability
+#      check every ordinary record gets, applied to the mode file itself) —
+#      presence of SOME blob at the path is not enough, because a mode file
+#      committed as `tracked` and then edited (uncommitted) in the working
+#      tree to `working-tree-only` would otherwise silently honor a skip
+#      that was never durably declared. Either a missing blob or a content
+#      mismatch is `untracked-opt-out` (rework round 1, 2026-08-08): the
+#      opt-out ITSELF is not tracked at `--ref`, whether or not a file
+#      happens to live at that path. Malformed mode-file content is
+#      `structural`, never a silent default. Absent file means the default
+#      mode `tracked`, and the observation runs.
 #   3. For every record the registry (templates/durability-records.txt)
 #      requires for the named `--phase`, in three steps, each its own
 #      verdict: the working file must exist and be readable
@@ -217,9 +224,32 @@ if [ -f "$MODE_FILE" ]; then
 fi
 
 if [ "$MODE" = "working-tree-only" ]; then
+  # DP7 rework round 1 (2026-08-08 codex review Blocker 1): "the opt-out
+  # must itself be durable" means the SAME DP3-style blob-presence AND
+  # content-match check ordinary records get below, applied here to the
+  # mode file. Confirming that SOME blob exists at $MODE_FILE's path in
+  # $REF's tree is not enough — MODE is parsed from the WORKING-TREE copy,
+  # so a mode file committed as `tracked` and then edited (uncommitted) to
+  # `working-tree-only` would otherwise honor a skip that never durably
+  # persisted. Both failure shapes below (no blob at all; a blob whose
+  # content differs) are reported as `untracked-opt-out`: the DECLARATION
+  # of the opt-out is not tracked at $REF, whether or not a file happens to
+  # live at that path with different content.
   mode_ls="$(git ls-tree "$REF" -- "$MODE_FILE" 2>/dev/null || true)"
-  if [ -z "$mode_ls" ]; then
+  mode_blob_sha=""
+  if [ -n "$mode_ls" ]; then
+    mode_blob_type="$(printf '%s\n' "$mode_ls" | awk '{print $2}')"
+    if [ "$mode_blob_type" = "blob" ]; then
+      mode_blob_sha="$(printf '%s\n' "$mode_ls" | awk '{print $3}')"
+    fi
+  fi
+  if [ -z "$mode_blob_sha" ]; then
     fail_not_durable untracked-opt-out "$MODE_FILE declares working-tree-only but is not tracked in $REF"
+  fi
+  mode_working_sha="$(git hash-object --path="$MODE_FILE" "$MODE_FILE" 2>/dev/null || true)"
+  [ -n "$mode_working_sha" ] || fail_structural "git hash-object failed while hashing: $MODE_FILE"
+  if [ "$mode_working_sha" != "$mode_blob_sha" ]; then
+    fail_not_durable untracked-opt-out "$MODE_FILE declares working-tree-only in the working tree, but its committed content in $REF is not working-tree-only — the opt-out itself is not durable"
   fi
   printf 'check-durability: skipped: working-tree-only declared in %s — no durability observation was made\n' "$MODE_FILE"
   exit 0

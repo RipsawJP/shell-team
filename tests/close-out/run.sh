@@ -1255,4 +1255,124 @@ cmp -s "$DA_ROOT/root/todo.md" "$DA_ROOT/root/todo.orig" || fail "closeout-durab
 grep -qF -- 'cannot verify hand-off durability' "$DA_ROOT/err" || fail "closeout-durability-checker-absent-exit2: reason must be printed"
 pass "closeout-durability-checker-absent-exit2 — a missing sibling check-durability.sh is exit 2, board untouched"
 
+# ============================================================================
+# T-1048 rework round 1 (2026-08-08 codex review Blocker 2): check-durability.sh
+# resolves the board/interventions paths independently via team-paths.sh and
+# never consults $TEAM_TODO / $TEAM_INTERVENTIONS_DIR. If either override
+# diverges from team-paths.sh's own resolution, close-out.sh must refuse
+# (exit 2) rather than let the durability gate observe the wrong file — but
+# ONLY when the durability gate actually performs a real (non-skip)
+# observation; a declared working-tree-only skip observes no file at all, so
+# a divergence is harmless there (which is exactly why every fixture above
+# this point uses the working-tree-only auto-stamp and is unaffected by this
+# guard). These three fixtures deliberately do NOT stamp working-tree-only —
+# that would skip the very gate under test.
+# ============================================================================
+
+# --- closeout-durability-override-divergent-refuses -------------------------
+# Close-out-phase records are genuinely durable at the DEFAULT (unoverridden)
+# .shell-team layout, so check-durability.sh (which never sees the override)
+# would report `durable:` if allowed to run unchecked — the exact "it could
+# pass while the actual, overridden board was never committed" scenario the
+# review named. $TEAM_TODO instead points at a board OUTSIDE .shell-team
+# entirely, so the two genuinely diverge.
+OD="$DUR_ROOT/override-divergent"
+mkdir -p "$OD/.shell-team/specs" "$OD/.shell-team/provenance" "$OD/.shell-team/interventions" "$OD/.shell-team/reviews"
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-963** demo — `READY_FOR_QA` — spec: .shell-team/specs/T-963-demo.md\n\n## Done\n' > "$OD/.shell-team/todo.md"
+printf 'spec\n' > "$OD/.shell-team/specs/T-963-demo.md"
+printf 'provenance\n' > "$OD/.shell-team/provenance/T-963.md"
+printf '<!-- BEGIN interventions: T-963 -->\nno interventions occurred\n<!-- END interventions: T-963 -->\n' > "$OD/.shell-team/interventions/T-963.md"
+printf 'review\n' > "$OD/.shell-team/reviews/T-963.md"
+git -C "$OD" init -q -b main --template="$EMPTY_GIT_TPL"
+git -C "$OD" config core.excludesFile /dev/null
+git -C "$OD" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+git -C "$OD" -c user.email=t@example.invalid -c user.name=t commit -qm "override-divergent fixture (durable at the default layout)" >/dev/null 2>&1
+# The OVERRIDE board close-out.sh will actually act on — outside .shell-team,
+# not committed, and genuinely a different file from the default layout's
+# .shell-team/todo.md above.
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-963** demo — `READY_FOR_QA` — spec: .shell-team/specs/T-963-demo.md\n\n## Done\n' > "$OD/override-todo.md"
+cp "$OD/override-todo.md" "$OD/override-todo.orig"
+set +e
+( cd "$OD" && TEAM_TODO="$OD/override-todo.md" bash "$CLOSEOUT" --task T-963 --date 2026-08-08 ) >"$OD/out" 2>"$OD/err"
+od_rc=$?
+set -e
+[ "$od_rc" -eq 2 ] || fail "closeout-durability-override-divergent-refuses: expected exit 2, got $od_rc (stderr: $(cat "$OD/err"))"
+cmp -s "$OD/override-todo.md" "$OD/override-todo.orig" \
+  || fail "closeout-durability-override-divergent-refuses: the override board must stay byte-identical (refused before any board write)"
+grep -qF -- 'cannot verify hand-off durability' "$OD/err" \
+  || fail "closeout-durability-override-divergent-refuses: expected the durability-gate classified reason"
+# shellcheck disable=SC2016  # literal `$TEAM_TODO` text in close-out's own message, not an expansion
+grep -qF -- '$TEAM_TODO' "$OD/err" \
+  || fail "closeout-durability-override-divergent-refuses: the message must name the diverging override"
+grep -qF -- "$OD/override-todo.md" "$OD/err" \
+  || fail "closeout-durability-override-divergent-refuses: the message must name the override's own value"
+pass "closeout-durability-override-divergent-refuses — \$TEAM_TODO pointing at a board outside team-paths.sh's own resolution refuses (exit 2, override named, board untouched) rather than trust a durable verdict measured against the wrong file"
+
+# --- closeout-durability-override-equal-runs-normally ------------------------
+# $TEAM_TODO is set, but to the SAME file team-paths.sh would resolve to on
+# its own (spelled absolute rather than team-paths.sh's own relative form) —
+# canonicalization must recognize these as the same file and let the gate
+# run normally.
+OE="$DUR_ROOT/override-equal"
+mkdir -p "$OE/.shell-team/specs" "$OE/.shell-team/provenance" "$OE/.shell-team/interventions" "$OE/.shell-team/reviews"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-964** demo — `READY_FOR_QA` — spec: .shell-team/specs/T-964-demo.md\n\n## Done\n' > "$OE/.shell-team/todo.md"
+printf 'spec\n' > "$OE/.shell-team/specs/T-964-demo.md"
+printf 'provenance\n' > "$OE/.shell-team/provenance/T-964.md"
+printf '<!-- BEGIN interventions: T-964 -->\nno interventions occurred\n<!-- END interventions: T-964 -->\n' > "$OE/.shell-team/interventions/T-964.md"
+printf 'review\n' > "$OE/.shell-team/reviews/T-964.md"
+git -C "$OE" init -q -b main --template="$EMPTY_GIT_TPL"
+git -C "$OE" config core.excludesFile /dev/null
+git -C "$OE" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+git -C "$OE" -c user.email=t@example.invalid -c user.name=t commit -qm "override-equal fixture (durable at the default layout)" >/dev/null 2>&1
+( cd "$OE" && TEAM_TODO="$OE/.shell-team/todo.md" bash "$CLOSEOUT" --task T-964 --date 2026-08-08 ) >"$OE/out" 2>"$OE/err" \
+  || fail "closeout-durability-override-equal-runs-normally: close-out should succeed (stderr: $(cat "$OE/err"))"
+grep -q '^- \[x\] \*\*T-964\*\*' "$OE/.shell-team/todo.md" \
+  || fail "closeout-durability-override-equal-runs-normally: T-964 must move to Done"
+pass "closeout-durability-override-equal-runs-normally — \$TEAM_TODO spelled absolute but naming the SAME file team-paths.sh resolves on its own is not treated as a divergence; the gate runs normally"
+
+# --- closeout-durability-override-interventions-divergent-refuses -----------
+# Same shape as the $TEAM_TODO case, for $TEAM_INTERVENTIONS_DIR: the
+# interventions gate is rescued by the override (a valid record lives there),
+# but the durability gate's own re-resolution of "interventions" points at
+# .shell-team/interventions — a DIFFERENT directory. Records are durable at
+# the default layout, so this would otherwise be exactly the "durable
+# verdict measured against the wrong file" scenario.
+OI="$DUR_ROOT/override-interventions-divergent"
+mkdir -p "$OI/.shell-team/specs" "$OI/.shell-team/provenance" "$OI/.shell-team/interventions" "$OI/.shell-team/reviews" "$OI/elsewhere"
+# shellcheck disable=SC2016
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-965** demo — `READY_FOR_QA` — spec: .shell-team/specs/T-965-demo.md\n\n## Done\n' > "$OI/.shell-team/todo.md"
+printf 'spec\n' > "$OI/.shell-team/specs/T-965-demo.md"
+printf 'provenance\n' > "$OI/.shell-team/provenance/T-965.md"
+printf '<!-- BEGIN interventions: T-965 -->\nno interventions occurred\n<!-- END interventions: T-965 -->\n' > "$OI/.shell-team/interventions/T-965.md"
+printf 'review\n' > "$OI/.shell-team/reviews/T-965.md"
+git -C "$OI" init -q -b main --template="$EMPTY_GIT_TPL"
+git -C "$OI" config core.excludesFile /dev/null
+git -C "$OI" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+git -C "$OI" -c user.email=t@example.invalid -c user.name=t commit -qm "override-interventions-divergent fixture (durable at the default layout)" >/dev/null 2>&1
+# The override interventions record lives OUTSIDE .shell-team/interventions —
+# a valid record too, so the interventions gate itself would pass using it.
+printf '<!-- BEGIN interventions: T-965 -->\nno interventions occurred\n<!-- END interventions: T-965 -->\n' > "$OI/elsewhere/T-965.md"
+cp "$OI/.shell-team/todo.md" "$OI/.shell-team/todo.orig"
+set +e
+( cd "$OI" && TEAM_INTERVENTIONS_DIR="$OI/elsewhere" bash "$CLOSEOUT" --task T-965 --date 2026-08-08 ) >"$OI/out" 2>"$OI/err"
+oi_rc=$?
+set -e
+[ "$oi_rc" -eq 2 ] || fail "closeout-durability-override-interventions-divergent-refuses: expected exit 2, got $oi_rc (stderr: $(cat "$OI/err"))"
+cmp -s "$OI/.shell-team/todo.md" "$OI/.shell-team/todo.orig" \
+  || fail "closeout-durability-override-interventions-divergent-refuses: board must stay byte-identical"
+grep -qF -- 'cannot verify hand-off durability' "$OI/err" \
+  || fail "closeout-durability-override-interventions-divergent-refuses: expected the durability-gate classified reason"
+# shellcheck disable=SC2016  # literal `$TEAM_INTERVENTIONS_DIR` text in close-out's own message, not an expansion
+grep -qF -- '$TEAM_INTERVENTIONS_DIR' "$OI/err" \
+  || fail "closeout-durability-override-interventions-divergent-refuses: the message must name the diverging override"
+pass "closeout-durability-override-interventions-divergent-refuses — \$TEAM_INTERVENTIONS_DIR pointing at a directory outside team-paths.sh's own resolution refuses (exit 2, override named, board untouched), even though the interventions gate itself is rescued by the same override"
+
+# "unset -> unchanged" is already exercised by closeout-durability-happy-path
+# above: no $TEAM_TODO / $TEAM_INTERVENTIONS_DIR override is set there at
+# all, so OVERRIDE_DIVERGENCE is never computed and the gate's behavior is
+# byte-for-byte what it was before this rework round.
+
 printf '\nAll close-out assertions passed.\n'
