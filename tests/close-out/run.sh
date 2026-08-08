@@ -12,6 +12,16 @@
 #   AC11     new scripts are shellcheck clean (soft-skip when unavailable)
 #   AC12     CI workflow wires shellcheck + the fixture suite
 #
+# Also covers bin/close-out.sh's T-1048 durability gate (issue #167;
+# .shell-team/specs/T-1048-handoff-durability-barrier.md's AC12): every
+# fixture above this gate's own dedicated section declares the
+# working-tree-only opt-out via stamp_durability_skip() /
+# write_conformant_interventions_record()'s embedded call, so the gate is
+# exercised transparently (always a documented skip) across the whole
+# suite; the dedicated "T-1048 durability gate" section near the end
+# exercises the gate's real predicate instead (a genuinely durable close-out,
+# a refusal on a missing review record, and a missing-sibling exit 2).
+#
 # Temp roots live under $TMPDIR when set (sandboxed runs deny writes to any
 # nested .git/ inside the repo tree, and these fixtures need `git init`),
 # falling back to $HERE/tmp-roots on plain CI runners. Cleaned via trap.
@@ -39,15 +49,58 @@ trap 'rm -rf "$TMP"' EXIT
 # copy sample hooks into a nested .git/hooks, and the fixtures need none.
 EMPTY_GIT_TPL="$TMP/empty-git-template"
 mkdir -p "$EMPTY_GIT_TPL"
+
+# T-1048: bin/close-out.sh's new durability gate (DP11 of the T-1048 spec)
+# requires --ref to resolve to a real commit before it examines anything
+# else (DP3's fail-closed no-recorded-commit floor), and then honors a
+# COMMITTED `<base>/durability-mode` opt-out (DP7) before it looks at any
+# task record. Every fixture root in this suite predates that gate and was
+# never built to carry committed spec/provenance/review records for the
+# tasks it uses, so each one declares the working-tree-only opt-out instead
+# — the same route a real adopter who does not want the observation would
+# take — rather than growing a parallel durable-records corpus across ~30
+# call sites. A handful of dedicated fixtures further below (the
+# "T-1048 durability gate" section) exercise the gate's real predicate
+# instead of this opt-out.
+stamp_durability_skip() {
+  # $1 = fixture root; $2 = base dir name relative to root (".shell-team"
+  # default layout, "tasks" legacy layout). Idempotent: safe to call more
+  # than once against the same root (a later call just adds a new commit).
+  local root="$1" base="$2"
+  mkdir -p "$root/$base"
+  printf 'working-tree-only\n' > "$root/$base/durability-mode"
+  [ -d "$root/.git" ] || git -C "$root" init -q -b main --template="$EMPTY_GIT_TPL"
+  git -C "$root" config core.excludesFile /dev/null
+  git -C "$root" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+  git -C "$root" -c user.email=t@example.invalid -c user.name=t commit -q -m "durability opt-out (T-1048 fixture stamp)" --allow-empty >/dev/null 2>&1
+}
+
 # T-1017: a conformant interventions record for a given task id, at the path
 # the resolver derives for it (legacy layout: tasks/interventions/<id>.md;
 # default layout: .shell-team/interventions/<id>.md). Written where the root
 # / task is built, not case by case (per the spec's Notes for engineer).
+#
+# T-1048: this helper is called at (almost) every fixture site in this
+# suite, so it ALSO stamps the durability opt-out for the standard
+# <root>/<base>/interventions/<file> path shape (derived from the
+# interventions path's own directory chain — the basename check keeps this
+# from misfiring on the handful of override-testing paths under $IV_ROOT
+# that deliberately use a non-standard interventions location, e.g.
+# .../elsewhere/T-901.md; those are stamped explicitly at their own call
+# sites instead).
 write_conformant_interventions_record() {
   local path="$1" task="$2"
   mkdir -p "$(dirname "$path")"
   printf '<!-- BEGIN interventions: %s -->\nno interventions occurred\n<!-- END interventions: %s -->\n' \
     "$task" "$task" > "$path"
+
+  local interventions_dir base_dir root
+  interventions_dir="$(dirname "$path")"
+  if [ "$(basename "$interventions_dir")" = "interventions" ]; then
+    base_dir="$(dirname "$interventions_dir")"
+    root="$(dirname "$base_dir")"
+    stamp_durability_skip "$root" "$(basename "$base_dir")"
+  fi
 }
 
 make_legacy_root() {
@@ -56,10 +109,12 @@ make_legacy_root() {
   : > "$R/tasks/loops/shell-team.contract.yaml"
   cp "$HERE/fixtures/todo-legacy.md" "$R/tasks/todo.md"
   cp "$HERE/fixtures/project_status.md" "$R/tasks/project_status.md"
+  # write_conformant_interventions_record's own T-1048 stamp (above) commits
+  # this entire fixture (git init + add -A + commit), since every other file
+  # written above is already present on disk by the time it runs — no
+  # separate git init/add/commit is needed here (and a second one on an
+  # unchanged tree would fail on "nothing to commit" under set -e).
   write_conformant_interventions_record "$R/tasks/interventions/T-100.md" T-100
-  git -C "$R" init -q -b main --template="$EMPTY_GIT_TPL"
-  git -C "$R" -c user.email=t@example.invalid -c user.name=t add -A
-  git -C "$R" -c user.email=t@example.invalid -c user.name=t commit -qm "fixture: initial state"
 }
 
 # --- AC1/AC2/AC3: happy path in a legacy layout ------------------------------
@@ -546,6 +601,7 @@ pass "interventions-structural-refuses positive control — correcting the recor
 CA_ROOT="$IV_ROOT/checker-absent"
 mkdir -p "$CA_ROOT"
 cp -R "$REPO_ROOT/bin" "$CA_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$CA_ROOT/templates"
 mkdir -p "$CA_ROOT/root"
 write_conformant_interventions_record "$CA_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
@@ -568,6 +624,7 @@ pass "interventions-checker-absent-exit2 — a missing sibling checker is exit 2
 STUB_ROOT="$IV_ROOT/stub"
 mkdir -p "$STUB_ROOT"
 cp -R "$REPO_ROOT/bin" "$STUB_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$STUB_ROOT/templates"
 mkdir -p "$STUB_ROOT/root"
 write_conformant_interventions_record "$STUB_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
@@ -609,6 +666,7 @@ pass "interventions-usage-classification-exit2 positive control — a stub check
 RF_ROOT="$IV_ROOT/resolver-failure"
 mkdir -p "$RF_ROOT"
 cp -R "$REPO_ROOT/bin" "$RF_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$RF_ROOT/templates"
 mkdir -p "$RF_ROOT/root"
 write_conformant_interventions_record "$RF_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
@@ -624,15 +682,37 @@ cmp -s "$RF_ROOT/root/todo.md" "$RF_ROOT/root/todo.orig" || fail "interventions-
 grep -qF -- 'cannot resolve the interventions directory' "$RF_ROOT/err" || fail "interventions-resolver-failure-exit2: reason D must be printed"
 pass "interventions-resolver-failure-exit2 — with team-paths.sh removed and no override, resolution fails exit 2, reason D (no guessing fallback — a conformant record sits at the default location a fallback would use)"
 
-( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2" \
-  || fail "interventions-resolver-failure-exit2 positive control: the override needs no resolver (stderr: $(cat "$RF_ROOT/err2"))"
-pass "interventions-resolver-failure-exit2 positive control — the same crippled bin/ copy succeeds once \$TEAM_INTERVENTIONS_DIR is set"
+set +e
+( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2"
+rf_rc2=$?
+set -e
+# T-1048: $TEAM_INTERVENTIONS_DIR bypasses ONLY the interventions gate's own
+# team-paths.sh dependency (proven above by reason D no longer appearing).
+# check-durability.sh has no analogous override (DP7: no environment-variable
+# route) and is copied into this SAME crippled bin/, so it hits its own
+# "team-paths.sh missing" resolver failure once the interventions gate lets
+# it through — close-out therefore still exits 2, now for the durability
+# reason instead of the interventions one.
+[ "$rf_rc2" -eq 2 ] || fail "interventions-resolver-failure-exit2 positive control: expected exit 2 once the durability gate is reached, got $rf_rc2 (stderr: $(cat "$RF_ROOT/err2"))"
+cmp -s "$RF_ROOT/root/todo.md" "$RF_ROOT/root/todo.orig" || fail "interventions-resolver-failure-exit2 positive control: board must stay byte-identical"
+if grep -qF -- 'cannot resolve the interventions directory' "$RF_ROOT/err2"; then
+  fail "interventions-resolver-failure-exit2 positive control: the interventions reason must NOT reappear once its own override rescues it"
+fi
+grep -qF -- 'cannot verify hand-off durability' "$RF_ROOT/err2" \
+  || fail "interventions-resolver-failure-exit2 positive control: expected the durability sibling's own resolver-failure reason"
+pass "interventions-resolver-failure-exit2 positive control — \$TEAM_INTERVENTIONS_DIR bypasses ITS OWN resolver dependency (the interventions gate passes), but check-durability.sh has no such override and correctly refuses now that team-paths.sh is missing for it too (T-1048)"
 
 # --- interventions-env-override-precedence ----------------------------------
 OV1="$IV_ROOT/override-only"
 OV2="$IV_ROOT/override-empty-rescue"
 mkdir -p "$OV1/elsewhere" "$OV2/.shell-team/interventions" "$OV2/empty"
 write_conformant_interventions_record "$OV1/elsewhere/T-901.md" T-901
+# OV1's interventions record sits at a non-standard path (testing the
+# $TEAM_INTERVENTIONS_DIR override itself), so write_conformant_interventions_record's
+# auto-stamp above did not fire for it (basename != "interventions") — stamp
+# the durability opt-out explicitly (default layout: team-paths.sh resolves
+# .shell-team here, since $OV1 carries no legacy marker).
+stamp_durability_skip "$OV1" ".shell-team"
 write_conformant_interventions_record "$OV2/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
 printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$OV1/todo.md"
@@ -733,6 +813,7 @@ pass "interventions-board-untouched-on-refusal — every interventions-gate refu
 HS_ROOT="$TMP/handoff-sibling"
 mkdir -p "$HS_ROOT/root"
 cp -R "$REPO_ROOT/bin" "$HS_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$HS_ROOT/templates"
 write_conformant_interventions_record "$HS_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
 printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$HS_ROOT/root/todo.md"
@@ -866,6 +947,7 @@ pass "closeout-sourceline-stderr-order-note-checker-reason — D4's three-part o
 STUB_SL_ROOT="$TMP/sourceline-stub"
 mkdir -p "$STUB_SL_ROOT/root"
 cp -R "$REPO_ROOT/bin" "$STUB_SL_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$STUB_SL_ROOT/templates"
 write_conformant_interventions_record "$STUB_SL_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
 printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$STUB_SL_ROOT/root/todo.md"
@@ -1089,5 +1171,88 @@ grep -q '^- \[x\] \*\*T-901\*\*' "$DSL_ROOT/todo.md" || fail "closeout-done-sect
 grep -qxF -- '- [x] T-800 an old loose entry with no spec path' "$DSL_ROOT/todo.md" \
   || fail "closeout-done-section-loose-entry-unaffected: the pre-existing loose Done entry must survive byte-identically"
 pass "closeout-done-section-loose-entry-unaffected — no check is widened to ## Done and no existing ## Done entry is repaired"
+
+# ============================================================================
+# T-1048 (#167): bin/close-out.sh's new durability gate. Two dedicated
+# fixtures, independent of the working-tree-only opt-out every other
+# fixture above declares (the T-1048 fixture stamp): a genuinely durable
+# task closes out normally, and a task whose committed close-out-phase
+# records are incomplete (no reviews record) is refused before any board
+# write, naming check-durability's own reason. A third fixture proves the
+# sibling screen (a missing check-durability.sh is exit 2, board untouched).
+# ============================================================================
+DUR_ROOT="$TMP/durability-gate"
+mkdir -p "$DUR_ROOT"
+
+# --- closeout-durability-happy-path ------------------------------------------
+DH="$DUR_ROOT/happy"
+mkdir -p "$DH/.shell-team/specs" "$DH/.shell-team/provenance" "$DH/.shell-team/interventions" "$DH/.shell-team/reviews"
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-960** demo — `READY_FOR_QA` — spec: .shell-team/specs/T-960-demo.md\n\n## Done\n' > "$DH/.shell-team/todo.md"
+printf 'spec\n' > "$DH/.shell-team/specs/T-960-demo.md"
+printf 'provenance\n' > "$DH/.shell-team/provenance/T-960.md"
+printf '<!-- BEGIN interventions: T-960 -->\nno interventions occurred\n<!-- END interventions: T-960 -->\n' > "$DH/.shell-team/interventions/T-960.md"
+printf 'review\n' > "$DH/.shell-team/reviews/T-960.md"
+git -C "$DH" init -q -b main --template="$EMPTY_GIT_TPL"
+git -C "$DH" config core.excludesFile /dev/null
+git -C "$DH" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+git -C "$DH" -c user.email=t@example.invalid -c user.name=t commit -qm "durability happy-path fixture" >/dev/null 2>&1
+( cd "$DH" && bash "$CLOSEOUT" --task T-960 --date 2026-08-08 ) >"$DH/out" 2>"$DH/err" \
+  || fail "closeout-durability-happy-path: close-out should succeed when every close-out-phase record is durable (stderr: $(cat "$DH/err"))"
+grep -q '^- \[x\] \*\*T-960\*\*' "$DH/.shell-team/todo.md" \
+  || fail "closeout-durability-happy-path: T-960 must move to Done"
+pass "closeout-durability-happy-path — check-durability.sh's own predicate (not the working-tree-only opt-out) lets a genuinely durable task close out"
+
+# --- closeout-durability-refuses / -board-untouched / -names-reason ---------
+DR="$DUR_ROOT/refuses"
+mkdir -p "$DR/.shell-team/specs" "$DR/.shell-team/provenance" "$DR/.shell-team/interventions"
+# Deliberately no .shell-team/reviews/T-961.md — the close-out phase's own
+# registry row this task's committed records fail to satisfy.
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-961** demo — `READY_FOR_QA` — spec: .shell-team/specs/T-961-demo.md\n\n## Done\n' > "$DR/.shell-team/todo.md"
+printf 'spec\n' > "$DR/.shell-team/specs/T-961-demo.md"
+printf 'provenance\n' > "$DR/.shell-team/provenance/T-961.md"
+printf '<!-- BEGIN interventions: T-961 -->\nno interventions occurred\n<!-- END interventions: T-961 -->\n' > "$DR/.shell-team/interventions/T-961.md"
+git -C "$DR" init -q -b main --template="$EMPTY_GIT_TPL"
+git -C "$DR" config core.excludesFile /dev/null
+git -C "$DR" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+git -C "$DR" -c user.email=t@example.invalid -c user.name=t commit -qm "durability refusal fixture (no review record)" >/dev/null 2>&1
+cp "$DR/.shell-team/todo.md" "$DR/.shell-team/todo.orig"
+set +e
+( cd "$DR" && bash "$CLOSEOUT" --task T-961 --date 2026-08-08 ) >"$DR/out" 2>"$DR/err"
+dr_rc=$?
+set -e
+[ "$dr_rc" -eq 1 ] || fail "closeout-durability-refuses: expected exit 1, got $dr_rc"
+cmp -s "$DR/.shell-team/todo.md" "$DR/.shell-team/todo.orig" \
+  || fail "closeout-durability-board-untouched: board must stay byte-identical on a durability refusal"
+grep -qF -- 'check-durability: not-durable:' "$DR/err" \
+  || fail "closeout-durability-names-reason: check-durability's own classified line must be surfaced"
+grep -qF -- 'failed the durability observation' "$DR/err" \
+  || fail "closeout-durability-names-reason: close-out's own reason must name the durability failure"
+pass "closeout-durability-refuses / -board-untouched / -names-reason — a task missing its close-out-phase review record refuses close-out (exit 1, board untouched, check-durability's reason surfaced)"
+
+# --- closeout-durability-checker-absent-exit2 -------------------------------
+DA_ROOT="$DUR_ROOT/checker-absent"
+mkdir -p "$DA_ROOT/root/.shell-team/interventions"
+cp -R "$REPO_ROOT/bin" "$DA_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$DA_ROOT/templates"
+printf '<!-- BEGIN interventions: T-962 -->\nno interventions occurred\n<!-- END interventions: T-962 -->\n' > "$DA_ROOT/root/.shell-team/interventions/T-962.md"
+printf 'working-tree-only\n' > "$DA_ROOT/root/.shell-team/durability-mode"
+git -C "$DA_ROOT/root" init -q -b main --template="$EMPTY_GIT_TPL"
+git -C "$DA_ROOT/root" config core.excludesFile /dev/null
+git -C "$DA_ROOT/root" -c user.email=t@example.invalid -c user.name=t add -A >/dev/null 2>&1
+git -C "$DA_ROOT/root" -c user.email=t@example.invalid -c user.name=t commit -qm "durability checker-absent fixture" >/dev/null 2>&1
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-962** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$DA_ROOT/root/todo.md"
+cp "$DA_ROOT/root/todo.md" "$DA_ROOT/root/todo.orig"
+rm -f "$DA_ROOT/bin/check-durability.sh"
+set +e
+( cd "$DA_ROOT/root" && TEAM_TODO="$DA_ROOT/root/todo.md" bash "$DA_ROOT/bin/close-out.sh" --task T-962 --date 2026-08-08 ) >"$DA_ROOT/out" 2>"$DA_ROOT/err"
+da_rc=$?
+set -e
+[ "$da_rc" -eq 2 ] || fail "closeout-durability-checker-absent-exit2: expected exit 2, got $da_rc"
+cmp -s "$DA_ROOT/root/todo.md" "$DA_ROOT/root/todo.orig" || fail "closeout-durability-checker-absent-exit2: board must stay byte-identical"
+grep -qF -- 'cannot verify hand-off durability' "$DA_ROOT/err" || fail "closeout-durability-checker-absent-exit2: reason must be printed"
+pass "closeout-durability-checker-absent-exit2 — a missing sibling check-durability.sh is exit 2, board untouched"
 
 printf '\nAll close-out assertions passed.\n'

@@ -23,14 +23,23 @@
 #
 # Before any of the above runs, fail-closed gates must pass, in order: T-068's
 # pending fast-follow disposition gate, then T-1017's interventions gate,
-# then T-1022's source-line gate —
+# then T-1048's durability gate, then T-1022's source-line gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
+#   a task whose close-out-phase records have not durably persisted (or whose durability sibling is unusable) refuses the close-out before any board write.
 #   a source line the hand-off lint would reject refuses the close-out before any board write.
 # The interventions record is resolved from $TEAM_INTERVENTIONS_DIR (same
 # override precedence as $TEAM_TODO below) or else the sibling team-paths.sh,
 # then verified with the sibling check-interventions.sh --task T-NNN. The
 # gate reads ONE path for the task being closed — no other task's record, no
 # ## Done history, no backfill or migration.
+#
+# T-1048's durability gate runs the sibling check-durability.sh --phase
+# close-out --task T-NNN --ref HEAD, which answers a different question from
+# the git-status-based guards elsewhere in this loop: did every record this
+# closing phase requires actually persist as a blob in HEAD's tree, matching
+# the working file — not merely "is anything uncommitted". An adopter who
+# declares the working-tree-only opt-out (DP7 of the T-1048 spec) is
+# unaffected: check-durability.sh itself reports the skip and exits 0.
 #
 # T-1022's source-line gate (#98) judges the task's Active source line the
 # same way check-handoff.sh would, by feeding it a synthesized single-entry
@@ -61,11 +70,12 @@
 #
 # Exit: 0 = board updated; 1 = task not in Active (missing or already Done),
 #       board shape error, an unresolved fast-follow disposition, a
-#       missing/unreadable/non-conformant interventions record, or a source
-#       line the hand-off lint would reject; 2 = usage / validation /
-#       resolver error, or an unusable interventions checker,
-#       interventions-directory resolver, or check-handoff.sh sibling. On any
-#       non-zero exit the board file is byte-untouched. In one line:
+#       missing/unreadable/non-conformant interventions record, a task whose
+#       close-out-phase records are not durable (T-1048), or a source line
+#       the hand-off lint would reject; 2 = usage / validation / resolver
+#       error, or an unusable interventions checker, interventions-directory
+#       resolver, check-durability.sh sibling, or check-handoff.sh sibling.
+#       On any non-zero exit the board file is byte-untouched. In one line:
 #   a missing, unreadable or non-conformant interventions record is exit 1; an unusable checker or resolver is exit 2.
 
 set -euo pipefail
@@ -309,6 +319,38 @@ if [ "$CK_RC" -ne 0 ]; then
       ;;
   esac
 fi
+
+# --- fail-closed gate: the task's close-out-phase records are durable ------
+# (T-1048, issue #167). check-durability.sh answers a different question
+# from the git-status-based guards elsewhere in the loop: did every record
+# this closing phase requires actually persist as a blob in HEAD's tree,
+# with the working file matching it — not merely "is anything uncommitted".
+# Same shape as the T-1017 interventions gate immediately above: resolve the
+# sibling, screen it for existence/readability before running it (exit 2 on
+# an unusable sibling), run it, and refuse (exit 1) on a substantive
+# not-durable verdict — all before any board write. An adopter who declares
+# the working-tree-only opt-out (DP7) is unaffected: check-durability.sh
+# itself reports the skip and exits 0.
+DURABILITY_CHECKER="$SCRIPT_DIR/check-durability.sh"
+if [ ! -f "$DURABILITY_CHECKER" ] || [ ! -r "$DURABILITY_CHECKER" ]; then
+  die "cannot verify hand-off durability (check-durability.sh missing or unreadable next to close-out.sh)"
+fi
+DUR_ERR="$(bash "$DURABILITY_CHECKER" --phase close-out --task "$TASK" --ref HEAD 2>&1 >/dev/null)" && DUR_RC=0 || DUR_RC=$?
+case "$DUR_RC" in
+  0) : ;;
+  1)
+    if [ -n "$DUR_ERR" ]; then
+      printf '%s\n' "$DUR_ERR" >&2 || true
+    fi
+    fail "$TASK failed the durability observation — a required close-out record has not durably persisted (see check-durability's reason above)"
+    ;;
+  *)
+    if [ -n "$DUR_ERR" ]; then
+      printf '%s\n' "$DUR_ERR" >&2 || true
+    fi
+    die "cannot verify hand-off durability (check-durability.sh exited $DUR_RC)"
+    ;;
+esac
 
 # --- build the Done entry ------------------------------------------------------
 MAIN_LINE="$(sed -n "${A_START}p" "$BOARD")"
