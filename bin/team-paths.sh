@@ -11,11 +11,13 @@
 #
 # Precedence (highest wins), evaluated against a repo ROOT (default: cwd):
 #   1. $TEAM_RUN_BASE env  — explicit operator/CI/host override (repo-relative).
-#   2. legacy layout       — if ROOT/tasks/loops/ exists, use the historical
-#                            split layout (base=tasks, specs=docs/specs). The
-#                            marker is `tasks/loops/` (plugin-unique), NOT a bare
-#                            `tasks/todo.md`, so an unrelated host `tasks/` dir
-#                            is never misdetected as a shell-team install.
+#   2. legacy layout       — if ROOT/tasks/loops/shell-team.contract.yaml
+#                            exists, use the historical split layout
+#                            (base=tasks, specs=docs/specs). The marker is
+#                            the contract file itself (plugin-unique), NOT a
+#                            bare `tasks/loops/` directory or a bare
+#                            `tasks/todo.md`, so an unrelated host `tasks/`
+#                            dir is never misdetected as a shell-team install.
 #   3. default             — base=.shell-team (specs=.shell-team/specs).
 #
 # Derived paths (all ROOT-relative):
@@ -58,7 +60,7 @@ Resolve where the shell-team loop's per-repo operating files live.
 
 Precedence (highest first), against ROOT (default: current directory):
   1. $TEAM_RUN_BASE env   explicit override (repo-relative)
-  2. legacy layout        if ROOT/tasks/loops/ exists -> base=tasks, specs=docs/specs
+  2. legacy layout        if ROOT/tasks/loops/shell-team.contract.yaml exists -> base=tasks, specs=docs/specs
   3. default              base=.shell-team, specs=.shell-team/specs
 
 Modes:
