@@ -273,13 +273,21 @@ commit_all "$R7" "initial"
 printf 'x\r\n' > "$R7/.shell-team/todo.md"
 blob="$(git -C "$R7" rev-parse refs/heads/main:.shell-team/todo.md)"
 [ -n "$blob" ] || fail "eol-correctness: fixture control failed — could not resolve the committed blob"
-raw="$(cd "$R7" && git hash-object .shell-team/todo.md)"
-norm="$(cd "$R7" && git hash-object --path=.shell-team/todo.md .shell-team/todo.md)"
-[ "$raw" != "$blob" ] || fail "eol-correctness: fixture control failed — this environment performs no eol normalization (raw already matches); the criterion would measure nothing"
-[ "$norm" = "$blob" ] || fail "eol-correctness: fixture control failed — --path= did not normalize to the committed blob"
+# Non-vacuity control, via --stdin rather than a bare file argument:
+# `git-hash-object(1)` documents that a --stdin read applies NO filters
+# unless --path is ALSO given, whereas a bare `<file>` argument (the shape
+# check-durability.sh itself uses) may already apply the text-attribute
+# filter without --path in some git versions/environments — measured true
+# in this one, which is exactly why this control uses --stdin instead: the
+# bare-file form would silently pass this control while measuring nothing
+# whenever an environment already normalizes without --path.
+raw_stdin="$(cd "$R7" && git hash-object --stdin < .shell-team/todo.md)"
+norm_stdin="$(cd "$R7" && git hash-object --stdin --path=.shell-team/todo.md < .shell-team/todo.md)"
+[ "$raw_stdin" != "$norm_stdin" ] || fail "eol-correctness: fixture control failed — this environment performs no eol normalization at all; the criterion would measure nothing"
+[ "$norm_stdin" = "$blob" ] || fail "eol-correctness: fixture control failed — --path did not normalize to the committed blob via --stdin"
 ( cd "$R7" && bash "$CHECKER" --phase implement --task T-900 --ref refs/heads/main >/dev/null 2>&1 ) \
-  || fail "eol-correctness: expected durable (exit 0), not uncommitted-change, once --path= normalizes the comparison"
-pass "eol-correctness — a CRLF working file that differs from its raw hash but matches under --path= is reported durable, not uncommitted-change"
+  || fail "eol-correctness: expected durable (exit 0), not uncommitted-change, once --path= normalizes the working-file comparison"
+pass "eol-correctness — a CRLF working file under a text gitattribute is reported durable (not uncommitted-change) by the checker's --path= comparison; the eol-normalization behavior is proven real via the --stdin form, which git-hash-object(1) documents as filter-free without --path"
 
 # =============================================================================
 # ambiguous / prefix task id (AC18 shape): the hyphen in <task-id>-*.md keeps
