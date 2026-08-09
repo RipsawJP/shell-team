@@ -1,0 +1,57 @@
+# durability-records.txt — the plugin-shipped, checker-owned registry of
+# which state files each hand-off phase must observe as durable (T-1048;
+# DP1/DP2 of .shell-team/specs/T-1048-handoff-durability-barrier.md).
+#
+# This registry is the central record-set definition bin/check-durability.sh
+# reads. It is resolved from that checker's OWN installed directory, never
+# from an adopter's tree — the same shape templates/prompt-blocks/registry.txt
+# already has for bin/check-prompt-sync.sh. The loop contract yaml
+# (.shell-team/loops/shell-team.contract.yaml) is deliberately NOT extended
+# to carry this: it names records in prose only, in legacy-layout spellings
+# that do not match every layout this checker must resolve against (DP1).
+#
+# Format (whitespace-delimited, one row per phase/key pair; `#` comments and
+# blank lines are skipped):
+#
+#   <phase> <team-paths-key> <pattern>
+#
+#   <phase>            one of the closed set: implement | pre-merge | close-out
+#   <team-paths-key>   a key `bin/team-paths.sh --get` accepts
+#   <pattern>          either the literal `-` — the resolved key IS the
+#                      record path (a singleton such as the board) — or a
+#                      filename pattern containing the token `<task-id>`,
+#                      resolved inside the key's directory. A pattern with no
+#                      glob metacharacter must resolve to exactly that one
+#                      file; a pattern with one must resolve to exactly one
+#                      existing entry — zero is a missing-working-file
+#                      verdict, two or more is structural (ambiguous), never
+#                      a silent pick of whichever the glob returned first.
+#
+# The `specs` row's pattern carries the hyphen deliberately: a spec file is
+# named `<task-id>-<slug>.md`, and `<task-id>-*.md` is what keeps a shorter
+# task id (e.g. T-104) from matching a longer one's spec (e.g. T-1048's) —
+# `<task-id>*.md` (no hyphen) would not.
+#
+# `implement` carries no `reviews` row: no review record exists at that seam
+# yet. `pre-merge` and `close-out` both do (their row sets are identical) —
+# by the pre-merge seam a review record is expected to already exist, and it
+# stays required through close-out. That per-phase difference (four records
+# at `implement`, five from `pre-merge` onward) is the whole reason the
+# phase column exists.
+
+implement todo -
+implement specs <task-id>-*.md
+implement provenance <task-id>.md
+implement interventions <task-id>.md
+
+pre-merge todo -
+pre-merge specs <task-id>-*.md
+pre-merge provenance <task-id>.md
+pre-merge interventions <task-id>.md
+pre-merge reviews <task-id>.md
+
+close-out todo -
+close-out specs <task-id>-*.md
+close-out provenance <task-id>.md
+close-out interventions <task-id>.md
+close-out reviews <task-id>.md
