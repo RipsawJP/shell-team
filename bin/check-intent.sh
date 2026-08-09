@@ -202,6 +202,31 @@ on_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
 trap 'on_signal HUP 129' HUP
 trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM
+# T-1051 #179(a) (measured, not guessed): SIGPIPE gets a DIFFERENT treatment
+# than HUP/INT/TERM above — ignored outright, never routed through
+# on_signal. Two builtin `printf` write sites in this file (the print-hash
+# deliverable at line 395, and the courtesy `aligned:` line at line 864)
+# are each already followed by their own `||` guard
+# (`fail_usage` / `true` respectively) — but a `printf` builtin's write() to
+# a pipe whose reader is gone, under SIGPIPE's REAL default disposition
+# (terminate), kills this whole process synchronously, inside the write()
+# syscall, before bash's interpreter ever reaches that trailing `||`: a
+# signal-killed write that never reaches the classifier guarding it,
+# confirmed live by forcing SIGPIPE to its true default disposition (a
+# coding sandbox's inherited SIG_IGN masks this in casual testing) and
+# observing the whole process die with the raw, unclassified exit 141 with
+# neither `fail_usage` nor the courtesy `|| true` ever running. Ignoring
+# SIGPIPE removes the kernel-level kill entirely: the interrupted write then
+# surfaces as an ordinary non-zero return from the `printf` builtin instead
+# (measured: "printf: write error: Broken pipe", rc=1) — precisely what the
+# EXISTING `||` guards at each site were already written to classify (T-1041
+# D3 for the print-hash site), so this closes the race without adding a new
+# stderr write site or a new classified exit code. Mirrored byte-for-byte in
+# bin/check-refreeze-class.sh (AC8 symmetry) even though that sibling's own
+# sole printf is already `|| true`-guarded with no deliverable-value site of
+# its own — defensive parity against the same class of future risk, at zero
+# behavioural cost today.
+trap '' PIPE
 
 print_help() {
   awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}' "$SELF" \
@@ -413,7 +438,7 @@ RATIFIED_FULL_RE='^[[:space:]]+- intent-ratified \([0-9]{4}-[0-9]{2}-[0-9]{2}\):
 #
 # T-1021 (D4, Codex round1 Major): the version capture and the four count
 # captures (`lines=<ran>/<total>`, `verdict=<P>P/<F>F`) all feed `10#`
-# arithmetic (`av`/`ar`/`at`/`ap`/`af` at check-intent.sh:616-623, plus
+# arithmetic (`av`/`ar`/`at`/`ap`/`af` at check-intent.sh:780-787, plus
 # `$((ap + af))`) with no width bound, so an oversized value wrapped
 # silently instead of refusing. Bounded to `{1,4}` (max 9999) at the
 # grammar side (D6), same reasoning as HASH_FULL_RE above: `ran`/`total`
