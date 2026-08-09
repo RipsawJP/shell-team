@@ -137,6 +137,18 @@ on_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
 trap 'on_signal HUP 129' HUP
 trap 'on_signal INT 130' INT
 trap 'on_signal TERM 143' TERM
+# T-1051 #179(a) (byte-parallel mirror, AC8 symmetry): SIGPIPE is ignored
+# outright here too, never routed through on_signal — mirroring
+# bin/check-intent.sh's own fix. That sibling's builtin `printf` deliverable
+# write (its `--print-hash` mode) is genuinely at risk of a signal-killed
+# write that never reaches its own `||` guard, measured live by forcing
+# SIGPIPE to its true default (terminate) disposition. This script's own
+# sole `printf` (the closing `mechanics:` line) is already `|| true`-guarded
+# with no deliverable-value site of its own, so it carries no independent
+# defect — this trap is defensive parity against the same class of future
+# risk, at zero behavioural cost today, kept symmetric with the sibling
+# rather than declaring an asymmetry that costs nothing to close.
+trap '' PIPE
 
 print_help() {
   awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}' "$SELF" \
