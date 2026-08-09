@@ -378,6 +378,21 @@ awk -v b="$begin_ln" -v e="$end_ln" 'NR > b && NR < e' "$SPEC" | normalize_stdin
 computed_hash="$(git hash-object --stdin < "$tmp_region")" \
   || fail_usage "git hash-object failed while hashing the intent block extracted from $SPEC"
 
+# T-1051 #179(c): computed_hash gets a shape gate BEFORE any of its three
+# consumers reads it (the print-mode write just below, the hash-match
+# comparison, and the courtesy `aligned:` print further down) — the same
+# anchor bin/check-refreeze-class.sh's HEX40_RE already uses. This is
+# defence-in-depth against a future edit to the extraction/hashing pipeline
+# above, never against real `git` (Non-goals #5): no fixture manufactures a
+# non-hex `git hash-object` output by patching or shimming git, so this
+# gate's own refusal path is proven only by mutation (spec AC17a), never by
+# faking its input. A refusal here fails closed as a classified usage(2)
+# exit through the existing `die`, the same convention every other guard in
+# this bootstrap already follows — adding no new stderr write site.
+HEX40_RE='^[0-9a-f]{40}$'
+[[ "$computed_hash" =~ $HEX40_RE ]] \
+  || fail_usage "git hash-object produced a value that is not 40 lowercase hex characters, refusing before any consumer reads it: $computed_hash"
+
 # --- print mode (T-1041 D2/D3): exit HERE, before the board is ever
 # required. Everything above this point — spec type/readability, Task ID
 # derivation, marker structural checks, extraction, normalization, hashing —
