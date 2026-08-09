@@ -109,7 +109,21 @@ and it does not become a tenth rule.** Two consequences, both load-bearing:
   host name. A token has no host-name continuation problem, and a real key preceded
   by `.` or `-` must still fire. Copying DP-5's class verbatim would manufacture a
   false-negative class. The two boundary classes therefore differ **on purpose**;
-  DP-5's line stays byte-identical (AC2).
+  DP-5's line stays byte-identical (AC2). **The accepted complement, stated here
+  because this is where the class is chosen**: whatever a left-context class
+  excludes, it excludes for real keys exactly as much as for lookalikes. One
+  character is the whole of the information available, and a label chain's `s`+`k`
+  ending and an unseparated real key present the identical left context, so no
+  choice of class separates them. Selecting `[^A-Za-z0-9]` therefore **accepts**
+  the suppression of an `sk-` key sitting immediately after a letter or a digit
+  with no separator — the mathematical complement of #178's own prescription, not
+  a separable implementation error: any class narrow enough to admit that key is
+  also wide enough to re-report the chain the issue asks to silence. DP-10's
+  prefer-firing bias would resolve this the other way on its own; the reason it
+  does not is that the issue's prescription is the ratified instruction, recorded
+  here so the next reader meets a decision rather than an oversight. The Goal
+  states the exception, AC1 pins it in both directions, and AC5 requires all four
+  repaired prose sites to disclose it.
 - *Decomposition.* T-111's frozen AC10 enumerates the rule set as **nine** — five
   patterns plus four named exclusions — and `bin/check-pii-shapes.sh:229-234` states
   the same count, with each rule on its own assignment line so the suite can
@@ -169,6 +183,8 @@ exist.
 | 2 | `gh[oprs]_` and `AKIA` stay unguarded (DP1) | AC1 |
 | 3 | A key preceded by `.`, `-`, `/`, or at line start, still fires (DP2 class) | AC1 |
 | 4 | The boundary class is `[^A-Za-z0-9]`, not DP-5's `[^A-Za-z0-9.-]` (DP2) | AC1, AC2 |
+| 4a | The accepted complement: an `sk-` key with no separator after a letter or digit is suppressed by construction (DP2 *Class*, Goal) | AC1 (both directions, plus the suite label) |
+| 4b | All four repaired prose sites disclose that complement (DP2 *Class*) | AC5 |
 | 5 | No tenth rule; `RE_TOKEN` stays one assignment line; DP-5's line untouched (DP2) | AC2 |
 | 6 | New suite assertions are added alongside T-111 AC8's labels, never renaming them (DP3) | AC3 |
 | 7 | The new negative control is proven to have teeth by a pre-fix mutation copy (DP3) | AC4 |
@@ -196,7 +212,22 @@ exist.
 
 `bin/check-pii-shapes.sh` no longer reports this repository's own kebab-case label
 convention (and its siblings) as a credential token, while every real key shape it
-caught before is still caught; `bin/check-intent.sh` classifies its two write-site
+caught before is still caught **with one deliberate, disclosed exception**: an
+`sk-` key whose prefix is immediately preceded by a letter or a digit, with no
+separating character, is now suppressed too. That exception is the mathematical
+complement of the false-positive class issue #178 asks this task to close — one
+character of left context cannot tell a label chain's `s`+`k` ending from an
+unseparated real key, because the two present the identical left context — so it
+is the price of the prescribed design rather than a defect in its implementation,
+and rejecting it would mean rejecting #178. DP-10's prefer-firing default yields
+here, and only here, because the issue's own prescription is the ratified
+instruction. The residual exposure is bounded rather than open-ended: every other
+boundary in the reachable set still fires (line start, space, `=`, `:`, quotes,
+brackets, `-`, `.`, `/`), and the `gh` and `AKIA` alternatives, which carry no
+guard at all, still fire after an alphanumeric. The exception is disclosed at all
+four repaired prose sites and pinned by a criterion in both directions, so a later
+edit that quietly moves the trade-off either way goes red rather than unnoticed.
+`bin/check-intent.sh` classifies its two write-site
 failures instead of dying unclassified, honours `--help` identically whatever the
 flag order, and refuses a hash that is not 40 lowercase hex before any consumer
 reads it; and all four sites of the prose claim the first fix falsifies now describe
@@ -245,8 +276,16 @@ at run time.
   space, after a hyphen, after a dot, and after a slash — the four boundary
   characters DP-5 would have suppressed and DP-10 requires to fire. A `gh`-form
   prefix immediately preceded by a letter still matches, proving the guard was
-  attached to one alternative and not to the group.
-  - check: S=bin/check-pii-shapes.sh; test -r "$S" || exit 1; RE=$(awk -F"'" '/^RE_TOKEN=/{print $2}' "$S"); test -n "$RE" || exit 1; rc=0; N1=ta; N2=sk-; N3=ABCDEFGHIJKLMNOP; P1=sk; P2=-; B1=ABCDEFGHIJ; B2=KLMNOP123456; G1=gh; G2=p_; K="${P1}${P2}${B1}${B2}"; if printf '%s\n' "see ${N1}${N2}${N3} here" | grep -qE -- "$RE"; then rc=1; fi; for pre in "" "x " "-" "." "/"; do printf '%s\n' "${pre}${K}" | grep -qE -- "$RE" || rc=1; done; printf '%s\n' "x${G1}${G2}${B1}${B2}" | grep -qE -- "$RE" || rc=1; test "$rc" -eq 0
+  attached to one alternative and not to the group. The **disclosed exception** of
+  the Goal is pinned here in both directions, so neither a silent widening nor a
+  silent narrowing of the trade-off survives: the same `sk-` key immediately
+  preceded by a letter, and again by a digit, with no separating character, does
+  **not** match — asserted as a documented expectation, the accepted complement of
+  #178's prescription — while the space-separated form one character away still
+  does, and the suite carries the same expectation under its own verbatim label,
+  written unwrapped here so it matches byte-for-byte what the check greps:
+  `disclosed: alnum-adjacent zero-separator sk form is suppressed by design (#178 complement)`.
+  - check: S=bin/check-pii-shapes.sh; test -r "$S" || exit 1; RE=$(awk -F"'" '/^RE_TOKEN=/{print $2}' "$S"); test -n "$RE" || exit 1; rc=0; N1=ta; N2=sk-; N3=ABCDEFGHIJKLMNOP; P1=sk; P2=-; B1=ABCDEFGHIJ; B2=KLMNOP123456; G1=gh; G2=p_; K="${P1}${P2}${B1}${B2}"; if printf '%s\n' "see ${N1}${N2}${N3} here" | grep -qE -- "$RE"; then rc=1; fi; for pre in "" "x " "-" "." "/"; do printf '%s\n' "${pre}${K}" | grep -qE -- "$RE" || rc=1; done; for pre in "x" "9"; do if printf '%s\n' "${pre}${K}" | grep -qE -- "$RE"; then rc=1; fi; done; T=tests/check-pii-shapes/run.sh; test -r "$T" || exit 1; grep -qF -- 'disclosed: alnum-adjacent zero-separator sk form is suppressed by design (#178 complement)' "$T" || rc=1; printf '%s\n' "x${G1}${G2}${B1}${B2}" | grep -qE -- "$RE" || rc=1; test "$rc" -eq 0
 - [ ] **AC2** The rule decomposition T-111 froze is intact. The number of top-level
   `RE_*=` assignment lines in the checker equals the base ref's — no rule added, none
   removed — `RE_TOKEN` is still exactly one such line, and `RE_HOME_PATH_BOUNDARY`'s
@@ -278,8 +317,16 @@ at run time.
   case on key-body length alone. In `docs/pii-controls.md` and
   `docs/pii-controls.ja.md`: the `token` bullet differs from the base ref, while
   every line of each file **outside** that bullet is byte-identical to the base ref —
-  so the repair landed exactly where the claim was and nowhere else.
-  - check: rc=0; S=bin/check-pii-shapes.sh; test -r "$S" || exit 1; D=$(mktemp -d "${TMPDIR:-/tmp}/t1051ac5.XXXXXX") || exit 1; awk '/^#   RE_TOKEN /{f=1} f&&/^# shellcheck/{exit} f{print}' "$S" > "$D/inv.txt"; test -s "$D/inv.txt" || rc=1; if grep -qF -- 'Not applicable' "$D/inv.txt"; then rc=1; fi; grep -qF -- '[^A-Za-z0-9]' "$D/inv.txt" || rc=1; BT=$(printf '\140'); pat="^- ${BT}token${BT}"; for f in docs/pii-controls.md docs/pii-controls.ja.md; do test -r "$f" || exit 1; b="$D/$(basename "$f").base"; git show "e57c287:$f" > "$b" || rc=1; test -s "$b" || rc=1; awk -v p="$pat" '$0 ~ p {f=1; print; next} f && /^- / {exit} f {print}' "$f" > "$D/reg.now"; awk -v p="$pat" '$0 ~ p {f=1; print; next} f && /^- / {exit} f {print}' "$b" > "$D/reg.base"; test -s "$D/reg.base" || rc=1; if cmp -s "$D/reg.now" "$D/reg.base"; then rc=1; fi; awk -v p="$pat" '$0 ~ p {f=1; next} f && /^- / {f=0} !f {print}' "$f" > "$D/out.now"; awk -v p="$pat" '$0 ~ p {f=1; next} f && /^- / {f=0} !f {print}' "$b" > "$D/out.base"; cmp -s "$D/out.now" "$D/out.base" || rc=1; done; rm -rf "$D"; test "$rc" -eq 0
+  so the repair landed exactly where the claim was and nowhere else. All four sites
+  additionally **disclose the accepted complement**: that the same guard suppresses
+  an `sk-` key with no separator after a letter or a digit. Each carries the
+  boundary-class literal `[^A-Za-z0-9]` as its language-neutral anchor — chosen
+  because these two documents cite no issue numbers anywhere (measured), so a
+  `#178` reference would be foreign to them, while a regex literal already appears
+  in the Japanese file's own token bullet. The anchor is a **necessary condition
+  the check can read, not the whole assertion**: whether each site states the
+  consequence in words is a reading judgment that stays with review.
+  - check: rc=0; S=bin/check-pii-shapes.sh; test -r "$S" || exit 1; D=$(mktemp -d "${TMPDIR:-/tmp}/t1051ac5.XXXXXX") || exit 1; awk '/^#   RE_TOKEN /{f=1} f&&/^# shellcheck/{exit} f{print}' "$S" > "$D/inv.txt"; test -s "$D/inv.txt" || rc=1; if grep -qF -- 'Not applicable' "$D/inv.txt"; then rc=1; fi; grep -qF -- '[^A-Za-z0-9]' "$D/inv.txt" || rc=1; awk '/^#   token /{f=1} f&&/^#$/{exit} f{print}' "$S" > "$D/desc.txt"; test -s "$D/desc.txt" || rc=1; grep -qF -- '[^A-Za-z0-9]' "$D/desc.txt" || rc=1; BT=$(printf '\140'); pat="^- ${BT}token${BT}"; for f in docs/pii-controls.md docs/pii-controls.ja.md; do test -r "$f" || exit 1; b="$D/$(basename "$f").base"; git show "e57c287:$f" > "$b" || rc=1; test -s "$b" || rc=1; awk -v p="$pat" '$0 ~ p {f=1; print; next} f && /^- / {exit} f {print}' "$f" > "$D/reg.now"; awk -v p="$pat" '$0 ~ p {f=1; print; next} f && /^- / {exit} f {print}' "$b" > "$D/reg.base"; test -s "$D/reg.base" || rc=1; if cmp -s "$D/reg.now" "$D/reg.base"; then rc=1; fi; grep -qF -- '[^A-Za-z0-9]' "$D/reg.now" || rc=1; awk -v p="$pat" '$0 ~ p {f=1; next} f && /^- / {f=0} !f {print}' "$f" > "$D/out.now"; awk -v p="$pat" '$0 ~ p {f=1; next} f && /^- / {f=0} !f {print}' "$b" > "$D/out.base"; cmp -s "$D/out.now" "$D/out.base" || rc=1; done; rm -rf "$D"; test "$rc" -eq 0
 - [ ] **AC6** The #178 oracle, in the shape the pre-fix step-0 measurement fixed:
   the checker is clean in **both** modes after the change — change-scoped against
   `develop` and against this task's own base ref, and full-tree under `--all` — which
@@ -386,9 +433,15 @@ repository, and must handle correctly:
    English and Japanese, including chains whose segment ends in the letters `s`+`k`
    immediately before a hyphen (this repository's own label convention, hyphenated
    file names, chained flag names) followed by 16 or more `[A-Za-z0-9_-]` characters.
-2. Real credential-token shapes at every boundary that occurs in this tree: line
-   start, after a space, after `=`, `:`, `"`, `'`, `(`, `-`, `.`, `/`, and
-   immediately after an alphanumeric character.
+2. Real credential-token shapes at every separated boundary that occurs in this
+   tree — line start, after a space, after `=`, `:`, `"`, `'`, `(`, `-`, `.`, `/` —
+   all of which must fire, for all three alternatives. The alphanumeric-adjacent
+   zero-separator boundary splits by alternative and is stated precisely rather
+   than left general: a `gh` or `AKIA` form immediately preceded by a letter or a
+   digit **must still fire**, since neither alternative carries a guard; the same
+   position for an `sk-` form is the **disclosed suppressed case** the Goal names —
+   reachable, deliberately not protected, and pinned as a documented expectation by
+   AC1 rather than treated as a defect to be reported.
 3. The four documented placeholder identity forms, and the existing emphasis-break
    spellings already committed in `.shell-team/test-recipe.md` and elsewhere.
 4. `bin/check-intent.sh` invoked with `--print-hash` and `--help` in either order,
@@ -503,7 +556,15 @@ disposition**: #178 (pattern, suite, four prose sites) → #179(a) → #179(b) �
    measured at. The `git show e57c287:<path>` forms inside the criteria above are
    themselves committed-blob reads, not working-tree reads, and are the only
    ref-labelled measurements this task ships.
-8. **The fixture self-reference contract (DP4) applies to your records too.** Compose
+8. **The v3 disclosure has two extraction boundaries AC5 depends on.** The
+   inventory entry is read from `^#   RE_TOKEN ` to the next `^# shellcheck`, and
+   the header's `token` description from `^#   token ` to the next bare `^#$`.
+   Both are the file's own existing comment grammar — keep the block markers where
+   they are when you add the disclosure sentence, or the extraction goes empty and
+   AC5 reds on a `test -s` that has nothing to do with your wording. The fourth and
+   first sites are the two document bullets, extracted by the same `token` bullet
+   boundary AC5 already used at v2.
+9. **The fixture self-reference contract (DP4) applies to your records too.** Compose
    every shape from fragments; run `bin/check-pii-shapes.sh` against each new record
    **before** its first commit (AC17d) rather than trusting the CI diff-time check.
 
