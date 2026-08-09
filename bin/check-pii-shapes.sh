@@ -38,8 +38,13 @@
 #                     red its own gate — see the spec's DP-1).
 #   token             a credential-token prefix (GitHub gh[oprs]_, AWS AKIA,
 #                     an OpenAI-style sk- key) long enough to be a real key
-#                     body, not a short lookalike such as this project's own
-#                     `task-0NN` label convention.
+#                     body. The sk- alternative additionally requires a
+#                     non-alphanumeric character, or line start, immediately
+#                     before it, so an identifier chain that merely ends in
+#                     the letters s+k before a hyphen — this project's own
+#                     label convention among them — never matches, however
+#                     long its tail runs; gh[oprs]_ and AKIA carry no such
+#                     guard (see the anchoring/boundary inventory below).
 #
 # Mechanism (DP-4, v4's premise change): this script NEVER parses git's
 # textual diff rendering. A rendering is a human-facing format whose framing
@@ -288,9 +293,20 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     positive would require the literal header text to appear
 #     coincidentally, which is not a boundary/anchoring question. Not
 #     applicable.
-#   RE_TOKEN  not anchored at either end — same asymmetry as RE_EMAIL_BASE:
-#     this is a PATTERN, so an unanchored match only widens detection
-#     (safe-directed), never creates a bypass. Not applicable.
+#   RE_TOKEN  the sk- alternative is now left-anchored: start-of-line, OR one
+#     character that is NOT a letter or digit — class [^A-Za-z0-9]. That
+#     class is deliberately narrower than RE_HOME_PATH_BOUNDARY's: a token
+#     has no host-name-continuation problem, so a real key preceded by a dot
+#     or a hyphen must still fire, and copying the home-path class verbatim
+#     would manufacture a false-negative class. APPLIED this round: closes
+#     the measured false-positive population (an ordinary word ending in the
+#     letters s+k before a hyphen and a long kebab-case identifier — this
+#     repository's own label convention among them) without suppressing a
+#     real key. The gh[oprs]_ and AKIA alternatives stay unanchored — no
+#     measured false-positive carrier in this tree, and guarding them risks
+#     the costlier false-negative error (DP-10); the rejected group-guard
+#     design that would have anchored all three is recorded in the task's
+#     spec, not repeated here.
 #
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
 RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9.-])'
@@ -310,8 +326,11 @@ RE_NOREPLY_PLAIN='^noreply@github\.com$'
 RE_RESERVED_DOMAIN='(^|\.)example\.(com|org|net)$|\.(example|invalid|test|localhost)$'
 # shellcheck disable=SC2016
 RE_PRIVATE_KEY='-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
-# shellcheck disable=SC2016
-RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|sk-[A-Za-z0-9_-]{16,}'
+# shellcheck disable=SC2016  # the sk- alternative alone gains a left
+# boundary guard, class [^A-Za-z0-9] — see the RE_TOKEN inventory entry
+# above and the T-1051 spec's DP1/DP2 for why gh[oprs]_ and AKIA stay
+# unguarded and why this class is narrower than RE_HOME_PATH_BOUNDARY's.
+RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}'
 
 # --- known-shapes list (DP-8) ------------------------------------------------
 # Per-file only — no directory entry, no glob, no pattern. Fixtures that

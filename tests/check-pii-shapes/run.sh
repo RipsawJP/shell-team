@@ -21,8 +21,11 @@
 #   - RFC 2606 / RFC 6761 reserved-domain addresses (example.com/.org/.net,
 #     .example/.invalid/.test/.localhost) — reserved precisely so nothing
 #     real can live there;
-#   - short "lookalike" labels (this repo's own task-0NN convention, a
-#     truncated ghp_ prefix) — deliberately too short to match any pattern.
+#   - short "lookalike" labels: a truncated ghp_ prefix (too short to match
+#     RE_TOKEN's minimum key-body length) and this repo's own kebab-case
+#     label convention immediately after an identifier character (blocked
+#     by the sk- alternative's left boundary guard, T-1051 #178 — not by
+#     length alone; a long lookalike is exercised separately, below).
 #
 # Covers, in order (see "Canonical suite assertion labels" in the spec for
 # the exact label strings this file must contain verbatim):
@@ -444,10 +447,12 @@ printf '\n--- negative: short lookalike must not fire ---\n'
 TK_P1="gh"; TK_P2="p_"
 TK_B1="ABCDEFGHIJ"; TK_B2="KLMNOPQRST12"
 TK_POS_LINE="token=${TK_P1}${TK_P2}${TK_B1}${TK_B2}"
-# This project's own task-0NN convention (literal substring "sk-") and a
-# truncated "ghp_" prefix are deliberately too short to match RE_TOKEN's
-# minimum key-body length — the same false-positive class
-# tests/rollup-track/run.sh already guards for its own write-time guard.
+# A truncated "ghp_" prefix is too short to match RE_TOKEN's minimum
+# key-body length. "task-043" is additionally blocked by the sk-
+# alternative's left boundary guard (T-1051 #178) — it is preceded by a
+# letter, not by line start or a non-alphanumeric character — so this stays
+# clean for a boundary reason now, not (only) a length reason; the boundary
+# case with a LONG lookalike tail is exercised on its own below.
 TK_NEG_LINE="see task-043 and ghp_short — neither is a real secret"
 
 TK_POS_REPO="$(new_repo)"; TK_POS_BASE="$(git -C "$TK_POS_REPO" rev-parse HEAD)"
@@ -459,6 +464,91 @@ TK_NEG_REPO="$(new_repo)"; TK_NEG_BASE="$(git -C "$TK_NEG_REPO" rev-parse HEAD)"
 add_fixture_line "$TK_NEG_REPO" "neg.txt" "$TK_NEG_LINE"
 assert_clean "negative: short lookalike must not fire (task-043 / ghp_short both clean)" \
   "$TK_NEG_REPO" "$TK_NEG_BASE"
+
+# =============================================================================
+# boundary: an identifier-adjacent label lookalike does not fire (token)
+# boundary: a non-identifier boundary still fires (start, dot, hyphen, slash)
+# positive: an unguarded prefix still fires after a letter (gh form)
+# T-1051 #178 (DP1/DP2): the sk- alternative gains a left boundary guard,
+# class [^A-Za-z0-9] — deliberately narrower than RE_HOME_PATH_BOUNDARY's,
+# since a token has no host-name-continuation problem. gh[oprs]_ and AKIA
+# stay unanchored (no measured false-positive carrier in this tree; a false
+# negative is the costlier error, DP-10).
+# =============================================================================
+printf '\n--- boundary: an identifier-adjacent label lookalike does not fire (token) ---\n'
+printf '\n--- boundary: a non-identifier boundary still fires (start, dot, hyphen, slash) ---\n'
+printf '\n--- positive: an unguarded prefix still fires after a letter (gh form) ---\n'
+
+# A LONG kebab-case lookalike (16-char tail, well past RE_TOKEN's minimum key
+# body) whose only overlap with the pattern is ending in the letters s+k
+# before a hyphen — this repository's own label convention among them. The
+# short negative above already proved a SHORT lookalike is clean; this
+# proves a LONG one is clean too, for the boundary reason and not the
+# length reason (the guard was the point of #178, not incidental brevity).
+TKG_N1="ta"; TKG_N2="sk-"; TKG_N3="ABCDEFGHIJKLMNOP"
+TKG_LOOKALIKE_LONG="${TKG_N1}${TKG_N2}${TKG_N3}"
+
+TKG_LONG_REPO="$(new_repo)"; TKG_LONG_BASE="$(git -C "$TKG_LONG_REPO" rev-parse HEAD)"
+add_fixture_line "$TKG_LONG_REPO" "longlookalike.txt" "see ${TKG_LOOKALIKE_LONG} here"
+assert_clean "boundary: an identifier-adjacent label lookalike does not fire (token)" \
+  "$TKG_LONG_REPO" "$TKG_LONG_BASE"
+
+# A real key body at every boundary DP-10 requires to fire: line start,
+# after a space, after a hyphen, after a dot, after a slash — the four
+# boundary characters DP-5's class would have suppressed.
+TKG_B1="ABCDEFGHIJ"; TKG_B2="KLMNOP12"
+TKG_KEY="sk-${TKG_B1}${TKG_B2}"
+TKG_BOUND_LINES=(
+  "${TKG_KEY}"
+  "value ${TKG_KEY}"
+  "id-${TKG_KEY}"
+  "v1.${TKG_KEY}"
+  "/${TKG_KEY}"
+)
+TKG_BOUND_REPO="$(new_repo)"; TKG_BOUND_BASE="$(git -C "$TKG_BOUND_REPO" rev-parse HEAD)"
+add_fixture_lines "$TKG_BOUND_REPO" "boundaries.txt" "${TKG_BOUND_LINES[@]}"
+set +e
+TKG_BOUND_OUT="$(cd "$TKG_BOUND_REPO" && bash "$BIN" --base "$TKG_BOUND_BASE" 2>&1)"
+TKG_BOUND_RC=$?
+set -e
+TKG_BOUND_HITS="$(printf '%s\n' "$TKG_BOUND_OUT" | grep -c '^FINDING pattern=token path=boundaries\.txt' || true)"
+if [ "$TKG_BOUND_RC" -eq 1 ] && [ "$TKG_BOUND_HITS" = "${#TKG_BOUND_LINES[@]}" ]; then
+  pass "boundary: a non-identifier boundary still fires (start, dot, hyphen, slash)"
+else
+  fail "boundary: a non-identifier boundary still fires (start, dot, hyphen, slash) (rc=$TKG_BOUND_RC hits=$TKG_BOUND_HITS out=$TKG_BOUND_OUT)"
+fi
+
+# The gh form's own alternative stays unguarded: immediately preceded by a
+# letter (never an '=' or a space, unlike the POS/NEG pair above), it must
+# still fire — proving the guard was attached to the sk- alternative only,
+# not to the whole group.
+TKG_GH_REPO="$(new_repo)"; TKG_GH_BASE="$(git -C "$TKG_GH_REPO" rev-parse HEAD)"
+add_fixture_line "$TKG_GH_REPO" "ghletter.txt" "x${TK_P1}${TK_P2}${TK_B1}${TK_B2}"
+assert_finding "positive: an unguarded prefix still fires after a letter (gh form)" \
+  "token" "$TKG_GH_REPO" "$TKG_GH_BASE"
+
+# =============================================================================
+# mutation: the token boundary is load-bearing (pre-fix rule reports the
+# lookalike) — T-1051 #178, DP3: the step-0 measurement found no live red
+# carrier for this defect on this branch (both --base develop and --all were
+# clean pre-fix), so the proof that the OLD, unguarded rule would have
+# reported the new long-lookalike fixture is a mutation, not a CI red — the
+# same neutralised-copy idiom the mutation blocks above already use.
+# =============================================================================
+printf '\n--- mutation: the token boundary is load-bearing (pre-fix rule reports the lookalike) ---\n'
+
+TOKEN_PREFIX_MUT="$(mktemp "$WORK/mut.XXXXXX")"
+sed "s/^RE_TOKEN=.*/RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|${TKG_N2}[A-Za-z0-9_-]{16,}'/" "$BIN" > "$TOKEN_PREFIX_MUT"
+set +e
+TOKEN_PREFIX_MUT_OUT="$(cd "$TKG_LONG_REPO" && bash "$TOKEN_PREFIX_MUT" --base "$TKG_LONG_BASE" 2>&1)"
+TOKEN_PREFIX_MUT_RC=$?
+set -e
+if [ "$TOKEN_PREFIX_MUT_RC" -eq 1 ] && printf '%s\n' "$TOKEN_PREFIX_MUT_OUT" | grep -qE 'pattern=token path=longlookalike\.txt'; then
+  pass "mutation: the token boundary is load-bearing (pre-fix rule reports the lookalike)"
+else
+  fail "mutation: the token boundary is load-bearing (pre-fix rule reports the lookalike) (rc=$TOKEN_PREFIX_MUT_RC out=$TOKEN_PREFIX_MUT_OUT)"
+fi
+rm -f "$TOKEN_PREFIX_MUT"
 
 # =============================================================================
 # placeholder forms are not findings (AC9) — a permanent false-positive
