@@ -502,3 +502,39 @@ that file's order.
   runs also write to is its own defect class (DP7), out of the lock's
   machine scope; a new suite should never `rm -rf` a wildcard over a
   parent directory anything else might be writing to.
+- T-1051: the T-1041 entry above (a hyphenated compound spelling an
+  unboundaried `sk-` + 16+ token characters false-positives `token` with no
+  way to suppress it) is **narrowed, not retired**, by #178's left boundary
+  guard on `RE_TOKEN`'s `sk-` alternative (class `[^A-Za-z0-9]`). The exact
+  measured case that entry names — `…task-**id**-malformed…`, where the
+  character immediately before `sk-` is the letter `a` — no longer
+  false-positives at all; confirmed live (`echo 'task-id-malformed-example'
+  | grep -qE -- "$RE_TOKEN"` now reports no match). The same id at line
+  start, after a space, or after any other non-alphanumeric character
+  still fires (DP-10's bias toward firing, deliberately unchanged) — so
+  the check-before-freezing discipline that entry describes still applies
+  in general; only the specific "immediately after a letter or digit"
+  sub-case is closed. Do not sweep existing emphasis-break spellings
+  elsewhere in this repo to remove them (T-1051's own Non-goals; they
+  remain correct either way) — this note only corrects the "no way to
+  suppress it" claim for the boundary this fix actually closes.
+- T-1051: a bash builtin's write (`printf`, `echo`) to a broken pipe can
+  behave two very different ways depending on SIGPIPE's disposition, and
+  this coding sandbox's inherited disposition (SIG_IGN, from its own
+  parent process tree) masks the more dangerous of the two — do not trust
+  a "no failure observed" result from a SIGPIPE-adjacent probe run
+  directly in this environment without first checking
+  `python3 -c "import signal; print(signal.getsignal(signal.SIGPIPE))"`
+  (`1` means `SIG_IGN`, inherited, not the real-world default). Under the
+  TRUE default (SIG_DFL, terminate — what a normal shell/CI/terminal
+  gives you), a builtin write to a closed pipe kills the whole process
+  synchronously inside the write() syscall, before any `||`/`trap`/`set -e`
+  handling ever runs; under SIG_IGN, the same write instead returns an
+  ordinary non-zero status from the builtin ("printf: write error: Broken
+  pipe"). To force the TRUE default disposition for a live probe despite
+  the sandbox's inheritance (bash's own `trap - PIPE` only restores the
+  INHERITED disposition, which is already SIG_IGN here, so it does not
+  help): fork in Python, explicitly `signal.signal(signal.SIGPIPE,
+  signal.SIG_DFL)` (or `SIG_IGN`, to compare) in the child BEFORE
+  `os.execvp`, close the pipe's read end first, then exec into the target
+  shell command with its stdout `dup2`'d onto the write end.
