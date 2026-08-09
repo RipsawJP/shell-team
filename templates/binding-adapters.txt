@@ -1,0 +1,34 @@
+# binding-adapters.txt — the plugin-shipped adapter allowlist consumed by
+# bin/check-binding.sh (T-1054; GitHub issue #203).
+#
+# This registry is resolved from this checker's OWN installed directory
+# (one level above it), never from an adopter's checked-out tree — the same
+# shape templates/durability-records.txt and templates/prompt-blocks/
+# registry.txt already have for their own consuming checkers. A checked-out
+# repository cannot register its own adapter by editing a file here or
+# anywhere in its own tree; the only override is bin/check-binding.sh's own
+# --adapters PATH flag, documented there as a testing affordance, not an
+# adopter-facing knob.
+#
+# Format (whitespace-delimited, one row per adapter; `#` comments and blank
+# lines are skipped):
+#
+#   <adapter-token> <provider-token>
+#
+#   <adapter-token>   the token a binding config's `bind` row spells in its
+#                     adapter field; matches ^[a-z][a-z0-9-]*$, at most 64
+#                     characters, and appears at most once in this file.
+#   <provider-token>  the provider this adapter composes an executor for;
+#                     same character class. Pairing an adapter with the
+#                     wrong provider in a binding config is refused
+#                     (`provider-adapter-mismatch`) rather than accepted.
+#
+# An adapter is a token here, never a command string, a path or an argument
+# list — bin/check-binding.sh composes nothing from either column; the two
+# columns exist only to be matched against a binding config's own fields.
+# Custom adapters are out of scope for this initial cut (epic #203); adding
+# one is a task for whoever builds the adapter layer (T-1055), not something
+# an adopter is expected to do by editing this file directly.
+
+claude-cli claude
+codex-cli codex
