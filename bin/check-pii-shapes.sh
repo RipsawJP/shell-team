@@ -38,13 +38,22 @@
 #                     red its own gate — see the spec's DP-1).
 #   token             a credential-token prefix (GitHub gh[oprs]_, AWS AKIA,
 #                     an OpenAI-style sk- key) long enough to be a real key
-#                     body. The sk- alternative additionally requires a
-#                     non-alphanumeric character, or line start, immediately
-#                     before it, so an identifier chain that merely ends in
-#                     the letters s+k before a hyphen — this project's own
-#                     label convention among them — never matches, however
-#                     long its tail runs; gh[oprs]_ and AKIA carry no such
-#                     guard (see the anchoring/boundary inventory below).
+#                     body. The sk- alternative additionally requires a left
+#                     boundary — start-of-line, or one character in the class
+#                     [^A-Za-z0-9] — immediately before it, so an identifier
+#                     chain that merely ends in the letters s+k before a
+#                     hyphen — this project's own label convention among them
+#                     — never matches, however long its tail runs; gh[oprs]_
+#                     and AKIA carry no such guard (see the anchoring/boundary
+#                     inventory below). Disclosed exception, accepted rather
+#                     than a defect (T-1051 DP2, issue #178's own
+#                     prescription): the same [^A-Za-z0-9] boundary also
+#                     suppresses a real sk- key sitting immediately after a
+#                     letter or a digit with no separating character, since
+#                     one character of left context cannot tell that case
+#                     apart from the label chain above — the mathematical
+#                     complement of the false positive this guard exists to
+#                     close, not a separable gap in it.
 #
 # Mechanism (DP-4, v4's premise change): this script NEVER parses git's
 # textual diff rendering. A rendering is a human-facing format whose framing
@@ -306,7 +315,16 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     measured false-positive carrier in this tree, and guarding them risks
 #     the costlier false-negative error (DP-10); the rejected group-guard
 #     design that would have anchored all three is recorded in the task's
-#     spec, not repeated here.
+#     spec, not repeated here. DISCLOSED ACCEPTED COMPLEMENT (T-1051 DP2):
+#     this same [^A-Za-z0-9] class, by construction, also suppresses a real
+#     sk- key sitting immediately after a letter or a digit with no
+#     separator — one character of left context cannot distinguish that case
+#     from the label chain above, so the two are inseparable under any class
+#     choice. This is the mathematical complement of issue #178's own
+#     prescription, ratified rather than an oversight; every other reachable
+#     boundary (line start, space, `=`, `:`, quotes, brackets, `-`, `.`, `/`)
+#     still fires, and gh[oprs]_/AKIA still fire after an alphanumeric since
+#     neither carries a guard.
 #
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
 RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9.-])'

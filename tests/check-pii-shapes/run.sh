@@ -528,6 +528,27 @@ assert_finding "positive: an unguarded prefix still fires after a letter (gh for
   "token" "$TKG_GH_REPO" "$TKG_GH_BASE"
 
 # =============================================================================
+# disclosed: alnum-adjacent zero-separator sk form is suppressed by design
+# (#178 complement) — T-1051 v3 (DP2 *Class*, Goal): the accepted, disclosed
+# exception. A real sk- key sitting immediately after a letter, and again
+# immediately after a digit, with no separating character, is suppressed —
+# the mathematical complement of the false-positive class #178 asks this
+# guard to close, since one character of left context cannot tell a real
+# unseparated key apart from the label-chain lookalike above. The
+# space-separated form one character away already fires ("boundary: a
+# non-identifier boundary still fires", above) — only the zero-separator,
+# alnum-adjacent position is accepted as suppressed.
+# =============================================================================
+printf '\n--- disclosed: alnum-adjacent zero-separator sk form is suppressed by design (#178 complement) ---\n'
+
+TKD_LETTER_LINE="x${TKG_KEY}"
+TKD_DIGIT_LINE="9${TKG_KEY}"
+TKD_REPO="$(new_repo)"; TKD_BASE="$(git -C "$TKD_REPO" rev-parse HEAD)"
+add_fixture_lines "$TKD_REPO" "zeroseparator.txt" "$TKD_LETTER_LINE" "$TKD_DIGIT_LINE"
+assert_clean "disclosed: alnum-adjacent zero-separator sk form is suppressed by design (#178 complement)" \
+  "$TKD_REPO" "$TKD_BASE"
+
+# =============================================================================
 # mutation: the token boundary is load-bearing (pre-fix rule reports the
 # lookalike) — T-1051 #178, DP3: the step-0 measurement found no live red
 # carrier for this defect on this branch (both --base develop and --all were
