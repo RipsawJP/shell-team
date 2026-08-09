@@ -33,8 +33,16 @@ Five generic, publishable shapes, each identified by a stable pattern id:
   testing (RFC 2606 / RFC 6761).
 - `private-key` — a PEM private-key header line.
 - `token` — a credential-token prefix (GitHub `gh[oprs]_`, an AWS access-key
-  id, an OpenAI-style `sk-` key) long enough to be a real key body, not a
-  short lookalike such as this project's own `task-0NN` label convention.
+  id, an OpenAI-style `sk-` key) long enough to be a real key body. The
+  `sk-` form additionally requires a left boundary — start-of-line, or one
+  character in the class `[^A-Za-z0-9]` — immediately before it, so an
+  identifier chain that merely ends in the letters s+k before a hyphen —
+  this project's own label convention among them — never matches, however
+  long its tail runs; `gh[oprs]_` and `AKIA` carry no such guard. Accepted,
+  disclosed exception: that same `[^A-Za-z0-9]` boundary also suppresses a
+  real `sk-` key sitting immediately after a letter or a digit with no
+  separator, since one character of left context cannot tell the two apart
+  — every other boundary this gate reaches still fires.
 
 ## Running it
 

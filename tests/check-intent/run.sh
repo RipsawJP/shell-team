@@ -1552,6 +1552,67 @@ SITE_COUNT=$(grep -cE '^[[:space:]]+fail_hash_structural$' "$CHECKER")
 [ "$SITE_COUNT" -eq 2 ] || fail "refusal-row10-message-byte-invariant: expected fail_hash_structural to have exactly two call sites (row 4 and row 10), got $SITE_COUNT"
 pass "refusal-row10-message-byte-invariant: the attested-bootstrap case (row 10) still reaches the shared row(4)/row(10) 'structural' message (D3 — unchanged from before T-1018/T-1041), and fail_hash_structural keeps exactly two call sites"
 
+# =============================================================================
+# T-1051 #179(b): --help wins whatever the flag order (spec AC9). Measured
+# before writing this fixture (Notes for engineer): the argument-parsing
+# `while`/`case` loop already checks `--help|-h` FIRST on every iteration and
+# consumes flags strictly left-to-right, so `--help` always short-circuits
+# before `--print-hash` (or anything else) ever runs, in EITHER order — this
+# was already-correct, implicit convention with no fixture pinning it. Both
+# case ids below are bare kebab-case, this file's own label convention
+# (measured at tests/check-intent/run.sh:1268's `printhash-stdout-contract`).
+# =============================================================================
+C="$TMP/case-help-precedence"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+
+HELP_BEFORE_RC=0
+HELP_BEFORE_OUT="$(bash "$CHECKER" --help --print-hash "$C/spec.md" 2>&1)" || HELP_BEFORE_RC=$?
+[ "$HELP_BEFORE_RC" -eq 0 ] || fail "help-wins-before-print-hash: expected exit 0, got $HELP_BEFORE_RC: $HELP_BEFORE_OUT"
+printf '%s\n' "$HELP_BEFORE_OUT" | grep -qF -- 'check-intent.sh —' || fail "help-wins-before-print-hash: expected the script's own help text, got: $HELP_BEFORE_OUT"
+if printf '%s\n' "$HELP_BEFORE_OUT" | grep -qE '^[0-9a-f]{40}$'; then
+  fail "help-wins-before-print-hash: expected no 40-hex value in the output, got: $HELP_BEFORE_OUT"
+fi
+pass "help-wins-before-print-hash: --help before --print-hash exits 0, prints the script's own help text, and never a 40-hex value"
+
+HELP_AFTER_RC=0
+HELP_AFTER_OUT="$(bash "$CHECKER" --print-hash --help "$C/spec.md" 2>&1)" || HELP_AFTER_RC=$?
+[ "$HELP_AFTER_RC" -eq 0 ] || fail "help-wins-after-print-hash: expected exit 0, got $HELP_AFTER_RC: $HELP_AFTER_OUT"
+printf '%s\n' "$HELP_AFTER_OUT" | grep -qF -- 'check-intent.sh —' || fail "help-wins-after-print-hash: expected the script's own help text, got: $HELP_AFTER_OUT"
+if printf '%s\n' "$HELP_AFTER_OUT" | grep -qE '^[0-9a-f]{40}$'; then
+  fail "help-wins-after-print-hash: expected no 40-hex value in the output, got: $HELP_AFTER_OUT"
+fi
+[ "$HELP_BEFORE_OUT" = "$HELP_AFTER_OUT" ] || fail "help-wins-after-print-hash: expected both flag orderings to print byte-identical output"
+pass "help-wins-after-print-hash: --print-hash before --help exits 0, prints the SAME help text as the reverse ordering (byte-identical), never a 40-hex value"
+
+# =============================================================================
+# T-1051 #179(c): the computed hash is shape-gated before any consumer reads
+# it (spec AC10). A real spec's print-mode hash still passes the gate (the
+# gate admits the true value it guards); the mutation self-check (removing
+# the gate) is a producer-run probe outside this checkout (AC17a), not a
+# fixture in this suite (mutating a scratch copy in-place would need the
+# gate's own exact source text, which drifts, whereas this suite's job is to
+# pin the OBSERVABLE contract: the gate exists, sits before the print-mode
+# branch, and admits a real value).
+# =============================================================================
+C="$TMP/case-hash-shape-gate"; mkdir -p "$C"
+write_spec "$C/spec.md" "Do the thing."
+run_print_hash "$C/spec.md"
+[ "$PRC" -eq 0 ] || fail "hash-shape-gate-admits-real-value: --print-hash failed unexpectedly, rc=$PRC err=$PERR"
+printf '%s' "$POUT" | grep -qE '^[0-9a-f]{40}$' || fail "hash-shape-gate-admits-real-value: expected a conformant 40-lowercase-hex value to pass the gate, got: $POUT"
+pass "hash-shape-gate-admits-real-value: a real spec's computed hash is 40 lowercase hex and print mode still emits it — the shape gate admits the true value it guards"
+
+GATE_LINE="$(grep -nF -- '[0-9a-f]{40}' "$CHECKER" | head -1 | cut -d: -f1)"
+# shellcheck disable=SC2016  # literal source-text search, not a variable expansion
+ASSIGN_LINE="$(grep -nF -- 'computed_hash="$(git hash-object' "$CHECKER" | head -1 | cut -d: -f1)"
+# shellcheck disable=SC2016  # literal source-text search, not a variable expansion
+PRINTMODE_LINE="$(grep -nF -- 'if [ "$PRINT_HASH" -eq 1 ]' "$CHECKER" | head -1 | cut -d: -f1)"
+[ -n "$GATE_LINE" ] || fail "hash-shape-gate-before-consumers: expected a '[0-9a-f]{40}' shape literal in the checker source"
+[ -n "$ASSIGN_LINE" ] || fail "hash-shape-gate-before-consumers: expected to locate computed_hash's assignment"
+[ -n "$PRINTMODE_LINE" ] || fail "hash-shape-gate-before-consumers: expected to locate the print-mode branch"
+[ "$GATE_LINE" -gt "$ASSIGN_LINE" ] || fail "hash-shape-gate-before-consumers: expected the shape gate ($GATE_LINE) to sit AFTER computed_hash's assignment ($ASSIGN_LINE)"
+[ "$GATE_LINE" -lt "$PRINTMODE_LINE" ] || fail "hash-shape-gate-before-consumers: expected the shape gate ($GATE_LINE) to sit BEFORE the print-mode branch ($PRINTMODE_LINE)"
+pass "hash-shape-gate-before-consumers: the '[0-9a-f]{40}' shape gate sits after computed_hash's assignment and before the print-mode branch — reads it before any consumer does"
+
 # --- self-check: this suite's own script is shellcheck clean (soft-skip) ---
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$CHECKER" "$HERE/run.sh" || fail "shellcheck: check-intent.sh / run.sh must be clean"
