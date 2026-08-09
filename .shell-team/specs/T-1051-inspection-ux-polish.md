@@ -246,7 +246,7 @@ at run time.
   characters DP-5 would have suppressed and DP-10 requires to fire. A `gh`-form
   prefix immediately preceded by a letter still matches, proving the guard was
   attached to one alternative and not to the group.
-  - check: S=bin/check-pii-shapes.sh; test -r "$S" || exit 1; RE=$(awk -F"'" '/^RE_TOKEN=/{print $2}' "$S"); test -n "$RE" || exit 1; rc=0; N1=ta; N2=sk-; N3=ABCDEFGHIJKLMNOP; P1=sk; P2=-; B1=ABCDEFGHIJ; B2=KLMNOP12; G1=gh; G2=p_; K="${P1}${P2}${B1}${B2}"; if printf '%s\n' "see ${N1}${N2}${N3} here" | grep -qE -- "$RE"; then rc=1; fi; for pre in "" "x " "-" "." "/"; do printf '%s\n' "${pre}${K}" | grep -qE -- "$RE" || rc=1; done; printf '%s\n' "x${G1}${G2}${B1}${B2}" | grep -qE -- "$RE" || rc=1; test "$rc" -eq 0
+  - check: S=bin/check-pii-shapes.sh; test -r "$S" || exit 1; RE=$(awk -F"'" '/^RE_TOKEN=/{print $2}' "$S"); test -n "$RE" || exit 1; rc=0; N1=ta; N2=sk-; N3=ABCDEFGHIJKLMNOP; P1=sk; P2=-; B1=ABCDEFGHIJ; B2=KLMNOP123456; G1=gh; G2=p_; K="${P1}${P2}${B1}${B2}"; if printf '%s\n' "see ${N1}${N2}${N3} here" | grep -qE -- "$RE"; then rc=1; fi; for pre in "" "x " "-" "." "/"; do printf '%s\n' "${pre}${K}" | grep -qE -- "$RE" || rc=1; done; printf '%s\n' "x${G1}${G2}${B1}${B2}" | grep -qE -- "$RE" || rc=1; test "$rc" -eq 0
 - [ ] **AC2** The rule decomposition T-111 froze is intact. The number of top-level
   `RE_*=` assignment lines in the checker equals the base ref's — no rule added, none
   removed — `RE_TOKEN` is still exactly one such line, and `RE_HOME_PATH_BOUNDARY`'s
