@@ -310,13 +310,16 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     would manufacture a false-negative class. APPLIED this round: closes
 #     the measured false-positive population (an ordinary word ending in the
 #     letters s+k before a hyphen and a long kebab-case identifier — this
-#     repository's own label convention among them) without suppressing a
-#     real key. The gh[oprs]_ and AKIA alternatives stay unanchored — no
-#     measured false-positive carrier in this tree, and guarding them risks
-#     the costlier false-negative error (DP-10); the rejected group-guard
-#     design that would have anchored all three is recorded in the task's
-#     spec, not repeated here. DISCLOSED ACCEPTED COMPLEMENT (T-1051 DP2):
-#     this same [^A-Za-z0-9] class, by construction, also suppresses a real
+#     repository's own label convention among them); every real key at a
+#     SEPARATED boundary still fires, at exactly one disclosed, accepted
+#     cost — detailed immediately below, not a second, independent claim
+#     that no real key is ever suppressed. The gh[oprs]_ and AKIA
+#     alternatives stay unanchored — no measured false-positive carrier in
+#     this tree, and guarding them risks the costlier false-negative error
+#     (DP-10); the rejected group-guard design that would have anchored all
+#     three is recorded in the task's spec, not repeated here.
+#     DISCLOSED ACCEPTED COMPLEMENT (T-1051 DP2): this same [^A-Za-z0-9]
+#     class, by construction, also suppresses a real
 #     sk- key sitting immediately after a letter or a digit with no
 #     separator — one character of left context cannot distinguish that case
 #     from the label chain above, so the two are inseparable under any class
