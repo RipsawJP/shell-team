@@ -518,6 +518,29 @@ that file's order.
   elsewhere in this repo to remove them (T-1051's own Non-goals; they
   remain correct either way) — this note only corrects the "no way to
   suppress it" claim for the boundary this fix actually closes.
+- T-1054: `bash tests/check-binding/run.sh` is `bin/check-binding.sh`'s
+  fixture suite (the T-1054 fail-closed binding-config validator and its
+  `--print-binding`/`--print-lock`/`--verify` integrity primitives). No new
+  prerequisite: pure bash + git, same synthetic-fixture-in-a-scratch-dir
+  convention as `tests/check-refreeze-class/run.sh` (the two-arm
+  `TMPDIR`-then-`$HERE` `mktemp -d … XXXXXX` idiom, no static `fixtures/`
+  directory — this suite builds no `git init` repositories, so the
+  `$HERE` fallback arm is the right one, not the `${TMPDIR:-/tmp}`-only
+  arm T-1044 reserves for suites that do). One non-obvious authoring trap
+  worth inheriting: proving `--verify`'s comment-only-edit tolerance and
+  its `binding-changed` refusal both require editing the SAME config
+  path the lock recorded (in place, then restored byte for byte before
+  the next case) — a differently-NAMED file with identical or edited
+  content trips `path-mismatch` first and never reaches the property the
+  case is meant to prove, since per-mode refusals in this checker are
+  ordered path-match before content-validate. Separately, a payload
+  string meant to prove "a field value is refused, never evaluated"
+  (a `$(...)`, a `;...;`, a backtick payload) must contain no embedded
+  whitespace — a payload with a space splits into two fields under this
+  format's whitespace-delimited grammar and is refused as
+  `unparseable-line` (a wrong-field-count row) rather than the intended
+  `bad-token` (a malformed single token), which still proves no
+  evaluation happened but asserts the wrong token if the test pins one.
 - T-1051: a bash builtin's write (`printf`, `echo`) to a broken pipe can
   behave two very different ways depending on SIGPIPE's disposition, and
   this coding sandbox's inherited disposition (SIG_IGN, from its own
