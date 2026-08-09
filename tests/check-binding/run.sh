@@ -43,6 +43,12 @@
 #   cb-registry-malformed-dup — a duplicated adapter token -> registry-malformed (2)
 #   cb-decoy-registry-ignored — a decoy templates/binding-adapters.txt in the
 #                                cwd never legitimizes an adapter
+#   cb-decoy-registry-ignored-allrows — the discriminating construction (every
+#                                row, not just one, matches the decoy's only
+#                                pair) — an AC16(a) mutation self-check found
+#                                the single-row case above cannot by itself
+#                                tell "decoy consulted" apart from "decoy
+#                                ignored", since either way some row fails
 #   cb-no-eval-source-static   — no eval/source/`.` invocation anywhere in the script
 #   cb-canary-dollar-paren     — a $(...) payload field is refused, no CANARY written
 #   cb-canary-semicolon        — a ;...; payload field is refused, no CANARY written
@@ -220,6 +226,39 @@ set -e
 [ "$rc" -eq 1 ] || fail "cb-decoy-registry-ignored: expected exit 1, got $rc — $out"
 printf '%s\n' "$out" | grep -qF -- 'unknown-adapter' || fail "cb-decoy-registry-ignored: expected unknown-adapter, got: $out"
 pass "cb-decoy-registry-ignored"
+
+# The single-row decoy case above does not, by itself, discriminate "the
+# decoy was consulted" from "the decoy was correctly ignored": every OTHER
+# row still uses the real claude-cli/codex-cli tokens, which the decoy
+# registry (one row, my-cli/claude) does not recognize either — so an
+# implementation that wrongly reads the registry from the CWD still refuses
+# `unknown-adapter`, just for a different row, and the substring assertion
+# above cannot tell the two apart (confirmed by an AC16(a) mutation
+# self-check on a scratch copy: reading the registry from `pwd` instead of
+# the script's own directory still passes the single-row case unchanged).
+# This second case is the discriminating construction: every one of the
+# six rows is bound to the decoy's only pair (my-cli/claude), so the two
+# behaviors produce different EXIT CODES rather than the same token —
+# decoy-ignored refuses all six (exit 1, unknown-adapter, since the real
+# registry has no my-cli row at all), decoy-consulted would accept all six
+# (exit 0), and only the real, SCRIPT_DIR-resolved registry decides which.
+alldecoy="$TMP/decoyroot/alldecoy.conf"
+printf '%s\n' \
+  'schema 1' \
+  'bind tech-lead claude m1 high my-cli' \
+  'bind pm-spec claude m1 - my-cli' \
+  'bind engineer claude m1 - my-cli' \
+  'bind qa-verifier claude m1 - my-cli' \
+  'bind ui-designer claude m1 - my-cli' \
+  'bind codex-reviewer claude m2 - my-cli' \
+  > "$alldecoy"
+set +e
+out="$(cd "$TMP/decoyroot" && bash "$CHECKER" --config alldecoy.conf 2>&1)"
+rc=$?
+set -e
+[ "$rc" -eq 1 ] || fail "cb-decoy-registry-ignored-allrows: expected exit 1 (decoy must have zero effect even when every row matches it), got $rc — $out"
+printf '%s\n' "$out" | grep -qF -- 'unknown-adapter' || fail "cb-decoy-registry-ignored-allrows: expected unknown-adapter, got: $out"
+pass "cb-decoy-registry-ignored-allrows"
 
 # =============================================================================
 # never sourced/evaluated (AC7): static absence + behavioral CANARY proof
