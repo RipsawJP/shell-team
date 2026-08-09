@@ -49,6 +49,13 @@
 #                                the single-row case above cannot by itself
 #                                tell "decoy consulted" apart from "decoy
 #                                ignored", since either way some row fails
+#   cb-ancestor-symlink-registry-ignored — a Codex-review-reproduced escape:
+#                                an ANCESTOR directory symlink (adopter/bin ->
+#                                the real, un-symlinked bin/), not just an
+#                                invocation-cwd decoy, must not legitimize
+#                                the adopter's registry either — the fix
+#                                this case locks is `pwd -P` at SCRIPT_DIR/
+#                                TEMPLATES_ROOT (2026-08-10 rework)
 #   cb-no-eval-source-static   — no eval/source/`.` invocation anywhere in the script
 #   cb-canary-dollar-paren     — a $(...) payload field is refused, no CANARY written
 #   cb-canary-semicolon        — a ;...; payload field is refused, no CANARY written
@@ -259,6 +266,44 @@ set -e
 [ "$rc" -eq 1 ] || fail "cb-decoy-registry-ignored-allrows: expected exit 1 (decoy must have zero effect even when every row matches it), got $rc — $out"
 printf '%s\n' "$out" | grep -qF -- 'unknown-adapter' || fail "cb-decoy-registry-ignored-allrows: expected unknown-adapter, got: $out"
 pass "cb-decoy-registry-ignored-allrows"
+
+# A Codex review round reproduced a distinct escape of the same trust
+# boundary: the two cases above only vary the invocation CWD, never the
+# checker's own installed location — the real, un-symlinked $REPO_ROOT/bin.
+# An ANCESTOR directory of the script being a symlink (an adopter's `bin/`
+# symlinked into the plugin's real `bin/`, ordinary vendoring, no hostile
+# action) is a different shape: the symlink-chasing bootstrap only follows a
+# symlink on the FINAL path component (`BASH_SOURCE[0]` itself), so it did
+# not catch this, and (before the fix) `SCRIPT_DIR`/`TEMPLATES_ROOT` were
+# derived with plain `pwd` (logical) rather than `pwd -P` (physical),
+# silently resolving inside the ADOPTER's tree. Build that exact topology:
+# `adopter/bin -> $REPO_ROOT/bin` (a directory-level symlink to the real,
+# shipped checker — not a copy) plus a decoy `adopter/templates/
+# binding-adapters.txt`, then invoke the checker THROUGH the symlinked path
+# with every role bound to the decoy's only pair (the same discriminating,
+# all-rows construction as the case above, for the same reason: a
+# single-row decoy cannot tell "consulted" from "ignored" apart, only the
+# exit code of an all-rows decoy can).
+mkdir -p "$TMP/symroot/adopter/templates" "$TMP/symroot/adopter/.shell-team"
+ln -s "$REPO_ROOT/bin" "$TMP/symroot/adopter/bin"
+[ -L "$TMP/symroot/adopter/bin" ] || fail "cb-ancestor-symlink-registry-ignored: adopter/bin was not created as a symlink"
+printf '%s\n' 'my-cli claude' > "$TMP/symroot/adopter/templates/binding-adapters.txt"
+printf '%s\n' \
+  'schema 1' \
+  'bind tech-lead claude m1 high my-cli' \
+  'bind pm-spec claude m1 - my-cli' \
+  'bind engineer claude m1 - my-cli' \
+  'bind qa-verifier claude m1 - my-cli' \
+  'bind ui-designer claude m1 - my-cli' \
+  'bind codex-reviewer claude m2 - my-cli' \
+  > "$TMP/symroot/adopter/.shell-team/binding.conf"
+set +e
+out="$(cd "$TMP/symroot/adopter" && TEAM_RUN_BASE=.shell-team bash bin/check-binding.sh 2>&1)"
+rc=$?
+set -e
+[ "$rc" -eq 1 ] || fail "cb-ancestor-symlink-registry-ignored: expected exit 1 (an ancestor-symlinked bin/ must not legitimize the adopter's decoy registry), got $rc — $out"
+printf '%s\n' "$out" | grep -qF -- 'unknown-adapter' || fail "cb-ancestor-symlink-registry-ignored: expected unknown-adapter, got: $out"
+pass "cb-ancestor-symlink-registry-ignored"
 
 # =============================================================================
 # never sourced/evaluated (AC7): static absence + behavioral CANARY proof

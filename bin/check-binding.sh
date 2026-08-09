@@ -116,9 +116,24 @@ fail_usage() { refuse usage 2 "$1"; }
 # Resolve this script's own file, following symlinks — a plugin install may
 # expose bin/ scripts on PATH via a symlink, so `dirname "$0"` alone would
 # resolve to the symlink's directory rather than this file's real location.
-# Ported verbatim (bootstrap shape) from bin/check-durability.sh, itself
-# ported from bin/check-provenance.sh (2026-06-15/2026-07-14 lesson: reuse
-# the proven symlink-safe resolver instead of hand-rolling one).
+# Ported (bootstrap shape) from bin/check-durability.sh, itself ported from
+# bin/check-provenance.sh (2026-06-15/2026-07-14 lesson: reuse the proven
+# symlink-safe resolver instead of hand-rolling one) — with one deliberate
+# departure from that ported shape: every `pwd` below is `pwd -P` (physical,
+# every symlink resolved), never the bare logical `pwd` the ported original
+# used. A T-1054 Codex review round reproduced that the loop above only
+# follows a symlink on the FINAL path component (`BASH_SOURCE[0]` itself);
+# an ANCESTOR directory being a symlink (an adopter's `bin/` symlinked into
+# the plugin's real `bin/` — ordinary vendoring, no hostile action) survived
+# a plain `cd && pwd` untouched, so `SCRIPT_DIR` silently resolved inside the
+# ADOPTER's tree, and the adapter-registry resolution below it (composed
+# from `SCRIPT_DIR`) then read the adopter's own `templates/binding-adapters.txt`
+# instead of the plugin's shipped one — defeating DP6's registry-identity
+# guarantee. `cd DIR && pwd -P` (no `-P` on `cd` itself needed) reports the
+# OS-canonical path of wherever `cd` actually landed, regardless of how many
+# symlinks — final-component or ancestor — were crossed getting there; this
+# is the same fix shape `bin/check-board-headings.sh` and
+# `bin/codex-capture.sh` already use for the identical reason.
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")" \
@@ -128,7 +143,7 @@ while [ -L "$script_path" ]; do
     *)
       link_dir_raw="$(dirname "$script_path")" \
         || fail_usage "dirname failed to resolve the directory of relative symlink target for: $script_path"
-      link_dir="$(cd "$link_dir_raw" && pwd)" \
+      link_dir="$(cd "$link_dir_raw" && pwd -P)" \
         || fail_usage "cd/pwd failed to resolve the directory of relative symlink target for: $script_path"
       script_path="$link_dir/$link_target"
       ;;
@@ -136,7 +151,7 @@ while [ -L "$script_path" ]; do
 done
 script_dir_raw="$(dirname "$script_path")" \
   || fail_usage "dirname failed to resolve this script's own directory for: $script_path"
-SCRIPT_DIR="$(cd "$script_dir_raw" && pwd)" \
+SCRIPT_DIR="$(cd "$script_dir_raw" && pwd -P)" \
   || fail_usage "cd/pwd failed to resolve this script's own directory for: $script_path"
 self_name="$(basename "$script_path")" \
   || fail_usage "basename failed to resolve this script's own file name for: $script_path"
@@ -211,10 +226,14 @@ get_path() {  # $1 = team-paths.sh --get key
 }
 
 # --- resolve + load the adapter registry (every mode reaches this point) ----
+# TEMPLATES_ROOT is composed from SCRIPT_DIR (already physical, above) with
+# `pwd -P` again here — SCRIPT_DIR is a plain string at this point, and
+# `cd "$SCRIPT_DIR/.." && pwd -P` re-canonicalizes rather than assuming the
+# one-level-up traversal itself introduces no new symlink to resolve.
 if [ -n "$ADAPTERS_ARG" ]; then
   REGISTRY="$ADAPTERS_ARG"
 else
-  TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)" \
+  TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)" \
     || fail_usage "cannot resolve the templates directory (one level above check-binding.sh's own installed directory)"
   REGISTRY="$TEMPLATES_ROOT/templates/binding-adapters.txt"
 fi
