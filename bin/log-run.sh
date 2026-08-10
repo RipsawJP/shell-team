@@ -17,11 +17,12 @@
 # NOTHING and exits 2, so the log never gains a corrupt line. Pure bash, no
 # JSON library, so it runs anywhere the other bin/ scripts do.
 #
-# Usage (span mode, unchanged):
+# Usage (span mode, unchanged plus the three T-1058 binding flags):
 #   log-run.sh <loop_id> --run-id R --seq K --span S --phase P \
 #              --iteration N --attempt A --status STATUS \
 #              [--model M] [--tokens T] [--tool-uses U] [--duration-ms D] \
-#              [--verdict V] [--usd X] [--error E] [--parent-span-id PS]
+#              [--verdict V] [--usd X] [--error E] [--parent-span-id PS] \
+#              [--provider P] [--effort E] [--adapter A]
 #
 # Usage (event mode, T-1011):
 #   log-run.sh <loop_id> --run-id R --seq K --event ID \
@@ -37,20 +38,35 @@
 #     gate     --from required, --label required
 #     human    --label required
 #     release  none required
-#   All 13 span-only flags (--span --phase --iteration --attempt --status
+#   All 16 span-only flags (--span --phase --iteration --attempt --status
 #   --model --tokens --tool-uses --duration-ms --verdict --usd --error
-#   --parent-span-id) are forbidden in event mode (exit 2, nothing written);
-#   `--from`/`--to`/`--label` are forbidden in span mode (same). `--event`
-#   together with `--span` is rejected by name.
+#   --parent-span-id --provider --effort --adapter) are forbidden in event
+#   mode (exit 2, nothing written); `--from`/`--to`/`--label` are forbidden
+#   in span mode (same). `--event` together with `--span` is rejected by name.
 #
 # Required (span mode): loop_id (positional), --run-id, --seq, --span,
 #           --phase, --iteration, --attempt, --status.
 # Nullable (span mode, omit => null in the row): --model --tokens
 #           --tool-uses --duration-ms --verdict --usd --error
-#           --parent-span-id.
+#           --parent-span-id --provider --effort --adapter.
 #
 # status  ∈ success | error | timeout | skipped | stopped
 # verdict ∈ PASS | FAIL | APPROVE | REQUEST_CHANGES   (or omit => null)
+#
+# T-1058 — the resolved binding, recorded on the span rather than discarded:
+#   --provider, --adapter ∈ a bare lower-case token, the same character class
+#     bin/check-binding.sh's ROLE_RE governs role/provider/adapter with
+#     (^[a-z][a-z0-9-]*$); a malformed value is a validation error (exit 2,
+#     nothing written) — `model` stays unvalidated and opaque, deliberately.
+#   --effort ∈ the same character class, EXCEPT the binding grammar's own and
+#     only "no value" spelling, the literal `-`: `--effort -` records
+#     `"effort":null`, never the two-character string `"-"`, because that is
+#     the row grammar's own spelling of the same fact. Any other malformed
+#     --effort value is a validation error exactly like --provider/--adapter.
+#   All three are nullable (omitted => null) and are appended AFTER
+#   `parent_span_id` in the emitted row, so the frozen seventeen keep their
+#   order and their offsets and a row written without them is byte-identical
+#   to one written before this task.
 #
 # Telemetry is observability-only: callers should treat a non-zero exit as
 # "telemetry not recorded" and carry on — it must never break the loop.
@@ -105,6 +121,7 @@ shift
 
 RUN_ID="" SEQ="" SPAN="" PHASE="" ITERATION="" ATTEMPT="" STATUS=""
 MODEL="" TOKENS="" TOOL_USES="" DURATION_MS="" VERDICT="" USD="" ERROR="" PARENT=""
+PROVIDER="" EFFORT="" ADAPTER=""
 EVENT="" FROM="" TO="" LABEL=""
 
 # Every flag actually passed on the command line, verbatim, in encounter
@@ -128,7 +145,7 @@ seen() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--event|--from|--to|--label)
+    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--provider|--effort|--adapter|--event|--from|--to|--label)
       [[ $# -ge 2 ]] || die "missing value for $1"
       SEEN+=("$1")
       case "$1" in
@@ -147,6 +164,9 @@ while [[ $# -gt 0 ]]; do
         --usd)            USD="$2" ;;
         --error)          ERROR="$2" ;;
         --parent-span-id) PARENT="$2" ;;
+        --provider)       PROVIDER="$2" ;;
+        --effort)         EFFORT="$2" ;;
+        --adapter)        ADAPTER="$2" ;;
         --event)          EVENT="$2" ;;
         --from)           FROM="$2" ;;
         --to)             TO="$2" ;;
@@ -164,14 +184,15 @@ if seen --event; then MODE="event"; else MODE="span"; fi
 [[ -n "$RUN_ID" ]] || die "missing required --run-id"
 [[ "$SEQ" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --seq (non-negative int): '${SEQ}'"
 
-SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id)
+SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id --provider --effort --adapter)
 EVENT_ONLY_FLAGS=(--from --to --label)
 
 if [[ "$MODE" == "event" ]]; then
   # D5: --event and --span are named explicitly with a frozen message; the
-  # other 12 span-only flags are rejected the same way (exit 2, nothing
-  # written) without a frozen message of their own — this mirrors D2's
-  # shape-mixing rule 1:1 rather than deferring the rejection to lint time.
+  # other 15 span-only flags (T-1058 adds --provider/--effort/--adapter to
+  # the array above) are rejected the same way (exit 2, nothing written)
+  # without a frozen message of their own — this mirrors D2's shape-mixing
+  # rule 1:1 rather than deferring the rejection to lint time.
   seen --span && die "--event and --span are mutually exclusive"
   for f in "${SPAN_ONLY_FLAGS[@]}"; do
     [[ "$f" == "--span" ]] && continue
@@ -225,6 +246,25 @@ else
       *) die "invalid --verdict '${VERDICT}' (PASS|FAIL|APPROVE|REQUEST_CHANGES)" ;;
     esac
   fi
+
+  # --- T-1058: the resolved binding (nullable) ---
+  # --provider/--adapter are bare lower-case tokens, the same character class
+  # bin/check-binding.sh's ROLE_RE governs role/provider/adapter with
+  # ('^[a-z][a-z0-9-]*$'); model stays unvalidated and opaque, deliberately
+  # (DP1). --effort shares that class EXCEPT the binding grammar's own and
+  # only "no value" spelling, the literal '-' (bin/check-binding.sh L364,
+  # where effort is the one field exempted from the token class): '--effort
+  # -' is mapped to JSON null below rather than admitting a second spelling
+  # of the same fact.
+  BINDING_TOKEN_RE='^[a-z][a-z0-9-]*$'
+  [[ -z "$PROVIDER" || "$PROVIDER" =~ $BINDING_TOKEN_RE ]] || die "invalid --provider '${PROVIDER}' (lower-case token: ^[a-z][a-z0-9-]*\$)"
+  [[ -z "$ADAPTER"  || "$ADAPTER"  =~ $BINDING_TOKEN_RE ]] || die "invalid --adapter '${ADAPTER}' (lower-case token: ^[a-z][a-z0-9-]*\$)"
+  EFFORT_OUT="$EFFORT"
+  if [[ -n "$EFFORT" && "$EFFORT" != "-" ]]; then
+    [[ "$EFFORT" =~ $BINDING_TOKEN_RE ]] || die "invalid --effort '${EFFORT}' (lower-case token, or '-' for none)"
+  elif [[ "$EFFORT" == "-" ]]; then
+    EFFORT_OUT=""   # the binding grammar's "-" spelling maps to JSON null
+  fi
 fi
 
 # Escape a string for embedding in a JSON value, PRESERVING content: backslash
@@ -274,7 +314,10 @@ else
   ROW+="$(jstr verdict "$VERDICT"),"
   ROW+="$(jnum usd "$USD"),"
   ROW+="$(jstr error "$ERROR"),"
-  ROW+="$(jstr parent_span_id "$PARENT")"
+  ROW+="$(jstr parent_span_id "$PARENT"),"
+  ROW+="$(jstr provider "$PROVIDER"),"
+  ROW+="$(jstr effort "$EFFORT_OUT"),"
+  ROW+="$(jstr adapter "$ADAPTER")"
   ROW+="}"
 fi
 

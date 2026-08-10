@@ -78,12 +78,24 @@ pass "cross-file: same run_id across two files folds to 1 block, spans summed"
 assert_out "empty: no runs found"     '\(no runs found\)'           "$FIX/empty.jsonl"
 
 # --- T-1011 AC30: an event-row-bearing input rolls up byte-identical to the
-# same run with the event rows removed — the invariance property, defended
-# here by this repo's own CI, not only by T-1011's spec `check:` lines. ---
+# SAME file with the event rows removed — the invariance property, defended
+# here by this repo's own CI, not only by T-1011's spec `check:` lines.
+# Derived from with-events.jsonl ITSELF (grep out the event rows) rather than
+# compared against the separately fixtured clean.jsonl: T-1058's `review:`
+# line prints each span's own `seq`, and with-events.jsonl's spans (seq
+# 1,3,5,7, interleaved with events) and clean.jsonl's spans (seq 1,2,3,4,
+# no events at all) are drawn from different seq sequences — comparing
+# across the two fixtures would no longer test what AC30 actually requires
+# (this script's stdout for a file == its stdout for the SAME file with
+# every event row deleted), only a coincidence that held while seq was
+# never printed. ---
 events_out="$(bash "$ROLLUP" "$FIX/with-events.jsonl" 2>/dev/null)"
-clean_out="$(bash "$ROLLUP" "$FIX/clean.jsonl" 2>/dev/null)"
-[ "$events_out" = "$clean_out" ] || fail "with-events: rollup output changed by event rows (T-1011 regression)"
-pass "with-events: event rows (T-1011) are skipped, output identical to the span-only run"
+WITHOUT_EVENTS="$(mktemp "${TMPDIR:-/tmp}/rollup-runs-without-events.XXXXXX")" || fail "mktemp failed"
+grep -v -- '"kind":"event"' "$FIX/with-events.jsonl" > "$WITHOUT_EVENTS"
+without_events_out="$(bash "$ROLLUP" "$WITHOUT_EVENTS" 2>/dev/null)"
+rm -f "$WITHOUT_EVENTS"
+[ "$events_out" = "$without_events_out" ] || fail "with-events: rollup output changed by event rows (T-1011 regression)"
+pass "with-events: event rows (T-1011) are skipped, output identical to the same file with event rows removed"
 
 # --- T-1021: a leading-zero numeric field must not silently re-base -------
 # Scratch rows are written under a temp dir (never checked in as new
@@ -111,6 +123,75 @@ grep -qE 'tokens: 8( |$)' <<< "$out_08" \
 grep -q 'value too great for base' "$ERRTMP" \
   && fail "T-1021-rollup-runs-tokens (zero-fixture=08): leaked bash's raw arithmetic error"
 pass "T-1021-rollup-runs-tokens (zero-fixture=08): sums as 8 with no raw arithmetic error"
+
+# =====================================================================
+# T-1058: the resolved binding — "providers:" and "review:" are ALWAYS
+# printed (never omitted), derived per reviewer span (never a per-run
+# boolean), over the closed three-member outcome set. Scratch rows only
+# (never checked in as new fixture files, matching the T-1021 idiom above).
+# =====================================================================
+T1058_TMP="$(mktemp -d "${TMPDIR:-/tmp}/t1058-rollup.XXXXXX")"
+# Re-declares the EXIT trap to cover BOTH scratch dirs (a second `trap ... EXIT`
+# replaces, never adds to, the first) — both variables are already set by the
+# time this trap actually fires.
+trap 'rm -rf "$T1021_TMP" "$T1058_TMP"' EXIT
+
+# bindrow <seq> <span> <provider-or-empty> — a minimal span row; an empty
+# provider omits the key entirely ("this row does not say", same as a
+# legacy pre-T-1058 row or an explicit JSON null under field_str's reading).
+bindrow() {
+  local seq="$1" span="$2" prov="$3" extra=""
+  [ -n "$prov" ] && extra=",\"provider\":\"$prov\",\"effort\":null,\"adapter\":\"a1\""
+  printf '{"loop_id":"shell-team","run_id":"RUN-BIND","seq":%s,"ts":"2026-08-01T00:00:0%sZ","span":"%s","phase":"p","iteration":1,"attempt":1,"status":"success","model":null,"tokens":null,"tool_uses":null,"duration_ms":null,"verdict":null,"usd":null,"error":null,"parent_span_id":null%s}\n' \
+    "$seq" "$seq" "$span" "$extra"
+}
+
+CROSS="$T1058_TMP/cross.jsonl"
+{ bindrow 1 engineer claude; bindrow 2 codex-reviewer codex; } > "$CROSS"
+assert_out "T-1058-provider-relation: cross-provider"    'review: codex-reviewer#2=cross-provider' "$CROSS"
+assert_out "T-1058-provider-relation: providers counted" 'providers: claude=1 codex=1'              "$CROSS"
+
+SAME="$T1058_TMP/same.jsonl"
+{ bindrow 1 engineer claude; bindrow 2 codex-reviewer claude; } > "$SAME"
+assert_out "T-1058-provider-relation: same-provider is a legitimate outcome" \
+  'review: codex-reviewer#2=same-provider' "$SAME"
+
+LEGACY="$T1058_TMP/legacy.jsonl"
+{ bindrow 1 engineer ''; bindrow 2 codex-reviewer ''; } > "$LEGACY"
+legacy_out="$(bash "$ROLLUP" "$LEGACY" 2>/dev/null)"
+grep -qF -- 'review: codex-reviewer#2=undetermined' <<< "$legacy_out" \
+  || fail "T-1058-provider-relation: legacy rows (no binding fields) should be undetermined"
+grep -qF -- 'providers: (none)' <<< "$legacy_out" \
+  || fail "T-1058-provider-relation: legacy rows should print providers: (none)"
+[ "$(grep -c 'same-provider\|cross-provider' <<< "$legacy_out" || true)" -eq 0 ] \
+  || fail "T-1058-provider-relation: legacy-only rows must never claim same-provider/cross-provider"
+pass "T-1058-provider-relation: legacy (no binding fields) rows are undetermined, never same/cross-provider"
+
+NOREV="$T1058_TMP/noreviewer.jsonl"
+bindrow 1 engineer claude > "$NOREV"
+assert_out "T-1058-provider-relation: no reviewer span -> review: (none)" 'review: \(none\)' "$NOREV"
+
+MIXED_PARTIAL="$T1058_TMP/mixed-partial.jsonl"
+{ bindrow 1 engineer claude; bindrow 2 codex-reviewer ''; } > "$MIXED_PARTIAL"
+assert_out "T-1058-provider-relation: one side unrecorded -> providers (partial)" \
+  'providers: claude=1 \(partial\)' "$MIXED_PARTIAL"
+
+# Three review rounds interleaved with three implementation rounds — the
+# per-reviewer-span shape (never a per-run boolean): exactly 3 tokens, at
+# least 2 distinct outcomes.
+THREE="$T1058_TMP/three-rounds.jsonl"
+{
+  bindrow 1 engineer claude; bindrow 2 codex-reviewer codex
+  bindrow 3 engineer claude; bindrow 4 codex-reviewer claude
+  bindrow 5 engineer '';     bindrow 6 codex-reviewer codex
+} > "$THREE"
+three_out="$(bash "$ROLLUP" "$THREE" 2>/dev/null)"
+review_line="$(sed -n 's/^ *review: //p' <<< "$three_out")"
+n_tokens="$(tr ' ' '\n' <<< "$review_line" | grep -c '=' || true)"
+[ "$n_tokens" -eq 3 ] || fail "T-1058-provider-relation: three-round run expected 3 review tokens, got $n_tokens ($review_line)"
+n_distinct="$(tr ' ' '\n' <<< "$review_line" | sed 's/^.*=//' | grep . | LC_ALL=C sort -u | grep -c . || true)"
+[ "$n_distinct" -ge 2 ] || fail "T-1058-provider-relation: three-round run expected >=2 distinct outcomes, got $n_distinct ($review_line)"
+pass "T-1058-provider-relation: three review rounds -> 3 per-span tokens, >=2 distinct outcomes"
 
 # --- usage errors ---
 assert_rc "no args -> 2"          2

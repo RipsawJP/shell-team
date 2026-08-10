@@ -327,5 +327,20 @@ assert_line "--line event missing required from -> 1" 1 \
   '{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","kind":"event","event":"handoff","from":null,"to":"implement","label":null}' \
   "requires non-null from"
 
+# =====================================================================
+# T-1058: the resolved binding — `provider`/`effort`/`adapter` are span-only
+# keys (never required), reported by name on an event row exactly like the
+# original 13, and tolerated as extra on a span row (no closed vocabulary).
+# =====================================================================
+
+BINDING_SPAN_LINE='{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","span":"engineer","phase":"implement","iteration":1,"attempt":1,"status":"success","model":"m","tokens":null,"tool_uses":null,"duration_ms":null,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":"high","adapter":"claude-cli"}'
+assert_line "--line span row carrying provider/effort/adapter -> 0" 0 "$BINDING_SPAN_LINE"
+
+for k in provider effort adapter; do
+  assert_line "--line event row carrying span-only key \"$k\" -> 1" 1 \
+    "$(printf '%s' "$EVENT_HANDOFF_LINE" | sed "s/}\$/,\"$k\":\"x\"}/")" \
+    "event row carries span-only key\\(s\\): $k"
+done
+
 printf 'OK\n'
 exit 0

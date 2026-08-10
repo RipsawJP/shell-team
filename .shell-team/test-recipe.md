@@ -698,3 +698,26 @@ that file's order.
   `cb-ancestor-symlink-registry-ignored` (an `adopter/bin -> $REPO_ROOT/bin`
   directory symlink, plus a decoy in the adopter's own `templates/`, that
   must have zero effect on which shipped file the checker actually reads).
+- T-1058: no new CI wiring needed — `bin/log-run.sh`, `bin/check-run.sh` and
+  `bin/rollup-runs.sh`, and their three suites (`tests/log-run/run.sh`,
+  `tests/check-run/run.sh`, `tests/rollup-runs/run.sh`), were already in
+  `.github/workflows/check-handoff.yml`'s shellcheck argument list and each
+  already had its own `bash tests/<suite>/run.sh` step, confirmed by
+  targeted search before touching anything (this task adds no `bin/` file,
+  no test suite, and makes no workflow edit). `bash tests/log-run/run.sh`,
+  `bash tests/check-run/run.sh` and `bash tests/rollup-runs/run.sh` run the
+  same way as every other suite here: pure bash + coreutils, no
+  prerequisite build, `${TMPDIR:-/tmp}` scratch space. One regression trap
+  worth recording for the next task that touches `bin/rollup-runs.sh`'s
+  stdout shape: `tests/rollup-runs/run.sh`'s pre-existing T-1011 AC30 check
+  used to compare `with-events.jsonl`'s roll-up output byte-for-byte
+  against the SEPARATELY fixtured `clean.jsonl`'s output — a comparison
+  that only worked because `rollup-runs.sh` never printed a row's own
+  `seq` anywhere; the two fixtures' span rows carry genuinely different
+  `seq` values (1/3/5/7 vs 1/2/3/4). The moment any output line prints
+  `seq` (this task's `review: <span>#<seq>=<relation>` line does), that
+  comparison must be rewritten to derive the "no events" side from the
+  SAME file (`grep -v -- '"kind":"event"' "$FIX/with-events.jsonl"`),
+  never from a different fixture — the shape `bin/log-run.sh`'s own
+  header and this task's AC5 check already use for the identical
+  invariance property.

@@ -19,7 +19,9 @@
 #       loop_id, run_id, seq, ts, kind, event
 #     `event` is in its closed 5-member enum (handoff|rework|gate|human|
 #     release), and per-event-id required fields (from/to/label) must be
-#     present and non-null (D3's table). None of the 13 span-only keys may
+#     present and non-null (D3's table). None of the 16 span-only keys
+#     (T-1058 adds `provider`, `effort`, `adapter` — the resolved binding,
+#     never required, reported by name exactly like the original 13) may
 #     appear on an event row (shape mixing, D2).
 #
 # This is a STRUCTURAL lint, not a full JSON parser: `log-run.sh` is the single
@@ -46,7 +48,7 @@ set -euo pipefail
 
 REQUIRED_KEYS=(loop_id run_id seq ts span phase iteration attempt status)
 REQUIRED_EVENT_KEYS=(loop_id run_id seq ts kind event)
-SPAN_ONLY_KEYS=(span phase iteration attempt status model tokens tool_uses duration_ms verdict usd error parent_span_id)
+SPAN_ONLY_KEYS=(span phase iteration attempt status model tokens tool_uses duration_ms verdict usd error parent_span_id provider effort adapter)
 
 violations=0
 # LABEL is the display prefix for emit() ("<file>" in file mode, "<line>" in
