@@ -31,6 +31,20 @@ component passes and gets back, not a payload anything here constructs.
 
 - boundary: The task envelope is a documented contract for what adapters receive and return, not a new serialization protocol: the substrate (files and the board) remains the actual interchange.
 
+A cross-provider review round (v1 → v2) reproduced four contract-design
+gaps a fail-closed checker cannot patch its way out of, each resolved
+definitionally rather than by adding an ad hoc check: `carries` now
+declares a value's return path and never an authority to act, with the
+`board` channel retired (DP13, below); `status` gets a machine-checkable
+vocabulary, `status-value` (DP14, below); the plugin-shipped adapter
+allowlist (`templates/binding-adapters.txt`) is validated at full parity
+with `bin/check-binding.sh`'s own reading of that same file, reusing that
+checker's own tokens (DP15 — the fix for round 1's Blocker); and the two
+shipped contract forms — this document and the registry — are held in
+agreement **by the checker itself**, via a new `--doc [PATH]` mode, rather
+than by a spec-check-time comparison that could quietly drift between
+rounds (DP16).
+
 ## The generalized invocation pattern
 
 Every adapter generalizes one pattern this repository already runs:
@@ -59,52 +73,147 @@ invocation and never a second implementation of the same mapping.
 Fourteen fields. Direction is stated from the **adapter's** point of view:
 `in` is what an adapter receives, `out` is what it returns. A conditional
 field is always declared (never silently absent from the contract); its
-condition is stated on its own line below.
+condition is stated on its own line below, as the literal phrase
+`required when`. Each field's own bullet below is machine-checked
+(`bin/check-adapter.sh --doc`): its direction/requiredness tuple must match
+`templates/task-envelope.txt`'s row for that field, byte for byte, and this
+is what closed a real, reproduced drift (round 1: this section's own
+`task-id` bullet was flipped from `in` to `out` with the registry left
+unchanged, and nothing before v2 caught it).
 
-- **task-id** (in, required): the `T-NNN` this invocation serves.
-- **role** (in, required): which of the six inner-loop roles is being run.
-- **phase** (in, required): which loop phase this invocation serves.
-- **request** (in, required): the work statement handed to the executor.
-- **artifact-paths** (in, required): the operating paths the role reads and
-  writes, as already resolved by the orchestrator — never re-derived by the
-  adapter itself.
-- **working-dir** (in, required): the repository root the invocation runs
-  in.
-- **resolved-binding** (in, required): the bound row for this role —
+- **task-id** — in, required — the `T-NNN` this invocation serves.
+- **role** — in, required — which of the six inner-loop roles is being run.
+- **phase** — in, required — which loop phase this invocation serves.
+- **request** — in, required — the work statement handed to the executor.
+- **artifact-paths** — in, required — the operating paths the role reads
+  and writes, as already resolved by the orchestrator — never re-derived
+  by the adapter itself.
+- **working-dir** — in, required — the repository root the invocation
+  runs in.
+- **resolved-binding** — in, required — the bound row for this role:
   provider, model, effort, adapter — exactly as `bin/check-binding.sh
   --print-binding` resolves it.
-- **status** (out, required): whether the invocation completed, from the
-  contract's closed status vocabulary (a success token, a refusal token, and
-  an error token — see `## Notes for engineer` in the spec for the suggested
-  shape; this cut does not freeze the status vocabulary's membership).
-- **verdict** (out, conditional): required when the role's phase produces
-  one (a `PASS`/`FAIL`, an `APPROVE`/`REQUEST_CHANGES`) — absent for a phase
-  whose role reports no such token (e.g. an engineer's implementation pass).
-- **produced-artifacts** (out, required): the paths the invocation wrote.
+- **status** — out, required — whether the invocation completed, from the
+  contract's closed `status-value` vocabulary (`templates/task-envelope.txt`'s
+  own directive — see `## The status vocabulary` below; exactly one member
+  is marked `success`).
+- **verdict** — out, conditional — required when the role's phase produces
+  one (a `PASS`/`FAIL`, an `APPROVE`/`REQUEST_CHANGES`); absent for a phase
+  whose role reports no such token (e.g. an engineer's implementation
+  pass).
+- **produced-artifacts** — out, required — the paths the invocation wrote.
   The envelope names them; it never carries their content.
-- **board-transition** (out, conditional): required when the role's own
+- **board-transition** — out, conditional — required when the role's own
   `role-board-authority` is `writes` or `proposes`, absent when it is
-  `none`. For a `writes` role the field records what the role itself already
-  wrote to the board; for a `proposes` role it is a **request** the
-  orchestrator transcribes, never an act the adapter performs on the
-  board's behalf.
-- **usage** (out, required): the resource accounting the executor reported.
-  Where the executor reports none, the adapter says so explicitly rather
-  than omitting the field — an envelope always carries a `usage` value, even
-  when that value is "none reported."
-- **error-class** (out, conditional): required when `status` is not the
+  `none`. Its `carries` channel declares only where this field's OWN VALUE
+  travels — never who may act on it (DP13, `## Carries declares a return
+  path, never an authority` below). For a `writes` role the field records
+  what the role itself already wrote to the board; for a `proposes` role
+  it is a **request** the orchestrator transcribes, never an act the
+  adapter performs on the board's behalf.
+- **usage** — out, required — the resource accounting the executor
+  reported. Where the executor reports none, the adapter says so
+  explicitly rather than omitting the field — an envelope always carries a
+  `usage` value, even when that value is "none reported."
+- **error-class** — out, conditional — required when `status` is not the
   success value, from the contract's closed error-class vocabulary.
-- **adapter-version** (out, required): the version of the adapter
+- **adapter-version** — out, required — the version of the adapter
   *definition* that actually ran — read from the definition file itself
   (`templates/adapters/<token>.txt`'s own `adapter-version` line), not
   something the executor process reports back.
 
+```
+<!-- BEGIN contract-canon -->
+schema 1
+field adapter-version out required
+field artifact-paths in required
+field board-transition out conditional
+field error-class out conditional
+field phase in required
+field produced-artifacts out required
+field request in required
+field resolved-binding in required
+field role in required
+field status out required
+field task-id in required
+field usage out required
+field verdict out conditional
+field working-dir in required
+channel argv
+channel exit-status
+channel file
+channel not-carried
+channel prompt
+channel stderr
+channel stdin
+channel stdout
+status-value error failure
+status-value ok success
+status-value refused failure
+error-class capability-unsupported
+error-class contract-violation
+error-class executor-unavailable
+error-class invocation-failed
+effort-mechanism cli-config-override
+effort-mechanism cli-flag
+effort-mechanism none
+role-board-authority codex-reviewer proposes
+role-board-authority engineer writes
+role-board-authority pm-spec writes
+role-board-authority qa-verifier writes
+role-board-authority tech-lead none
+role-board-authority ui-designer none
+<!-- END contract-canon -->
+```
+
+The block above is regenerated, never hand-edited: `bash
+bin/check-adapter.sh --print-contract` redirected between the two marker
+lines. `bin/check-adapter.sh --doc` requires it byte-identical to that
+command's live output — this is the **table-level** half of DP16's
+agreement, covering every directive (including one a later task adds) with
+no parser to extend; the **tuple-level** half is each field's own bullet
+above, checked independently.
+
+## Carries declares a return path, never an authority (DP13)
+
+Round 1 reproduced a category error in the v1 cut: `role-board-authority` is
+**role**-scoped (which of the six roles may write, propose or request
+nothing), while `carries` is **adapter**-scoped (what an adapter's own
+invocation shape can return) — and nothing in `bin/check-binding.sh`'s
+grammar restricts which role may bind to which adapter (only the
+provider/adapter pairing is checked). `templates/adapters/claude-cli.txt`
+declared `carries board-transition board` unconditionally in v1, which
+read as "this adapter writes the board itself" — wrong for a `proposes`
+role (`codex-reviewer`) legally bound to it, since that role must never
+write the board directly.
+
+The fix is definitional, not a new check bolted on: **a `carries <field>
+<channel>` row states which part of the existing substrate the field's own
+VALUE travels on between the orchestrator and the executor, and states
+nothing about who may act on it.** Whether the board is actually written
+during a given invocation is decided **solely** by the bound role's
+`role-board-authority` row (below) — never by any adapter's channel
+declaration. Making the wrong state unrepresentable is preferred here over
+detecting it after the fact, which is why the `board` channel token —
+which named an action rather than a path — is **retired** from the
+contract's channel vocabulary entirely, rather than kept and cross-checked
+against role authority everywhere it might appear.
+
+One genuine join does remain, and **is** enforced, because `--binding`
+(`bin/check-adapter.sh`) is the one mode that knows the role and the
+adapter together: `board-transition` is a *conditional* field, so
+`carries board-transition not-carried` stays legal in general (an adapter
+through which no transition ever returns) — but binding a role whose
+authority is `writes` or `proposes` to such an adapter is a contradiction
+the contract can see (the role must produce a transition, and the adapter
+declares no path for it), and is refused `authority-channel-conflict`.
+
 ## The channel vocabulary
 
 A `carries <field> <channel>` row in an adapter definition claims which part
-of the existing substrate carries that field for that adapter — never an
-instruction to execute anything. The channels `templates/task-envelope.txt`
-declares:
+of the existing substrate a field's VALUE travels on for that adapter —
+never an instruction to execute anything, and never a claim about who may
+act (above). The channels `templates/task-envelope.txt` declares:
 
 | Channel | What it names |
 |---|---|
@@ -114,9 +223,33 @@ declares:
 | `stdout` | the executor's standard output (its final answer, in a headless/print invocation) |
 | `stderr` | the executor's standard error stream |
 | `file` | a file the executor reads from or writes to (a captured output, a review record, the definition file itself) |
-| `board` | the literal, git-tracked task board (`bin/team-paths.sh --get todo`) |
 | `exit-status` | the executor process's exit code |
 | `not-carried` | this field is not carried by this adapter at all |
+
+There is deliberately no `board` channel (above) — a v1 row of that name is
+retired in v2 and must not be reintroduced; `bin/check-adapter.sh --print-contract`
+asserts its absence.
+
+## The status vocabulary (DP14)
+
+The `status` field's closed vocabulary now has a machine-checkable form:
+`templates/task-envelope.txt`'s `status-value <token> <success|failure>`
+directive. Exactly one row is marked `success`; at least one is marked
+`failure` — `error-class` is required exactly when `status` is not the
+success value, so "which token means success" cannot be left as a
+convention nobody encodes. The shipped set:
+
+| Token | Kind | What it means |
+|---|---|---|
+| `ok` | success | the invocation completed and every required `out` field is present. |
+| `refused` | failure | the invocation completed, but the executor's own request or content was rejected — a content-level failure, not an infrastructure one. |
+| `error` | failure | the invocation could not complete at all — an infrastructure or environment failure, distinct from a content refusal. |
+
+None of this set's membership is frozen (only the shape — closed,
+declared here, exactly one `success` — is); a later task that finds it
+needs a different or finer-grained set edits this registry, and
+`bin/check-adapter.sh --doc` immediately proves the document and the
+registry still agree.
 
 ## Board-transition authority
 
@@ -228,6 +361,11 @@ effort value it cannot honour returns `status` non-success with
 `error-class capability-unsupported` and invokes nothing — the error class
 already exists in this contract's vocabulary so that task does not have to
 invent one.
+
+A second, unrelated static check lives in the same `--binding` mode:
+`authority-channel-conflict` (DP13, above) — a role whose board-transition
+authority is `writes` or `proposes` bound to an adapter that declares no
+return path for `board-transition` at all.
 
 ## Telemetry readiness
 

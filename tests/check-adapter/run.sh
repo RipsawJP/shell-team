@@ -277,6 +277,73 @@ assert_case ca-definitions-unreadable-empty-dir 2 'definitions-unreadable' --con
 
 assert_case ca-definition-missing 2 'definition-missing' --contract "$GOLD_CONTRACT" --definitions "$GOLD_DEFS" --adapter not-a-real-adapter
 
+d="$TMP/d-setcompleteness"; mkdir -p "$d"
+cp "$GOLD_DEFS/claude-cli.txt" "$d/"
+assert_case ca-set-completeness-definition-missing 2 'definition-missing' --contract "$GOLD_CONTRACT" --definitions "$d"
+
+# =============================================================================
+# adapter allowlist parity (DP15/R1): a scratch TREE, not just --contract/
+# --definitions overrides — the allowlist has no override flag by design
+# (DP9), so bin/ and templates/ are copied together so both this checker
+# and (where used) check-binding.sh resolve the SAME $SCRIPT_DIR-relative
+# allowlist, matching AC18's own method.
+# =============================================================================
+scratch_tree() {  # $1 = new scratch tree root; copies real bin/ + templates/
+  mkdir -p "$1"
+  cp -R "$REPO_ROOT/bin" "$1/bin"
+  cp -R "$REPO_ROOT/templates" "$1/templates"
+}
+
+# The adapter allowlist has no override flag (DP9/DP15), so it ONLY ever
+# resolves from a checker's OWN installed directory — invoking the real
+# $CHECKER with --contract/--definitions overrides never touches it. Every
+# case in this block therefore invokes the SCRATCH TREE's own copy of the
+# script ("$st/bin/check-adapter.sh"), never $CHECKER, so its own
+# $SCRIPT_DIR-relative resolution actually reaches the mutated file.
+st="$TMP/tree-registry"; scratch_tree "$st"
+STCHECKER="$st/bin/check-adapter.sh"
+RA="$st/templates/binding-adapters.txt"
+cp "$RA" "$TMP/reg.bak"
+
+bash "$STCHECKER" >/dev/null 2>&1 \
+  || fail "ca-registry-parity-positive-control: pristine scratch tree does not validate before any corruption"
+
+assert_registry_case() {  # <id> <want-rc> <want-token>
+  local id="$1" want_rc="$2" want_token="$3" out rc
+  set +e
+  out="$(bash "$STCHECKER" 2>&1)"
+  rc=$?
+  set -e
+  [ "$rc" -eq "$want_rc" ] || fail "$id: expected exit $want_rc, got $rc — output: $out"
+  printf '%s\n' "$out" | grep -qF -- "$want_token" || fail "$id: expected token '$want_token', got: $out"
+  pass "$id"
+}
+
+rm -f "$RA"
+assert_registry_case ca-registry-unreadable-missing 2 'registry-unreadable'
+cp "$TMP/reg.bak" "$RA"
+
+{ cat "$TMP/reg.bak"; printf '%s\n' 'claude-cli claude extra-junk'; } > "$RA"
+cmp -s "$TMP/reg.bak" "$RA" && fail "ca-registry-malformed-extra-token: mutated registry is byte-identical to the pristine one"
+assert_registry_case ca-registry-malformed-extra-token 2 'registry-malformed'
+cp "$TMP/reg.bak" "$RA"
+
+{ cat "$TMP/reg.bak"; printf '%s\n' 'ZZZCLI claude'; } > "$RA"
+cmp -s "$TMP/reg.bak" "$RA" && fail "ca-registry-malformed-badtoken: mutated registry is byte-identical to the pristine one"
+assert_registry_case ca-registry-malformed-badtoken 2 'registry-malformed'
+cp "$TMP/reg.bak" "$RA"
+
+{ cat "$TMP/reg.bak"; printf '%s\n' 'claude-cli codex'; } > "$RA"
+cmp -s "$TMP/reg.bak" "$RA" && fail "ca-registry-malformed-duplicate: mutated registry is byte-identical to the pristine one"
+assert_registry_case ca-registry-malformed-duplicate 2 'registry-malformed'
+cp "$TMP/reg.bak" "$RA"
+
+# positive control: the pristine scratch tree still validates 0 after every
+# corruption above has been reverted — proves the reverts themselves applied
+bash "$STCHECKER" >/dev/null 2>&1 \
+  || fail "ca-registry-parity-positive-control: pristine scratch tree does not validate after reverts"
+pass "ca-registry-parity-positive-control"
+
 # =============================================================================
 # definition grammar refusals (exit 1)
 # =============================================================================
@@ -359,6 +426,42 @@ mkdef "$d/claude-cli.txt" claude-cli claude supported zzz-not-a-mechanism high
 assert_case ca-unknown-effort-mechanism 1 'unknown-effort-mechanism' --contract "$GOLD_CONTRACT" --definitions "$d" --adapter claude-cli
 
 # =============================================================================
+# widened field-coverage-gap (DP14/R5): a required field on not-carried
+# =============================================================================
+d="$TMP/d-notcarried-required"; scratch_defs "$d"
+sed -E 's/^carries task-id .*/carries task-id not-carried/' "$GOLD_DEFS/claude-cli.txt" > "$d/claude-cli.txt"
+cmp -s "$GOLD_DEFS/claude-cli.txt" "$d/claude-cli.txt" && fail "ca-field-coverage-gap-required-not-carried: mutated definition is byte-identical to the shipped one"
+assert_case ca-field-coverage-gap-required-not-carried 1 'field-coverage-gap' --contract "$GOLD_CONTRACT" --definitions "$d" --adapter claude-cli
+
+# =============================================================================
+# status-value directive (DP14/R8): contract-incomplete + contract-malformed
+# =============================================================================
+c="$TMP/status-no-rows.txt"; grep -v '^status-value ' "$GOLD_CONTRACT" > "$c"
+assert_case ca-contract-incomplete-no-status-values 2 'contract-incomplete' --contract "$c"
+
+c="$TMP/status-no-success.txt"; sed 's/^status-value ok success$/status-value ok failure/' "$GOLD_CONTRACT" > "$c"
+cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-contract-incomplete-no-success: mutated contract is byte-identical to the shipped one"
+assert_case ca-contract-incomplete-no-success 2 'contract-incomplete' --contract "$c"
+
+c="$TMP/status-two-success.txt"; { cat "$GOLD_CONTRACT"; printf '%s\n' 'status-value zzzsecond success'; } > "$c"
+assert_case ca-contract-incomplete-two-success 2 'contract-incomplete' --contract "$c"
+
+c="$TMP/status-bad-kind.txt"; sed 's/^status-value ok success$/status-value ok sideways/' "$GOLD_CONTRACT" > "$c"
+cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-contract-malformed-bad-status-kind: mutated contract is byte-identical to the shipped one"
+assert_case ca-contract-malformed-bad-status-kind 2 'contract-malformed' --contract "$c"
+
+c="$TMP/schema-unsupported.txt"; sed 's/^schema 1$/schema 99/' "$GOLD_CONTRACT" > "$c"
+cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-contract-malformed-schema-unsupported: mutated contract is byte-identical to the shipped one"
+assert_case ca-contract-malformed-schema-unsupported 2 'contract-malformed' --contract "$c"
+
+# board channel retired (DP13): the shipped contract's own printed form
+# never declares it — a static, non-mutated assertion
+out_pc="$(bash "$CHECKER" --contract "$GOLD_CONTRACT" --print-contract 2>/dev/null)"
+n_board="$(printf '%s\n' "$out_pc" | grep -c '^channel board$' || true)"
+[ "$n_board" = "0" ] || fail "ca-board-channel-retired: the shipped contract still declares a 'board' channel"
+pass "ca-board-channel-retired"
+
+# =============================================================================
 # --binding mode: effort fail-closed (AC6) and delegation refusal (AC7)
 # =============================================================================
 mk_binding_cfg() {  # $1 outfile ; $2 tech-lead-effort ; $3 codex-reviewer-effort
@@ -412,6 +515,80 @@ binding_invalid_case ca-binding-invalid-no-schema "$b2"
 
 b3="$TMP/b3.conf"; sed 's/^bind pm-spec claude m1 - claude-cli$/bind pm-spec claude m1 claude-cli/' "$okcfg" > "$b3"
 binding_invalid_case ca-binding-invalid-wrong-fieldcount "$b3"
+
+# =============================================================================
+# authority-channel-conflict (DP13/R9): the one role/adapter join --binding
+# alone can see — a writes/proposes role bound to an adapter that declares
+# no board-transition return path
+# =============================================================================
+bd2="$TMP/binding-defs-conflict"; mkdir -p "$bd2"
+mkdef "$bd2/claude-cli.txt" claude-cli claude supported cli-flag high
+mkdef "$bd2/codex-cli.txt" codex-cli codex unsupported none ""
+sed -E 's/^carries board-transition .*/carries board-transition not-carried/' "$bd2/codex-cli.txt" > "$TMP/codex-nc.txt"
+cmp -s "$bd2/codex-cli.txt" "$TMP/codex-nc.txt" && fail "ca-authority-channel-conflict: mutated definition is byte-identical to the generated one"
+mv "$TMP/codex-nc.txt" "$bd2/codex-cli.txt"
+cfg5="$TMP/cfg-authority-conflict.conf"; mk_binding_cfg "$cfg5" - -
+assert_case ca-authority-channel-conflict 1 'authority-channel-conflict' --contract "$GOLD_CONTRACT" --definitions "$bd2" --binding "$cfg5"
+
+# a role whose authority is `none` (tech-lead/ui-designer) is NOT in
+# conflict with the same not-carried declaration — positive control
+# proving this is a role-authority join, not a blanket ban on the value.
+# Only the two `none`-authority roles are bound to the mutated (not-carried)
+# claude-cli; every writes/proposes role is bound to the unmutated codex-cli
+# instead, so a conflict here would prove the join fires on VALUE alone.
+bd3="$TMP/binding-defs-none-authority"; mkdir -p "$bd3"
+mkdef "$bd3/claude-cli.txt" claude-cli claude supported cli-flag high
+sed -E 's/^carries board-transition .*/carries board-transition not-carried/' "$bd3/claude-cli.txt" > "$TMP/claude-nc.txt"
+mv "$TMP/claude-nc.txt" "$bd3/claude-cli.txt"
+mkdef "$bd3/codex-cli.txt" codex-cli codex unsupported none ""
+cfg6="$TMP/cfg-none-authority.conf"
+printf '%s\n' \
+  'schema 1' \
+  'bind tech-lead claude m1 - claude-cli' \
+  'bind ui-designer claude m1 - claude-cli' \
+  'bind pm-spec codex m2 - codex-cli' \
+  'bind engineer codex m2 - codex-cli' \
+  'bind qa-verifier codex m2 - codex-cli' \
+  'bind codex-reviewer codex m2 - codex-cli' \
+  > "$cfg6"
+assert_case ca-authority-channel-conflict-none-authority-ok 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$bd3" --binding "$cfg6"
+
+# =============================================================================
+# --binding delegated-shape re-assertion (R6): a stub sibling whose
+# canonical output has the wrong SHAPE (too few bound rows, or a blank line
+# in the middle) — a scratch TREE, since the re-assertion targets the
+# script's own SCRIPT_DIR-relative sibling resolution
+# (bash "$SCRIPT_DIR/check-binding.sh"), not the --definitions override
+# =============================================================================
+st2="$TMP/tree-stub"; scratch_tree "$st2"
+bash "$st2/bin/check-adapter.sh" --binding "$okcfg" >/dev/null 2>&1 \
+  || fail "ca-binding-invalid-truncated-shape: pristine scratch tree with the REAL sibling does not validate first"
+
+printf '%s\n' '#!/usr/bin/env bash' \
+  'printf "%s\n" "schema 1" "bound tech-lead claude m1 - claude-cli" "bound pm-spec claude m1 - claude-cli"' \
+  'exit 0' > "$st2/bin/check-binding.sh"
+chmod 755 "$st2/bin/check-binding.sh"
+set +e
+out="$(bash "$st2/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-truncated")"
+rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "ca-binding-invalid-truncated-shape: expected exit 2, got $rc"
+grep -q -- 'binding-invalid' "$TMP/e-truncated" || fail "ca-binding-invalid-truncated-shape: expected binding-invalid, got: $(cat "$TMP/e-truncated")"
+[ -z "$out" ] || fail "ca-binding-invalid-truncated-shape: expected zero stdout bytes, got: $out"
+pass "ca-binding-invalid-truncated-shape"
+
+printf '%s\n' '#!/usr/bin/env bash' \
+  'printf "%s\n" "schema 1" "bound tech-lead claude m1 - claude-cli" "" "bound pm-spec claude m1 - claude-cli" "bound engineer claude m1 - claude-cli" "bound qa-verifier claude m1 - claude-cli" "bound ui-designer claude m1 - claude-cli" "bound codex-reviewer codex m2 - codex-cli"' \
+  'exit 0' > "$st2/bin/check-binding.sh"
+chmod 755 "$st2/bin/check-binding.sh"
+set +e
+out="$(bash "$st2/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-blank")"
+rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "ca-binding-invalid-blank-line: expected exit 2, got $rc"
+grep -q -- 'binding-invalid' "$TMP/e-blank" || fail "ca-binding-invalid-blank-line: expected binding-invalid, got: $(cat "$TMP/e-blank")"
+[ -z "$out" ] || fail "ca-binding-invalid-blank-line: expected zero stdout bytes, got: $out"
+pass "ca-binding-invalid-blank-line"
 
 # =============================================================================
 # usage refusals (exit 2)
@@ -481,6 +658,7 @@ c="$TMP/scrambled.txt"
   grep '^role-board-authority ' "$GOLD_CONTRACT"
   grep '^effort-mechanism ' "$GOLD_CONTRACT"
   grep '^error-class ' "$GOLD_CONTRACT"
+  grep '^status-value ' "$GOLD_CONTRACT"
   grep '^channel ' "$GOLD_CONTRACT"
   grep '^field ' "$GOLD_CONTRACT"
   grep '^schema ' "$GOLD_CONTRACT"
@@ -527,5 +705,45 @@ set -e
 [ "$rc" -eq 1 ] || fail "ca-definitions-dir-unknown-file: expected exit 1, got $rc"
 printf '%s\n' "$out" | grep -qF -- 'unknown-adapter' || fail "ca-definitions-dir-unknown-file: expected unknown-adapter, got: $out"
 pass "ca-definitions-dir-unknown-file"
+
+# =============================================================================
+# --doc mode (R7/DP16): the two contract forms held in agreement BY THE
+# CHECKER, at table level (canon region) and tuple level (per-field
+# direction/requiredness), proved non-vacuous by mutation
+# =============================================================================
+DOC="$REPO_ROOT/docs/loop-engineering/task-envelope.md"
+assert_case ca-doc-valid 0 'valid' --doc "$DOC"
+
+assert_case ca-doc-unreadable 2 'doc-unreadable' --doc "$TMP/no-such-doc.md"
+
+doc_mut() {  # <id> <mutated-doc-path>
+  local id="$1" docpath="$2"
+  cmp -s "$DOC" "$docpath" && fail "$id: mutated document is byte-identical to the shipped one"
+  assert_case "$id" 1 'doc-drift' --doc "$docpath"
+}
+
+# GOLD_CONTRACT rows are "field <name> <dir> <req>" — $2 is the field name
+ffreq=$(grep '^field ' "$GOLD_CONTRACT" | awk '$3=="in" && $4=="required"{print $2; exit}')
+[ -n "$ffreq" ] || fail "ca-doc-drift-direction: could not find an in/required field in the registry"
+m="$TMP/doc-direction.md"
+awk -v f="$ffreq" '{ if ($0 ~ "^- \\*\\*" f "\\*\\*") sub(/ in,/, " out,"); print }' "$DOC" > "$m"
+doc_mut ca-doc-drift-direction "$m"
+
+m="$TMP/doc-requiredness.md"
+awk -v f="$ffreq" '{ if ($0 ~ "^- \\*\\*" f "\\*\\*") sub(/, required /, ", conditional "); print }' "$DOC" > "$m"
+doc_mut ca-doc-drift-requiredness "$m"
+
+cfreq=$(grep '^field ' "$GOLD_CONTRACT" | awk '$4=="conditional"{print $2; exit}')
+[ -n "$cfreq" ] || fail "ca-doc-drift-required-when: could not find a conditional field in the registry"
+m="$TMP/doc-requiredwhen.md"
+awk -v f="$cfreq" '{ if ($0 ~ "^- \\*\\*" f "\\*\\*") sub(/required when/, "applies whenever"); print }' "$DOC" > "$m"
+doc_mut ca-doc-drift-required-when "$m"
+
+m="$TMP/doc-canon-line-deleted.md"
+bash "$CHECKER" --print-contract > "$TMP/canon-ref.txt" 2>/dev/null
+canon_first_channel="$(grep -m1 '^channel ' "$TMP/canon-ref.txt" || true)"
+[ -n "$canon_first_channel" ] || fail "ca-doc-drift-canon-line: no channel row in the live printed contract"
+grep -vxF -- "$canon_first_channel" "$DOC" > "$m"
+doc_mut ca-doc-drift-canon-line "$m"
 
 printf 'check-adapter suite: all cases passed\n'

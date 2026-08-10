@@ -257,3 +257,6 @@ jobs:
           set -e
           bash bin/check-adapter.sh
           bash bin/check-adapter.sh --binding templates/binding-template.conf
+
+      - name: Dogfood check-adapter --doc — the shipped contract document agrees with the registry
+        run: bash bin/check-adapter.sh --doc docs/loop-engineering/task-envelope.md

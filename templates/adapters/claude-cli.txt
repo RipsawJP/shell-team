@@ -12,6 +12,15 @@
 # json ...` style non-interactive CLI call) is prose in
 # docs/loop-engineering/task-envelope.md, never a value in this file.
 #
+# `carries board-transition stdout` (DP13, v2): this declares only where
+# the board-transition FIELD's own VALUE travels — this adapter's headless
+# invocation reports it on stdout, exactly like `verdict`/`usage`/
+# `produced-artifacts`. It says nothing about who may write the board:
+# that is decided solely by the bound role's `role-board-authority` row.
+# `claude-cli` binds roles of every authority (`writes`, `proposes` and
+# `none`); a `writes` role's own board edit is a side effect of that role
+# acting as itself, never a claim this adapter definition makes.
+#
 # effort capability — MEASURED, not guessed (DP7), 2026-08-10:
 # `claude --help` (Claude Code CLI v2.1.226) documents a first-class flag:
 #   --effort <level>   Effort level for the current session (low, medium,
@@ -36,7 +45,7 @@ carries resolved-binding argv
 carries status exit-status
 carries verdict stdout
 carries produced-artifacts stdout
-carries board-transition board
+carries board-transition stdout
 carries usage stdout
 carries error-class stderr
 carries adapter-version file
