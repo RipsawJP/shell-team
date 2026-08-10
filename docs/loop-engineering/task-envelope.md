@@ -28,7 +28,7 @@ initial adapter definitions (`templates/adapters/claude-cli.txt` and
 `templates/adapters/codex-cli.txt`), and `bin/check-adapter.sh` with its
 fixture suite. **Nothing here invokes an executor.** No code composes an
 argv, calls a provider, or reads this contract at loop-run time — that is
-T-1056's work. No envelope *instance* format exists either (see the boundary
+T-1057's work. No envelope *instance* format exists either (see the boundary
 statement below) — this is a vocabulary for describing what a later
 component passes and gets back, not a payload anything here constructs.
 
@@ -73,7 +73,7 @@ authority rule — now ships as **byte-frozen normative statements** in this
 document instead, pinned by the spec's own AC6, so the rules survive the
 drop even though nothing in this task checks a binding config against them
 any more; that enforcement is inherited by the successor issue and by
-T-1056.
+T-1057.
 
 ## The generalized invocation pattern
 
@@ -247,7 +247,7 @@ binding config against this join was `bin/check-adapter.sh`'s
 cross-check mode — the one mode that knew the role and the adapter
 together — until it was carved out at v4 (DP18, below); the rule survives
 in the `- normative: ` line under `## Board-transition authority`, and its
-enforcement is inherited by the successor issue and by T-1056.
+enforcement is inherited by the successor issue and by T-1057.
 
 ## The channel vocabulary
 
@@ -317,7 +317,7 @@ this task:
 This rule was enforced by `bin/check-adapter.sh`'s binding-config
 cross-check mode until DP18 carved that mode out at v4; it now ships as
 the byte-frozen statement above, with its enforcement inherited by the
-successor issue and by T-1056 (`## What T-1056 inherits from here`,
+successor issue and by T-1057 (`## What T-1057 inherits from here`,
 below).
 
 A disclosed, unresolved nuance carried over rather than fixed here (it is a
@@ -417,7 +417,7 @@ carved out at v4 when this spec's pre-commitment fired a second time
 (DP18). The rule above is what survives the drop, byte-frozen and pinned
 by the spec's own AC6; checking a host's bound effort value against it,
 before a run, is inherited by the successor issue rather than shipped
-here. **Runtime** (T-1056, not shipped here either): an adapter actually
+here. **Runtime** (T-1057, not shipped here either): an adapter actually
 invoked with an effort value it cannot honour returns `status`
 non-success with `error-class capability-unsupported` and invokes
 nothing — the error class already exists in this contract's vocabulary
@@ -441,7 +441,7 @@ they are the three values `resolved-binding` packages, exactly as
 `bin/check-binding.sh --print-binding`'s own `bound <role> <provider>
 <model> <effort|-> <adapter>` row already resolves them.
 
-## What T-1056 inherits from here
+## What T-1057 inherits from here
 
 - The runtime half of the fail-closed effort rule (above).
 - The runtime half of GitHub issue #221: re-asserting, over whatever

@@ -24,6 +24,11 @@ set -euo pipefail
 # Locate the shell-team repository root (where this script lives).
 # Resolves regardless of cwd / symlinks so install can be invoked from
 # anywhere, though the spec's primary assumption is that cwd is the repo root.
+# `cd DIR && pwd -P` (T-1057, issue #218), not a bare logical `pwd`: an
+# ANCESTOR directory symlink (an adopter's `bin/` symlinked into the
+# plugin's real `bin/`) would otherwise survive untouched and could
+# misresolve AGENTS_SRC_DIR to a decoy in the adopter's own tree — this
+# script, of all of them, installs those files INTO another repository.
 # ---------------------------------------------------------------------------
 script_path="${BASH_SOURCE[0]}"
 # Resolve a single layer of symlink without relying on `readlink -f` (BSD
@@ -32,11 +37,11 @@ while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")"
   case "$link_target" in
     /*) script_path="$link_target" ;;
-    *)  script_path="$(cd "$(dirname "$script_path")" && pwd)/$link_target" ;;
+    *)  script_path="$(cd "$(dirname "$script_path")" && pwd -P)/$link_target" ;;
   esac
 done
-SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 AGENTS_SRC_DIR="$REPO_ROOT/agents"
 
 # Common agents installed regardless of which team(s) are requested.
@@ -174,7 +179,7 @@ done
 [ -d "$TARGET" ] || die "target path is not a directory: $TARGET"
 
 # Resolve target to an absolute path for stable manifest content / messages.
-TARGET="$(cd "$TARGET" && pwd)"
+TARGET="$(cd "$TARGET" && pwd -P)"
 
 # ---------------------------------------------------------------------------
 # Framework version + commit hash discovery.

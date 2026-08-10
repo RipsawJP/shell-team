@@ -120,7 +120,16 @@ fail_not_durable() {  # $1 = reason token (closed set); $2 = plain-language body
 # instead of hand-rolling one) — every external command in this bootstrap
 # (readlink / dirname / cd / pwd / basename) is independently guarded,
 # including the split-substitution fix that keeps a failing `dirname` from
-# silently becoming `$PWD`.
+# silently becoming `$PWD`. Every `cd DIR && pwd` below is `cd DIR &&
+# pwd -P` (T-1057, issue #218): a bare logical `pwd` preserves an ANCESTOR
+# directory symlink in the reported path (an adopter's `bin/` symlinked
+# into the plugin's real `bin/` — ordinary vendoring, no hostile action),
+# which silently resolves TEMPLATES_ROOT below inside the ADOPTER's own
+# tree and lets a decoy `templates/durability-records.txt` there stand in
+# for the plugin's shipped registry. `pwd -P` reports the OS-canonical path
+# regardless of how many symlinks — final-component or ancestor — were
+# crossed getting there, the same fix shape `bin/check-binding.sh` and
+# `bin/check-adapter.sh` already carry for the identical reason.
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")" \
@@ -130,7 +139,7 @@ while [ -L "$script_path" ]; do
     *)
       link_dir_raw="$(dirname "$script_path")" \
         || fail_usage "dirname failed to resolve the directory of relative symlink target for: $script_path"
-      link_dir="$(cd "$link_dir_raw" && pwd)" \
+      link_dir="$(cd "$link_dir_raw" && pwd -P)" \
         || fail_usage "cd/pwd failed to resolve the directory of relative symlink target for: $script_path"
       script_path="$link_dir/$link_target"
       ;;
@@ -138,7 +147,7 @@ while [ -L "$script_path" ]; do
 done
 script_dir_raw="$(dirname "$script_path")" \
   || fail_usage "dirname failed to resolve this script's own directory for: $script_path"
-SCRIPT_DIR="$(cd "$script_dir_raw" && pwd)" \
+SCRIPT_DIR="$(cd "$script_dir_raw" && pwd -P)" \
   || fail_usage "cd/pwd failed to resolve this script's own directory for: $script_path"
 self_name="$(basename "$script_path")" \
   || fail_usage "basename failed to resolve this script's own file name for: $script_path"
@@ -190,7 +199,7 @@ BASE_DIR="$(get_path base)"
 if [ -n "$RECORDS_OVERRIDE" ]; then
   REGISTRY="$RECORDS_OVERRIDE"
 else
-  TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)" \
+  TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)" \
     || fail_structural "cannot resolve the templates directory (one level above check-durability.sh's own installed directory)"
   REGISTRY="$TEMPLATES_ROOT/templates/durability-records.txt"
 fi

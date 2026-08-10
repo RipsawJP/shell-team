@@ -426,6 +426,34 @@ MISSING_REGISTRY="$TMP/does-not-exist.txt"
 pass "records-override-missing-file — a --records override naming a nonexistent file fails structurally rather than silently using the shipped default"
 
 # =============================================================================
+# T-1057 ancestor-symlink (issue #218): resolving templates/durability-records.txt
+# through an ANCESTOR-symlinked bin/ must still reach the plugin's own shipped
+# registry, never a decoy planted in the adopter's own templates/ dir.
+# adopter/bin -> the real, un-symlinked $REPO_ROOT/bin (ordinary vendoring, no
+# hostile action) — the topology a plain `cd && pwd` bootstrap survives
+# untouched, silently resolving TEMPLATES_ROOT inside the ADOPTER's tree.
+# =============================================================================
+R_ANC="$TMP/r-ancestor-symlink"
+build_repo "$R_ANC"
+write_task_records "$R_ANC" T-900
+commit_all "$R_ANC" "initial"
+
+mkdir -p "$TMP/symroot/adopter/templates"
+ln -s "$REPO_ROOT/bin" "$TMP/symroot/adopter/bin"
+[ -L "$TMP/symroot/adopter/bin" ] || fail "ancestor-symlink-check-durability: adopter/bin was not created as a symlink"
+# A decoy registry with no 'implement' rows at all: consulting it would
+# produce 'no registry rows found for phase implement' (structural, exit 2)
+# instead of the real 'durable' verdict — a stark discriminator.
+printf 'pre-merge todo -\n' > "$TMP/symroot/adopter/templates/durability-records.txt"
+cmp -s "$REPO_ROOT/templates/durability-records.txt" "$TMP/symroot/adopter/templates/durability-records.txt" \
+  && fail "ancestor-symlink-check-durability: fixture control failed — the decoy registry is byte-identical to the shipped one"
+
+outanc="$(cd "$R_ANC" && bash "$TMP/symroot/adopter/bin/check-durability.sh" --phase implement --task T-900 --ref refs/heads/main 2>&1)" && rcanc=0 || rcanc=$?
+[ "$rcanc" -eq 0 ] || fail "ancestor-symlink-check-durability: expected exit 0 (the plugin's own shipped registry, not the adopter's decoy, must be consulted), got $rcanc — $outanc"
+printf '%s\n' "$outanc" | grep -qF 'check-durability: durable:' || fail "ancestor-symlink-check-durability: expected a durable: line"
+pass "ancestor-symlink-check-durability — an ancestor-symlinked bin/ (adopter/bin -> real bin/) still resolves templates/durability-records.txt from the plugin's own installed directory, never a decoy planted in the adopter's own templates/ dir"
+
+# =============================================================================
 # usage floor: bad --task shape, a missing --ref, and an outside-the-closed-set
 # --phase are usage errors (exit 2), not silent no-ops.
 # =============================================================================
