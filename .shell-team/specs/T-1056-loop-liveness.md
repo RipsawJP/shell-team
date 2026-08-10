@@ -205,8 +205,8 @@ Every point at which either skill hands control to a human and waits. This is DP
 
 **The two declared values below are live measurements taken by the coordinating session at the v1 freeze sweep, replacing pm-spec's reading-derived estimates of 15 and 6.** They sit **outside** the intent block on purpose, which is what made that correction an ordinary edit rather than a re-freeze; the same route is the right one whenever `- stale-at:` fires. pm-spec has no shell and could not have measured them.
 
-- pattern-lines (skills/run/SKILL.md): 16
-- pattern-lines (skills/goal/SKILL.md): 5
+- pattern-lines (skills/run/SKILL.md): 17
+- pattern-lines (skills/goal/SKILL.md): 6
 
 | file | line(s) measured | what stops | reason token |
 |---|---|---|---|

@@ -39,6 +39,7 @@ contain operating-paths-core.md           agents/engineer.md agents/qa-verifier.
 contain retro-inputs.md                   bin/retro-inputs.sh bin/check-retro.sh agents/scrum-master.md docs/templates/retro-template.md
 contain retro-sections.md                 bin/check-retro.sh agents/scrum-master.md docs/templates/retro-template.md
 contain interventions-classes.md          bin/check-interventions.sh skills/run/SKILL.md
+contain liveness-declaration.md           skills/run/SKILL.md skills/goal/SKILL.md
 marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
 marker  playbook-engineer.md               agents/engineer.md
 marker  playbook-qa-verifier.md            agents/qa-verifier.md
