@@ -16,8 +16,10 @@
 #
 # The task envelope itself is a CONTRACT, never an instance: nothing in
 # this script (or anywhere else in this task) serializes, parses, or writes
-# an envelope value. There is no `--envelope` flag and none is ever added;
-# passing one is refused as ordinary unknown-flag usage.
+# an envelope value. No flag exists here for constructing or reading an
+# envelope instance, and none is ever added; a flag of that shape is
+# refused as ordinary unknown-flag usage, the same as any other unknown
+# flag.
 #
 # Everything here is a bare token, never sourced or evaluated as code: an
 # adapter definition cannot spell a command string, an argv list, an

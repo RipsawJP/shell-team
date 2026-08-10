@@ -40,20 +40,20 @@ provider codex
 adapter-version 1
 envelope-schema 1
 
-carries task-id           prompt
-carries role              prompt
-carries phase              prompt
-carries request            prompt
-carries artifact-paths     prompt
-carries working-dir        argv
-carries resolved-binding   argv
-carries status              exit-status
-carries verdict             file
-carries produced-artifacts  file
-carries board-transition    file
-carries usage                file
-carries error-class          stderr
-carries adapter-version      file
+carries task-id prompt
+carries role prompt
+carries phase prompt
+carries request prompt
+carries artifact-paths prompt
+carries working-dir argv
+carries resolved-binding argv
+carries status exit-status
+carries verdict file
+carries produced-artifacts file
+carries board-transition file
+carries usage file
+carries error-class stderr
+carries adapter-version file
 
 capability effort supported
 effort-mechanism cli-config-override

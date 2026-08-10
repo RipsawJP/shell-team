@@ -26,20 +26,20 @@ provider claude
 adapter-version 1
 envelope-schema 1
 
-carries task-id           prompt
-carries role              argv
-carries phase              prompt
-carries request            prompt
-carries artifact-paths     prompt
-carries working-dir        argv
-carries resolved-binding   argv
-carries status              exit-status
-carries verdict             stdout
-carries produced-artifacts  stdout
-carries board-transition    board
-carries usage                stdout
-carries error-class          stderr
-carries adapter-version      file
+carries task-id prompt
+carries role argv
+carries phase prompt
+carries request prompt
+carries artifact-paths prompt
+carries working-dir argv
+carries resolved-binding argv
+carries status exit-status
+carries verdict stdout
+carries produced-artifacts stdout
+carries board-transition board
+carries usage stdout
+carries error-class stderr
+carries adapter-version file
 
 capability effort supported
 effort-mechanism cli-flag
