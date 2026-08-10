@@ -65,18 +65,6 @@
 #     script requires, is `binding-invalid` at exit 2, with exactly zero
 #     bytes written to stdout — no cross-check is attempted on input that
 #     could not be trusted.
-#   check-adapter.sh [--contract PATH] --doc [PATH]
-#     Prove the contract's two shipped forms agree, held in agreement by
-#     THIS SCRIPT rather than by a spec-check-time comparison (DP16). With
-#     no PATH, resolves the shipped contract document from this script's
-#     own installed tree. Checks two things: the document's canon region
-#     (between `<!-- BEGIN contract-canon -->` and `<!-- END contract-canon
-#     -->`) is byte-identical to `--print-contract`'s output; and each
-#     field's documented direction/requiredness tuple in `## Envelope
-#     fields` matches the registry's row for that field, with every
-#     `conditional` field's bullet stating `required when`. A mismatch is
-#     `doc-drift` (1); an absent or unreadable document is `doc-unreadable`
-#     (2).
 #   check-adapter.sh --contract PATH    (a testing affordance; the
 #     contract registry otherwise resolves next to this script's own
 #     installation)
@@ -85,14 +73,13 @@
 #     installation)
 #   check-adapter.sh --help
 #
-# Exit codes: 0 = valid. 1 = a content refusal (a definition file, a
-# binding join or a contract document is readable and structurally
-# parseable but its declared content is wrong — a name mismatch, an
-# unknown field, an inconsistent capability, an unsupported effort value,
-# a role/adapter authority conflict, documentation drift, ...). 2 = the
-# input could not be evaluated at all (a missing or malformed contract
-# registry, a missing or malformed adapter allowlist, a missing
-# definition, an unreadable document, a bad flag, or a config the sibling
+# Exit codes: 0 = valid. 1 = a content refusal (a definition file or a
+# binding join is readable and structurally parseable but its declared
+# content is wrong — a name mismatch, an unknown field, an inconsistent
+# capability, an unsupported effort value, a role/adapter authority
+# conflict, ...). 2 = the input could not be evaluated at all (a missing
+# or malformed contract registry, a missing or malformed adapter
+# allowlist, a missing definition, a bad flag, or a config the sibling
 # validator already rejected or returned in an untrustworthy shape).
 # Every refusal prints exactly one token, from a closed set, to stderr.
 
@@ -103,18 +90,18 @@ set -euo pipefail
 # file's header at the first non-comment line below, i.e. at `set -euo
 # pipefail` above; everything from here on is free to use any word at all).
 #
-# Refusal matrix (token: exit code — condition), the CLOSED 26-entry set
-# every non-zero exit comes from (spec `## Refusal matrix`, v2):
+# Refusal matrix (token: exit code — condition), the CLOSED 25-entry set
+# every non-zero exit comes from (spec `## Refusal matrix`, v3):
 #   contract-unreadable (2), contract-malformed (2), contract-incomplete (2),
-#   registry-unreadable (2), registry-malformed (2), definition-missing (2),
-#   definitions-unreadable (2), unparseable-line (1), bad-token (1),
-#   missing-field (1), duplicate-field (1), adapter-name-mismatch (1),
-#   unknown-adapter (1), provider-adapter-mismatch (1),
-#   unsupported-envelope-schema (1), unknown-envelope-field (1),
-#   unknown-channel (1), field-coverage-gap (1), capability-inconsistent (1),
-#   unknown-effort-mechanism (1), effort-unsupported (1),
-#   authority-channel-conflict (1), binding-invalid (2), doc-unreadable (2),
-#   doc-drift (1), usage (2).
+#   retired-channel-declared (2), registry-unreadable (2),
+#   registry-malformed (2), definition-missing (2), definitions-unreadable (2),
+#   unparseable-line (1), bad-token (1), missing-field (1),
+#   duplicate-field (1), adapter-name-mismatch (1), unknown-adapter (1),
+#   provider-adapter-mismatch (1), unsupported-envelope-schema (1),
+#   unknown-envelope-field (1), unknown-channel (1), field-coverage-gap (1),
+#   capability-inconsistent (1), unknown-effort-mechanism (1),
+#   effort-unsupported (1), authority-channel-conflict (1),
+#   binding-invalid (2), usage (2).
 #
 # Contract-registry issues (contract-unreadable/-malformed/-incomplete) are
 # ALWAYS exit 2 — the registry is plugin-shipped, not hand-authored, so any
@@ -150,17 +137,40 @@ set -euo pipefail
 # about whether it is well-formed — that disagreement, reproduced against
 # the real shipped file, was round 1's Blocker.
 #
-# Two more validated surfaces, both new in v2. `authority-channel-conflict`
-# (1) is the one role/adapter join DP13 leaves enforceable: a bound role
-# whose `role-board-authority` is `writes` or `proposes` MUST produce a
-# board-transition, so binding it to an adapter whose `carries
-# board-transition` row names `not-carried` is a contradiction the
-# `--binding` mode alone can see (it is the only mode that knows the role
-# and the adapter together). `doc-unreadable` (2) / `doc-drift` (1) are the
-# `--doc` mode's own refusals — the contract document's canon region and
-# per-field tuples held in agreement with the registry BY THIS SCRIPT
-# (DP16), never left to a spec-check-time comparison a doc could quietly
-# drift past between runs.
+# `authority-channel-conflict` (1) is the one role/adapter join DP13 leaves
+# enforceable: a bound role whose `role-board-authority` is `writes` or
+# `proposes` MUST produce a board-transition, so binding it to an adapter
+# whose `carries board-transition` row names `not-carried` is a
+# contradiction the `--binding` mode alone can see (it is the only mode
+# that knows the role and the adapter together).
+#
+# `retired-channel-declared` (2) is new in v3 (DP17). Round 2 reproduced
+# that v1/v2's retirement of the `board` channel was a fact about the
+# shipped registry file rather than a property of this checker: a scratch
+# contract supplied through `--contract` could re-declare `channel board`
+# and validate cleanly. The fix is structural rather than file-scoped: this
+# script carries its own compiled-in retired-channel set (`RETIRED_CHANNELS`
+# below), and a `channel` row naming any member of it is refused
+# `retired-channel-declared` REGARDLESS OF WHICH CONTRACT FILE IS LOADED —
+# no `--contract` override can reintroduce a retired token. The registry
+# additionally carries a `retired-channel <token>` row per retired token, so
+# the retirement is visible to a reader of the contract and not only in
+# this script's own source; that declared set must equal the compiled-in
+# set exactly, and a divergence in either direction is `contract-incomplete`
+# (2). A `carries` row naming a retired token needs no new refusal at all:
+# once the token cannot be a `channel` member, `unknown-channel` (1) — the
+# machinery that already exists — refuses it.
+#
+# The doc-sync mode this script once carried (validating the contract
+# document against this registry), its two dedicated refusal tokens and
+# its CI dogfood step were carved out of this branch at v3, when the
+# spec's own pre-commitment fired after two consecutive rounds of new
+# Blocker/Major findings against this script (DP16 v3). They are not a
+# fast-follow to revisit here — the successor issue owns them. Two-form
+# agreement between this registry and the contract document is still
+# required; it is proved
+# by the spec's own AC8, which performs the comparison independently at
+# spec-check time rather than delegating it to a flag of this script.
 #
 # Never spelled anywhere in this file, in code or in a comment: the name of
 # bin/check-binding.sh's own registry-override flag (DP9; issue #221). That
@@ -237,13 +247,24 @@ print_help() {
 # --- fixed vocabulary --------------------------------------------------------
 TOKEN_RE='^[a-z][a-z0-9-]*$'
 VERSION_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+# MODEL_RE is bin/check-binding.sh's own MODEL_RE, byte-identical, since a
+# `bound` row's model token here is the same token that checker already
+# validated once and this script re-asserts rather than trusts (DP10, V4).
+MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 MAXLEN=64
 SIX_ROLES=(tech-lead pm-spec engineer qa-verifier codex-reviewer ui-designer)
 BOARD_AUTHORITY_VALUES=(writes proposes none)
 STATUS_KIND_VALUES=(success failure)
 SUPPORTED_SCHEMA_VERSIONS=(1)
-CONTRACT_DIRECTIVES=(schema field channel status-value error-class effort-mechanism role-board-authority)
+CONTRACT_DIRECTIVES=(schema field channel status-value error-class effort-mechanism role-board-authority retired-channel)
 DEFINITION_DIRECTIVES=(envelope-schema adapter provider adapter-version carries capability effort-mechanism effort-value)
+REQUIRED_ERRORCLASSES=(executor-unavailable capability-unsupported invocation-failed contract-violation)
+# The compiled-in retired-channel set (DP17): a `channel` row naming any of
+# these is refused `retired-channel-declared` REGARDLESS of which contract
+# file is loaded, so no `--contract` override can reintroduce a retired
+# token. The registry's own `retired-channel` rows must equal this set
+# exactly (checked at the end of load_contract).
+RETIRED_CHANNELS=(board)
 
 in_list() {  # $1 = candidate; $2.. = list
   local x="$1" c; shift
@@ -255,10 +276,10 @@ schema_version_supported() {  # $1 = candidate schema version token
 }
 
 # --- argument parsing --------------------------------------------------------
-CONTRACT_ARG="" DEFINITIONS_ARG="" ADAPTER_ARG="" BINDING_ARG="" DOC_ARG=""
+CONTRACT_ARG="" DEFINITIONS_ARG="" ADAPTER_ARG="" BINDING_ARG=""
 MODE="validate"
 set_mode() {  # $1 = the new mode; refuses if a mode flag was already given
-  [ "$MODE" = "validate" ] || fail_usage "specify only one of --print-contract, --adapter, --binding or --doc"
+  [ "$MODE" = "validate" ] || fail_usage "specify only one of --print-contract, --adapter or --binding"
   MODE="$1"
 }
 
@@ -270,12 +291,6 @@ while [ "$#" -gt 0 ]; do
     --print-contract)  set_mode print-contract; shift ;;
     --adapter)         [ "$#" -ge 2 ] || fail_usage "--adapter requires a value"; ADAPTER_ARG="$2"; set_mode adapter; shift 2 ;;
     --binding)         [ "$#" -ge 2 ] || fail_usage "--binding requires a value"; BINDING_ARG="$2"; set_mode binding; shift 2 ;;
-    --doc)
-      set_mode doc
-      # Optional value: `--doc` alone resolves the shipped document; a
-      # following token that is not itself a flag is taken as the path.
-      if [ "$#" -ge 2 ] && [[ "$2" != -* ]]; then DOC_ARG="$2"; shift 2; else shift; fi
-      ;;
     --) shift; break ;;
     -*) fail_usage "unknown flag: $1" ;;
     *)  fail_usage "unexpected positional argument: $1" ;;
@@ -302,11 +317,6 @@ else
   DEFINITIONS_DIR="$TEMPLATES_ROOT/templates/adapters"
 fi
 ADAPTERS_REGISTRY="$TEMPLATES_ROOT/templates/binding-adapters.txt"
-if [ -n "$DOC_ARG" ]; then
-  DOC_PATH="$DOC_ARG"
-else
-  DOC_PATH="$TEMPLATES_ROOT/docs/loop-engineering/task-envelope.md"
-fi
 
 # --- load the adapter allowlist (read-only; T-1054's own shipped file) -----
 # Validated at FULL PARITY with bin/check-binding.sh's own reading of this
@@ -365,6 +375,7 @@ STATUS_TOKEN=() STATUS_KIND=()
 ERRORCLASS_SET=()
 EFFORTMECH_SET=()
 RBA_ROLE=() RBA_VALUE=()
+RETIRED_CHANNEL_SET=()
 
 field_index() {  # $1 = field name; prints its index in FIELD_NAME, or fails
   local x="$1" i
@@ -415,7 +426,19 @@ load_contract() {
         [ "${#f[@]}" -eq 2 ] || refuse contract-malformed 2 "malformed channel row (expected 'channel <token>'): $line"
         [[ "${f[1]}" =~ $TOKEN_RE ]] && [ "${#f[1]}" -le "$MAXLEN" ] \
           || refuse contract-malformed 2 "malformed channel token: ${f[1]}"
+        # DP17: a retired channel token is refused from the set COMPILED
+        # INTO this script, whichever contract file is loaded — this is
+        # what makes the retirement structural rather than a fact about the
+        # shipped registry file that a --contract override could evade.
+        in_list "${f[1]}" "${RETIRED_CHANNELS[@]}" \
+          && refuse retired-channel-declared 2 "channel row declares a retired channel token: ${f[1]}"
         in_channel_set "${f[1]}" || CHANNEL_SET+=("${f[1]}")
+        ;;
+      retired-channel)
+        [ "${#f[@]}" -eq 2 ] || refuse contract-malformed 2 "malformed retired-channel row (expected 'retired-channel <token>'): $line"
+        [[ "${f[1]}" =~ $TOKEN_RE ]] && [ "${#f[1]}" -le "$MAXLEN" ] \
+          || refuse contract-malformed 2 "malformed retired-channel token: ${f[1]}"
+        in_list "${f[1]}" "${RETIRED_CHANNEL_SET[@]:-}" || RETIRED_CHANNEL_SET+=("${f[1]}")
         ;;
       status-value)
         [ "${#f[@]}" -eq 3 ] || refuse contract-malformed 2 "malformed status-value row (expected 'status-value <token> <success|failure>'): $line"
@@ -423,6 +446,12 @@ load_contract() {
           || refuse contract-malformed 2 "malformed status-value token: ${f[1]}"
         in_list "${f[2]}" "${STATUS_KIND_VALUES[@]}" \
           || refuse contract-malformed 2 "status-value second column must be 'success' or 'failure': $line"
+        # A status-value token may not be declared twice at all, including
+        # once as 'success' and once as 'failure' (V2/round 2): a token
+        # already seen (in either kind) makes a second declaration of it
+        # contract-malformed rather than a silent second row.
+        in_list "${f[1]}" "${STATUS_TOKEN[@]:-}" \
+          && refuse contract-malformed 2 "status-value token declared more than once: ${f[1]}"
         STATUS_TOKEN+=("${f[1]}"); STATUS_KIND+=("${f[2]}")
         ;;
       error-class)
@@ -458,7 +487,14 @@ load_contract() {
 
   # Every declared minimum is ENFORCED here rather than merely observed on
   # a shipped file that happens to be correct (round 1's Major findings).
-  [ "${#ERRORCLASS_SET[@]}" -gt 0 ] || refuse contract-incomplete 2 "the contract registry declares no error-class rows"
+  # The floor is the four REQUIRED tokens themselves (V3/round 2), not mere
+  # non-emptiness: round 2 reproduced a single arbitrary error-class row
+  # passing this check under v2's non-emptiness-only form.
+  local ec
+  for ec in "${REQUIRED_ERRORCLASSES[@]}"; do
+    in_list "$ec" "${ERRORCLASS_SET[@]:-}" \
+      || refuse contract-incomplete 2 "the contract registry is missing required error-class row: $ec"
+  done
   in_effortmech_set none \
     || refuse contract-incomplete 2 "the contract registry declares no effort-mechanism 'none' row"
   local has_nonnone=0 m
@@ -480,6 +516,21 @@ load_contract() {
     in_list "$r" "${RBA_ROLE[@]:-}" \
       || refuse contract-incomplete 2 "the contract registry has no role-board-authority row for: $r"
   done
+
+  # DP17: the registry's declared retired-channel set must equal this
+  # script's own compiled-in set EXACTLY. A divergence in either direction
+  # means the registry's declaration of what's retired doesn't match what
+  # is actually enforced, which is the visibility half of DP17's two-halves
+  # fix going stale relative to the authority half.
+  local rc1 rc2
+  for rc1 in "${RETIRED_CHANNELS[@]}"; do
+    in_list "$rc1" "${RETIRED_CHANNEL_SET[@]:-}" \
+      || refuse contract-incomplete 2 "the contract registry does not declare a retired-channel row for: $rc1"
+  done
+  for rc2 in "${RETIRED_CHANNEL_SET[@]:-}"; do
+    in_list "$rc2" "${RETIRED_CHANNELS[@]}" \
+      || refuse contract-incomplete 2 "the contract registry declares a retired-channel not in this checker's compiled-in set: $rc2"
+  done
 }
 
 print_contract() {
@@ -490,6 +541,9 @@ print_contract() {
   done
   printf '%s\n' "${lines[@]}" | LC_ALL=C sort
   printf '%s\n' "${CHANNEL_SET[@]}" | sed 's/^/channel /' | LC_ALL=C sort
+  if [ "${#RETIRED_CHANNEL_SET[@]}" -gt 0 ]; then
+    printf '%s\n' "${RETIRED_CHANNEL_SET[@]}" | sed 's/^/retired-channel /' | LC_ALL=C sort
+  fi
   lines=()
   for ((i = 0; i < ${#STATUS_TOKEN[@]}; i++)); do
     lines+=("status-value ${STATUS_TOKEN[$i]} ${STATUS_KIND[$i]}")
@@ -723,7 +777,7 @@ case "$MODE" in
     # six `bound` rows, one per inner-loop role, no other non-blank line —
     # so a sibling that succeeded while emitting a truncated or partial set
     # produces a refusal here rather than a false-successful cross-check.
-    BOUND_ROLE=() BOUND_EFFORT=() BOUND_ADAPTER=()
+    BOUND_ROLE=() BOUND_PROVIDER=() BOUND_MODEL=() BOUND_EFFORT=() BOUND_ADAPTER=()
     binding_schema_seen=0
     while IFS= read -r bline || [ -n "$bline" ]; do
       [ -n "$bline" ] \
@@ -737,13 +791,38 @@ case "$MODE" in
       fi
       [ "${bf[0]:-}" = "bound" ] && [ "${#bf[@]}" -eq 6 ] \
         || refuse binding-invalid 2 "unexpected canonical binding row shape: $bline"
-      BOUND_ROLE+=("${bf[1]}"); BOUND_EFFORT+=("${bf[4]}"); BOUND_ADAPTER+=("${bf[5]}")
+      # Every field of each row is actually READ, not extracted and
+      # ignored (V4/round 2): the provider and model tokens are validated
+      # for shape, and the provider is cross-checked below against the
+      # allowlist's own pairing for that row's adapter.
+      [[ "${bf[2]}" =~ $TOKEN_RE ]] && [ "${#bf[2]}" -le "$MAXLEN" ] \
+        || refuse binding-invalid 2 "the canonical binding's provider token is malformed: $bline"
+      [[ "${bf[3]}" =~ $MODEL_RE ]] && [ "${#bf[3]}" -le "$MAXLEN" ] \
+        || refuse binding-invalid 2 "the canonical binding's model token is malformed: $bline"
+      BOUND_ROLE+=("${bf[1]}"); BOUND_PROVIDER+=("${bf[2]}"); BOUND_MODEL+=("${bf[3]}")
+      BOUND_EFFORT+=("${bf[4]}"); BOUND_ADAPTER+=("${bf[5]}")
     done <<< "$BOUND_OUT"
+    # The delegated output's leading schema line is REQUIRED, not merely
+    # tracked (V4/round 2): v2 set binding_schema_seen and never read it, so
+    # a delegated output with zero schema lines and six otherwise-valid
+    # bound rows was never refused.
+    [ "$binding_schema_seen" -eq 1 ] \
+      || refuse binding-invalid 2 "the canonical binding carries no leading schema line"
     [ "${#BOUND_ROLE[@]}" -eq 6 ] \
       || refuse binding-invalid 2 "the canonical binding does not contain exactly six bound rows (found ${#BOUND_ROLE[@]})"
     for role_check in "${SIX_ROLES[@]}"; do
       in_list "$role_check" "${BOUND_ROLE[@]}" \
         || refuse binding-invalid 2 "the canonical binding is missing a bound row for role: $role_check"
+    done
+    # Cross-check each row's asserted provider against the allowlist's own
+    # pairing for that row's adapter (V4/round 2) — the delegated output's
+    # own claim about which provider a role is bound through, re-verified
+    # rather than trusted.
+    for ((pi = 0; pi < ${#BOUND_ROLE[@]}; pi++)); do
+      preg_provider="$(adapter_registered_provider "${BOUND_ADAPTER[$pi]}")" \
+        || refuse binding-invalid 2 "the canonical binding names an adapter not in the allowlist: ${BOUND_ADAPTER[$pi]}"
+      [ "$preg_provider" = "${BOUND_PROVIDER[$pi]}" ] \
+        || refuse binding-invalid 2 "the canonical binding's provider '${BOUND_PROVIDER[$pi]}' for role '${BOUND_ROLE[$pi]}' does not match the allowlist's provider '$preg_provider' for adapter '${BOUND_ADAPTER[$pi]}'"
     done
 
     # No per-adapter cache: each bound row's adapter definition is
@@ -782,50 +861,6 @@ case "$MODE" in
     done
 
     printf 'check-adapter: valid: binding config agrees with every bound adapter'"'"'s declared effort capability and board-transition authority (config: %s)\n' "$BINDING_ARG"
-    exit 0
-    ;;
-  doc)
-    [ -f "$DOC_PATH" ] && [ -r "$DOC_PATH" ] \
-      || refuse doc-unreadable 2 "cannot read the contract document: $DOC_PATH"
-
-    # Table level: the canon region must be byte-identical to
-    # --print-contract's own output — this covers every directive,
-    # including any a later task adds, with no parser to extend (DP16).
-    CANON_RAW="$(awk '/BEGIN contract-canon/{f=1;next} /END contract-canon/{f=0} f' "$DOC_PATH")"
-    [ -n "$CANON_RAW" ] \
-      || refuse doc-drift 1 "the document's canon region is empty or its markers are absent: $DOC_PATH"
-    PRINTED="$(print_contract)"
-    [ "$CANON_RAW" = "$PRINTED" ] \
-      || refuse doc-drift 1 "the document's canon region does not match --print-contract's output: $DOC_PATH"
-
-    # Tuple level: each field's own documented direction/requiredness must
-    # match the registry, and every conditional field's bullet must state
-    # its condition on that same physical line.
-    SEC_RAW="$(awk '/^## Envelope fields$/{f=1;next} f&&/^## /{exit} f' "$DOC_PATH")"
-    [ -n "$SEC_RAW" ] \
-      || refuse doc-drift 1 "the document's ## Envelope fields section is empty or absent: $DOC_PATH"
-
-    DOC_FIELDS="$(printf '%s\n' "$SEC_RAW" | grep -oE '^- \*\*[a-z][a-z0-9-]*\*\*' | sed -E 's/^- \*\*(.*)\*\*$/\1/' | LC_ALL=C sort -u)"
-    [ -n "$DOC_FIELDS" ] \
-      || refuse doc-drift 1 "no field bullets found in the document: $DOC_PATH"
-    REG_FIELDS="$(printf '%s\n' "${FIELD_NAME[@]}" | LC_ALL=C sort -u)"
-    [ "$DOC_FIELDS" = "$REG_FIELDS" ] \
-      || refuse doc-drift 1 "the document's field set differs from the registry's: $DOC_PATH"
-
-    for ((di = 0; di < ${#FIELD_NAME[@]}; di++)); do
-      doc_fn="${FIELD_NAME[$di]}" doc_dir="${FIELD_DIR[$di]}" doc_req="${FIELD_REQ[$di]}"
-      doc_line="$(printf '%s\n' "$SEC_RAW" | grep -E -- "^- \*\*$doc_fn\*\*" | head -n1)"
-      [ -n "$doc_line" ] \
-        || refuse doc-drift 1 "no documented bullet found for field '$doc_fn': $DOC_PATH"
-      printf '%s\n' "$doc_line" | grep -qE -- "— ${doc_dir}, ${doc_req} —" \
-        || refuse doc-drift 1 "field '$doc_fn' documented direction/requiredness does not match the registry ($doc_dir, $doc_req): $DOC_PATH"
-      if [ "$doc_req" = "conditional" ]; then
-        printf '%s\n' "$doc_line" | grep -qF -- 'required when' \
-          || refuse doc-drift 1 "conditional field '$doc_fn' does not state 'required when' on its own bullet line: $DOC_PATH"
-      fi
-    done
-
-    printf 'check-adapter: valid: document %s agrees with the contract registry\n' "$DOC_PATH"
     exit 0
     ;;
   validate)

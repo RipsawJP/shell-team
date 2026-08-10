@@ -60,6 +60,19 @@
 #     a future adapter needing a genuinely new channel adds a row here,
 #     and AC2 checks this vocabulary's SHAPE (a bare lower-case token) and
 #     the absence of `board` specifically, never its membership otherwise.
+#     Since v3 (DP17) `board`'s retirement is enforced STRUCTURALLY: the
+#     checker refuses any `channel` row naming a token from its own
+#     compiled-in retired set, from whichever contract file is loaded —
+#     not only this shipped one — so a scratch contract cannot reintroduce
+#     the token either.
+#
+#   retired-channel <token>
+#     One row per retired channel token (DP17), declared here so a reader
+#     of this contract sees the retirement rather than only inferring it
+#     from `board`'s absence above. This declared set must equal exactly
+#     the checker's own compiled-in retired-channel set; a divergence in
+#     either direction is contract-incomplete. A retired token can never
+#     also appear as a `channel` row (retired-channel-declared).
 #
 #   status-value <token> <success|failure>
 #     One row per member of the closed status vocabulary an envelope's
@@ -132,6 +145,8 @@ channel stderr
 channel file
 channel exit-status
 channel not-carried
+
+retired-channel board
 
 status-value ok success
 status-value refused failure

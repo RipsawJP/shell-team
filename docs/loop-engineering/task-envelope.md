@@ -40,10 +40,23 @@ vocabulary, `status-value` (DP14, below); the plugin-shipped adapter
 allowlist (`templates/binding-adapters.txt`) is validated at full parity
 with `bin/check-binding.sh`'s own reading of that same file, reusing that
 checker's own tokens (DP15 — the fix for round 1's Blocker); and the two
-shipped contract forms — this document and the registry — are held in
-agreement **by the checker itself**, via a new `--doc [PATH]` mode, rather
-than by a spec-check-time comparison that could quietly drift between
-rounds (DP16).
+shipped contract forms were held in agreement by the checker itself, via a
+`--doc [PATH]` mode.
+
+A second review round (v2 → v3) reproduced that the `board` channel's
+retirement was still a fact about the shipped registry FILE rather than a
+property of the checker: a scratch contract could re-declare `channel
+board` and validate cleanly. This spec's own pre-commitment fired at that
+point (two consecutive rounds of new findings against the same component),
+and its recorded disposition was executed: the `--doc` mode is carved out
+of this branch to a successor issue, and the retirement is fixed
+structurally instead (DP17, below) — the checker refuses a retired channel
+token from its own compiled-in set, from whichever contract file is
+loaded, and the registry declares that same set so a reader of the
+contract sees it too. Two-form agreement between this document and the
+registry is still required and still checked — by the spec's own AC8, at
+spec-check time — but it is no longer a standing CI gate; that is a stated
+loss, not an oversight.
 
 ## The generalized invocation pattern
 
@@ -53,19 +66,21 @@ reached as a bare-first-token `codex exec --sandbox read-only --cd <repo>
 ...` call whose **request** is a prompt and whose **working dir** is an argv
 value. Results come back two ways: as **files** — the `-o` last-message
 capture, the JSONL event stream, the review record under the resolved
-reviews directory — and as **board tokens** inside a verdict block that the
-orchestrator reads and transcribes; the role itself never edits the board.
-Availability is probed with `codex --version`, whose verbatim output is
-recorded as provenance; a missing CLI or a failed auth check is `BLOCKED`
-with the exact error, never a silent substitution of a same-family reviewer.
+reviews directory — and as a **verdict block** the orchestrator reads and
+transcribes (who may act on that transcription is `role-board-authority`'s
+to say, not this pattern's — see `## Carries declares a return path, never
+an authority` below). Availability is probed with `codex --version`, whose
+verbatim output is recorded as provenance; a missing CLI or a failed auth
+check is `BLOCKED` with the exact error, never a silent substitution of a
+same-family reviewer.
 
 An adapter is the same shape, generalized: an executor is reached through
 some concrete invocation (a CLI flag, a prompt convention, a config
 override); it receives the envelope's `in` fields through *some* existing
 channel (argv, prompt text, stdin, ...) and returns its `out` fields through
-some other existing channel (a file, stdout, the exit code, the board
-itself). Which channel carries which field, for a given adapter, is declared
-in that adapter's own `carries <field> <channel>` rows — never invented per
+some other existing channel (a file, stdout, stderr, the exit code). Which
+channel carries which field, for a given adapter, is declared in that
+adapter's own `carries <field> <channel>` rows — never invented per
 invocation and never a second implementation of the same mapping.
 
 ## Envelope fields
@@ -74,8 +89,8 @@ Fourteen fields. Direction is stated from the **adapter's** point of view:
 `in` is what an adapter receives, `out` is what it returns. A conditional
 field is always declared (never silently absent from the contract); its
 condition is stated on its own line below, as the literal phrase
-`required when`. Each field's own bullet below is machine-checked
-(`bin/check-adapter.sh --doc`): its direction/requiredness tuple must match
+`required when`. Each field's own bullet below is machine-checked by the
+spec's own AC8: its direction/requiredness tuple must match
 `templates/task-envelope.txt`'s row for that field, byte for byte, and this
 is what closed a real, reproduced drift (round 1: this section's own
 `task-id` bullet was flipped from `in` to `out` with the registry left
@@ -147,6 +162,7 @@ channel prompt
 channel stderr
 channel stdin
 channel stdout
+retired-channel board
 status-value error failure
 status-value ok success
 status-value refused failure
@@ -168,11 +184,11 @@ role-board-authority ui-designer none
 
 The block above is regenerated, never hand-edited: `bash
 bin/check-adapter.sh --print-contract` redirected between the two marker
-lines. `bin/check-adapter.sh --doc` requires it byte-identical to that
-command's live output — this is the **table-level** half of DP16's
-agreement, covering every directive (including one a later task adds) with
-no parser to extend; the **tuple-level** half is each field's own bullet
-above, checked independently.
+lines. The spec's own AC8 requires it byte-identical to that command's live
+output — this is the **table-level** half of the two-form agreement,
+covering every directive (including one a later task adds) with no parser
+to extend; the **tuple-level** half is each field's own bullet above,
+checked independently, with exactly one bullet required per field.
 
 ## Carries declares a return path, never an authority (DP13)
 
@@ -190,9 +206,13 @@ write the board directly.
 The fix is definitional, not a new check bolted on: **a `carries <field>
 <channel>` row states which part of the existing substrate the field's own
 VALUE travels on between the orchestrator and the executor, and states
-nothing about who may act on it.** Whether the board is actually written
-during a given invocation is decided **solely** by the bound role's
-`role-board-authority` row (below) — never by any adapter's channel
+nothing about who may act on it.** `codex-reviewer` is the measured
+instance: its `role-board-authority` is `proposes`, so the role itself
+never edits the board — it states the transition it wants in its verdict
+block and its review record, and the orchestrator transcribes it. Whether
+the board is actually written during a given invocation is decided
+**solely** by the bound role's `role-board-authority` row (below) — never
+by any adapter's channel
 declaration. Making the wrong state unrepresentable is preferred here over
 detecting it after the fact, which is why the `board` channel token —
 which named an action rather than a path — is **retired** from the
@@ -227,8 +247,13 @@ act (above). The channels `templates/task-envelope.txt` declares:
 | `not-carried` | this field is not carried by this adapter at all |
 
 There is deliberately no `board` channel (above) — a v1 row of that name is
-retired in v2 and must not be reintroduced; `bin/check-adapter.sh --print-contract`
-asserts its absence.
+retired and must not be reintroduced. Since v3 (DP17) that retirement is
+enforced structurally, not merely observed on this shipped file: the
+checker refuses a `channel` row naming `board` from its own compiled-in
+retired set, whichever contract is loaded, and the registry's own
+`retired-channel board` row makes the retirement visible in the contract
+itself — see `templates/task-envelope.txt`'s header comment for the
+directive's shape.
 
 ## The status vocabulary (DP14)
 
@@ -245,11 +270,11 @@ convention nobody encodes. The shipped set:
 | `refused` | failure | the invocation completed, but the executor's own request or content was rejected — a content-level failure, not an infrastructure one. |
 | `error` | failure | the invocation could not complete at all — an infrastructure or environment failure, distinct from a content refusal. |
 
-None of this set's membership is frozen (only the shape — closed,
-declared here, exactly one `success` — is); a later task that finds it
-needs a different or finer-grained set edits this registry, and
-`bin/check-adapter.sh --doc` immediately proves the document and the
-registry still agree.
+None of this set's membership is frozen (only the shape — closed, declared
+here, exactly one `success`, no token declared more than once even across
+`success` and `failure` — is); a later task that finds it needs a
+different or finer-grained set edits this registry, and the spec's own
+AC8 immediately proves the document and the registry still agree.
 
 ## Board-transition authority
 

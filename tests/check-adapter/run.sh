@@ -5,10 +5,12 @@
 # modes). .shell-team/specs/T-1055-adapter-envelope.md's own `- check:`
 # lines exercise every acceptance criterion against this checker; this
 # suite is a second, independently-authored surface (matching
-# tests/check-binding/run.sh's own precedent) covering the same 21-token
-# refusal matrix plus the "Coverage the suite must carry beyond the
-# criteria" items a `- check:` line cannot spell (no backticks in a
-# `- check:` line, per this repository's own convention).
+# tests/check-binding/run.sh's own precedent) covering the same 25-token
+# refusal matrix (v3 — the doc-sync mode this suite once exercised and its
+# two tokens were carved out to a successor issue when this spec's
+# pre-commitment fired; DP16 v3/DP17) plus the "Coverage the suite must
+# carry beyond the criteria" items a `- check:` line cannot spell (no
+# backticks in a `- check:` line, per this repository's own convention).
 #
 # Every case runs through assert_case (exit code AND token together — this
 # repository's fixture-synthesis discipline) or a dedicated block for
@@ -114,6 +116,29 @@
 #   ca-definitions-dir-unknown-file    — a definitions dir entry whose name
 #                                      does not match any known adapter
 #                                      token -> unknown-adapter
+#   ca-retired-channel-declared-via-contract — channel board supplied
+#                                      through --contract itself ->
+#                                      retired-channel-declared (V1/DP17;
+#                                      structural, not file-scoped)
+#   ca-contract-incomplete-retired-channel-missing/-extra — the registry's
+#                                      declared retired-channel set must
+#                                      equal the checker's compiled-in set
+#                                      exactly, in both directions
+#   ca-contract-malformed-status-duplicate-same-kind/-cross-kind — a
+#                                      status-value token declared twice,
+#                                      once as the same kind and once split
+#                                      across success/failure (V2)
+#   ca-contract-incomplete-errorclass-missing-required — one of the four
+#                                      required error-class tokens absent
+#                                      with an arbitrary row in its place;
+#                                      non-emptiness is not the floor (V3)
+#   ca-binding-stub-correct-payload-positive-control/
+#   ca-binding-invalid-stub-no-schema/
+#   ca-binding-invalid-stub-provider-flip — a stub sibling's delegated
+#                                      output missing its schema line, and
+#                                      one whose first bound row's provider
+#                                      does not match the allowlist's
+#                                      pairing for that row's adapter (V4)
 
 set -euo pipefail
 
@@ -659,6 +684,7 @@ c="$TMP/scrambled.txt"
   grep '^effort-mechanism ' "$GOLD_CONTRACT"
   grep '^error-class ' "$GOLD_CONTRACT"
   grep '^status-value ' "$GOLD_CONTRACT"
+  grep '^retired-channel ' "$GOLD_CONTRACT"
   grep '^channel ' "$GOLD_CONTRACT"
   grep '^field ' "$GOLD_CONTRACT"
   grep '^schema ' "$GOLD_CONTRACT"
@@ -707,43 +733,98 @@ printf '%s\n' "$out" | grep -qF -- 'unknown-adapter' || fail "ca-definitions-dir
 pass "ca-definitions-dir-unknown-file"
 
 # =============================================================================
-# --doc mode (R7/DP16): the two contract forms held in agreement BY THE
-# CHECKER, at table level (canon region) and tuple level (per-field
-# direction/requiredness), proved non-vacuous by mutation
+# retired-channel structural refusal (V1/DP17): compiled into the checker,
+# refused REGARDLESS of which contract file is loaded — a --contract
+# override cannot reintroduce the token, unlike a fact about the shipped
+# registry file alone
 # =============================================================================
-DOC="$REPO_ROOT/docs/loop-engineering/task-envelope.md"
-assert_case ca-doc-valid 0 'valid' --doc "$DOC"
+c="$TMP/retired-via-contract.txt"; { cat "$GOLD_CONTRACT"; printf '%s\n' 'channel board'; } > "$c"
+cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-retired-channel-declared-via-contract: mutated contract is byte-identical to the shipped one"
+assert_case ca-retired-channel-declared-via-contract 2 'retired-channel-declared' --contract "$c"
 
-assert_case ca-doc-unreadable 2 'doc-unreadable' --doc "$TMP/no-such-doc.md"
+c="$TMP/retired-row-missing.txt"; grep -v '^retired-channel ' "$GOLD_CONTRACT" > "$c"
+cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-contract-incomplete-retired-channel-missing: mutated contract is byte-identical to the shipped one"
+assert_case ca-contract-incomplete-retired-channel-missing 2 'contract-incomplete' --contract "$c"
 
-doc_mut() {  # <id> <mutated-doc-path>
-  local id="$1" docpath="$2"
-  cmp -s "$DOC" "$docpath" && fail "$id: mutated document is byte-identical to the shipped one"
-  assert_case "$id" 1 'doc-drift' --doc "$docpath"
+c="$TMP/retired-row-extra.txt"; { cat "$GOLD_CONTRACT"; printf '%s\n' 'retired-channel zzz-not-retired'; } > "$c"
+assert_case ca-contract-incomplete-retired-channel-extra 2 'contract-incomplete' --contract "$c"
+
+# =============================================================================
+# status-value token uniqueness (V2/round 2): a token may not be declared
+# twice at all, whether both times as the same kind or split across
+# success/failure
+# =============================================================================
+c="$TMP/status-dup-same-kind.txt"; { cat "$GOLD_CONTRACT"; printf '%s\n' 'status-value ok success'; } > "$c"
+assert_case ca-contract-malformed-status-duplicate-same-kind 2 'contract-malformed' --contract "$c"
+
+c="$TMP/status-dup-cross-kind.txt"; { cat "$GOLD_CONTRACT"; printf '%s\n' 'status-value ok failure'; } > "$c"
+assert_case ca-contract-malformed-status-duplicate-cross-kind 2 'contract-malformed' --contract "$c"
+
+# =============================================================================
+# error-class completeness floor (V3/round 2): the four REQUIRED tokens,
+# never mere non-emptiness — a single arbitrary row must not satisfy it
+# =============================================================================
+c="$TMP/errorclass-missing-required.txt"
+{ grep -v '^error-class capability-unsupported$' "$GOLD_CONTRACT"; printf '%s\n' 'error-class zzz-arbitrary'; } > "$c"
+cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-contract-incomplete-errorclass-missing-required: mutated contract is byte-identical to the shipped one"
+assert_case ca-contract-incomplete-errorclass-missing-required 2 'contract-incomplete' --contract "$c"
+
+# =============================================================================
+# --binding delegated-output reassertion, completed (V4/round 2): the
+# sibling's leading schema line is REQUIRED (v2 tracked it and never
+# checked it — a delegated output with no schema line and six otherwise-
+# valid bound rows was never refused), and each row's own provider token is
+# actually read and cross-checked against the allowlist's pairing for that
+# row's adapter — a scratch TREE with a stub sibling, since the
+# re-assertion targets the script's own SCRIPT_DIR-relative sibling
+# resolution, not the --definitions override
+# =============================================================================
+st3="$TMP/tree-stub-v4"; scratch_tree "$st3"
+bash "$st3/bin/check-adapter.sh" --binding "$okcfg" >/dev/null 2>&1 \
+  || fail "ca-binding-invalid-stub-no-schema: pristine scratch tree with the REAL sibling does not validate first"
+
+stub3() {  # $1 = payload file (already using the canonical 'bound' rows)
+  printf '%s\n' '#!/usr/bin/env bash' "cat '$1'" 'exit 0' > "$st3/bin/check-binding.sh"
+  chmod 755 "$st3/bin/check-binding.sh"
 }
 
-# GOLD_CONTRACT rows are "field <name> <dir> <req>" — $2 is the field name
-ffreq=$(grep '^field ' "$GOLD_CONTRACT" | awk '$3=="in" && $4=="required"{print $2; exit}')
-[ -n "$ffreq" ] || fail "ca-doc-drift-direction: could not find an in/required field in the registry"
-m="$TMP/doc-direction.md"
-awk -v f="$ffreq" '{ if ($0 ~ "^- \\*\\*" f "\\*\\*") sub(/ in,/, " out,"); print }' "$DOC" > "$m"
-doc_mut ca-doc-drift-direction "$m"
+p0="$TMP/v4-p0-correct.txt"
+printf '%s\n' \
+  'schema 1' \
+  'bound tech-lead claude m1 - claude-cli' \
+  'bound pm-spec claude m1 - claude-cli' \
+  'bound engineer claude m1 - claude-cli' \
+  'bound qa-verifier claude m1 - claude-cli' \
+  'bound ui-designer claude m1 - claude-cli' \
+  'bound codex-reviewer codex m2 - codex-cli' \
+  > "$p0"
+stub3 "$p0"
+bash "$st3/bin/check-adapter.sh" --binding "$okcfg" >/dev/null 2>&1 \
+  || fail "ca-binding-stub-correct-payload-positive-control: stub emitting the CORRECT payload does not validate"
+pass "ca-binding-stub-correct-payload-positive-control"
 
-m="$TMP/doc-requiredness.md"
-awk -v f="$ffreq" '{ if ($0 ~ "^- \\*\\*" f "\\*\\*") sub(/, required /, ", conditional "); print }' "$DOC" > "$m"
-doc_mut ca-doc-drift-requiredness "$m"
+p2="$TMP/v4-p2-no-schema.txt"; grep -v '^schema ' "$p0" > "$p2"
+cmp -s "$p0" "$p2" && fail "ca-binding-invalid-stub-no-schema: mutated payload is byte-identical to the correct one"
+stub3 "$p2"
+set +e
+out="$(bash "$st3/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-noschema")"
+rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "ca-binding-invalid-stub-no-schema: expected exit 2, got $rc"
+grep -q -- 'binding-invalid' "$TMP/e-noschema" || fail "ca-binding-invalid-stub-no-schema: expected binding-invalid, got: $(cat "$TMP/e-noschema")"
+[ -z "$out" ] || fail "ca-binding-invalid-stub-no-schema: expected zero stdout bytes, got: $out"
+pass "ca-binding-invalid-stub-no-schema"
 
-cfreq=$(grep '^field ' "$GOLD_CONTRACT" | awk '$4=="conditional"{print $2; exit}')
-[ -n "$cfreq" ] || fail "ca-doc-drift-required-when: could not find a conditional field in the registry"
-m="$TMP/doc-requiredwhen.md"
-awk -v f="$cfreq" '{ if ($0 ~ "^- \\*\\*" f "\\*\\*") sub(/required when/, "applies whenever"); print }' "$DOC" > "$m"
-doc_mut ca-doc-drift-required-when "$m"
-
-m="$TMP/doc-canon-line-deleted.md"
-bash "$CHECKER" --print-contract > "$TMP/canon-ref.txt" 2>/dev/null
-canon_first_channel="$(grep -m1 '^channel ' "$TMP/canon-ref.txt" || true)"
-[ -n "$canon_first_channel" ] || fail "ca-doc-drift-canon-line: no channel row in the live printed contract"
-grep -vxF -- "$canon_first_channel" "$DOC" > "$m"
-doc_mut ca-doc-drift-canon-line "$m"
+p3="$TMP/v4-p3-provider-flip.txt"; sed 's/^bound tech-lead claude /bound tech-lead codex /' "$p0" > "$p3"
+cmp -s "$p0" "$p3" && fail "ca-binding-invalid-stub-provider-flip: mutated payload is byte-identical to the correct one"
+stub3 "$p3"
+set +e
+out="$(bash "$st3/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-providerflip")"
+rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "ca-binding-invalid-stub-provider-flip: expected exit 2, got $rc"
+grep -q -- 'binding-invalid' "$TMP/e-providerflip" || fail "ca-binding-invalid-stub-provider-flip: expected binding-invalid, got: $(cat "$TMP/e-providerflip")"
+[ -z "$out" ] || fail "ca-binding-invalid-stub-provider-flip: expected zero stdout bytes, got: $out"
+pass "ca-binding-invalid-stub-provider-flip"
 
 printf 'check-adapter suite: all cases passed\n'
