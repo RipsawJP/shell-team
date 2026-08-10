@@ -273,7 +273,7 @@ The closed set every `OBSERVE_ERROR` comes from. Each row is one token, one cond
 | `registry-unreadable` | the shipped reason registry cannot be read from the script's own installed directory |
 | `registry-malformed` | a registry row not exactly two tokens, an unknown gate kind, or a duplicated reason token |
 | `git-unreadable` | `HEAD` does not resolve, or its committer epoch is not a bounded decimal |
-| `out-unwritable` | the `--out` target is a symlink (dangling or not), or the guarded temp write or replace failed |
+| `out-unwritable` | the `--out` target is occupied by anything `mv` is not trusted to replace correctly — a symlink (dangling or not) or any other existing non-regular entry (a directory concretely, plus any other non-regular type a real host produces, e.g. a fifo or a socket) — or the guarded temp write or replace failed |
 | `unclassified` | the script's final statement — reached only if a future edit adds a path that falls through |
 
 `declaration-superseded` is deliberately **not** in this table: it is context printed on stderr beside a ladder verdict, not a refusal (DP3).

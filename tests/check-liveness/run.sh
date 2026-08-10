@@ -229,6 +229,42 @@ call_cl "$((HC + 100000))" --state "$OLD" --declaration "$TMP/none"
 assert_verdict cl-dead-s2g1 5 DEAD
 
 # =============================================================================
+# M1 (Codex round-1 Major): state-file mtime/content consistency re-read —
+# a bounded retry (stat -> read content -> stat again) closes the TOCTOU
+# window between the mtime sample and the content read, so a rewrite landing
+# between them cannot pin a stale, pre-rewrite mtime against fresh content.
+# LIVENESS_TEST_RACE_MTIME_BUMP is a test-only seam (documented in the
+# script itself) that mutates the fixture BETWEEN the two steps
+# deterministically -- no sleep, no background process, no live race.
+# =============================================================================
+RACE_CONTROL="$TMP/race-control"
+mk_state "$RACE_CONTROL" "946684800"
+touch -t 200001010000 "$RACE_CONTROL"
+set +e
+( cd "$REPO_ROOT" && bash "$CHECKER" --state "$RACE_CONTROL" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-race-control-stalled 4 STALLED
+
+RACE_SINGLE="$TMP/race-single-bump"
+mk_state "$RACE_SINGLE" "946684800"
+touch -t 200001010000 "$RACE_SINGLE"
+set +e
+( cd "$REPO_ROOT" && LIVENESS_TEST_RACE_MTIME_BUMP=1 bash "$CHECKER" --state "$RACE_SINGLE" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-race-single-bump-running 0 RUNNING
+
+RACE_ALWAYS="$TMP/race-always-bump"
+mk_state "$RACE_ALWAYS" "946684800"
+touch -t 200001010000 "$RACE_ALWAYS"
+set +e
+( cd "$REPO_ROOT" && LIVENESS_TEST_RACE_MTIME_BUMP=always bash "$CHECKER" --state "$RACE_ALWAYS" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-race-always-bump-running 0 RUNNING
+
+# =============================================================================
 # threshold overrides move both boundaries
 # =============================================================================
 call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 5 --dead-after 100000
@@ -514,6 +550,30 @@ ln -s "$NOWHERE" "$LINK"
 call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$LINK"
 assert_refusal cl-out-symlink-refused out-unwritable
 [ ! -e "$NOWHERE" ] || fail "cl-out-symlink-refused: the symlink target was created (it must never be followed)"
+
+# =============================================================================
+# M2 (Codex round-1 Major): the --out occupancy lattice. `mv` treats an
+# existing directory as "move INTO it" and returns success -- refused now,
+# the same way a symlink already was, and generalized to any non-regular
+# type (the `[ ! -f ]` test is false for all of them, not just directories).
+# =============================================================================
+OUTDIR="$TMP/out-existing-dir"
+mkdir -p "$OUTDIR"
+[ "$(find "$OUTDIR" -mindepth 1 | grep -c . || true)" = "0" ] || fail "cl-out-directory-refused: fixture precondition failed (dir not empty)"
+call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$OUTDIR"
+assert_refusal cl-out-directory-refused out-unwritable
+[ -d "$OUTDIR" ] || fail "cl-out-directory-refused: the target is no longer a directory"
+[ "$(find "$OUTDIR" -mindepth 1 | grep -c . || true)" = "0" ] || fail "cl-out-directory-refused: a file was created INSIDE the directory (mv moved into it)"
+
+if command -v mkfifo >/dev/null 2>&1; then
+  OUTFIFO="$TMP/out-existing-fifo"
+  mkfifo -- "$OUTFIFO"
+  call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$OUTFIFO"
+  assert_refusal cl-out-fifo-refused out-unwritable
+  [ -p "$OUTFIFO" ] || fail "cl-out-fifo-refused: the target is no longer a fifo"
+else
+  pass "cl-out-fifo-refused (skipped: mkfifo unavailable on this host)"
+fi
 
 # =============================================================================
 # read-only proof: the state file's and the declaration's git-hash-object

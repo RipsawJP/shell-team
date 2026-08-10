@@ -191,20 +191,58 @@ fi
 # mtime: GNU form, then BSD form, then a fail-closed third arm — never a
 # substituted zero (DP5's deliberate inversion of the cross-tick state
 # helper's own floor for a negative elapsed value).
-STATE_MTIME_RAW="$(stat -c %Y -- "$STATE_PATH" 2>/dev/null)" \
-  || STATE_MTIME_RAW="$(stat -f %m -- "$STATE_PATH" 2>/dev/null)" \
-  || true
-[ -n "${STATE_MTIME_RAW:-}" ] || refuse state-unreadable "cannot determine mtime (both stat forms failed): $STATE_PATH"
-[[ "$STATE_MTIME_RAW" =~ ^[0-9]{1,11}$ ]] || refuse state-unreadable "state file mtime not a bounded decimal: $STATE_MTIME_RAW"
-STATE_MTIME=$((10#$STATE_MTIME_RAW))
+read_state_mtime() {  # sets STATE_MTIME_RAW, or refuses; callable repeatedly
+  STATE_MTIME_RAW="$(stat -c %Y -- "$STATE_PATH" 2>/dev/null)" \
+    || STATE_MTIME_RAW="$(stat -f %m -- "$STATE_PATH" 2>/dev/null)" \
+    || true
+  [ -n "${STATE_MTIME_RAW:-}" ] || refuse state-unreadable "cannot determine mtime (both stat forms failed): $STATE_PATH"
+  [[ "$STATE_MTIME_RAW" =~ ^[0-9]{1,11}$ ]] || refuse state-unreadable "state file mtime not a bounded decimal: $STATE_MTIME_RAW"
+}
 
 # Single-pass awk key read, the same shape the cross-tick state helper's own
 # key reader uses (no `| head`, so no SIGPIPE under pipefail).
 read_state_key() {  # $1 = key
   awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/, ""); print; exit }' "$STATE_PATH"
 }
-STATE_START_EPOCH_RAW="$(read_state_key start_epoch)"
-STATE_ITERATION_RAW="$(read_state_key iteration)"
+
+# Bounded mtime/content consistency re-read (Codex round-1 Major M1): the
+# mtime sample above and the content read below are two separate syscalls
+# against a file the cross-tick state helper's own bump subcommand rewrites
+# in place with no locking, so a rewrite landing between them can pair a
+# stale (pre-rewrite) mtime with fresh (post-rewrite) content, understating A_STATE and
+# misreporting a genuinely ticking loop as STALLED/DEAD — the spec's own
+# `## Input space` names "an invocation that overlaps a tick's own write" as
+# reachable, so this is not out-of-scope. Fix: stat, read content, stat
+# again; if the mtime moved, the file changed under us — retry with the
+# fresh mtime, bounded to a small number of attempts. If it is STILL moving
+# after those attempts, that is itself positive evidence the loop is writing
+# right now, and using the LAST (freshest) mtime observed feeds that
+# evidence into the ladder's existing single RUNNING emit site below
+# (DP8/AC4) — no second RUNNING site, no new verdict path invented.
+CONSISTENCY_ATTEMPTS=0
+CONSISTENCY_MAX=3
+while :; do
+  CONSISTENCY_ATTEMPTS=$((CONSISTENCY_ATTEMPTS + 1))
+  read_state_mtime; mtime_before="$STATE_MTIME_RAW"
+  STATE_START_EPOCH_RAW="$(read_state_key start_epoch)"
+  STATE_ITERATION_RAW="$(read_state_key iteration)"
+  # Test-only seam (never reached unless a fixture sets this env var):
+  # simulates a `bump` landing between the content read just above and the
+  # confirming re-stat just below, so the retry path is exercised
+  # deterministically — no sleep, no background process, no live race.
+  # A value of "always" fires on every attempt (a continuously-writing
+  # loop, exercising the bounded-exhaustion path); any other non-empty
+  # value fires once, on the first attempt only (a single bump).
+  if [ "${LIVENESS_TEST_RACE_MTIME_BUMP:-}" = "always" ] \
+    || { [ -n "${LIVENESS_TEST_RACE_MTIME_BUMP:-}" ] && [ "$CONSISTENCY_ATTEMPTS" -eq 1 ]; }; then
+    touch -- "$STATE_PATH" 2>/dev/null || true
+  fi
+  read_state_mtime; mtime_after="$STATE_MTIME_RAW"
+  [ "$mtime_before" = "$mtime_after" ] && break
+  [ "$CONSISTENCY_ATTEMPTS" -lt "$CONSISTENCY_MAX" ] || break
+done
+STATE_MTIME=$((10#$mtime_after))
+
 [[ "$STATE_START_EPOCH_RAW" =~ ^[0-9]{1,11}$ ]] || refuse state-malformed "start_epoch missing or out of range: '$STATE_START_EPOCH_RAW'"
 [[ "$STATE_ITERATION_RAW"   =~ ^[0-9]{1,9}$  ]] || refuse state-malformed "iteration missing or out of range: '$STATE_ITERATION_RAW'"
 STATE_START_EPOCH=$((10#$STATE_START_EPOCH_RAW))
@@ -260,12 +298,26 @@ DECL_TASK="" DECL_REASON="" DECL_RUN_EPOCH="" DECL_DECLARED_EPOCH=""
 
 parse_declaration() {  # $1 = path
   local path="$1"
-  [ -r "$path" ] || refuse declaration-unreadable "cannot read declaration: $path"
   local -a LINES=()
   local line
-  while IFS= read -r line || [ -n "$line" ]; do
+  # A single guarded open on one fd, rather than a separate readability
+  # CHECK followed by a separate OPEN for the read loop — closes the gap
+  # between the two (the write/clear choke point can delete this file at
+  # any instant; "checked readable" and "opened for reading" being two
+  # syscalls left a window where the file could vanish between them and
+  # abort the script with a raw redirection error instead of a clean
+  # refusal). Once open, POSIX unlink-while-open semantics mean a concurrent
+  # delete cannot truncate what is read from here on.
+  # `exec` with no command word applies every redirection it is given to
+  # the CURRENT shell PERSISTENTLY, not scoped to one statement — a trailing
+  # `2>/dev/null` here would silently and permanently redirect this script's
+  # own stderr for the rest of its run, which is exactly why neither `exec`
+  # below carries one.
+  exec 3< "$path" || refuse declaration-unreadable "cannot read declaration: $path"
+  while IFS= read -r line <&3 || [ -n "$line" ]; do
     LINES+=("${line%$'\r'}")
-  done < "$path"
+  done
+  exec 3<&- || true
   local n="${#LINES[@]}"
   [ "$n" -ge 1 ] || refuse declaration-malformed "empty declaration file: $path"
 
@@ -349,7 +401,27 @@ fi
 # while stdout claims health.
 write_out() {  # $1=token $2=reason $3=state-age $4=git-age
   local tok="$1" reason="$2" sage="$3" gage="$4" outdir tmp
+  # Occupancy lattice at the --out target (Codex round-1 Major M2): `mv`
+  # (a rename) is trusted only for the two shapes it is documented to
+  # handle correctly — an ABSENT target (create) and an existing REGULAR
+  # FILE (atomic replace). A symlink, live or dangling, is refused without
+  # being followed (DP9's own stated precedent) by the `-L` check below.
+  # Every OTHER existing, non-regular occupant is refused on the identical
+  # reasoning DP9 already states for the symlink case: a DIRECTORY is the
+  # concrete case that motivated this fix (`mv` treats an existing
+  # directory as "move INTO it" and returns success while the named path
+  # itself never receives the verdict document — silently violating the
+  # Goal sentence's write-containment guarantee, since an extra,
+  # randomly-named file appears where the caller never asked for one, and
+  # misleading a caller that checks the named path's own existence/mtime),
+  # but the same refusal applies uniformly to any other type a real host
+  # can produce at that path (a fifo, a socket, a block or character
+  # device) — the `[ -f ]` test below is false for every one of them, so
+  # none needs its own separate check or its own unreachability argument.
   [ -L "$OUT_PATH" ] && return 1
+  if [ -e "$OUT_PATH" ] && [ ! -f "$OUT_PATH" ]; then
+    return 1
+  fi
   outdir="$(dirname -- "$OUT_PATH")" || return 1
   [ -d "$outdir" ] || return 1
   tmp="$(mktemp "$outdir/.liveness-verdict.XXXXXX" 2>/dev/null)" || return 1

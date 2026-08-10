@@ -643,3 +643,26 @@ that file's order.
   `# shellcheck disable=SC2016` on its own line, immediately above a
   single-statement line — shellcheck does not honor the directive when it
   shares a `;`-joined line with a preceding assignment.
+- T-1056 (Codex round-1 rework): `exec N< file` (or any bare `exec` with
+  redirections and no command word) applies EVERY redirection it is given
+  to the CURRENT shell PERSISTENTLY, not scoped to that one statement —
+  writing `exec 3< "$path" 2>/dev/null || refuse ...` to suppress a
+  diagnostic on open failure silently and permanently redirects the
+  script's own stderr to `/dev/null` for the rest of its run **on the
+  success path too**, since the `2>/dev/null` isn't scoped to the `exec`
+  call, it just becomes the shell's new stderr. This produced a real bug
+  (a downstream `printf ... >&2` after a successful guarded `exec` open
+  went silently missing) that a live invocation caught (empty stderr,
+  correct verdict) — the frozen fixture suite's own coverage of that
+  stderr line did not, since it happened to grep an ERROR path this
+  particular success-path bug never touched. Fix: never attach a trailing
+  redirect to a bare `exec` used only to open/close a numbered fd; let a
+  failed open print bash's own diagnostic (harmless — no `- check:` line
+  or fixture in this repo asserts an EXACT stderr line, only substring
+  containment) and catch the failure via `||` on the `exec` itself.
+  Before shipping any new bare `exec <N>{<,>} file` fd-management site,
+  grep the same file for every OTHER site using the pattern and confirm a
+  live run's stderr still carries every message emitted before AND after
+  that site — a suite that only asserts "the expected message is present
+  somewhere" cannot by itself catch "and every OTHER message after this
+  point silently vanished" the way this bug did.
