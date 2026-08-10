@@ -601,3 +601,20 @@ that file's order.
   both instances processed before one finished, which is easy to miss
   since the corruption is partial (only the early portion of the file) and
   every individual line still looks well-formed.
+- T-1055 (round 2 / v2 rework): a doc's "canon region" delimited by a
+  marker-comment pair that itself sits inside a fenced code block (e.g.
+  `` ``` ``, then `<!-- BEGIN X -->`, content, `<!-- END X -->`, then
+  `` ``` `` again) must have the FENCE lines OUTSIDE the marker pair, not
+  inside it — an `awk` extraction keyed on the marker lines (not the fence
+  lines) captures the fence lines too if they sit between the markers,
+  which then fails a byte-identity comparison against a command's raw
+  output that never included them. Verify a marker-plus-fence layout by
+  running the actual extraction command against the first draft, not by
+  reasoning about which delimiter nests inside which. Separately: when
+  writing a NEW shape-check against another script's own canonical output
+  format (here, `bin/check-binding.sh --print-binding`'s `schema <version>`
+  line followed by N `bound` rows), re-read that format's full grammar
+  before parsing it — a check written to expect only the row type under
+  test (all lines are `bound` rows) breaks immediately against the real
+  producer's own leading `schema` line, which its own spec's `## Summarized
+  sources` already documented.
