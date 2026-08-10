@@ -7,7 +7,7 @@
 # every acceptance criterion directly against this script; this suite is a
 # second, independently-authored surface (the repository's standing
 # convention: check-binding.sh, check-adapter.sh and others each carry one)
-# covering every verdict, every one of the closed 19 refusal tokens, and
+# covering every verdict, every one of the closed 18 refusal tokens, and
 # adversarial fixtures beyond the frozen criteria's own coverage — boundary
 # arithmetic, regex/character-set anchoring on the declaration grammar and
 # the --task shape, and "did this really run" positive controls beside every
@@ -66,11 +66,19 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 CHECKER="$REPO_ROOT/bin/check-liveness.sh"
 WORKFLOW="$REPO_ROOT/.github/workflows/check-handoff.yml"
 
-if [ -n "${TMPDIR:-}" ]; then
-  TMP="$(mktemp -d "${TMPDIR%/}/check-liveness-fixtures.XXXXXX")"
-else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
-fi
+# The fixture root MUST resolve outside this checkout, unconditionally: the
+# cl-waiting-nogit and cl-git-unreadable cases below build a scratch
+# directory that must NOT be inside any git repository, and this repo
+# itself is one. The `$HERE`-relative fallback other suites use when
+# $TMPDIR is unset (e.g. tests/check-refreeze-class/run.sh) is wrong for
+# THIS suite specifically, because it lands the whole fixture root inside
+# tests/check-liveness/ -- fine for a suite indifferent to git context, not
+# for one whose nogit cases depend on being outside one. GitHub's
+# ubuntu-latest runners leave $TMPDIR unset, so this bit CI (PR #231) while
+# never reproducing locally, where the sandbox always sets $TMPDIR. Match
+# the frozen spec's own check lines instead, which all use this exact
+# ${TMPDIR:-/tmp} idiom uniformly and never the $HERE fallback.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-liveness-fixtures.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
