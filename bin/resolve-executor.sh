@@ -74,7 +74,18 @@
 #   binding-unresolved (2)     — the effective binding, the delegated
 #                                 contract, or a bound adapter's definition
 #                                 did not resolve to a well-formed,
-#                                 trustworthy form.
+#                                 trustworthy form: this covers a malformed
+#                                 delegated canonical form, a row whose
+#                                 field count is wrong, a value outside its
+#                                 governing closed set (a channel token not
+#                                 declared by the contract, an authority or
+#                                 capability value outside its own closed
+#                                 set), AND a non-regular-file occupant
+#                                 (a directory, a FIFO, a dangling symlink)
+#                                 at the host config's own path — never
+#                                 silently substituted with the plugin
+#                                 default, which is reserved for TRUE
+#                                 absence.
 #   capability-unsupported (1) — the effort rule refused.
 #   contract-violation (1)     — the authority rule refused.
 #   executor-unavailable (1)   — the compiled-in probe found no table entry
@@ -283,9 +294,33 @@ BASE_DIR="${BASE_DIR%/}"
 # a binding.
 TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)" \
   || fail_usage "cannot resolve the templates directory (one level above resolve-executor.sh's own installed directory)"
+# Occupancy-type discrimination at $HOST_CONFIG (round-1 review Blocker 1):
+# ABSENT and PRESENT-BUT-NOT-A-REGULAR-FILE are different conditions with
+# different correct outcomes, and `[ -f ]` alone cannot tell them apart — it
+# is false for BOTH "nothing there" (the plugin default is the right
+# answer) AND "something broken there" (a refusal is the right answer), so
+# a bare `if [ -f ] ... else <default> fi` silently treated a dangling
+# symlink or a directory the same as absence. The occupancy lattice at this
+# one path, and the outcome for each member:
+#   - absent                              -> plugin default (unchanged)
+#   - regular file                        -> host config wins (unchanged)
+#   - live symlink resolving to a regular file -> host config wins: `[ -f ]`
+#     follows symlinks by design, so this is indistinguishable from "regular
+#     file" and deliberately treated the same — a host is free to author
+#     the config at a symlinked path, and there is nothing broken about it
+#   - unreadable regular file             -> refuses `binding-unresolved`,
+#     via the delegated `check-binding.sh` call below (its own `[ -f ] &&
+#     [ -r ]` check refuses `missing-config`) — already correct pre-fix
+#   - dangling symlink / a directory / a FIFO / anything else that is
+#     PRESENT (via `-e`) or is itself a symlink (via `-L`, so a dangling or
+#     looping symlink is caught even though `-e` is false for both) but is
+#     not a regular file -> refuses `binding-unresolved` HERE, before any
+#     delegation, rather than silently falling through to the default
 HOST_CONFIG="$BASE_DIR/binding.conf"
 if [ -f "$HOST_CONFIG" ]; then
   CONFIG_PATH="$HOST_CONFIG"
+elif [ -e "$HOST_CONFIG" ] || [ -L "$HOST_CONFIG" ]; then
+  refuse binding-unresolved 2 "a non-regular-file occupant exists at $HOST_CONFIG (a directory, a FIFO, a dangling symlink, or some other non-regular type) — refusing rather than silently falling back to the plugin default"
 else
   CONFIG_PATH="$TEMPLATES_ROOT/templates/binding-default.conf"
 fi
@@ -356,15 +391,18 @@ fi
 [ -n "$CONTRACT_OUT" ] \
   || refuse binding-unresolved 2 "the task-envelope contract registry printed no content"
 
-role_board_authority_for() {  # $1 = role; stdout = writes|proposes|none; return 1 if malformed/absent
-  local role="$1" n val
-  n="$(printf '%s\n' "$CONTRACT_OUT" | awk -v r="$role" '$1=="role-board-authority" && $2==r { c++ } END { print c+0 }')" || return 1
-  [ "$n" = "1" ] || return 1
-  val="$(printf '%s\n' "$CONTRACT_OUT" | awk -v r="$role" '$1=="role-board-authority" && $2==r { print $3 }')" || return 1
-  case "$val" in
-    writes|proposes|none) printf '%s\n' "$val" ;;
-    *) return 1 ;;
-  esac
+# channel_known: membership against the delegated contract's OWN closed
+# channel vocabulary (round-1 review Blocker 2) — never a bare shape regex.
+# `$CONTRACT_OUT` already carries one `channel <token>` row per member of
+# that closed set (this resolver already holds it in memory; no second
+# sibling call), so this is a lookup against the authoritative set rather
+# than a second, independently-guessed vocabulary. `not-carried` is itself
+# an ordinary member of that set (templates/task-envelope.txt declares it),
+# so this membership check is what makes `not-carried` recognizable AT ALL
+# — an unknown token (a typo, a stray value) is never treated as a member.
+channel_known() {  # $1 = candidate channel token; return 0 iff a real `channel <token>` row names it
+  local val="$1"
+  printf '%s\n' "$CONTRACT_OUT" | awk -v v="$val" '$1=="channel" && NF==2 && $2==v { found=1 } END { exit !found }'
 }
 
 # --- read one bound adapter's definition directly (its two relevant fields) -
@@ -373,28 +411,56 @@ role_board_authority_for() {  # $1 = role; stdout = writes|proposes|none; return
 # agree with the capability declaration) this script's two narrow reads do
 # not depend on and must not inherit — a mutated definition that is
 # "inconsistent" by that stricter rule is still a legal input for the two
-# fields this script actually reads.
+# fields this script actually reads. Every one of the four readers below
+# re-asserts BOTH halves DP2 requires of a delegated/read row before
+# trusting it (round-1 review Major 3, matching AC8's own discipline for
+# the binding's canonical form): the row's own FIELD COUNT (an extra or
+# missing field refuses, never silently ignored) and the extracted value's
+# MEMBERSHIP in its governing closed set (never a bare shape check) —
+# `role_board_authority_for`'s and `capability_effort_for`'s value checks
+# were already closed-set membership (a `case` statement with no catch-all
+# acceptance) and gain only the field-count half here; `effort_value_declared`'s
+# comparison IS ALREADY the correct membership check for its own vocabulary
+# (there is no GLOBAL effort-value set — each adapter declares its own, and
+# checking against exactly that declared set is the whole of what "closed
+# vocabulary" means here) and likewise gains only the field-count half.
+role_board_authority_for() {  # $1 = role; stdout = writes|proposes|none; return 1 if malformed/absent
+  local role="$1" n nf val
+  n="$(printf '%s\n' "$CONTRACT_OUT" | awk -v r="$role" '$1=="role-board-authority" && $2==r { c++ } END { print c+0 }')" || return 1
+  [ "$n" = "1" ] || return 1
+  nf="$(printf '%s\n' "$CONTRACT_OUT" | awk -v r="$role" '$1=="role-board-authority" && $2==r { print NF }')" || return 1
+  [ "$nf" = "3" ] || return 1
+  val="$(printf '%s\n' "$CONTRACT_OUT" | awk -v r="$role" '$1=="role-board-authority" && $2==r { print $3 }')" || return 1
+  case "$val" in
+    writes|proposes|none) printf '%s\n' "$val" ;;
+    *) return 1 ;;
+  esac
+}
 capability_effort_for() {  # $1 = definition path; stdout = supported|unsupported; return 1 if malformed/absent
-  local path="$1" n val
+  local path="$1" n nf val
   n="$(awk '$1=="capability" && $2=="effort" { c++ } END { print c+0 }' "$path")" || return 1
   [ "$n" = "1" ] || return 1
+  nf="$(awk '$1=="capability" && $2=="effort" { print NF }' "$path")" || return 1
+  [ "$nf" = "3" ] || return 1
   val="$(awk '$1=="capability" && $2=="effort" { print $3 }' "$path")" || return 1
   case "$val" in
     supported|unsupported) printf '%s\n' "$val" ;;
     *) return 1 ;;
   esac
 }
-carries_board_transition_channel() {  # $1 = definition path; stdout = channel; return 1 if malformed/absent
-  local path="$1" n val
+carries_board_transition_channel() {  # $1 = definition path; stdout = channel; return 1 if malformed/absent/unknown
+  local path="$1" n nf val
   n="$(awk '$1=="carries" && $2=="board-transition" { c++ } END { print c+0 }' "$path")" || return 1
   [ "$n" = "1" ] || return 1
+  nf="$(awk '$1=="carries" && $2=="board-transition" { print NF }' "$path")" || return 1
+  [ "$nf" = "3" ] || return 1
   val="$(awk '$1=="carries" && $2=="board-transition" { print $3 }' "$path")" || return 1
-  [[ "$val" =~ ^[a-z][a-z0-9-]*$ ]] || return 1
+  channel_known "$val" || return 1
   printf '%s\n' "$val"
 }
-effort_value_declared() {  # $1 = definition path; $2 = effort value; return 0 if declared among effort-value rows
+effort_value_declared() {  # $1 = definition path; $2 = effort value; return 0 iff declared, well-formed, among effort-value rows
   local path="$1" val="$2"
-  awk -v v="$val" '$1=="effort-value" && $2==v { found=1 } END { exit !found }' "$path"
+  awk -v v="$val" '$1=="effort-value" && NF==2 && $2==v { found=1 } END { exit !found }' "$path"
 }
 
 # --- lookup + both normative rules for one role (DP4) ------------------------

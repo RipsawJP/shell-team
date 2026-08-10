@@ -143,6 +143,78 @@ printf '%s\n' "$out" | grep -qF -- 'codex-cli' \
 pass "decoy-cwd-ignored — the plugin default resolves from the resolver's own installed directory, never the working directory"
 
 # =============================================================================
+# occupancy-type discrimination at <base>/binding.conf (round-1 review
+# Blocker 1): one case per member of the occupancy lattice, each with the
+# outcome that member's own class demands. Absent and "present but broken"
+# must never collapse onto the same silent-default outcome.
+# =============================================================================
+mkdir -p "$TMP/occ/.ops"
+
+# absent (control: already covered by default-binding above, re-asserted
+# here beside its siblings so the whole lattice reads as one table)
+rm -f "$TMP/occ/.ops/binding.conf"
+( cd "$TMP/occ" && TEAM_RUN_BASE=.ops bash "$RESOLVER" --print-resolved >"$TMP/occ.out" 2>"$TMP/occ.err" ) && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "occupancy-absent: expected exit 0 (plugin default), got $rc"
+pass "occupancy-absent — nothing at the path resolves the plugin default"
+
+# dangling symlink
+ln -sfn "$TMP/occ/does-not-exist-target" "$TMP/occ/.ops/binding.conf"
+( cd "$TMP/occ" && TEAM_RUN_BASE=.ops bash "$RESOLVER" --print-resolved >"$TMP/occ.out" 2>"$TMP/occ.err" ) && rc=0 || rc=$?
+[ "$rc" -eq 2 ] || fail "occupancy-dangling-symlink: expected exit 2, got $rc"
+[ ! -s "$TMP/occ.out" ] || fail "occupancy-dangling-symlink: expected zero stdout bytes"
+grep -qF -- 'binding-unresolved' "$TMP/occ.err" || fail "occupancy-dangling-symlink: expected binding-unresolved"
+pass "occupancy-dangling-symlink — a dangling symlink at the config path refuses rather than silently defaulting"
+rm -f "$TMP/occ/.ops/binding.conf"
+
+# directory
+mkdir -p "$TMP/occ/.ops/binding.conf"
+( cd "$TMP/occ" && TEAM_RUN_BASE=.ops bash "$RESOLVER" --print-resolved >"$TMP/occ.out" 2>"$TMP/occ.err" ) && rc=0 || rc=$?
+[ "$rc" -eq 2 ] || fail "occupancy-directory: expected exit 2, got $rc"
+[ ! -s "$TMP/occ.out" ] || fail "occupancy-directory: expected zero stdout bytes"
+grep -qF -- 'binding-unresolved' "$TMP/occ.err" || fail "occupancy-directory: expected binding-unresolved"
+pass "occupancy-directory — a directory at the config path refuses rather than silently defaulting"
+rmdir "$TMP/occ/.ops/binding.conf"
+
+# fifo (gracefully skipped when mkfifo is unavailable on this host, per the
+# T-1056 precedent — tests/check-liveness/run.sh's cl-out-fifo-refused)
+if command -v mkfifo >/dev/null 2>&1; then
+  mkfifo -- "$TMP/occ/.ops/binding.conf"
+  ( cd "$TMP/occ" && TEAM_RUN_BASE=.ops bash "$RESOLVER" --print-resolved >"$TMP/occ.out" 2>"$TMP/occ.err" ) && rc=0 || rc=$?
+  [ "$rc" -eq 2 ] || fail "occupancy-fifo: expected exit 2, got $rc"
+  [ ! -s "$TMP/occ.out" ] || fail "occupancy-fifo: expected zero stdout bytes"
+  grep -qF -- 'binding-unresolved' "$TMP/occ.err" || fail "occupancy-fifo: expected binding-unresolved"
+  [ -p "$TMP/occ/.ops/binding.conf" ] || fail "occupancy-fifo: the target is no longer a fifo"
+  pass "occupancy-fifo — a fifo at the config path refuses rather than silently defaulting"
+  rm -f "$TMP/occ/.ops/binding.conf"
+else
+  pass "occupancy-fifo (skipped: mkfifo unavailable on this host)"
+fi
+
+# unreadable regular file (the discriminating positive control: readability,
+# not type, is what this case tests — must still refuse, exactly as before
+# this round's fix)
+printf 'schema 1\n' > "$TMP/occ/.ops/binding.conf"
+chmod 000 "$TMP/occ/.ops/binding.conf"
+( cd "$TMP/occ" && TEAM_RUN_BASE=.ops bash "$RESOLVER" --print-resolved >"$TMP/occ.out" 2>"$TMP/occ.err" ) && rc=0 || rc=$?
+chmod 644 "$TMP/occ/.ops/binding.conf"
+[ "$rc" -eq 2 ] || fail "occupancy-unreadable-regular-file: expected exit 2, got $rc"
+[ ! -s "$TMP/occ.out" ] || fail "occupancy-unreadable-regular-file: expected zero stdout bytes"
+grep -qF -- 'binding-unresolved' "$TMP/occ.err" || fail "occupancy-unreadable-regular-file: expected binding-unresolved"
+pass "occupancy-unreadable-regular-file — present but unreadable refuses (readability, not type, is what fails here)"
+rm -f "$TMP/occ/.ops/binding.conf"
+
+# live symlink resolving to a regular, valid config: `[ -f ]` follows
+# symlinks by design, so this is deliberately treated the same as a regular
+# file — a host authoring the config at a symlinked path is not broken.
+a_valid_binding "$TMP/occ-target.conf"
+ln -sfn "$TMP/occ-target.conf" "$TMP/occ/.ops/binding.conf"
+( cd "$TMP/occ" && TEAM_RUN_BASE=.ops bash "$RESOLVER" --print-resolved >"$TMP/occ.out" 2>"$TMP/occ.err" ) && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "occupancy-live-symlink-to-regular: expected exit 0, got $rc"
+[ -s "$TMP/occ.out" ] || fail "occupancy-live-symlink-to-regular: expected non-empty stdout"
+pass "occupancy-live-symlink-to-regular — a live symlink to a regular, valid config resolves exactly like a regular file (deliberate: [ -f ] follows symlinks)"
+rm -f "$TMP/occ/.ops/binding.conf" "$TMP/occ-target.conf"
+
+# =============================================================================
 # the fail-closed effort rule (AC6 shape), against a scratch-installed tree
 # =============================================================================
 EFF="$TMP/effort-tree"
@@ -222,7 +294,99 @@ pass "authority-rule-not-carried-writes-proposes — writes/proposes roles bound
 run_auth_role tech-lead && rc=0 || rc=$?
 [ "$rc" -eq 0 ] || fail "authority-rule-none-role-unaffected: expected exit 0 (authority 'none'), got $rc"
 pass "authority-rule-none-role-unaffected — a 'none'-authority role is unaffected by the same not-carried mutation (proves the rule keys on authority, not on the mutation's mere presence)"
+
+# =============================================================================
+# channel-token CLOSED-VOCABULARY membership (round-1 review Blocker 2): an
+# unrecognized board-transition channel value must refuse, never default to
+# "carrying and safe" — the class the reviewer's one-character typo
+# (`not-caried`) instance is drawn from. Several distinct malformed shapes
+# exercise the same class, not just the reported reproduction.
+# =============================================================================
+channel_mutation() {  # $1 = the mutated channel value to install
+  sed "s/^carries board-transition .*\$/carries board-transition $1/" "$TMP/claude-cli.auth.orig" > "$AUTH/templates/adapters/claude-cli.txt"
+}
+for variant in not-caried zzz-unknown-token Stdout board; do
+  channel_mutation "$variant"
+  cmp -s "$TMP/claude-cli.auth.orig" "$AUTH/templates/adapters/claude-cli.txt" && fail "channel-membership-$variant: fixture control failed — mutation had no effect"
+  run_auth_role engineer && rc=0 || rc=$?
+  [ "$rc" -eq 2 ] || { fail "channel-membership-$variant: expected exit 2 (binding-unresolved), got $rc"; continue; }
+  [ ! -s "$TMP/auth.out" ] || fail "channel-membership-$variant: expected zero stdout bytes"
+  grep -qF -- 'binding-unresolved' "$TMP/auth.err" || fail "channel-membership-$variant: expected binding-unresolved"
+done
+pass "channel-membership-unrecognized-value — an unrecognized board-transition channel value (a one-character typo, an unrelated token, a case variant, and the RETIRED 'board' token) is refused binding-unresolved in every case, never treated as carrying-and-safe"
 cp "$TMP/claude-cli.auth.orig" "$AUTH/templates/adapters/claude-cli.txt"
+run_auth_role engineer && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "channel-membership-positive-control: expected exit 0 once the mutation is reverted, got $rc"
+pass "channel-membership-positive-control — reverting the mutation restores the baseline resolve (proves the refusals above measured the mutation, not a stuck fixture)"
+
+# =============================================================================
+# field-count validation on non-binding reads (round-1 review Major 3): the
+# contract's role-board-authority rows and an adapter definition's own
+# capability-effort / carries-board-transition / effort-value rows must be
+# refused on an extra field, exactly the rigor AC8 already gives the
+# BINDING's own canonical form.
+# =============================================================================
+FC="$TMP/fieldcount-tree"
+build_installed_tree "$FC"
+mkdir -p "$FC/r/.ops"
+printf '%s\n' 'schema 1' \
+  'bind tech-lead claude m1 - claude-cli' 'bind pm-spec claude m1 - claude-cli' \
+  'bind engineer claude m1 high claude-cli' 'bind qa-verifier claude m1 - claude-cli' \
+  'bind ui-designer claude m1 - claude-cli' 'bind codex-reviewer claude m1 - claude-cli' \
+  > "$FC/r/.ops/binding.conf"
+run_fc_role() { ( cd "$FC/r" && TEAM_RUN_BASE=.ops bash "$FC/bin/resolve-executor.sh" --role "$1" >"$TMP/fc.out" 2>"$TMP/fc.err" ); }
+
+run_fc_role engineer && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "field-count-baseline: expected exit 0 (unmutated), got $rc"
+pass "field-count-baseline — the unmutated fixture resolves before any field-count mutation is applied"
+
+cp "$FC/templates/adapters/claude-cli.txt" "$TMP/claude-cli.fc.orig"
+sed 's/^capability effort supported$/capability effort supported extra-token/' "$TMP/claude-cli.fc.orig" > "$FC/templates/adapters/claude-cli.txt"
+cmp -s "$TMP/claude-cli.fc.orig" "$FC/templates/adapters/claude-cli.txt" && fail "field-count-capability-effort: fixture control failed — mutation had no effect"
+run_fc_role engineer && rc=0 || rc=$?
+[ "$rc" -eq 2 ] || fail "field-count-capability-effort: expected exit 2, got $rc"
+[ ! -s "$TMP/fc.out" ] || fail "field-count-capability-effort: expected zero stdout bytes"
+grep -qF -- 'binding-unresolved' "$TMP/fc.err" || fail "field-count-capability-effort: expected binding-unresolved"
+pass "field-count-capability-effort — an extra trailing field on the capability effort row is refused, not silently ignored"
+cp "$TMP/claude-cli.fc.orig" "$FC/templates/adapters/claude-cli.txt"
+
+sed 's/^carries board-transition stdout$/carries board-transition stdout extra-token/' "$TMP/claude-cli.fc.orig" > "$FC/templates/adapters/claude-cli.txt"
+cmp -s "$TMP/claude-cli.fc.orig" "$FC/templates/adapters/claude-cli.txt" && fail "field-count-carries-board-transition: fixture control failed — mutation had no effect"
+run_fc_role engineer && rc=0 || rc=$?
+[ "$rc" -eq 2 ] || fail "field-count-carries-board-transition: expected exit 2, got $rc"
+[ ! -s "$TMP/fc.out" ] || fail "field-count-carries-board-transition: expected zero stdout bytes"
+grep -qF -- 'binding-unresolved' "$TMP/fc.err" || fail "field-count-carries-board-transition: expected binding-unresolved"
+pass "field-count-carries-board-transition — an extra trailing field on the carries board-transition row is refused, not silently ignored"
+cp "$TMP/claude-cli.fc.orig" "$FC/templates/adapters/claude-cli.txt"
+
+sed 's/^effort-value high$/effort-value high extra-token/' "$TMP/claude-cli.fc.orig" > "$FC/templates/adapters/claude-cli.txt"
+cmp -s "$TMP/claude-cli.fc.orig" "$FC/templates/adapters/claude-cli.txt" && fail "field-count-effort-value: fixture control failed — mutation had no effect"
+run_fc_role engineer && rc=0 || rc=$?
+[ "$rc" -eq 1 ] || fail "field-count-effort-value: expected exit 1 (the malformed row no longer counts as declaring 'high'), got $rc"
+[ ! -s "$TMP/fc.out" ] || fail "field-count-effort-value: expected zero stdout bytes"
+grep -qF -- 'capability-unsupported' "$TMP/fc.err" || fail "field-count-effort-value: expected capability-unsupported"
+pass "field-count-effort-value — an extra trailing field on an effort-value row disqualifies it from declaring that value, rather than being silently accepted"
+cp "$TMP/claude-cli.fc.orig" "$FC/templates/adapters/claude-cli.txt"
+
+STUB_CONTRACT_FC="$TMP/fc-stub-contract.txt"
+printf '%s\n' \
+  'schema 1' \
+  'field task-id in required' \
+  'channel argv' 'channel prompt' 'channel stdin' 'channel stdout' 'channel stderr' 'channel file' 'channel exit-status' 'channel not-carried' \
+  'status-value ok success' 'status-value error failure' \
+  'error-class executor-unavailable' 'error-class capability-unsupported' 'error-class invocation-failed' 'error-class contract-violation' \
+  'effort-mechanism none' 'effort-mechanism cli-flag' \
+  'role-board-authority tech-lead none' 'role-board-authority pm-spec writes' \
+  'role-board-authority engineer writes extra-field-here' \
+  'role-board-authority qa-verifier writes' 'role-board-authority codex-reviewer proposes' 'role-board-authority ui-designer none' \
+  > "$STUB_CONTRACT_FC"
+printf '#!/usr/bin/env bash\ncat %s\nexit 0\n' "$STUB_CONTRACT_FC" > "$FC/bin/check-adapter.sh"
+chmod +x "$FC/bin/check-adapter.sh"
+run_fc_role engineer && rc=0 || rc=$?
+[ "$rc" -eq 2 ] || fail "field-count-role-board-authority: expected exit 2, got $rc"
+[ ! -s "$TMP/fc.out" ] || fail "field-count-role-board-authority: expected zero stdout bytes"
+grep -qF -- 'binding-unresolved' "$TMP/fc.err" || fail "field-count-role-board-authority: expected binding-unresolved"
+pass "field-count-role-board-authority — an extra trailing field on a delegated role-board-authority row is refused, not silently ignored"
 
 # =============================================================================
 # the delegated canonical form re-asserted by content (AC8 shape), via a
