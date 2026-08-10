@@ -13,10 +13,13 @@ in both directions.
 
 T-1054 shipped a host-authored binding config (`bin/check-binding.sh`,
 `templates/binding-template.conf`): a host can declare which provider, model,
-effort and adapter runs each of the six inner-loop roles. Nothing consumed
-that binding yet — this document is what an adapter *is*: what it is handed,
-what it must give back, and how an unsupported `effort` value fails closed
-before a run rather than surprising a host inside one.
+effort and adapter runs each of the six inner-loop roles. Nothing consumes
+that binding — this document is what an adapter *is*: what it is handed,
+what it must give back, and what a host is owed when it assigns an
+`effort` value the executor cannot honour. That last rule is **normative
+here, not enforced here**: the pre-run cross-check that once enforced it
+was carved out to a successor issue (DP18), so a component acting on this
+contract must implement it rather than assume it already runs.
 
 ## What this task ships, and what it does not
 
