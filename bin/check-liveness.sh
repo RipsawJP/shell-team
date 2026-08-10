@@ -39,7 +39,7 @@ set -euo pipefail
 # Every non-terminal-success path funnels through here: print the bare
 # OBSERVE_ERROR token on stdout (nothing else), the classification token plus
 # a plain-language message on stderr, and exit 2 — the same shape every
-# refusal in the closed 19-token set uses.
+# refusal in the closed 18-token set uses.
 refuse() {  # $1 = token (closed set); $2 = message
   printf 'OBSERVE_ERROR\n'
   printf 'check-liveness: %s: %s\n' "$1" "$2" >&2 || true
