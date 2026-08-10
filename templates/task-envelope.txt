@@ -1,0 +1,134 @@
+# task-envelope.txt — the plugin-shipped, line-oriented task-envelope
+# contract registry consumed by bin/check-adapter.sh (T-1055; GitHub issue
+# #203; .shell-team/specs/T-1055-adapter-envelope.md).
+#
+# This is the machine-readable half of the task-envelope contract; the
+# normative prose half — meanings, per-field conditions, the generalized
+# invocation pattern, the measured effort mechanisms — lives in
+# docs/loop-engineering/task-envelope.md. The two are checked against each
+# other (AC8): the field-token set this file declares and the field-token
+# set that document's `## Envelope fields` section documents must be equal
+# in both directions.
+#
+# This registry describes a CONTRACT, never an instance: no code anywhere
+# serializes, parses or writes an envelope value in the shape this file
+# declares. It is resolved from bin/check-adapter.sh's OWN installed
+# directory (one level above it), never from an adopter's checked-out tree —
+# the same shape templates/binding-adapters.txt and
+# templates/durability-records.txt already have for their own consuming
+# checkers. The testing override is bin/check-adapter.sh's own --contract
+# PATH flag, documented there as a testing affordance, not an adopter knob.
+#
+# Format (whitespace-delimited rows; `#` comments and blank lines are
+# skipped; row order and extra whitespace do not matter):
+#
+#   schema <version>
+#     Required, exactly once. The envelope-schema version this contract
+#     declares; an adapter definition's own `envelope-schema` value must
+#     match it exactly or the definition is refused
+#     (unsupported-envelope-schema).
+#
+#   field <name> <in|out> <required|conditional>
+#     One row per envelope field. <name> is a bare lower-case token (the
+#     field's own identity, matched byte for byte against a `carries` row
+#     in an adapter definition). <in|out> is stated from the ADAPTER's own
+#     point of view: `in` is what an adapter receives, `out` is what it
+#     returns. `required` or `conditional` states requiredness; a
+#     conditional field is always declared here — its condition (when a
+#     value is actually required) is prose, documented in
+#     docs/loop-engineering/task-envelope.md, never encoded in this file.
+#     Every field an adapter definition declares in a `carries` row must
+#     name a field token declared here (unknown-envelope-field); every
+#     field declared here must have a `carries` row in every definition
+#     (field-coverage-gap).
+#
+#   channel <token>
+#     One row per member of the closed channel vocabulary — the substrate
+#     shape a `carries` row may claim carries a field: which part of the
+#     existing loop (an argv value, the prompt text, a file, the board
+#     itself, ...) actually carries that field for a given adapter. A
+#     `carries` row's channel must name a token declared here
+#     (unknown-channel). This vocabulary is closed but not frozen — a
+#     future adapter needing a genuinely new channel adds a row here, and
+#     AC2 checks this vocabulary's SHAPE (a bare lower-case token) only,
+#     never its membership.
+#
+#   error-class <token>
+#     One row per member of the closed error-class vocabulary an
+#     envelope's `error-class` field may carry when `status` is not the
+#     success value. Four are required by AC2 — executor-unavailable,
+#     capability-unsupported, invocation-failed, contract-violation —
+#     because #203 design point 4 names them as telemetry T-1057 needs
+#     ready; more may be added later without cost.
+#
+#   effort-mechanism <token>
+#     One row per member of the closed effort-mechanism vocabulary an
+#     adapter's own `effort-mechanism` directive may declare. Exactly one
+#     row must be the literal `none` (an adapter with no per-invocation
+#     effort knob at all); at least one other row must exist for an
+#     adapter that does have one. An adapter definition's declared
+#     mechanism must name a token declared here (unknown-effort-mechanism).
+#
+#   role-board-authority <role> <writes|proposes|none>
+#     One row per inner-loop role (tech-lead, pm-spec, engineer,
+#     qa-verifier, codex-reviewer, ui-designer — no more, no fewer; the
+#     three advisory roles scrum-master, triage-orchestrator and
+#     drift-evaluator never appear here). `writes` means the role edits
+#     the board itself and the envelope's `board-transition` field records
+#     what it wrote. `proposes` means the role returns the board
+#     transition it wants and the orchestrator transcribes it — the role
+#     itself never edits the board. `none` means the role requests no
+#     board transition at all. The value for each of the six roles is
+#     measured from that role's own shipped prompt (agents/*.md), not
+#     assigned by fiat; see docs/loop-engineering/task-envelope.md for the
+#     citation behind each one.
+#
+# Nothing in this registry, and nothing that reads it, composes a command,
+# an argv list, an environment assignment or a path to an executable —
+# every value here is a bare token (DP5). How the envelope actually
+# reaches an executor is declared per adapter, in that adapter's own
+# `carries` rows — never here, and never as a second implementation of
+# this file's own vocabulary.
+
+schema 1
+
+field task-id            in  required
+field role                in  required
+field phase               in  required
+field request             in  required
+field artifact-paths      in  required
+field working-dir         in  required
+field resolved-binding    in  required
+field status              out required
+field verdict             out conditional
+field produced-artifacts  out required
+field board-transition    out conditional
+field usage               out required
+field error-class         out conditional
+field adapter-version     out required
+
+channel argv
+channel prompt
+channel stdin
+channel stdout
+channel stderr
+channel file
+channel board
+channel exit-status
+channel not-carried
+
+error-class executor-unavailable
+error-class capability-unsupported
+error-class invocation-failed
+error-class contract-violation
+
+effort-mechanism none
+effort-mechanism cli-flag
+effort-mechanism cli-config-override
+
+role-board-authority tech-lead      none
+role-board-authority pm-spec       writes
+role-board-authority engineer      writes
+role-board-authority qa-verifier   writes
+role-board-authority codex-reviewer proposes
+role-board-authority ui-designer   none
