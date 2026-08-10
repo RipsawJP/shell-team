@@ -17,16 +17,17 @@
 #   stdout           exit
 #   RUNNING          0     positive evidence the loop ticked recently
 #   WAITING          3     a fresh human-gate declaration explains it
-#   STALLED          4     past the stall threshold, not (yet) past the dead one
-#   DEAD             5     past the dead threshold on both clocks
+#   STALLED          4     past the stall threshold, at any magnitude
 #   OBSERVE_ERROR    2     could not be fully evaluated; a reason token is on
-#                          stderr, from a closed 19-token set
+#                          stderr, from a closed 18-token set
 #
 # Exit 1 is reserved for NOTHING: bash's own `errexit` failure fallback is
 # exit 1, so a contract that assigned a verdict to it could never distinguish
-# "decided this" from "crashed before deciding". See --help for the full
-# vocabulary, the two default thresholds, and the invocation recipe an
-# external timer should use.
+# "decided this" from "crashed before deciding". Exit 5 named a retired
+# fourth verdict value this cut drops — it stays unassigned rather than
+# reused, so a v1 caller that still branches on it gets no verdict rather
+# than the wrong one. See --help for the full vocabulary, the one default
+# threshold, and the invocation recipe an external timer should use.
 #
 # Nothing here reads the board, gates any phase transition, or forwards
 # anything to any other checker in this repository — the only sibling script
@@ -77,10 +78,10 @@ SCRIPT_DIR="$(cd "$script_dir_raw" && pwd -P)" \
 print_help() {
   cat <<'EOF'
 Usage: check-liveness.sh (--task T-NNN | --state PATH --declaration PATH)
-                          [--stall-after N] [--dead-after N] [--out PATH]
+                          [--stall-after N] [--out PATH]
 
 Fail-closed, out-of-band classifier for whether a shell-team loop is still
-ticking, waiting on a human, stalled, or dead. Reads only already-persisted
+ticking, waiting on a human, or stalled. Reads only already-persisted
 state and writes nothing unless --out is given. Invoke it from a timer
 process outside this repository (cron, launchd, or any external scheduler
 of the operator's choosing) — no such timer ships here; this text is the
@@ -89,10 +90,11 @@ whole of the invocation recipe.
 Verdicts (stdout: exactly one bare token; also the exit code):
   RUNNING        0  positive evidence the loop ticked recently
   WAITING        3  a fresh human-gate declaration explains the silence
-  STALLED        4  past the stall threshold, not (yet) past the dead one
-  DEAD           5  past the dead threshold on both the tick clock and HEAD
+  STALLED        4  past the stall threshold, at any magnitude past it
   OBSERVE_ERROR  2  the input could not be fully evaluated; see stderr
   exit 1         reserved; assigned to no verdict at all (never printed)
+
+All four surviving tokens are listed above; this cut carries no fifth.
 
 Arguments:
   --task T-NNN          compose both paths under the shared runs directory
@@ -100,17 +102,14 @@ Arguments:
                          --declaration; mutually exclusive with --task)
   --declaration PATH    the human-gate declaration file (see above)
   --stall-after N       seconds of state-file silence before RUNNING
-                        becomes STALLED
+                        becomes STALLED — the ONLY threshold this cut has
   default stall-after: 900
-  --dead-after N        seconds of state-file silence AND HEAD silence
-                        before STALLED becomes DEAD
-  default dead-after: 3600
   --out PATH            also write a self-describing verdict document
                         (replace semantics; a symlink target is refused,
                         dangling or not, without being followed)
   --help, -h            show this help and exit
 
-Re-evaluation trigger for the two defaults above: re-derive both if a single
+Re-evaluation trigger for the default above: re-derive it if a single
 /goal tick in this repository is measured to exceed --stall-after, if the
 completion gate gains a seventh layer, or if the cross-provider review
 call's synchronous duration changes materially.
@@ -118,8 +117,13 @@ EOF
 }
 
 # --- argument parsing ---------------------------------------------------------
+# The one retired threshold flag from v1 is deliberately NOT given its own
+# case arm here: it falls through to the generic unknown-flag arm below and
+# is refused `usage` rather than silently accepted and ignored, so a v1-
+# shaped invocation fails loudly instead of being reinterpreted (DP6). It is
+# not named in this file anywhere, including in this comment, by design.
 TASK="" STATE_PATH="" DECL_PATH="" OUT_PATH=""
-STALL_AFTER="900" DEAD_AFTER="3600"
+STALL_AFTER="900"
 HAVE_TASK=0 HAVE_STATE=0 HAVE_DECL=0
 
 while [ "$#" -gt 0 ]; do
@@ -129,7 +133,6 @@ while [ "$#" -gt 0 ]; do
     --state)         [ "$#" -ge 2 ] || refuse usage "--state requires a value"; STATE_PATH="$2"; HAVE_STATE=1; shift 2 ;;
     --declaration)   [ "$#" -ge 2 ] || refuse usage "--declaration requires a value"; DECL_PATH="$2"; HAVE_DECL=1; shift 2 ;;
     --stall-after)   [ "$#" -ge 2 ] || refuse usage "--stall-after requires a value"; STALL_AFTER="$2"; shift 2 ;;
-    --dead-after)    [ "$#" -ge 2 ] || refuse usage "--dead-after requires a value"; DEAD_AFTER="$2"; shift 2 ;;
     --out)           [ "$#" -ge 2 ] || refuse usage "--out requires a value"; OUT_PATH="$2"; shift 2 ;;
     --) shift; break ;;
     -*) refuse usage "unknown flag: $1" ;;
@@ -149,12 +152,12 @@ else
   refuse usage "supply --task T-NNN, or both --state PATH and --declaration PATH"
 fi
 
-# --- thresholds: shape-then-order, width-bounded, 10#-normalized immediately after the bound proves a plain decimal
+# --- the one surviving threshold: width-bounded, 10#-normalized immediately
+# after the bound proves a plain decimal. With one threshold there is no
+# ordering relation left to violate, so that refusal token is deleted
+# outright rather than kept unreachable (DP6).
 [[ "$STALL_AFTER" =~ ^[0-9]{1,9}$ ]] || refuse threshold-invalid "invalid --stall-after: '$STALL_AFTER'"
-[[ "$DEAD_AFTER"  =~ ^[0-9]{1,9}$ ]] || refuse threshold-invalid "invalid --dead-after: '$DEAD_AFTER'"
 STALL_AFTER=$((10#$STALL_AFTER))
-DEAD_AFTER=$((10#$DEAD_AFTER))
-[ "$DEAD_AFTER" -gt "$STALL_AFTER" ] || refuse threshold-order "--dead-after must be strictly greater than --stall-after"
 
 # --- resolve the sibling path resolver (the only sibling script this file calls) ---
 resolve_team_paths() {
@@ -209,16 +212,25 @@ read_state_key() {  # $1 = key
 # mtime sample above and the content read below are two separate syscalls
 # against a file the cross-tick state helper's own bump subcommand rewrites
 # in place with no locking, so a rewrite landing between them can pair a
-# stale (pre-rewrite) mtime with fresh (post-rewrite) content, understating A_STATE and
-# misreporting a genuinely ticking loop as STALLED/DEAD — the spec's own
-# `## Input space` names "an invocation that overlaps a tick's own write" as
-# reachable, so this is not out-of-scope. Fix: stat, read content, stat
-# again; if the mtime moved, the file changed under us — retry with the
+# stale (pre-rewrite) mtime with fresh (post-rewrite) content, understating
+# A_STATE and misreporting a genuinely ticking loop as STALLED — the spec's
+# own `## Input space` names "an invocation that overlaps a tick's own
+# write" as reachable, so this is not out-of-scope. Fix: stat, read content,
+# stat again; if the mtime moved, the file changed under us — retry with the
 # fresh mtime, bounded to a small number of attempts. If it is STILL moving
 # after those attempts, that is itself positive evidence the loop is writing
 # right now, and using the LAST (freshest) mtime observed feeds that
 # evidence into the ladder's existing single RUNNING emit site below
 # (DP8/AC4) — no second RUNNING site, no new verdict path invented.
+#
+# DP9a (v2): this loop carries NO env-var-gated seam that mutates the state
+# file to exercise its own retry path — a round-2 finding on the v1 seam
+# reproduced live that a seam writing to an observed input can fabricate the
+# healthiest verdict from the sickest input, which is precisely the failure
+# DP5 exists to prevent, reached by a different mechanism than a floored
+# clock. Race coverage lives entirely in the test process (a `PATH`-shadowed
+# helper that forwards to the real tool and performs the mutation from
+# outside this script), never in a hook shipped here.
 CONSISTENCY_ATTEMPTS=0
 CONSISTENCY_MAX=3
 while :; do
@@ -226,17 +238,6 @@ while :; do
   read_state_mtime; mtime_before="$STATE_MTIME_RAW"
   STATE_START_EPOCH_RAW="$(read_state_key start_epoch)"
   STATE_ITERATION_RAW="$(read_state_key iteration)"
-  # Test-only seam (never reached unless a fixture sets this env var):
-  # simulates a `bump` landing between the content read just above and the
-  # confirming re-stat just below, so the retry path is exercised
-  # deterministically — no sleep, no background process, no live race.
-  # A value of "always" fires on every attempt (a continuously-writing
-  # loop, exercising the bounded-exhaustion path); any other non-empty
-  # value fires once, on the first attempt only (a single bump).
-  if [ "${LIVENESS_TEST_RACE_MTIME_BUMP:-}" = "always" ] \
-    || { [ -n "${LIVENESS_TEST_RACE_MTIME_BUMP:-}" ] && [ "$CONSISTENCY_ATTEMPTS" -eq 1 ]; }; then
-    touch -- "$STATE_PATH" 2>/dev/null || true
-  fi
   read_state_mtime; mtime_after="$STATE_MTIME_RAW"
   [ "$mtime_before" = "$mtime_after" ] && break
   [ "$CONSISTENCY_ATTEMPTS" -lt "$CONSISTENCY_MAX" ] || break
@@ -437,13 +438,12 @@ write_out() {  # $1=token $2=reason $3=state-age $4=git-age
   return 0
 }
 
-emit_final() {  # $1 = TOKEN (RUNNING|WAITING|STALLED|DEAD) $2 = reason context (may be empty)
+emit_final() {  # $1 = TOKEN (RUNNING|WAITING|STALLED) $2 = reason context (may be empty)
   local tok="$1" reason="${2:-none}" code sage gage
   case "$tok" in
     RUNNING) code=0 ;;
     WAITING) code=3 ;;
     STALLED) code=4 ;;
-    DEAD)    code=5 ;;
     *) refuse unclassified "emit_final called with an unrecognized token: $tok" ;;
   esac
   sage="${A_STATE:-n/a}"
@@ -465,9 +465,17 @@ if [ "$DECL_STATE" = "superseded" ]; then
   printf 'check-liveness: declaration-superseded: declared-epoch is not later than the state file mtime; the wait has ended\n' >&2 || true
 fi
 
-# --- step 5: HEAD's committer epoch and its non-negative age — only reached
-# when the declaration is absent or superseded (a fresh one already exited
-# above, per DP8, which is why WAITING never requires HEAD to resolve).
+# --- step 5: HEAD's resolution and the sanity of its committer epoch — only
+# reached when the declaration is absent or superseded (a fresh one already
+# exited above, per DP8, which is why WAITING never requires HEAD to
+# resolve). This is a GATE in this cut (DP2/DP8), not a discriminating age:
+# the last-commit clock no longer separates any two verdicts from each
+# other, but a clock behind the repository's own last commit is still a
+# broken clock, and DP5's whole point is that a broken clock must never
+# yield RUNNING. A_GIT is still computed here rather than only gated,
+# because it is reported unchanged in the --out document's git-age line
+# (AC11) — that reporting costs no extra read, since HEAD_EPOCH is already
+# read for the sanity check either way.
 if ! HEAD_EPOCH_RAW="$(git log -1 --format=%ct HEAD 2>/dev/null)"; then
   refuse git-unreadable "HEAD does not resolve"
 fi
@@ -479,17 +487,13 @@ A_GIT=$((NOW - HEAD_EPOCH))
 
 # --- step 6: the ladder. RUNNING is reachable from exactly this one emit
 # site, on positive evidence only (A_STATE within the stall band, a
-# resolvable HEAD, and no unresolved declaration) — never a fallthrough.
+# resolvable and sane HEAD, and no unresolved declaration) — never a
+# fallthrough. One threshold, one quantity, two branches: there is no
+# second discriminant left to fold in (DP2).
 if [ "$A_STATE" -le "$STALL_AFTER" ]; then
   emit_final RUNNING "$DECL_CTX"
-elif [ "$A_STATE" -le "$DEAD_AFTER" ]; then
-  emit_final STALLED "$DECL_CTX"
 else
-  if [ "$A_GIT" -le "$DEAD_AFTER" ]; then
-    emit_final STALLED "$DECL_CTX"
-  else
-    emit_final DEAD "$DECL_CTX"
-  fi
+  emit_final STALLED "$DECL_CTX"
 fi
 
 # --- step 8: every branch above exits explicitly; this is reached only if a

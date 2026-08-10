@@ -23,8 +23,20 @@
 # (T-1001's entry). The declaration/state-file scratch fixtures still live
 # under a plain (non-git) $TMP.
 #
-# Case ids (grouped; searched by `check-acs.sh`'s AC15 for the five verdict
-# tokens and by this file's own token-presence for all 19 refusal tokens —
+# v2 (Codex round-2 REQUEST_CHANGES; pre-commitment trigger fired; the
+# spec's own first droppable executed): the vocabulary collapses to three
+# values (RUNNING/WAITING/STALLED — v1's retired fourth value, its second
+# threshold and flag, and the now-unreachable ordering refusal are all gone)
+# and the shipped LIVENESS_TEST_RACE_MTIME_BUMP production test seam is
+# deleted outright (DP9a: no write path to an observed input, under any
+# environment). Race coverage that the seam used to provide now lives
+# entirely in this suite via a PATH-shadowed `awk` helper that forwards to
+# the real tool and performs the mutation from the TEST PROCESS, between
+# the classifier's own reads — the technique QA round-2 proved live, never
+# a hook shipped in the classifier itself.
+#
+# Case ids (grouped; searched by `check-acs.sh`'s AC15 for the four verdict
+# tokens and by this file's own token-presence for all 18 refusal tokens —
 # `unclassified` is the one token this suite documents rather than reaches
 # behaviourally: it is the script's own internal fall-through backstop,
 # unreachable through any CLI input, and AC19(a)'s producer-run mutation
@@ -33,14 +45,17 @@
 #   cl-help-sane, cl-ci-wiring                    — static/CI sanity
 #   cl-no-eval-source-static, cl-emit-count-static,
 #   cl-sibling-name-static                        — structural self-checks
-#   cl-running*, cl-stalled*, cl-dead*             — ladder + boundaries
+#   cl-running*, cl-stalled*                       — ladder + boundaries
+#   cl-race-*                                      — TOCTOU coverage via the
+#                                                     test-process shadow, not
+#                                                     a production seam
 #   cl-waiting*                                    — categorical, non-git-safe
 #   cl-superseded*                                 — falls through, not an error
 #   cl-decl-*                                      — the closed declaration
 #                                                     refusal vocabulary
 #   cl-registry-*                                  — plugin-shipped, decoy-proof
 #   cl-clock-*, cl-threshold-*, cl-usage-*,
-#   cl-state-*, cl-git-unreadable, cl-out-*        — the rest of the 19 tokens
+#   cl-state-*, cl-git-unreadable, cl-out-*        — the rest of the 18 tokens
 #   cl-readonly-inputs, cl-canary-*                 — read-only + no-eval proof
 #   cl-task-*                                       — --task composition/shape
 
@@ -141,13 +156,18 @@ mk_decl() {
 h="$TMP/help.txt"
 bash "$CHECKER" --help > "$h" 2>&1 || fail "cl-help-sane: --help did not exit 0"
 [ -s "$h" ] || fail "cl-help-sane: --help produced no output"
-for t in RUNNING WAITING STALLED DEAD OBSERVE_ERROR; do
+for t in RUNNING WAITING STALLED OBSERVE_ERROR; do
   grep -qF -- "$t" "$h" || fail "cl-help-sane: --help does not name $t"
 done
+# The retired fourth token's own absence from --help is AC3's frozen clause
+# to make (this suite is scoped to zero occurrences of that literal itself,
+# per AC10, so it is not independently re-asserted here); the retired flag's
+# name IS suite-permitted (AC10 scopes that absence to the classifier alone)
+# and is checked below.
+[ "$(grep -cF -- 'dead-after' "$h" || true)" = "0" ] || fail "cl-help-sane: --help still names the retired dead-after flag"
 grep -qF -- 'exit 1' "$h" || fail "cl-help-sane: --help does not carry the literal 'exit 1'"
 grep -qF -- 'no verdict' "$h" || fail "cl-help-sane: --help does not carry the literal 'no verdict'"
 grep -qxE '  default stall-after: [0-9]{1,9}' "$h" || fail "cl-help-sane: --help missing the exact 'default stall-after: <n>' line"
-grep -qxE '  default dead-after: [0-9]{1,9}' "$h" || fail "cl-help-sane: --help missing the exact 'default dead-after: <n>' line"
 pass "cl-help-sane"
 
 # =============================================================================
@@ -208,75 +228,116 @@ call_cl "$((MT + 901))" --state "$S" --declaration "$TMP/none"
 assert_verdict cl-stalled-boundary-over-stall 4 STALLED
 
 call_cl "$((MT + 3600))" --state "$S" --declaration "$TMP/none"
-assert_verdict cl-stalled-boundary-at-dead 4 STALLED
+assert_verdict cl-stalled-boundary-far-past 4 STALLED
 
 # =============================================================================
-# STALLED via S2xG0 and DEAD via S2xG1 — measured against THIS checkout's
-# own real HEAD, live, rather than a scratch git repository (see this file's
-# header note and the provenance file for why).
+# STALLED at extreme age — measured against THIS checkout's own real HEAD,
+# live, rather than a scratch git repository (see this file's header note
+# and the provenance file for why). Two ages three-plus orders of magnitude
+# apart, both STALLED, is the v2 collapse's own observable signature (AC9).
 # =============================================================================
 HC="$(git -C "$REPO_ROOT" log -1 --format=%ct HEAD)"
 OLD="$TMP/old"
 mk_state "$OLD" "946684800"
 touch -t 200001010000 "$OLD"
 OM="$(state_mtime "$OLD")"
-[ "$((HC - OM))" -gt 31536000 ] || fail "cl-stalled-s2g0: fixture precondition failed (backdated file is not >1 year behind HEAD)"
+[ "$((HC - OM))" -gt 31536000 ] || fail "cl-stalled-extreme-age-near: fixture precondition failed (backdated file is not >1 year behind HEAD)"
 
 call_cl "$((HC + 60))" --state "$OLD" --declaration "$TMP/none"
-assert_verdict cl-stalled-s2g0 4 STALLED
+assert_verdict cl-stalled-extreme-age-near 4 STALLED
 
 call_cl "$((HC + 100000))" --state "$OLD" --declaration "$TMP/none"
-assert_verdict cl-dead-s2g1 5 DEAD
+assert_verdict cl-stalled-extreme-age-far 4 STALLED
 
 # =============================================================================
-# M1 (Codex round-1 Major): state-file mtime/content consistency re-read —
-# a bounded retry (stat -> read content -> stat again) closes the TOCTOU
-# window between the mtime sample and the content read, so a rewrite landing
-# between them cannot pin a stale, pre-rewrite mtime against fresh content.
-# LIVENESS_TEST_RACE_MTIME_BUMP is a test-only seam (documented in the
-# script itself) that mutates the fixture BETWEEN the two steps
-# deterministically -- no sleep, no background process, no live race.
+# M1 (Codex round-1 Major, race-closing fix) + DP9a (v2, round-2 Major: the
+# fix's own v1 test seam wrote to an observed input and is deleted outright).
+# Race coverage now lives entirely here, via a PATH-shadowed `awk` that
+# forwards to the REAL awk and then mutates the state file's mtime FROM THE
+# TEST PROCESS, between the classifier's own content read and its
+# confirming re-stat -- the technique QA round-2 proved live. No production
+# hook, no sleep, no background process.
 # =============================================================================
-RACE_CONTROL="$TMP/race-control"
-mk_state "$RACE_CONTROL" "946684800"
-touch -t 200001010000 "$RACE_CONTROL"
+REAL_AWK="$(command -v awk)" || fail "cl-race-shadow-touch-running: no awk found on PATH to shadow"
+SHADOW_DIR="$TMP/shadow-awk"
+mkdir -p "$SHADOW_DIR"
+
+# The no-op shadow: forwards only, never mutates -- a vacuity control
+# proving the shadow mechanism itself changes nothing when it doesn't touch.
+cat > "$SHADOW_DIR/awk-noop" <<SHADOWEOF
+#!/bin/sh
+exec "$REAL_AWK" "\$@"
+SHADOWEOF
+chmod +x "$SHADOW_DIR/awk-noop"
+
+# The touching shadow: forwards, THEN touches the last argument (the file
+# awk was asked to read -- exactly \$STATE_PATH in every call the classifier
+# makes), simulating a rewrite landing between the content read and the
+# confirming re-stat.
+cat > "$SHADOW_DIR/awk-touch" <<SHADOWEOF
+#!/bin/sh
+"$REAL_AWK" "\$@"
+rc=\$?
+n=\$#
+if [ "\$n" -gt 0 ]; then
+  shift \$((n - 1))
+  touch -- "\$1" 2>/dev/null || true
+fi
+exit "\$rc"
+SHADOWEOF
+chmod +x "$SHADOW_DIR/awk-touch"
+
+RACE_OLD="$TMP/race-old"
+mk_state "$RACE_OLD" "946684800"
+touch -t 200001010000 "$RACE_OLD"
+ROM="$(state_mtime "$RACE_OLD")"
+
+# A fixed clock, captured once and given a generous forward buffer, rather
+# than letting the classifier call `date +%s` internally: the touching
+# shadow's `touch` sets the file's mtime to REAL wall-clock time at the
+# instant it fires, mid-invocation -- comparing that against an
+# un-buffered "now" captured a moment earlier is exactly the kind of
+# second-boundary race this suite's own conventions avoid (no sleep, no
+# real-time comparison without a margin). $RACE_NOW is comfortably after
+# any delay between capturing it and the shadow's touch actually running.
+RACE_NOW=$(( $(date +%s) + 30 ))
+
+# control: the no-op shadow changes nothing -- same STALLED as the real awk.
+mkdir -p "$SHADOW_DIR/noop"; ln -sf "$SHADOW_DIR/awk-noop" "$SHADOW_DIR/noop/awk"
 set +e
-( cd "$REPO_ROOT" && bash "$CHECKER" --state "$RACE_CONTROL" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+( cd "$REPO_ROOT" && PATH="$SHADOW_DIR/noop:$PATH" LIVENESS_NOW="$RACE_NOW" bash "$CHECKER" --state "$RACE_OLD" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
 CL_RC=$?
 set -e
-assert_verdict cl-race-control-stalled 4 STALLED
+assert_verdict cl-race-shadow-noop-control-stalled 4 STALLED
+ROM2="$(state_mtime "$RACE_OLD")"
+[ "$ROM" = "$ROM2" ] || fail "cl-race-shadow-noop-control-stalled: the no-op shadow unexpectedly changed the file's mtime"
 
-RACE_SINGLE="$TMP/race-single-bump"
-mk_state "$RACE_SINGLE" "946684800"
-touch -t 200001010000 "$RACE_SINGLE"
+# the race itself: the touching shadow lands a mutation mid-read; the
+# classifier's own bounded consistency re-read must pick up the FRESH mtime
+# it produces, landing RUNNING rather than leaking the stale, pre-touch one.
+mkdir -p "$SHADOW_DIR/touch"; ln -sf "$SHADOW_DIR/awk-touch" "$SHADOW_DIR/touch/awk"
 set +e
-( cd "$REPO_ROOT" && LIVENESS_TEST_RACE_MTIME_BUMP=1 bash "$CHECKER" --state "$RACE_SINGLE" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+( cd "$REPO_ROOT" && PATH="$SHADOW_DIR/touch:$PATH" LIVENESS_NOW="$RACE_NOW" bash "$CHECKER" --state "$RACE_OLD" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
 CL_RC=$?
 set -e
-assert_verdict cl-race-single-bump-running 0 RUNNING
-
-RACE_ALWAYS="$TMP/race-always-bump"
-mk_state "$RACE_ALWAYS" "946684800"
-touch -t 200001010000 "$RACE_ALWAYS"
-set +e
-( cd "$REPO_ROOT" && LIVENESS_TEST_RACE_MTIME_BUMP=always bash "$CHECKER" --state "$RACE_ALWAYS" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
-CL_RC=$?
-set -e
-assert_verdict cl-race-always-bump-running 0 RUNNING
+assert_verdict cl-race-shadow-touch-running 0 RUNNING
+ROM3="$(state_mtime "$RACE_OLD")"
+[ "$ROM" != "$ROM3" ] || fail "cl-race-shadow-touch-running: fixture precondition failed (the touching shadow never actually touched the file)"
+[ "$((RACE_NOW - ROM3))" -ge 0 ] || fail "cl-race-shadow-touch-running: fixture precondition failed (the touched mtime is still after the buffered clock -- widen the buffer)"
 
 # =============================================================================
-# threshold overrides move both boundaries
+# threshold override moves the one surviving boundary
 # =============================================================================
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 5 --dead-after 100000
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 5
 assert_verdict cl-threshold-override-stalled 4 STALLED
 
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 100 --dead-after 200
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 100
 assert_verdict cl-threshold-override-running 0 RUNNING
 
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 0900 --dead-after 3600
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 0900
 assert_verdict cl-threshold-leading-zero-running 0 RUNNING
 
-call_cl "$((MT + 901))" --state "$S" --declaration "$TMP/none" --stall-after 0900 --dead-after 3600
+call_cl "$((MT + 901))" --state "$S" --declaration "$TMP/none" --stall-after 0900
 assert_verdict cl-threshold-leading-zero-stalled 4 STALLED
 
 # =============================================================================
@@ -296,7 +357,7 @@ assert_verdict cl-waiting-control-running 0 RUNNING
 call_cl "$((MT + 1200))" --state "$S" --declaration "$TMP/none"
 assert_verdict cl-waiting-control-stalled 4 STALLED
 call_cl "$((MT + 100000))" --state "$S" --declaration "$TMP/none"
-assert_verdict cl-waiting-control-dead 5 DEAD
+assert_verdict cl-waiting-control-far-stalled 4 STALLED
 
 mkdir -p "$TMP/nogit"
 if git -C "$TMP/nogit" rev-parse --show-toplevel >/dev/null 2>&1; then
@@ -440,17 +501,16 @@ call_cl "$((OM + 5))" --state "$OLD" --declaration "$TMP/none"
 assert_refusal cl-clock-skew-git clock-skew
 
 # =============================================================================
-# thresholds: shape, order, boundary width
+# thresholds: shape and boundary width. The v1 ordering-refusal token is
+# retired outright at v2 -- one threshold has no ordering relation left to
+# violate (DP6) -- so there is no case for it here; --dead-after's own retirement is covered
+# under usage below, since it now falls to the generic unknown-flag arm.
 # =============================================================================
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 900 --dead-after 900
-assert_refusal cl-threshold-order-equal threshold-order
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 900 --dead-after 100
-assert_refusal cl-threshold-order-less threshold-order
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after abc --dead-after 3600
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after abc
 assert_refusal cl-threshold-invalid-nonnumeric threshold-invalid
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after -5 --dead-after 3600
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after -5
 assert_refusal cl-threshold-invalid-negative threshold-invalid
-call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 1234567890123 --dead-after 9999999999999
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 1234567890123
 assert_refusal cl-threshold-invalid-overwide threshold-invalid
 
 # =============================================================================
@@ -466,6 +526,14 @@ call_cl "" --task "T-" ; assert_refusal cl-usage-task-no-digits usage
 call_cl "" --task "t-1" ; assert_refusal cl-usage-task-lowercase usage
 call_cl "" --frobnicate ; assert_refusal cl-usage-unknown-flag usage
 call_cl "" "$S" ; assert_refusal cl-usage-bare-positional usage
+
+# the retired --dead-after flag (v2, DP6/AC8): refused usage through the
+# generic unknown-flag arm, alone and alongside the surviving flag, never
+# accepted and silently ignored.
+call_cl "" --state "$S" --declaration "$TMP/none" --dead-after 3600
+assert_refusal cl-usage-dead-after-alone usage
+call_cl "" --state "$S" --declaration "$TMP/none" --stall-after 900 --dead-after 3600
+assert_refusal cl-usage-dead-after-with-stall-after usage
 
 # --task with a valid, unusual (but shape-legal) digit run is ACCEPTED at the
 # argument-shape layer — it fails later, on state-missing, never on usage.
