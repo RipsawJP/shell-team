@@ -180,7 +180,7 @@ pass "cl-emit-count-static"
 sib_bad=0
 for p in $(git -C "$REPO_ROOT" ls-tree -r --name-only HEAD bin/ | sed -n 's#^bin/##p'); do
   case "$p" in
-    team-paths.sh) continue ;;
+    team-paths.sh|check-liveness.sh) continue ;;  # team-paths.sh is the one permitted sibling; check-liveness.sh is this script's OWN name, not a sibling
     *.sh) ;;
     *) continue ;;
   esac
