@@ -666,3 +666,35 @@ that file's order.
   that site — a suite that only asserts "the expected message is present
   somewhere" cannot by itself catch "and every OTHER message after this
   point silently vanished" the way this bug did.
+- T-1057: `bash tests/resolve-executor/run.sh` is `bin/resolve-executor.sh`'s
+  fixture suite (the T-1057 fail-closed per-role executor resolver). No new
+  prerequisite: pure bash + git, but its scratch root is the
+  `${TMPDIR:-/tmp}`-only `mktemp -d ... XXXXXX` arm — **no `$HERE` fallback
+  arm at all** — because this suite copies an installed tree (`bin/` +
+  `templates/`) out of the checkout to mutate a scratch copy, and the
+  ancestor-symlink fixtures a sibling suite builds for the identical reason
+  would otherwise land inside this repository's own working tree (a nested
+  nested-install shape sandboxed runs deny, the same restriction the T-1044
+  entry above already documents for a different suite shape). Reaching the
+  effort-unsupported and board-transition-not-carried branches requires
+  editing a SCRATCH COPY of `templates/adapters/claude-cli.txt` — both
+  shipped adapters declare `capability effort supported` and a real
+  `carries board-transition` channel, so those branches are unreachable
+  against the installed tree as shipped. One authoring trap specific to
+  this resolver: its two normative-rule reads (`capability effort
+  <supported|unsupported>`, `carries board-transition <channel>`) are done
+  with a direct `awk` field read against the bound adapter's own definition
+  file, never by delegating to `bin/check-adapter.sh --adapter TOKEN` —
+  that mode's own internal-consistency check refuses a definition mutated
+  to declare `capability effort unsupported` while its `effort-mechanism`/
+  `effort-value` rows are left untouched with a DIFFERENT token
+  (`capability-inconsistent`) than the one this resolver's own rule
+  requires (`capability-unsupported`), so a fixture built by mutating only
+  the one field the rule under test reads is exactly the shape that mode's
+  stricter grammar was never meant to validate. Two sibling suites gained
+  an ancestor-symlink case in the same round (`bin/check-durability.sh`'s
+  and `bin/team-init.sh`'s own `$SCRIPT_DIR/..`-crossing sites, issue #218):
+  the fixture model is `tests/check-binding/run.sh`'s
+  `cb-ancestor-symlink-registry-ignored` (an `adopter/bin -> $REPO_ROOT/bin`
+  directory symlink, plus a decoy in the adopter's own `templates/`, that
+  must have zero effect on which shipped file the checker actually reads).
