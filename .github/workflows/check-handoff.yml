@@ -252,8 +252,5 @@ jobs:
       - name: Run check-adapter fixture suite
         run: bash tests/check-adapter/run.sh
 
-      - name: Dogfood check-adapter — the shipped contract, definitions and binding specimen all validate
-        run: |
-          set -e
-          bash bin/check-adapter.sh
-          bash bin/check-adapter.sh --binding templates/binding-template.conf
+      - name: Dogfood check-adapter — the shipped contract and definitions validate
+        run: bash bin/check-adapter.sh

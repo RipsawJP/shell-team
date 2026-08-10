@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # run.sh — fixture suite for bin/check-adapter.sh (T-1055's fail-closed
 # task-envelope contract + adapter-definition validator, and its
-# `--print-contract`/`--adapter`/`--definitions`/`--contract`/`--binding`
-# modes). .shell-team/specs/T-1055-adapter-envelope.md's own `- check:`
-# lines exercise every acceptance criterion against this checker; this
-# suite is a second, independently-authored surface (matching
-# tests/check-binding/run.sh's own precedent) covering the same 25-token
-# refusal matrix (v3 — the doc-sync mode this suite once exercised and its
-# two tokens were carved out to a successor issue when this spec's
-# pre-commitment fired; DP16 v3/DP17) plus the "Coverage the suite must
-# carry beyond the criteria" items a `- check:` line cannot spell (no
-# backticks in a `- check:` line, per this repository's own convention).
+# `--print-contract`/`--adapter`/`--definitions`/`--contract` modes).
+# .shell-team/specs/T-1055-adapter-envelope.md's own `- check:` lines
+# exercise every acceptance criterion against this checker; this suite
+# is a second, independently-authored surface (matching
+# tests/check-binding/run.sh's own precedent) covering the same 22-token
+# refusal matrix (v4 — the doc-sync mode this suite once exercised, and
+# then the binding-config cross-check mode, were each carved out to a
+# successor issue when this spec's pre-commitment fired, twice; DP16 v3/
+# DP17, DP18) plus the "Coverage the suite must carry beyond the
+# criteria" items a `- check:` line cannot spell (no backticks in a
+# `- check:` line, per this repository's own convention).
 #
 # Every case runs through assert_case (exit code AND token together — this
 # repository's fixture-synthesis discipline) or a dedicated block for
@@ -18,7 +19,7 @@
 # equality, a static source-text absence).
 #
 # Case ids:
-#   ca-help-sane                    — --help: non-empty, mentions --binding,
+#   ca-help-sane                    — --help: non-empty, mentions --adapter,
 #                                      exit 0
 #   ca-ci-wiring                     — check-handoff.yml names both
 #                                      deliverables (T-1054 AC12's own
@@ -29,8 +30,6 @@
 #                                      schema line present
 #   ca-valid-adapter-claude/codex     — --adapter <token> on each shipped
 #                                      definition
-#   ca-valid-binding                 — --binding against the shipped
-#                                      specimen
 #   ca-mkdef-positive-control         — the mkdef() generator itself
 #                                      produces a valid definition before
 #                                      any mutation of its output is judged
@@ -76,16 +75,6 @@
 #                                      unsupported/wrong-mechanism)
 #   ca-unknown-effort-mechanism       — a mechanism outside the contract's
 #                                      vocabulary
-#   ca-binding-effort-allunset/
-#   ca-binding-effort-supported-value — --binding accepts `-` and a
-#                                      declared value
-#   ca-effort-unsupported-*           — a bound value outside the adapter's
-#                                      set, and a bound value on an
-#                                      unsupported-capability adapter
-#   ca-binding-invalid-*              — three configs check-binding.sh
-#                                      itself refuses (bad role, no schema,
-#                                      wrong bind-row field count) —>
-#                                      binding-invalid, exit 2, zero stdout
 #   ca-usage-*                        — unknown flag, a flag missing its
 #                                      value, mutually exclusive modes, and
 #                                      --envelope itself
@@ -132,13 +121,6 @@
 #                                      required error-class tokens absent
 #                                      with an arbitrary row in its place;
 #                                      non-emptiness is not the floor (V3)
-#   ca-binding-stub-correct-payload-positive-control/
-#   ca-binding-invalid-stub-no-schema/
-#   ca-binding-invalid-stub-provider-flip — a stub sibling's delegated
-#                                      output missing its schema line, and
-#                                      one whose first bound row's provider
-#                                      does not match the allowlist's
-#                                      pairing for that row's adapter (V4)
 
 set -euo pipefail
 
@@ -218,7 +200,7 @@ mkdef() {
 h="$TMP/help.txt"
 bash "$CHECKER" --help > "$h" 2>&1 || fail "ca-help-sane: --help did not exit 0"
 [ -s "$h" ] || fail "ca-help-sane: --help produced no output"
-grep -q -- '--binding' "$h" || fail "ca-help-sane: --help does not mention --binding"
+grep -q -- '--adapter' "$h" || fail "ca-help-sane: --help does not mention --adapter"
 n_envelope="$(grep -c -- '--envelope' "$h" || true)"
 [ "$n_envelope" = "0" ] || fail "ca-help-sane: --help mentions --envelope"
 pass "ca-help-sane"
@@ -244,7 +226,6 @@ pass "ca-valid-print-contract"
 
 assert_case ca-valid-adapter-claude 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$GOLD_DEFS" --adapter claude-cli
 assert_case ca-valid-adapter-codex 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$GOLD_DEFS" --adapter codex-cli
-assert_case ca-valid-binding 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$GOLD_DEFS" --binding "$REPO_ROOT/templates/binding-template.conf"
 
 d="$TMP/d-mkdefcheck"; mkdir -p "$d"
 mkdef "$d/claude-cli.txt" claude-cli claude supported cli-flag high
@@ -487,135 +468,6 @@ n_board="$(printf '%s\n' "$out_pc" | grep -c '^channel board$' || true)"
 pass "ca-board-channel-retired"
 
 # =============================================================================
-# --binding mode: effort fail-closed (AC6) and delegation refusal (AC7)
-# =============================================================================
-mk_binding_cfg() {  # $1 outfile ; $2 tech-lead-effort ; $3 codex-reviewer-effort
-  printf '%s\n' \
-    'schema 1' \
-    "bind tech-lead claude m1 $2 claude-cli" \
-    'bind pm-spec claude m1 - claude-cli' \
-    'bind engineer claude m1 - claude-cli' \
-    'bind qa-verifier claude m1 - claude-cli' \
-    'bind ui-designer claude m1 - claude-cli' \
-    "bind codex-reviewer codex m2 $3 codex-cli" \
-    > "$1"
-}
-
-bd="$TMP/binding-defs"; mkdir -p "$bd"
-mkdef "$bd/claude-cli.txt" claude-cli claude supported cli-flag high
-mkdef "$bd/codex-cli.txt" codex-cli codex unsupported none ""
-
-cfg1="$TMP/cfg-allunset.conf"; mk_binding_cfg "$cfg1" - -
-assert_case ca-binding-effort-allunset 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$bd" --binding "$cfg1"
-
-cfg2="$TMP/cfg-supported.conf"; mk_binding_cfg "$cfg2" high -
-assert_case ca-binding-effort-supported-value 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$bd" --binding "$cfg2"
-
-cfg3="$TMP/cfg-unsupportedvalue.conf"; mk_binding_cfg "$cfg3" xhigh -
-assert_case ca-effort-unsupported-unknown-value 1 'effort-unsupported' --contract "$GOLD_CONTRACT" --definitions "$bd" --binding "$cfg3"
-
-cfg4="$TMP/cfg-unsupportedcap.conf"; mk_binding_cfg "$cfg4" - high
-assert_case ca-effort-unsupported-capability-unsupported 1 'effort-unsupported' --contract "$GOLD_CONTRACT" --definitions "$bd" --binding "$cfg4"
-
-okcfg="$TMP/ok.conf"; mk_binding_cfg "$okcfg" - -
-
-binding_invalid_case() {  # <id> <mutated-config-path>
-  local id="$1" cfgpath="$2" out rc
-  cmp -s "$okcfg" "$cfgpath" && fail "$id: mutated config is byte-identical to the valid one"
-  set +e
-  out="$(bash "$CHECKER" --contract "$GOLD_CONTRACT" --definitions "$bd" --binding "$cfgpath" 2>"$TMP/e-$id")"
-  rc=$?
-  set -e
-  [ "$rc" -eq 2 ] || fail "$id: expected exit 2, got $rc"
-  grep -q -- 'binding-invalid' "$TMP/e-$id" || fail "$id: expected binding-invalid, got: $(cat "$TMP/e-$id")"
-  [ -z "$out" ] || fail "$id: expected zero stdout bytes, got: $out"
-  pass "$id"
-}
-
-b1="$TMP/b1.conf"; sed 's/^bind ui-designer /bind scrum-master /' "$okcfg" > "$b1"
-binding_invalid_case ca-binding-invalid-bad-role "$b1"
-
-b2="$TMP/b2.conf"; grep -v '^schema ' "$okcfg" > "$b2"
-binding_invalid_case ca-binding-invalid-no-schema "$b2"
-
-b3="$TMP/b3.conf"; sed 's/^bind pm-spec claude m1 - claude-cli$/bind pm-spec claude m1 claude-cli/' "$okcfg" > "$b3"
-binding_invalid_case ca-binding-invalid-wrong-fieldcount "$b3"
-
-# =============================================================================
-# authority-channel-conflict (DP13/R9): the one role/adapter join --binding
-# alone can see — a writes/proposes role bound to an adapter that declares
-# no board-transition return path
-# =============================================================================
-bd2="$TMP/binding-defs-conflict"; mkdir -p "$bd2"
-mkdef "$bd2/claude-cli.txt" claude-cli claude supported cli-flag high
-mkdef "$bd2/codex-cli.txt" codex-cli codex unsupported none ""
-sed -E 's/^carries board-transition .*/carries board-transition not-carried/' "$bd2/codex-cli.txt" > "$TMP/codex-nc.txt"
-cmp -s "$bd2/codex-cli.txt" "$TMP/codex-nc.txt" && fail "ca-authority-channel-conflict: mutated definition is byte-identical to the generated one"
-mv "$TMP/codex-nc.txt" "$bd2/codex-cli.txt"
-cfg5="$TMP/cfg-authority-conflict.conf"; mk_binding_cfg "$cfg5" - -
-assert_case ca-authority-channel-conflict 1 'authority-channel-conflict' --contract "$GOLD_CONTRACT" --definitions "$bd2" --binding "$cfg5"
-
-# a role whose authority is `none` (tech-lead/ui-designer) is NOT in
-# conflict with the same not-carried declaration — positive control
-# proving this is a role-authority join, not a blanket ban on the value.
-# Only the two `none`-authority roles are bound to the mutated (not-carried)
-# claude-cli; every writes/proposes role is bound to the unmutated codex-cli
-# instead, so a conflict here would prove the join fires on VALUE alone.
-bd3="$TMP/binding-defs-none-authority"; mkdir -p "$bd3"
-mkdef "$bd3/claude-cli.txt" claude-cli claude supported cli-flag high
-sed -E 's/^carries board-transition .*/carries board-transition not-carried/' "$bd3/claude-cli.txt" > "$TMP/claude-nc.txt"
-mv "$TMP/claude-nc.txt" "$bd3/claude-cli.txt"
-mkdef "$bd3/codex-cli.txt" codex-cli codex unsupported none ""
-cfg6="$TMP/cfg-none-authority.conf"
-printf '%s\n' \
-  'schema 1' \
-  'bind tech-lead claude m1 - claude-cli' \
-  'bind ui-designer claude m1 - claude-cli' \
-  'bind pm-spec codex m2 - codex-cli' \
-  'bind engineer codex m2 - codex-cli' \
-  'bind qa-verifier codex m2 - codex-cli' \
-  'bind codex-reviewer codex m2 - codex-cli' \
-  > "$cfg6"
-assert_case ca-authority-channel-conflict-none-authority-ok 0 'valid' --contract "$GOLD_CONTRACT" --definitions "$bd3" --binding "$cfg6"
-
-# =============================================================================
-# --binding delegated-shape re-assertion (R6): a stub sibling whose
-# canonical output has the wrong SHAPE (too few bound rows, or a blank line
-# in the middle) — a scratch TREE, since the re-assertion targets the
-# script's own SCRIPT_DIR-relative sibling resolution
-# (bash "$SCRIPT_DIR/check-binding.sh"), not the --definitions override
-# =============================================================================
-st2="$TMP/tree-stub"; scratch_tree "$st2"
-bash "$st2/bin/check-adapter.sh" --binding "$okcfg" >/dev/null 2>&1 \
-  || fail "ca-binding-invalid-truncated-shape: pristine scratch tree with the REAL sibling does not validate first"
-
-printf '%s\n' '#!/usr/bin/env bash' \
-  'printf "%s\n" "schema 1" "bound tech-lead claude m1 - claude-cli" "bound pm-spec claude m1 - claude-cli"' \
-  'exit 0' > "$st2/bin/check-binding.sh"
-chmod 755 "$st2/bin/check-binding.sh"
-set +e
-out="$(bash "$st2/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-truncated")"
-rc=$?
-set -e
-[ "$rc" -eq 2 ] || fail "ca-binding-invalid-truncated-shape: expected exit 2, got $rc"
-grep -q -- 'binding-invalid' "$TMP/e-truncated" || fail "ca-binding-invalid-truncated-shape: expected binding-invalid, got: $(cat "$TMP/e-truncated")"
-[ -z "$out" ] || fail "ca-binding-invalid-truncated-shape: expected zero stdout bytes, got: $out"
-pass "ca-binding-invalid-truncated-shape"
-
-printf '%s\n' '#!/usr/bin/env bash' \
-  'printf "%s\n" "schema 1" "bound tech-lead claude m1 - claude-cli" "" "bound pm-spec claude m1 - claude-cli" "bound engineer claude m1 - claude-cli" "bound qa-verifier claude m1 - claude-cli" "bound ui-designer claude m1 - claude-cli" "bound codex-reviewer codex m2 - codex-cli"' \
-  'exit 0' > "$st2/bin/check-binding.sh"
-chmod 755 "$st2/bin/check-binding.sh"
-set +e
-out="$(bash "$st2/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-blank")"
-rc=$?
-set -e
-[ "$rc" -eq 2 ] || fail "ca-binding-invalid-blank-line: expected exit 2, got $rc"
-grep -q -- 'binding-invalid' "$TMP/e-blank" || fail "ca-binding-invalid-blank-line: expected binding-invalid, got: $(cat "$TMP/e-blank")"
-[ -z "$out" ] || fail "ca-binding-invalid-blank-line: expected zero stdout bytes, got: $out"
-pass "ca-binding-invalid-blank-line"
-
-# =============================================================================
 # usage refusals (exit 2)
 # =============================================================================
 set +e
@@ -768,63 +620,5 @@ c="$TMP/errorclass-missing-required.txt"
 { grep -v '^error-class capability-unsupported$' "$GOLD_CONTRACT"; printf '%s\n' 'error-class zzz-arbitrary'; } > "$c"
 cmp -s "$GOLD_CONTRACT" "$c" && fail "ca-contract-incomplete-errorclass-missing-required: mutated contract is byte-identical to the shipped one"
 assert_case ca-contract-incomplete-errorclass-missing-required 2 'contract-incomplete' --contract "$c"
-
-# =============================================================================
-# --binding delegated-output reassertion, completed (V4/round 2): the
-# sibling's leading schema line is REQUIRED (v2 tracked it and never
-# checked it — a delegated output with no schema line and six otherwise-
-# valid bound rows was never refused), and each row's own provider token is
-# actually read and cross-checked against the allowlist's pairing for that
-# row's adapter — a scratch TREE with a stub sibling, since the
-# re-assertion targets the script's own SCRIPT_DIR-relative sibling
-# resolution, not the --definitions override
-# =============================================================================
-st3="$TMP/tree-stub-v4"; scratch_tree "$st3"
-bash "$st3/bin/check-adapter.sh" --binding "$okcfg" >/dev/null 2>&1 \
-  || fail "ca-binding-invalid-stub-no-schema: pristine scratch tree with the REAL sibling does not validate first"
-
-stub3() {  # $1 = payload file (already using the canonical 'bound' rows)
-  printf '%s\n' '#!/usr/bin/env bash' "cat '$1'" 'exit 0' > "$st3/bin/check-binding.sh"
-  chmod 755 "$st3/bin/check-binding.sh"
-}
-
-p0="$TMP/v4-p0-correct.txt"
-printf '%s\n' \
-  'schema 1' \
-  'bound tech-lead claude m1 - claude-cli' \
-  'bound pm-spec claude m1 - claude-cli' \
-  'bound engineer claude m1 - claude-cli' \
-  'bound qa-verifier claude m1 - claude-cli' \
-  'bound ui-designer claude m1 - claude-cli' \
-  'bound codex-reviewer codex m2 - codex-cli' \
-  > "$p0"
-stub3 "$p0"
-bash "$st3/bin/check-adapter.sh" --binding "$okcfg" >/dev/null 2>&1 \
-  || fail "ca-binding-stub-correct-payload-positive-control: stub emitting the CORRECT payload does not validate"
-pass "ca-binding-stub-correct-payload-positive-control"
-
-p2="$TMP/v4-p2-no-schema.txt"; grep -v '^schema ' "$p0" > "$p2"
-cmp -s "$p0" "$p2" && fail "ca-binding-invalid-stub-no-schema: mutated payload is byte-identical to the correct one"
-stub3 "$p2"
-set +e
-out="$(bash "$st3/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-noschema")"
-rc=$?
-set -e
-[ "$rc" -eq 2 ] || fail "ca-binding-invalid-stub-no-schema: expected exit 2, got $rc"
-grep -q -- 'binding-invalid' "$TMP/e-noschema" || fail "ca-binding-invalid-stub-no-schema: expected binding-invalid, got: $(cat "$TMP/e-noschema")"
-[ -z "$out" ] || fail "ca-binding-invalid-stub-no-schema: expected zero stdout bytes, got: $out"
-pass "ca-binding-invalid-stub-no-schema"
-
-p3="$TMP/v4-p3-provider-flip.txt"; sed 's/^bound tech-lead claude /bound tech-lead codex /' "$p0" > "$p3"
-cmp -s "$p0" "$p3" && fail "ca-binding-invalid-stub-provider-flip: mutated payload is byte-identical to the correct one"
-stub3 "$p3"
-set +e
-out="$(bash "$st3/bin/check-adapter.sh" --binding "$okcfg" 2>"$TMP/e-providerflip")"
-rc=$?
-set -e
-[ "$rc" -eq 2 ] || fail "ca-binding-invalid-stub-provider-flip: expected exit 2, got $rc"
-grep -q -- 'binding-invalid' "$TMP/e-providerflip" || fail "ca-binding-invalid-stub-provider-flip: expected binding-invalid, got: $(cat "$TMP/e-providerflip")"
-[ -z "$out" ] || fail "ca-binding-invalid-stub-provider-flip: expected zero stdout bytes, got: $out"
-pass "ca-binding-invalid-stub-provider-flip"
 
 printf 'check-adapter suite: all cases passed\n'

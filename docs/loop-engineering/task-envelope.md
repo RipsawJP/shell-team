@@ -58,6 +58,20 @@ registry is still required and still checked — by the spec's own AC8, at
 spec-check time — but it is no longer a standing CI gate; that is a stated
 loss, not an oversight.
 
+A third review round (v3 → v4) reproduced that the checker's cross-check
+against a host-authored binding config validated the delegated `schema`
+line for presence but not content, the same "trust the shape without
+validating it" pattern a prior round had already found in that same
+reassertion block. The pre-commitment fired a **second** time, and its
+recorded disposition was executed again: the whole cross-check mode is
+carved out of this branch to a successor issue (DP18, below). What that
+mode once enforced — the fail-closed effort rule and the board-transition
+authority rule — now ships as **byte-frozen normative statements** in this
+document instead, pinned by the spec's own AC6, so the rules survive the
+drop even though nothing in this task checks a binding config against them
+any more; that enforcement is inherited by the successor issue and by
+T-1056.
+
 ## The generalized invocation pattern
 
 Every adapter generalizes one pattern this repository already runs:
@@ -219,14 +233,18 @@ which named an action rather than a path — is **retired** from the
 contract's channel vocabulary entirely, rather than kept and cross-checked
 against role authority everywhere it might appear.
 
-One genuine join does remain, and **is** enforced, because `--binding`
-(`bin/check-adapter.sh`) is the one mode that knows the role and the
-adapter together: `board-transition` is a *conditional* field, so
-`carries board-transition not-carried` stays legal in general (an adapter
-through which no transition ever returns) — but binding a role whose
-authority is `writes` or `proposes` to such an adapter is a contradiction
-the contract can see (the role must produce a transition, and the adapter
-declares no path for it), and is refused `authority-channel-conflict`.
+One genuine join remains, and is stated here as a **normative obligation**
+rather than something this task's checker enforces: `board-transition` is a
+*conditional* field, so `carries board-transition not-carried` stays legal
+in general (an adapter through which no transition ever returns) — but
+binding a role whose authority is `writes` or `proposes` to such an adapter
+is a contradiction the contract forbids (the role must produce a
+transition, and the adapter declares no path for it). Checking a host's
+binding config against this join was `bin/check-adapter.sh`'s
+cross-check mode — the one mode that knew the role and the adapter
+together — until it was carved out at v4 (DP18, below); the rule survives
+in the `- normative: ` line under `## Board-transition authority`, and its
+enforcement is inherited by the successor issue and by T-1056.
 
 ## The channel vocabulary
 
@@ -290,6 +308,14 @@ this task:
 | `qa-verifier` | `writes` | `agents/qa-verifier.md`: "set status to `READY_FOR_REVIEW`" or "set status back to `READY_FOR_ENG`" — the role edits the board itself. |
 | `codex-reviewer` | `proposes` | `agents/codex-reviewer.md`: "you never edit the board ... You state it in your verdict block and in your review record, and the orchestrator transcribes it." |
 | `ui-designer` | `none` | `agents/ui-designer.md`: "Don't introduce a new status flag. The board flag stays where pm-spec set it." |
+
+- normative: Whether the board is written during an invocation is decided solely by the bound role, from its role-board-authority value, and never by the adapter; binding a role whose authority is writes or proposes to an adapter that declares no return path for board-transition is a contradiction this contract forbids.
+
+This rule was enforced by `bin/check-adapter.sh`'s binding-config
+cross-check mode until DP18 carved that mode out at v4; it now ships as
+the byte-frozen statement above, with its enforcement inherited by the
+successor issue and by T-1056 (`## What T-1056 inherits from here`,
+below).
 
 A disclosed, unresolved nuance carried over rather than fixed here (it is a
 pre-existing property of a file this task must not edit):
@@ -374,23 +400,29 @@ was made to `templates/binding-template.conf` by this task.
 
 ## Fail-closed effort, statically and at runtime
 
-Two halves. **Static** (this task, `bin/check-adapter.sh --binding`): an
-unset effort (`-`) is always accepted, by an adapter that supports the
-capability and by one that does not. A bound, non-`-` value is checked
-against the bound adapter's own declared `effort-value` set; an adapter
-declaring `capability effort unsupported` refuses *any* non-`-` value; one
-declaring `supported` refuses any value outside its declared set. Either
-refusal is `effort-unsupported`, available to a host before a run.
-**Runtime** (T-1056, not shipped here): an adapter actually invoked with an
-effort value it cannot honour returns `status` non-success with
-`error-class capability-unsupported` and invokes nothing — the error class
-already exists in this contract's vocabulary so that task does not have to
-invent one.
+- normative: An adapter presented an effort value it does not declare fails closed: it returns a non-success status with error-class capability-unsupported and invokes nothing, never silently ignoring the value and never substituting a default. An unset effort means the provider or model default.
 
-A second, unrelated static check lives in the same `--binding` mode:
-`authority-channel-conflict` (DP13, above) — a role whose board-transition
-authority is `writes` or `proposes` bound to an adapter that declares no
-return path for `board-transition` at all.
+An unset effort (`-`) is always accepted, by an adapter that supports the
+capability and by one that does not. A bound, non-`-` value must be one
+the bound adapter's own declared `effort-value` set names; an adapter
+declaring `capability effort unsupported` accepts no non-`-` value; one
+declaring `supported` accepts only values inside its declared set.
+
+**Static enforcement of this rule, before a run** was `bin/check-adapter.sh`'s
+binding-config cross-check mode, refusing `effort-unsupported`; it was
+carved out at v4 when this spec's pre-commitment fired a second time
+(DP18). The rule above is what survives the drop, byte-frozen and pinned
+by the spec's own AC6; checking a host's bound effort value against it,
+before a run, is inherited by the successor issue rather than shipped
+here. **Runtime** (T-1056, not shipped here either): an adapter actually
+invoked with an effort value it cannot honour returns `status`
+non-success with `error-class capability-unsupported` and invokes
+nothing — the error class already exists in this contract's vocabulary
+so that task does not have to invent one.
+
+A second, related normative rule — the board-transition authority join a
+role/adapter binding must satisfy — lives under `## Board-transition
+authority` above (DP13); it was enforced by the same now-carved-out mode.
 
 ## Telemetry readiness
 

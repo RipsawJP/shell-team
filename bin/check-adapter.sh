@@ -3,16 +3,19 @@
 # registry and the adapter definitions that implement it (T-1055; GitHub
 # issue #203; .shell-team/specs/T-1055-adapter-envelope.md).
 #
-# This script validates TWO things and cross-checks a third. First, the
-# shipped contract registry (templates/task-envelope.txt): the envelope's
-# field set, the closed channel / error-class / effort-mechanism
-# vocabularies, and the per-role board-transition authority table. Second,
-# an adapter definition (templates/adapters/<token>.txt): its identity
-# (adapter token, paired provider, its own version, the envelope schema it
-# implements), its field-to-channel `carries` mapping, and its `effort`
-# capability declaration. Third, on request, a host-authored binding config
-# (T-1054): whether every bound, non-unset `effort` value is one the bound
-# adapter actually declares support for.
+# This script validates TWO things. First, the shipped contract registry
+# (templates/task-envelope.txt): the envelope's field set, the closed
+# channel / error-class / effort-mechanism vocabularies, and the per-role
+# board-transition authority table. Second, an adapter definition
+# (templates/adapters/<token>.txt): its identity (adapter token, paired
+# provider, its own version, the envelope schema it implements), its
+# field-to-channel `carries` mapping, and its `effort` capability
+# declaration. It reads no binding config at all: the cross-check that
+# once did (a host-authored binding config, T-1054) was carved out when
+# this spec's pre-commitment trigger fired a second time (DP18) — the
+# fail-closed effort rule and the board-transition authority rule now
+# ship as normative statements in the contract document instead, with
+# their enforcement inherited by a successor issue and by T-1056.
 #
 # The task envelope itself is a CONTRACT, never an instance: nothing in
 # this script (or anywhere else in this task) serializes, parses, or writes
@@ -48,23 +51,6 @@
 #   check-adapter.sh [--contract PATH] [--definitions PATH] --adapter TOKEN
 #     Validate the contract registry, then validate exactly the one named
 #     adapter's definition file (<definitions-dir>/TOKEN.txt).
-#   check-adapter.sh [--contract PATH] [--definitions PATH] --binding PATH
-#     Validate the contract registry; resolve PATH's canonical binding by
-#     delegating to `check-binding.sh --config PATH --print-binding` (this
-#     script never re-implements that config's own grammar) and RE-ASSERT
-#     that delegated output's own shape — exactly six `bound` rows, one per
-#     inner-loop role, no other non-blank line — before trusting a byte of
-#     it; validate the definition for every adapter the binding actually
-#     binds; refuse `authority-channel-conflict` when a role whose
-#     `role-board-authority` is `writes` or `proposes` is bound to an
-#     adapter that declares no return path (`not-carried`) for
-#     `board-transition`; then refuse `effort-unsupported` for any bound
-#     role whose effort value is not `-` and is absent from its bound
-#     adapter's declared value set. A config the sibling validator itself
-#     refuses, or one whose canonical output does not have the shape this
-#     script requires, is `binding-invalid` at exit 2, with exactly zero
-#     bytes written to stdout — no cross-check is attempted on input that
-#     could not be trusted.
 #   check-adapter.sh --contract PATH    (a testing affordance; the
 #     contract registry otherwise resolves next to this script's own
 #     installation)
@@ -73,15 +59,13 @@
 #     installation)
 #   check-adapter.sh --help
 #
-# Exit codes: 0 = valid. 1 = a content refusal (a definition file or a
-# binding join is readable and structurally parseable but its declared
-# content is wrong — a name mismatch, an unknown field, an inconsistent
-# capability, an unsupported effort value, a role/adapter authority
-# conflict, ...). 2 = the input could not be evaluated at all (a missing
-# or malformed contract registry, a missing or malformed adapter
-# allowlist, a missing definition, a bad flag, or a config the sibling
-# validator already rejected or returned in an untrustworthy shape).
-# Every refusal prints exactly one token, from a closed set, to stderr.
+# Exit codes: 0 = valid. 1 = a content refusal (a definition file is
+# readable and structurally parseable but its declared content is wrong —
+# a name mismatch, an unknown field, an inconsistent capability, ...).
+# 2 = the input could not be evaluated at all (a missing or malformed
+# contract registry, a missing or malformed adapter allowlist, a missing
+# definition, or a bad flag). Every refusal prints exactly one token, from
+# a closed set, to stderr.
 
 set -euo pipefail
 
@@ -90,8 +74,8 @@ set -euo pipefail
 # file's header at the first non-comment line below, i.e. at `set -euo
 # pipefail` above; everything from here on is free to use any word at all).
 #
-# Refusal matrix (token: exit code — condition), the CLOSED 25-entry set
-# every non-zero exit comes from (spec `## Refusal matrix`, v3):
+# Refusal matrix (token: exit code — condition), the CLOSED 22-entry set
+# every non-zero exit comes from (spec `## Refusal matrix`, v4):
 #   contract-unreadable (2), contract-malformed (2), contract-incomplete (2),
 #   retired-channel-declared (2), registry-unreadable (2),
 #   registry-malformed (2), definition-missing (2), definitions-unreadable (2),
@@ -99,9 +83,7 @@ set -euo pipefail
 #   duplicate-field (1), adapter-name-mismatch (1), unknown-adapter (1),
 #   provider-adapter-mismatch (1), unsupported-envelope-schema (1),
 #   unknown-envelope-field (1), unknown-channel (1), field-coverage-gap (1),
-#   capability-inconsistent (1), unknown-effort-mechanism (1),
-#   effort-unsupported (1), authority-channel-conflict (1),
-#   binding-invalid (2), usage (2).
+#   capability-inconsistent (1), unknown-effort-mechanism (1), usage (2).
 #
 # Contract-registry issues (contract-unreadable/-malformed/-incomplete) are
 # ALWAYS exit 2 — the registry is plugin-shipped, not hand-authored, so any
@@ -137,13 +119,6 @@ set -euo pipefail
 # about whether it is well-formed — that disagreement, reproduced against
 # the real shipped file, was round 1's Blocker.
 #
-# `authority-channel-conflict` (1) is the one role/adapter join DP13 leaves
-# enforceable: a bound role whose `role-board-authority` is `writes` or
-# `proposes` MUST produce a board-transition, so binding it to an adapter
-# whose `carries board-transition` row names `not-carried` is a
-# contradiction the `--binding` mode alone can see (it is the only mode
-# that knows the role and the adapter together).
-#
 # `retired-channel-declared` (2) is new in v3 (DP17). Round 2 reproduced
 # that v1/v2's retirement of the `board` channel was a fact about the
 # shipped registry file rather than a property of this checker: a scratch
@@ -172,14 +147,28 @@ set -euo pipefail
 # by the spec's own AC8, which performs the comparison independently at
 # spec-check time rather than delegating it to a flag of this script.
 #
+# The host-authored binding-config cross-check mode this script once
+# carried (delegating to bin/check-binding.sh's print-form output,
+# re-asserting the delegated output's shape, then checking the
+# fail-closed effort rule and the board-transition-authority join) was
+# carved out of this branch at v4, when the spec's own pre-commitment
+# fired a SECOND time (DP18) — a third consecutive round of new
+# independent findings against this script (round 3: the delegated
+# `schema` line was validated for presence but not content). This script
+# now reads no binding config at all: not the effort agreement, not the
+# authority join, not the shipped specimen's agreement with the shipped
+# definitions. Both rules the mode once enforced survive as byte-frozen
+# `- normative: ` statements in the contract document (pinned by AC6),
+# with their enforcement inherited by a successor issue and by T-1056 —
+# not a fast-follow to revisit here.
+#
 # Never spelled anywhere in this file, in code or in a comment: the name of
 # bin/check-binding.sh's own registry-override flag (DP9; issue #221). That
 # flag is a testing affordance with zero production consumers today
-# (AC12); this script's own `--binding` mode calls check-binding.sh with
-# only `--config` and `--print-binding`, never forwarding anything that
-# would let a caller override check-binding.sh's own adapter allowlist.
-# Refer to it, when it must be named at all, as "the sibling validator's
-# registry-override testing affordance."
+# (AC12). This script no longer calls check-binding.sh at all — the
+# binding-config cross-check mode that once did was carved out (DP18); see
+# below. Refer to the sibling's flag, when it must be named at all, as
+# "the sibling validator's registry-override testing affordance."
 #
 # Resolution is physical (`cd DIR && pwd -P`) at every self-location site,
 # from the first commit — never a hardening step bolted on after a review
@@ -247,10 +236,6 @@ print_help() {
 # --- fixed vocabulary --------------------------------------------------------
 TOKEN_RE='^[a-z][a-z0-9-]*$'
 VERSION_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
-# MODEL_RE is bin/check-binding.sh's own MODEL_RE, byte-identical, since a
-# `bound` row's model token here is the same token that checker already
-# validated once and this script re-asserts rather than trusts (DP10, V4).
-MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 MAXLEN=64
 SIX_ROLES=(tech-lead pm-spec engineer qa-verifier codex-reviewer ui-designer)
 BOARD_AUTHORITY_VALUES=(writes proposes none)
@@ -276,10 +261,10 @@ schema_version_supported() {  # $1 = candidate schema version token
 }
 
 # --- argument parsing --------------------------------------------------------
-CONTRACT_ARG="" DEFINITIONS_ARG="" ADAPTER_ARG="" BINDING_ARG=""
+CONTRACT_ARG="" DEFINITIONS_ARG="" ADAPTER_ARG=""
 MODE="validate"
 set_mode() {  # $1 = the new mode; refuses if a mode flag was already given
-  [ "$MODE" = "validate" ] || fail_usage "specify only one of --print-contract, --adapter or --binding"
+  [ "$MODE" = "validate" ] || fail_usage "specify only one of --print-contract or --adapter"
   MODE="$1"
 }
 
@@ -290,7 +275,6 @@ while [ "$#" -gt 0 ]; do
     --definitions)     [ "$#" -ge 2 ] || fail_usage "--definitions requires a value"; DEFINITIONS_ARG="$2"; shift 2 ;;
     --print-contract)  set_mode print-contract; shift ;;
     --adapter)         [ "$#" -ge 2 ] || fail_usage "--adapter requires a value"; ADAPTER_ARG="$2"; set_mode adapter; shift 2 ;;
-    --binding)         [ "$#" -ge 2 ] || fail_usage "--binding requires a value"; BINDING_ARG="$2"; set_mode binding; shift 2 ;;
     --) shift; break ;;
     -*) fail_usage "unknown flag: $1" ;;
     *)  fail_usage "unexpected positional argument: $1" ;;
@@ -574,7 +558,6 @@ validate_definition() {  # $1 = definition file path; $2 = expected adapter toke
     || refuse definition-missing 2 "adapter definition file is missing, not a regular file, or unreadable: $path"
 
   DEF_ADAPTER="" DEF_PROVIDER="" DEF_VERSION="" DEF_SCHEMA="" DEF_CAP="" DEF_MECH=""
-  DEF_BOARD_TRANSITION_CHANNEL=""
   DEF_VALUES=()
   local -a carries_field=() carries_channel=()
   local raw line f first lineno=0
@@ -678,10 +661,7 @@ validate_definition() {  # $1 = definition file path; $2 = expected adapter toke
   # Field coverage, widened (DP14): a field with no carries row at all is a
   # gap, and so is a field the contract marks `required` whose carries row
   # names the `not-carried` channel — a required field cannot be declared
-  # uncarried and still validate. Also captures board-transition's own
-  # declared channel for the one role/adapter join DP13 leaves enforceable
-  # (checked by the --binding dispatch, which reads DEF_BOARD_TRANSITION_CHANNEL
-  # after this function returns).
+  # uncarried and still validate.
   local fn chan_for_field j
   for ((i = 0; i < ${#FIELD_NAME[@]}; i++)); do
     fn="${FIELD_NAME[$i]}"
@@ -696,9 +676,6 @@ validate_definition() {  # $1 = definition file path; $2 = expected adapter toke
       || refuse field-coverage-gap 1 "no carries row for contract field '$fn' in $path"
     if [ "${FIELD_REQ[$i]}" = "required" ] && [ "$chan_for_field" = "not-carried" ]; then
       refuse field-coverage-gap 1 "required field '$fn' is declared not-carried in $path"
-    fi
-    if [ "$fn" = "board-transition" ]; then
-      DEF_BOARD_TRANSITION_CHANNEL="$chan_for_field"
     fi
   done
 
@@ -738,7 +715,7 @@ validate_all_definitions() {
   # Set completeness (round 1's Major): the whole-directory mode validates
   # the file SET against the allowlist, never merely whatever files happen
   # to be present — an accidental deletion must fail closed here too, not
-  # only in --adapter/--binding, which look up a specific file by name.
+  # only in --adapter, which looks up a specific file by name.
   local a dp
   for a in "${REG_ADAPTER[@]:-}"; do
     [ -n "$a" ] || continue
@@ -762,105 +739,6 @@ case "$MODE" in
     load_adapters_registry
     validate_definition "$(definition_path "$ADAPTER_ARG")" "$ADAPTER_ARG"
     printf 'check-adapter: valid: adapter definition %s (config: %s)\n' "$ADAPTER_ARG" "$(definition_path "$ADAPTER_ARG")"
-    exit 0
-    ;;
-  binding)
-    CHECK_BINDING="$SCRIPT_DIR/check-binding.sh"
-    [ -f "$CHECK_BINDING" ] && [ -r "$CHECK_BINDING" ] \
-      || fail_usage "cannot resolve the sibling validator (check-binding.sh missing or unreadable next to check-adapter.sh)"
-    BOUND_OUT="$(bash "$CHECK_BINDING" --config "$BINDING_ARG" --print-binding 2>/dev/null)" \
-      || refuse binding-invalid 2 "the binding config was refused by check-binding.sh --print-binding: $BINDING_ARG"
-    load_adapters_registry
-
-    # Delegation is not the same as trust: re-assert the delegated
-    # canonical binding's own SHAPE before consuming a byte of it — exactly
-    # six `bound` rows, one per inner-loop role, no other non-blank line —
-    # so a sibling that succeeded while emitting a truncated or partial set
-    # produces a refusal here rather than a false-successful cross-check.
-    BOUND_ROLE=() BOUND_PROVIDER=() BOUND_MODEL=() BOUND_EFFORT=() BOUND_ADAPTER=()
-    binding_schema_seen=0
-    while IFS= read -r bline || [ -n "$bline" ]; do
-      [ -n "$bline" ] \
-        || refuse binding-invalid 2 "the canonical binding contains a blank line"
-      read -r -a bf <<< "$bline"
-      if [ "${bf[0]:-}" = "schema" ]; then
-        [ "$binding_schema_seen" -eq 0 ] && [ "${#BOUND_ROLE[@]}" -eq 0 ] \
-          || refuse binding-invalid 2 "the canonical binding's schema line is not the first line: $bline"
-        binding_schema_seen=1
-        continue
-      fi
-      [ "${bf[0]:-}" = "bound" ] && [ "${#bf[@]}" -eq 6 ] \
-        || refuse binding-invalid 2 "unexpected canonical binding row shape: $bline"
-      # Every field of each row is actually READ, not extracted and
-      # ignored (V4/round 2): the provider and model tokens are validated
-      # for shape, and the provider is cross-checked below against the
-      # allowlist's own pairing for that row's adapter.
-      [[ "${bf[2]}" =~ $TOKEN_RE ]] && [ "${#bf[2]}" -le "$MAXLEN" ] \
-        || refuse binding-invalid 2 "the canonical binding's provider token is malformed: $bline"
-      [[ "${bf[3]}" =~ $MODEL_RE ]] && [ "${#bf[3]}" -le "$MAXLEN" ] \
-        || refuse binding-invalid 2 "the canonical binding's model token is malformed: $bline"
-      BOUND_ROLE+=("${bf[1]}"); BOUND_PROVIDER+=("${bf[2]}"); BOUND_MODEL+=("${bf[3]}")
-      BOUND_EFFORT+=("${bf[4]}"); BOUND_ADAPTER+=("${bf[5]}")
-    done <<< "$BOUND_OUT"
-    # The delegated output's leading schema line is REQUIRED, not merely
-    # tracked (V4/round 2): v2 set binding_schema_seen and never read it, so
-    # a delegated output with zero schema lines and six otherwise-valid
-    # bound rows was never refused.
-    [ "$binding_schema_seen" -eq 1 ] \
-      || refuse binding-invalid 2 "the canonical binding carries no leading schema line"
-    [ "${#BOUND_ROLE[@]}" -eq 6 ] \
-      || refuse binding-invalid 2 "the canonical binding does not contain exactly six bound rows (found ${#BOUND_ROLE[@]})"
-    for role_check in "${SIX_ROLES[@]}"; do
-      in_list "$role_check" "${BOUND_ROLE[@]}" \
-        || refuse binding-invalid 2 "the canonical binding is missing a bound row for role: $role_check"
-    done
-    # Cross-check each row's asserted provider against the allowlist's own
-    # pairing for that row's adapter (V4/round 2) — the delegated output's
-    # own claim about which provider a role is bound through, re-verified
-    # rather than trusted.
-    for ((pi = 0; pi < ${#BOUND_ROLE[@]}; pi++)); do
-      preg_provider="$(adapter_registered_provider "${BOUND_ADAPTER[$pi]}")" \
-        || refuse binding-invalid 2 "the canonical binding names an adapter not in the allowlist: ${BOUND_ADAPTER[$pi]}"
-      [ "$preg_provider" = "${BOUND_PROVIDER[$pi]}" ] \
-        || refuse binding-invalid 2 "the canonical binding's provider '${BOUND_PROVIDER[$pi]}' for role '${BOUND_ROLE[$pi]}' does not match the allowlist's provider '$preg_provider' for adapter '${BOUND_ADAPTER[$pi]}'"
-    done
-
-    # No per-adapter cache: each bound row's adapter definition is
-    # (re-)validated in place via validate_definition(), which sets
-    # DEF_CAP/DEF_VALUES/DEF_BOARD_TRANSITION_CHANNEL fresh every call.
-    # Re-validating the same adapter's definition once per role that binds
-    # it is cheap (a handful of small files) and keeps this loop to
-    # indexed-array/plain-variable state only — no associative arrays, no
-    # `declare -g`, no dynamic variable names — matching this repository's
-    # bash-3.2 compatibility bar.
-    for ((bi = 0; bi < ${#BOUND_ROLE[@]}; bi++)); do
-      brole="${BOUND_ROLE[$bi]}" beffort="${BOUND_EFFORT[$bi]}" badapter="${BOUND_ADAPTER[$bi]}"
-
-      validate_definition "$(definition_path "$badapter")" "$badapter"
-
-      # DP13's one enforceable join: a role whose board-transition
-      # authority is `writes` or `proposes` MUST produce a transition, so
-      # binding it to an adapter that declares no return path for that
-      # field (`not-carried`) is a contradiction the contract can see.
-      role_authority=""
-      for ((rk = 0; rk < ${#RBA_ROLE[@]}; rk++)); do
-        if [ "${RBA_ROLE[$rk]}" = "$brole" ]; then role_authority="${RBA_VALUE[$rk]}"; break; fi
-      done
-      if [ "$role_authority" = "writes" ] || [ "$role_authority" = "proposes" ]; then
-        [ "$DEF_BOARD_TRANSITION_CHANNEL" != "not-carried" ] \
-          || refuse authority-channel-conflict 1 "role '$brole' (authority $role_authority) is bound to adapter '$badapter', which declares no board-transition return path (not-carried)"
-      fi
-
-      [ "$beffort" = "-" ] && continue
-
-      if [ "$DEF_CAP" != "supported" ]; then
-        refuse effort-unsupported 1 "role '$brole' is bound to effort '$beffort' but adapter '$badapter' declares capability effort unsupported"
-      fi
-      in_list "$beffort" "${DEF_VALUES[@]:-}" \
-        || refuse effort-unsupported 1 "role '$brole' is bound to effort '$beffort', which adapter '$badapter' does not declare as an accepted value"
-    done
-
-    printf 'check-adapter: valid: binding config agrees with every bound adapter'"'"'s declared effort capability and board-transition authority (config: %s)\n' "$BINDING_ARG"
     exit 0
     ;;
   validate)
