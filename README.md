@@ -181,79 +181,26 @@ See [docs/history.md](docs/history.md) for how this operating discipline evolved
 Each of the six inner-loop roles — `tech-lead`, `pm-spec`, `engineer`,
 `qa-verifier`, `codex-reviewer`, `ui-designer` — is host-assignable to a
 specific executor (provider + model + effort + adapter) through a
-`<base>/binding.conf` (`<base>` resolves via `bin/team-paths.sh --get base`).
-With no host config, `bin/resolve-executor.sh` falls back to the
-plugin-shipped default, `templates/binding-default.conf` — the **shipped
-default**; `<base>/binding.conf`, when present, is the **host override**
-`resolve-executor.sh` prefers instead. The two are never the same file.
-**A host config is adopted whole**: there is no per-role merge, layering
-or fallback against the shipped default, so it must carry exactly one
-`bind` row for each of the six roles — no more, no fewer. A partial file
-is refused, not completed from the default.
-
-1. Rename the scaffolded `<base>/binding.conf.example` (written by
-   `team-init` from `templates/binding-template.conf`) to
-   `<base>/binding.conf` — or, if `team-init` has not run yet, copy the
-   plugin's own `templates/binding-template.conf` (resolved from the
-   plugin's installed directory, not a path under your own repository) to
-   `<base>/binding.conf` by hand. **Its six rows carry placeholder model
-   tokens** — `model-1` on the five `claude` rows, `model-2` on
-   `codex-reviewer` — that name no real model: replace **every** row
-   before relying on it, or transcribe the actual rows from
-   `templates/binding-default.conf` (**not** the grammar example below,
-   which is a custom-binding illustration with different values) for any
-   role you are not changing. Editing one row and stopping there ships
-   five placeholder bindings into resolution and telemetry.
-2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
-   one per role — to assign the executor you want. `effort` is
-   positionally required; spell "no value" as a literal `-`, never by
-   omitting the field (only the effort column spells "unset" that way —
-   the model column always needs a leading alphanumeric).
-3. Validate with `bash check-binding.sh --config <base>/binding.conf`
-   (exit `0` = valid) and inspect the effective binding with
-   `bash resolve-executor.sh --print-resolved` — with the plugin loaded,
-   `bin/` is on `PATH`, so both resolve with no `bin/` prefix; inside a
-   checkout with no plugin loaded, prefix each with `bin/` instead.
-   `--print-resolved` runs **no availability probe at all**.
-   `resolve-executor.sh --role <role>` goes further, but its probe is
-   keyed by the bound provider: for an **out-of-process** provider
-   (`codex`) it checks that `codex --version` is observable on `PATH` and
-   then runs that read-only probe; for an **in-process** provider
-   (`claude`) it performs **no availability check at all** — it prints
-   the probe kind and leaves grounding the harness's own sub-agent
-   invocation failure to the caller. Under the shipped default, five of
-   the six roles bind `claude`, so `resolve-executor.sh --role
-   codex-reviewer` is the only one of the six invocations that actually
-   probes anything.
-
-A config the real validator accepts — all six roles, as an adopted
-config must carry:
-
-```
-schema 1
-
-bind tech-lead      claude opus   high claude-cli
-bind pm-spec        claude opus   high claude-cli
-bind engineer       claude sonnet -    claude-cli
-bind qa-verifier    claude sonnet -    claude-cli
-bind ui-designer    claude sonnet -    claude-cli
-bind codex-reviewer codex  gpt-5  -    codex-cli
-```
-
-**The honest boundary**: rebinding a role changes which executor
-`resolve-executor.sh` **resolves** and which value **telemetry** records
-for it. It does **not** wire an alternate-executor **invocation path**,
-and that is two separate limits. The **model**: a role's invocation still
-takes its model from that role's own `agents/<role>.md` pin, not from the
-resolved row — issue **#236** tracks retiring those pins, for the five
-`claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
-whose pin configures the Claude wrapper that shells out to the Codex CLI
-rather than the model that reviews. The **executor**: which provider and
-adapter a role is actually invoked through is not routed by resolution at
-all, for any role, and no issue tracks changing that — so a rebind across
-providers moves what is reported and recorded, never what runs. See
-[Design choices](#design-choices) for the reviewer row's own shipped
-default and its rationale.
+`<base>/binding.conf`; with no host config, the plugin-shipped
+`templates/binding-default.conf` is the **shipped default**. The how-to,
+the config grammar, the fail-closed refusals and each adapter's own
+effort values live in [docs/adopting.md](docs/adopting.md) — the single
+canonical detail surface for this mechanism — and in `bash
+resolve-executor.sh --help`, which is that script's own header and
+cannot drift from it. **The honest boundary** has two axes: the binding
+gates **whether** a call proceeds — resolution runs first and a refusal
+stops the phase rather than falling back, so a rebind can stop a call
+outright — and it never changes **how** a proceeding call is executed,
+where it moves only what resolution reports and what **telemetry**
+records, provider, model, effort and adapter alike, so no
+alternate-executor **invocation path** is wired. Illustratively, on that
+second axis: the model still comes from the role's own `agents/<role>.md`
+pin (issue **#236** tracks retiring those pins for the five
+`claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
+effort is recorded but applied to no call, and executor-level routing is
+not resolved at all. Every bound value is declared, never an observation
+of what executed. See [Design choices](#design-choices) for the reviewer
+row's own shipped default and its rationale.
 
 ## Replaying a run
 

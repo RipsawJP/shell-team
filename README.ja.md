@@ -179,82 +179,28 @@ build sha と uptime を返す /healthz を shell-team で追加して
 ## 役割と executor の紐付け
 
 6 つの inner-loop 役割 — `tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
-`codex-reviewer`・`ui-designer` — は、`<base>/binding.conf`
-（`<base>` は `bin/team-paths.sh --get base` で解決）を通じて、それぞれ
-executor（provider + model + effort + adapter）を host が個別に割り当て
-られます。host 設定が無い場合、`bin/resolve-executor.sh` はプラグイン
-出荷時の既定である `templates/binding-default.conf` にフォールバックします
-——これが**出荷時の既定**で、存在する場合の `<base>/binding.conf` が
-resolver の優先する host override です。両者は決して同じファイルでは
-ありません。**host config は丸ごと採用されます**: 出荷時の既定に対する
-per-role の merge・layering・fallback は存在しないため、6 役割それぞれに
-`bind` 行を 1 本ずつ、多くも少なくもなく持つ必要があります。部分的な
-ファイルは既定から補完されるのではなく refuse されます。
-
-1. スキャフォールドされた `<base>/binding.conf.example`（`team-init` が
-   `templates/binding-template.conf` から書き出す）を
-   `<base>/binding.conf` にリネームする——`team-init` がまだ走っていない
-   場合は、プラグイン自身の `templates/binding-template.conf`（プラグイン
-   のインストール先ディレクトリから解決される——自リポジトリ配下の
-   パスではない）を手動でコピーする。**この 6 行はプレースホルダーの
-   モデルトークン**を持っています——`claude` 系の 5 行に `model-1`、
-   `codex-reviewer` に `model-2`——これらは実在するモデルを指しません。
-   これに依拠する前に**全ての行**を置き換えるか、変更しない役割の行は
-   `templates/binding-default.conf` の実際の行を転記してください
-   （**下記の grammar example ではありません**——それは異なる値を持つ
-   custom-binding の例示です）。1 行だけ編集して止めると、残り 5 役割に
-   プレースホルダーの紐付けが resolution と telemetry にそのまま入って
-   しまいます。
-2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
-   1 行）を編集して割り当てたい executor を指定する。`effort` は
-   位置的に必須で、「値なし」はフィールドを省略せず常にリテラル `-` で
-   綴る（この「未設定」の綴り方は effort 列だけのもの——model 列は
-   常に英数字始まりが必要）。
-3. `bash check-binding.sh --config <base>/binding.conf`（exit `0` =
-   valid）で検証し、`bash resolve-executor.sh --print-resolved` で
-   有効な紐付けを確認する——プラグインをロードしていれば `bin/` は
-   `PATH` に載るのでどちらも `bin/` 接頭辞なしで解決する。プラグインを
-   ロードしていないチェックアウト内では、それぞれ `bin/` を付けて
-   実行する。`--print-resolved` は **availability probe を一切行わない**。
-   `resolve-executor.sh --role <role>` はさらに検査するが、その probe は
-   紐付けられた provider によって決まる: **out-of-process** な provider
-   （`codex`）については `codex --version` が `PATH` 上で観測可能かを
-   確認し、その read-only probe を実行する。**in-process** な provider
-   （`claude`）については **availability の判定を一切行わない**——probe
-   kind を表示するだけで、根拠を持てる判定（harness 自身のサブエージェント
-   呼び出し失敗）を下すのは呼び出し側に委ねる。出荷時の既定では 6 役割
-   のうち 5 つが `claude` に紐付いているため、`resolve-executor.sh
-   --role codex-reviewer` だけが実際に何かを probe する唯一の呼び出しに
-   なる。
-
-実際の validator が受理する設定例——採用される config が持つべき
-6 役割すべてを示す:
-
-```
-schema 1
-
-bind tech-lead      claude opus   high claude-cli
-bind pm-spec        claude opus   high claude-cli
-bind engineer       claude sonnet -    claude-cli
-bind qa-verifier    claude sonnet -    claude-cli
-bind ui-designer    claude sonnet -    claude-cli
-bind codex-reviewer codex  gpt-5  -    codex-cli
-```
-
-**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する** executor
-と**テレメトリ**が記録する値が変わる。ただし別 executor への
-**呼び出し経路**が配線されるわけでは**ない**——そしてこれは 2 つの別々
-の限界である。**model について**: 役割の実際の呼び出しは、resolved row
-ではなく、その役割自身の `agents/<role>.md` の pin から model を取る。
-issue **#236** はその pin の退役を追跡しているが、対象は `claude-cli`
-に紐付く 5 役割のみで、`codex-reviewer` は意図的に除外されている——
-その pin は Codex CLI を呼び出す Claude 側の wrapper を設定するもので
-あって、レビューを行うモデルではないため。**executor について**: どの
-provider / adapter 経由で役割が実際に呼び出されるかは、どの役割につい
-ても resolution が経路制御していない。これを変える issue は存在しない
-——したがって provider をまたぐ rebind が動かすのは、報告される値と
-記録される値であって、実際に走るものではない。reviewer 行自身の出荷時
-の既定とその理由は [設計上の選択](#設計上の選択) を参照。
+`codex-reviewer`・`ui-designer` — は、`<base>/binding.conf` を通じて
+それぞれ executor（provider + model + effort + adapter）を host が個別に
+割り当てられる。host 設定が無い場合は、プラグイン**出荷時の既定**
+`templates/binding-default.conf` が使われる。手順・設定の文法・
+fail-closed な refusal・各 adapter 自身の effort 値は
+[docs/adopting.ja.md](docs/adopting.ja.md)——この機構について唯一の
+正典となる詳細面——と `bash resolve-executor.sh --help`（スクリプト
+自身のヘッダであり、そこから乖離しえない）にある。**正直な境界線**には
+2 つの軸がある: binding は呼び出しが**行われるかどうか**を制御する——
+resolution が先に走り、refusal はフォールバックせずフェーズを停止させる
+ので、rebind によって呼び出しを完全に止めることができる——一方で、
+行われる呼び出しが**どう実行されるか**は決して変えない。そちらで動くの
+は resolution が報告する値と**テレメトリ**が記録する値だけ（provider・
+model・effort・adapter のいずれも同じ）であり、別 executor への
+**呼び出し経路**は配線されない。第 2 軸の例示として、model は今なお
+役割自身の `agents/<role>.md` の pin から来る（issue **#236** はその
+pin の退役を追跡するが対象は `claude-cli` に紐付く 5 役割のみ・
+`codex-reviewer` は除外）。宣言された effort は記録されるがどの呼び出し
+にも適用されず、executor レベルの経路は resolution が制御していない。
+紐付けられた値はすべて宣言された値であって、実行されたものの観測では
+ない。reviewer 行自身の出荷時の既定とその理由は
+[設計上の選択](#設計上の選択) を参照。
 
 ## run のリプレイ
 

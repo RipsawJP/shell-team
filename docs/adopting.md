@@ -116,7 +116,10 @@ you want to assign specific executors to all six:
    role you are not changing. Editing one row and stopping there ships
    five placeholder bindings into resolution and telemetry.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
-   one per role.
+   one per role. `effort` is positionally required; spell "no value" as
+   a literal `-`, never by omitting the field (only the effort column
+   spells "unset" that way — the model column always needs a leading
+   alphanumeric).
 3. `bash check-binding.sh --config <base>/binding.conf` — with the plugin
    loaded, `bin/` is on `PATH`, so this resolves with no `bin/` prefix;
    inside a checkout with no plugin loaded, run `bash bin/check-binding.sh
@@ -196,18 +199,31 @@ Each adapter declares its own effort vocabulary; there is no shared list:
 `claude-cli` accepts `low`, `medium`, `high`, `xhigh`, `max`; `codex-cli`
 accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`.
 
-**The honest boundary**: rebinding a role changes which executor
-`resolve-executor.sh` **resolves** and which value **telemetry** records
-for it. It does **not** wire an alternate-executor **invocation path**,
-and that is two separate limits. The **model**: a role's invocation still
-takes its model from that role's own `agents/<role>.md` pin, not from the
-resolved row — issue **#236** tracks retiring those pins, for the five
+**The honest boundary** has two axes, and collapsing them is what makes
+this easy to get wrong. **Whether a call proceeds** — the binding gates
+that, and a rebind can stop one outright. Resolution runs before any
+invocation, and a refusal is a blocker that stops the phase rather than
+falling back to anything: an ordinary edit can reach `binding-unresolved`,
+`capability-unsupported` and `executor-unavailable`, each described
+above. **How a proceeding call is executed** — there the binding changes
+**only** what `resolve-executor.sh` resolves and reports and what
+**telemetry** records, provider, model, effort and adapter alike, and
+nothing about the execution itself, so no alternate-executor
+**invocation path** is wired. Three instances of that second axis,
+illustrative rather than exhaustive: the **model** a role runs at still
+comes from that role's own `agents/<role>.md` pin, not from the resolved
+row — issue **#236** tracks retiring those pins, for the five
 `claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
 whose pin configures the Claude wrapper that shells out to the Codex CLI
-rather than the model that reviews. The **executor**: which provider and
-adapter a role is actually invoked through is not routed by resolution at
-all, for any role, and no issue tracks changing that — so a rebind across
-providers moves what is reported and recorded, never what runs.
+rather than the model that reviews; a declared **effort** is recorded on
+the span but applied to no call, its only other effect being the
+`capability-unsupported` refusal above — an adapter definition declares
+an effort *mechanism*, and declaring one is not applying it; and which
+**executor** — provider and adapter — a role is invoked through is not
+routed by resolution at all, for any role, with no issue tracking that.
+The rule to take away is the second axis stated universally rather than
+its list: every bound value is **declared, never an observation of what
+executed**.
 
 ## Conversational usage (no slash commands)
 

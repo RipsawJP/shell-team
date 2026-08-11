@@ -120,7 +120,9 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    残り 5 役割にプレースホルダーの紐付けが resolution と telemetry に
    そのまま入ってしまいます。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
-   1 行）を編集する。
+   1 行）を編集する。`effort` は位置的に必須で、「値なし」はフィールド
+   を省略せず常にリテラル `-` で綴る（この「未設定」の綴り方は effort
+   列だけのもの——model 列は常に英数字始まりが必要）。
 3. `bash check-binding.sh --config <base>/binding.conf` ——プラグインを
    ロードしていれば `bin/` は `PATH` に載るので `bin/` 接頭辞なしで
    解決する。プラグインをロードしていないチェックアウト内では
@@ -202,19 +204,30 @@ config-condition refusal で、うち 3 つは通常の config 編集で到達�
 `codex-cli` は `none`・`minimal`・`low`・`medium`・`high`・`xhigh`・
 `max` を受理する。
 
-**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する** executor
-と**テレメトリ**が記録する値が変わる。ただし別 executor への
-**呼び出し経路**が配線されるわけでは**ない**——そしてこれは 2 つの別々
-の限界である。**model について**: 役割の実際の呼び出しは、resolved row
-ではなく、その役割自身の `agents/<role>.md` の pin から model を取る。
-issue **#236** はその pin の退役を追跡しているが、対象は `claude-cli`
-に紐付く 5 役割のみで、`codex-reviewer` は意図的に除外されている——
-その pin は Codex CLI を呼び出す Claude 側の wrapper を設定するもので
-あって、レビューを行うモデルではないため。**executor について**: どの
-provider / adapter 経由で役割が実際に呼び出されるかは、どの役割につい
-ても resolution が経路制御していない。これを変える issue は存在しない
-——したがって provider をまたぐ rebind が動かすのは、報告される値と
-記録される値であって、実際に走るものではない。
+**正直な境界線**には 2 つの軸があり、これを混ぜることが誤解の元になる。
+**呼び出しが行われるかどうか**——ここは binding が制御しており、rebind
+によって呼び出しを完全に止めることができる。resolution はあらゆる
+invocation の前に走り、refusal は何かにフォールバックするのではなく
+フェーズを停止させる blocker である: 通常の編集で `binding-unresolved`・
+`capability-unsupported`・`executor-unavailable` に到達しうる（いずれも
+上記参照）。**行われる呼び出しがどう実行されるか**——こちらで binding
+が変えるのは、`resolve-executor.sh` が解決して報告する値と**テレメトリ**
+が記録する値**だけ**であり（provider・model・effort・adapter のいずれも
+同じ）、実行そのものは何も変わらない。したがって別 executor への
+**呼び出し経路**は配線されない。この第 2 軸の具体例を 3 つ挙げる（網羅
+ではなく例示）: 役割が走る **model** は今なおその役割自身の
+`agents/<role>.md` の pin から来る（resolved row からではない）——
+issue **#236** はその pin の退役を追跡するが、対象は `claude-cli` に
+紐付く 5 役割のみで、`codex-reviewer` は意図的に除外される（その pin は
+Codex CLI を呼び出す Claude 側の wrapper を設定するもので、レビューを
+行うモデルではない）。宣言された **effort** は span に記録されるが
+どの呼び出しにも適用されず、他に及ぶ影響は上記の `capability-unsupported`
+refusal だけである——adapter 定義が宣言しているのは effort の*機構*で
+あって、宣言は適用ではない。そして、どの **executor**（provider と
+adapter）経由で役割が呼び出されるかは、どの役割についても resolution が
+経路制御しておらず、これを追跡する issue も存在しない。持ち帰るべき
+規則は、第 2 軸を列挙ではなく普遍形で述べたほうである: 紐付けられた値
+はすべて**宣言された値であって、実行されたものの観測ではない**。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
