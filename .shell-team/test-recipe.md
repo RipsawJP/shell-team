@@ -518,6 +518,29 @@ that file's order.
   elsewhere in this repo to remove them (T-1051's own Non-goals; they
   remain correct either way) — this note only corrects the "no way to
   suppress it" claim for the boundary this fix actually closes.
+- T-1054: `bash tests/check-binding/run.sh` is `bin/check-binding.sh`'s
+  fixture suite (the T-1054 fail-closed binding-config validator and its
+  `--print-binding`/`--print-lock`/`--verify` integrity primitives). No new
+  prerequisite: pure bash + git, same synthetic-fixture-in-a-scratch-dir
+  convention as `tests/check-refreeze-class/run.sh` (the two-arm
+  `TMPDIR`-then-`$HERE` `mktemp -d … XXXXXX` idiom, no static `fixtures/`
+  directory — this suite builds no `git init` repositories, so the
+  `$HERE` fallback arm is the right one, not the `${TMPDIR:-/tmp}`-only
+  arm T-1044 reserves for suites that do). One non-obvious authoring trap
+  worth inheriting: proving `--verify`'s comment-only-edit tolerance and
+  its `binding-changed` refusal both require editing the SAME config
+  path the lock recorded (in place, then restored byte for byte before
+  the next case) — a differently-NAMED file with identical or edited
+  content trips `path-mismatch` first and never reaches the property the
+  case is meant to prove, since per-mode refusals in this checker are
+  ordered path-match before content-validate. Separately, a payload
+  string meant to prove "a field value is refused, never evaluated"
+  (a `$(...)`, a `;...;`, a backtick payload) must contain no embedded
+  whitespace — a payload with a space splits into two fields under this
+  format's whitespace-delimited grammar and is refused as
+  `unparseable-line` (a wrong-field-count row) rather than the intended
+  `bad-token` (a malformed single token), which still proves no
+  evaluation happened but asserts the wrong token if the test pins one.
 - T-1051: a bash builtin's write (`printf`, `echo`) to a broken pipe can
   behave two very different ways depending on SIGPIPE's disposition, and
   this coding sandbox's inherited disposition (SIG_IGN, from its own
@@ -538,3 +561,184 @@ that file's order.
   signal.SIG_DFL)` (or `SIG_IGN`, to compare) in the child BEFORE
   `os.execvp`, close the pipe's read end first, then exec into the target
   shell command with its stdout `dup2`'d onto the write end.
+- T-1055: `bash tests/check-adapter/run.sh` is `bin/check-adapter.sh`'s
+  fixture suite (the T-1055 fail-closed task-envelope contract + adapter
+  definition validator, plus its `--print-contract`/`--adapter`/
+  `--definitions`/`--contract`/`--binding` modes). No new prerequisite: pure
+  bash + git, same synthetic-fixture-in-a-scratch-dir convention as
+  `tests/check-binding/run.sh` (the two-arm `TMPDIR`-then-`$HERE` `mktemp -d
+  ... XXXXXX` idiom, no static `fixtures/` directory - this suite builds no
+  `git init` repositories). One authoring trap this suite's own fixtures
+  hit: a spec `- check:` line that asserts a `carries <field> <channel>`
+  row via a single-literal-space regex (`grep -cE "^carries $fl
+  [a-z][a-z0-9-]*$"`) means the SHIPPED definition files must themselves be
+  single-space-delimited on that directive - a visually column-aligned
+  `carries` row (extra internal whitespace for readability) reads fine to
+  the checker's own `read -r -a f` field splitting but silently fails a
+  frozen criterion's exact-single-space grep. Author every `carries` row
+  (and any other directive a frozen `- check:` line greps by fixed
+  whitespace shape) single-space from the start rather than aligning
+  columns. Measuring an executor's real effort/reasoning mechanism (DP7 of
+  `.shell-team/specs/T-1055-adapter-envelope.md`) for the Codex CLI: its
+  `--help`/`exec --help` document no dedicated `--effort` flag, only a
+  generic `-c key=value` config override with NO client-side validation -
+  passing a deliberately invalid `-c model_reasoning_effort=<garbage>`
+  value reaches the provider, which refuses it with a 400 whose message
+  enumerates the complete accepted value set verbatim; that provider-side
+  refusal message, not documentation, is the measurement. Separately: a
+  spec's own `## Blast radius` full-population diff (running
+  `bin/check-acs.sh` against every `.shell-team/specs/*.md` file at both
+  the base ref, via a disposable `git worktree add --detach`, and at HEAD)
+  takes on the order of ten-plus minutes per side on this machine - poll a
+  backgrounded run's output file for row-count growth rather than waiting
+  on a single long timeout, and NEVER launch a second background attempt
+  of the identical script "just in case" the first one's own launch looked
+  suspicious (e.g. a `nice(5) failed: operation not permitted` warning from
+  a manual `&`-backgrounding attempt) without first confirming, from the
+  output file itself, that only one instance is actually running - two
+  concurrent instances of the same script race to truncate-then-append the
+  same output file, producing silently duplicated rows for whichever specs
+  both instances processed before one finished, which is easy to miss
+  since the corruption is partial (only the early portion of the file) and
+  every individual line still looks well-formed.
+- T-1055 (round 2 / v2 rework): a doc's "canon region" delimited by a
+  marker-comment pair that itself sits inside a fenced code block (e.g.
+  `` ``` ``, then `<!-- BEGIN X -->`, content, `<!-- END X -->`, then
+  `` ``` `` again) must have the FENCE lines OUTSIDE the marker pair, not
+  inside it — an `awk` extraction keyed on the marker lines (not the fence
+  lines) captures the fence lines too if they sit between the markers,
+  which then fails a byte-identity comparison against a command's raw
+  output that never included them. Verify a marker-plus-fence layout by
+  running the actual extraction command against the first draft, not by
+  reasoning about which delimiter nests inside which. Separately: when
+  writing a NEW shape-check against another script's own canonical output
+  format (here, `bin/check-binding.sh --print-binding`'s `schema <version>`
+  line followed by N `bound` rows), re-read that format's full grammar
+  before parsing it — a check written to expect only the row type under
+  test (all lines are `bound` rows) breaks immediately against the real
+  producer's own leading `schema` line, which its own spec's `## Summarized
+  sources` already documented.
+- T-1056: `bash tests/check-liveness/run.sh` is `bin/check-liveness.sh`'s
+  fixture suite (the fail-closed, out-of-band loop-liveness classifier). No
+  new prerequisite: pure bash + git + coreutils, the two-arm
+  `TMPDIR`-then-`$HERE` `mktemp -d ... XXXXXX` idiom (the same shape
+  `tests/check-refreeze-class/run.sh:82-87` uses). Deliberately **no git
+  init scratch repository**: every git-band case (`STALLED` via a stale
+  state file with a fresh `HEAD`, `DEAD` via both clocks old) instead
+  measures THIS checkout's own real `HEAD` committer epoch live
+  (`git log -1 --format=%ct HEAD`) and derives `$LIVENESS_NOW` relative to
+  it — reaching the same cells a scratch repository would, without the
+  sandboxed nested-`.git` write restriction the T-1001 entry above already
+  documents. Every threshold boundary is exercised through `$LIVENESS_NOW`
+  (no `sleep` anywhere, matching this checker's own design). Two portability
+  notes specific to this checker: **(1)** its reason registry
+  (`templates/liveness-reasons.txt`) is resolved from the checker's own
+  installed directory (`$SCRIPT_DIR/..`), never the working directory — to
+  exercise `registry-unreadable`/`registry-malformed` against a
+  deliberately corrupted registry, build a scratch "install" (a copy of
+  `bin/check-liveness.sh` plus `bin/team-paths.sh` under a scratch `bin/`,
+  with a scratch `templates/liveness-reasons.txt` beside it) rather than
+  editing the shipped file. **(2)** a `sed` pattern deliberately containing
+  literal `$(...)`/`;...;` text (the no-eval CANARY proof) needs
+  `# shellcheck disable=SC2016` on its own line, immediately above a
+  single-statement line — shellcheck does not honor the directive when it
+  shares a `;`-joined line with a preceding assignment.
+- T-1056 (Codex round-1 rework): `exec N< file` (or any bare `exec` with
+  redirections and no command word) applies EVERY redirection it is given
+  to the CURRENT shell PERSISTENTLY, not scoped to that one statement —
+  writing `exec 3< "$path" 2>/dev/null || refuse ...` to suppress a
+  diagnostic on open failure silently and permanently redirects the
+  script's own stderr to `/dev/null` for the rest of its run **on the
+  success path too**, since the `2>/dev/null` isn't scoped to the `exec`
+  call, it just becomes the shell's new stderr. This produced a real bug
+  (a downstream `printf ... >&2` after a successful guarded `exec` open
+  went silently missing) that a live invocation caught (empty stderr,
+  correct verdict) — the frozen fixture suite's own coverage of that
+  stderr line did not, since it happened to grep an ERROR path this
+  particular success-path bug never touched. Fix: never attach a trailing
+  redirect to a bare `exec` used only to open/close a numbered fd; let a
+  failed open print bash's own diagnostic (harmless — no `- check:` line
+  or fixture in this repo asserts an EXACT stderr line, only substring
+  containment) and catch the failure via `||` on the `exec` itself.
+  Before shipping any new bare `exec <N>{<,>} file` fd-management site,
+  grep the same file for every OTHER site using the pattern and confirm a
+  live run's stderr still carries every message emitted before AND after
+  that site — a suite that only asserts "the expected message is present
+  somewhere" cannot by itself catch "and every OTHER message after this
+  point silently vanished" the way this bug did.
+- T-1057: `bash tests/resolve-executor/run.sh` is `bin/resolve-executor.sh`'s
+  fixture suite (the T-1057 fail-closed per-role executor resolver). No new
+  prerequisite: pure bash + git, but its scratch root is the
+  `${TMPDIR:-/tmp}`-only `mktemp -d ... XXXXXX` arm — **no `$HERE` fallback
+  arm at all** — because this suite copies an installed tree (`bin/` +
+  `templates/`) out of the checkout to mutate a scratch copy, and the
+  ancestor-symlink fixtures a sibling suite builds for the identical reason
+  would otherwise land inside this repository's own working tree (a nested
+  nested-install shape sandboxed runs deny, the same restriction the T-1044
+  entry above already documents for a different suite shape). Reaching the
+  effort-unsupported and board-transition-not-carried branches requires
+  editing a SCRATCH COPY of `templates/adapters/claude-cli.txt` — both
+  shipped adapters declare `capability effort supported` and a real
+  `carries board-transition` channel, so those branches are unreachable
+  against the installed tree as shipped. One authoring trap specific to
+  this resolver: its two normative-rule reads (`capability effort
+  <supported|unsupported>`, `carries board-transition <channel>`) are done
+  with a direct `awk` field read against the bound adapter's own definition
+  file, never by delegating to `bin/check-adapter.sh --adapter TOKEN` —
+  that mode's own internal-consistency check refuses a definition mutated
+  to declare `capability effort unsupported` while its `effort-mechanism`/
+  `effort-value` rows are left untouched with a DIFFERENT token
+  (`capability-inconsistent`) than the one this resolver's own rule
+  requires (`capability-unsupported`), so a fixture built by mutating only
+  the one field the rule under test reads is exactly the shape that mode's
+  stricter grammar was never meant to validate. Two sibling suites gained
+  an ancestor-symlink case in the same round (`bin/check-durability.sh`'s
+  and `bin/team-init.sh`'s own `$SCRIPT_DIR/..`-crossing sites, issue #218):
+  the fixture model is `tests/check-binding/run.sh`'s
+  `cb-ancestor-symlink-registry-ignored` (an `adopter/bin -> $REPO_ROOT/bin`
+  directory symlink, plus a decoy in the adopter's own `templates/`, that
+  must have zero effect on which shipped file the checker actually reads).
+- T-1059: purely a documentation task — no new `bin/` script, no new test suite,
+  no workflow edit. The mechanical gates that matter are `bash
+  bin/check-acs.sh .shell-team/specs/T-1059-docs-release-notes.md` (all 10
+  `check:` lines), `bash bin/check-intent.sh
+  .shell-team/specs/T-1059-docs-release-notes.md .shell-team/todo.md`
+  (confirms the frozen intent block is untouched), and `bash
+  tests/team-init/run.sh` (the one suite that content-asserts the scaffolded
+  `AGENTS.md` this task rewrites — it must still match `Codex`
+  case-insensitively and carry no `YYYY-MM-DD` date after the rewrite). A
+  `## Cutting a release` bullet count is a **base-relative delta**
+  (branch-point count + 2), never an absolute literal — re-derive it live
+  rather than hardcoding a number, the same discipline the population-count
+  entries elsewhere in this file already establish. Observing whether a
+  two-space-indented `CHANGELOG.md` sub-bullet (this task's own
+  `docs/templates/release-notes-template.md` instructs transcribing it
+  verbatim into `## Highlights`) renders as a Markdown list rather than an
+  indented code block can be checked without a browser: POST the candidate
+  text to `https://api.github.com/markdown` with `{"mode":"gfm","text":
+  "<content>"}` and inspect the returned HTML for `<ul><li>` vs `<pre><code>` —
+  `api.github.com` is on this environment's network allow-list and needs no
+  authentication for this endpoint.
+- T-1058: no new CI wiring needed — `bin/log-run.sh`, `bin/check-run.sh` and
+  `bin/rollup-runs.sh`, and their three suites (`tests/log-run/run.sh`,
+  `tests/check-run/run.sh`, `tests/rollup-runs/run.sh`), were already in
+  `.github/workflows/check-handoff.yml`'s shellcheck argument list and each
+  already had its own `bash tests/<suite>/run.sh` step, confirmed by
+  targeted search before touching anything (this task adds no `bin/` file,
+  no test suite, and makes no workflow edit). `bash tests/log-run/run.sh`,
+  `bash tests/check-run/run.sh` and `bash tests/rollup-runs/run.sh` run the
+  same way as every other suite here: pure bash + coreutils, no
+  prerequisite build, `${TMPDIR:-/tmp}` scratch space. One regression trap
+  worth recording for the next task that touches `bin/rollup-runs.sh`'s
+  stdout shape: `tests/rollup-runs/run.sh`'s pre-existing T-1011 AC30 check
+  used to compare `with-events.jsonl`'s roll-up output byte-for-byte
+  against the SEPARATELY fixtured `clean.jsonl`'s output — a comparison
+  that only worked because `rollup-runs.sh` never printed a row's own
+  `seq` anywhere; the two fixtures' span rows carry genuinely different
+  `seq` values (1/3/5/7 vs 1/2/3/4). The moment any output line prints
+  `seq` (this task's `review: <span>#<seq>=<relation>` line does), that
+  comparison must be rewritten to derive the "no events" side from the
+  SAME file (`grep -v -- '"kind":"event"' "$FIX/with-events.jsonl"`),
+  never from a different fixture — the shape `bin/log-run.sh`'s own
+  header and this task's AC5 check already use for the identical
+  invariance property.

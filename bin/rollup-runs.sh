@@ -33,6 +33,29 @@
 # tokens/duration_ms are nullable: null values are summed as 0 and the total is
 # marked "(partial)" so a missing-cost run is never silently reported as cheap.
 #
+# T-1058 adds two more lines per run block, derived from the span rows' own
+# (optional) `provider`/`effort`/`adapter` fields and stored nowhere — this
+# script remains a pure reporter:
+#   providers: <provider>=<count> ...  (or "(none)")  — every recorded
+#     provider value across the run's span rows, counted in first-seen
+#     order, marked "(partial)" when at least one span row in the run
+#     recorded none (the same "total over incomplete data" discipline the
+#     tokens/duration totals above already use).
+#   review: <span>#<seq>=<relation> ... (or "(none)") — one token PER
+#     reviewer span (never one boolean per run), in input order. The
+#     reviewer role set is {codex-reviewer}; the authoring role set is
+#     {engineer} (T-1058 DP6). A reviewer span's counterpart is the nearest
+#     PRECEDING authoring span in the same run in input order (no sort: this
+#     reporter already buffers in file/line order and adds none). <relation>
+#     is one of the closed three: `cross-provider` (declared providers
+#     differ), `same-provider` (declared providers agree — a legitimate,
+#     legal outcome, not a defect report), or `undetermined` — fail-closed,
+#     NEVER `false` and never `same-provider` — whenever either side
+#     recorded no provider, whenever no authoring span precedes the reviewer
+#     span at all, and for every row written before this task. What is
+#     recorded is the DECLARED binding, never an independently verified
+#     observation of what executed (T-1057's own boundary, carried forward).
+#
 # Usage:  rollup-runs.sh <run.jsonl> [<run.jsonl>...]
 # Exit:   0 = summary printed (incl. "no runs found"), 2 = usage / unreadable file.
 
@@ -97,6 +120,25 @@ field_num() {
   fi
 }
 
+# T-1058 DP6 — the provider-relation role pair, stated as two sets (each with
+# ≥1 member, so no bash-3.2 empty-array guard is needed to expand them) rather
+# than a cardinality-one assumption: a later role joins the set instead of
+# forcing this definition to be re-read. Keyed on the row's `span` field
+# (which names the role the relation is defined over), never on `phase`
+# (which names where in the loop the call happened).
+AUTHOR_ROLES=(engineer)
+REVIEWER_ROLES=(codex-reviewer)
+is_author_role() {
+  local want="$1" r
+  for r in "${AUTHOR_ROLES[@]}"; do [[ "$r" == "$want" ]] && return 0; done
+  return 1
+}
+is_reviewer_role() {
+  local want="$1" r
+  for r in "${REVIEWER_ROLES[@]}"; do [[ "$r" == "$want" ]] && return 0; done
+  return 1
+}
+
 # --- pass 1: collect unique run_ids in first-seen order ---
 RUN_IDS=()
 if [[ "${#LINES[@]}" -gt 0 ]]; then
@@ -126,6 +168,13 @@ for rid in "${RUN_IDS[@]}"; do
   tok_sum=0 tok_partial=0
   dur_sum=0 dur_partial=0
   ts_min="" ts_max=""
+  # T-1058: provider counts (first-seen order, parallel arrays — no bash-4
+  # associative arrays), the review-relation tokens (one per reviewer span,
+  # in input order), and the "nearest preceding authoring span" state this
+  # single forward pass tracks as it goes.
+  prov_names=() prov_counts=() prov_partial=0
+  review_str=""
+  last_author_seen=0 last_author_provider=""
 
   for line in "${LINES[@]}"; do
     [[ "$(field_str "$line" run_id)" == "$rid" ]] || continue
@@ -168,6 +217,54 @@ for rid in "${RUN_IDS[@]}"; do
       [[ -z "$ts_min" || "$ts" < "$ts_min" ]] && ts_min="$ts"
       [[ -z "$ts_max" || "$ts" > "$ts_max" ]] && ts_max="$ts"
     fi
+
+    # T-1058: the declared provider relation. `field_str` returns empty for
+    # BOTH an absent key and an explicit JSON null — "records no provider" —
+    # which is exactly the two-generation-fail-closed reading DP6/DP8 need:
+    # a legacy row (absent key) and a row that recorded a null both count as
+    # "this row does not say". Boundary-anchored, so a free-text `error`
+    # value whose bytes mimic `"provider":"..."` is never mistaken for the
+    # real key (the same mimicry defense field_str's other callers rely on).
+    prov="$(field_str "$line" provider)"
+    if [[ -n "$prov" ]]; then
+      pidx=-1
+      if [[ "${#prov_names[@]}" -gt 0 ]]; then
+        pi=0
+        for pn in "${prov_names[@]}"; do
+          [[ "$pn" == "$prov" ]] && { pidx=$pi; break; }
+          pi=$((pi + 1))
+        done
+      fi
+      if [[ "$pidx" -ge 0 ]]; then
+        prov_counts[pidx]=$((prov_counts[pidx] + 1))
+      else
+        prov_names+=("$prov")
+        prov_counts+=(1)
+      fi
+    else
+      prov_partial=1
+    fi
+
+    row_span="$(field_str "$line" span)"
+    if is_author_role "$row_span"; then
+      # The nearest PRECEDING authoring span, in input order — updated on
+      # every authoring span this pass reaches, including one that recorded
+      # no provider (which must itself make the NEXT reviewer span
+      # `undetermined`, not silently fall back to an earlier authoring
+      # span's provider).
+      last_author_seen=1
+      last_author_provider="$prov"
+    elif is_reviewer_role "$row_span"; then
+      rseq="$(field_num "$line" seq)"
+      if [[ "$last_author_seen" -eq 0 || -z "$prov" || -z "$last_author_provider" ]]; then
+        relation="undetermined"
+      elif [[ "$prov" == "$last_author_provider" ]]; then
+        relation="same-provider"
+      else
+        relation="cross-provider"
+      fi
+      review_str="${review_str:+$review_str }${row_span}#${rseq}=${relation}"
+    fi
   done
 
   # health flag
@@ -197,10 +294,30 @@ for rid in "${RUN_IDS[@]}"; do
   tok_label="$tok_sum"; [[ "$tok_partial" -eq 1 ]] && tok_label="$tok_sum (partial)"
   dur_label="${dur_sum}ms"; [[ "$dur_partial" -eq 1 ]] && dur_label="${dur_sum}ms (partial)"
 
+  # T-1058: "providers:" — zero recorded providers prints "(none)" outright
+  # (never "(none) (partial)"); one or more recorded prints each in
+  # first-seen order, marked "(partial)" only when at least one span row in
+  # the run ALSO recorded none (the same "total over incomplete data"
+  # discipline tok_label/dur_label above already apply).
+  if [[ "${#prov_names[@]}" -eq 0 ]]; then
+    providers_str="(none)"
+  else
+    providers_str=""
+    pi=0
+    for pn in "${prov_names[@]}"; do
+      providers_str="${providers_str:+$providers_str }${pn}=${prov_counts[$pi]}"
+      pi=$((pi + 1))
+    done
+    [[ "$prov_partial" -eq 1 ]] && providers_str="$providers_str (partial)"
+  fi
+  [[ -z "$review_str" ]] && review_str="(none)"
+
   printf 'run %s  [loop %s]  %s\n' "$rid" "${loop_id:-?}" "$flag"
   printf '  spans: %s   phases: %s\n' "$n_spans" "${phases:-(none)}"
   printf '  status: %s\n' "$status_str"
   printf '  verdict: %s\n' "$verdict_str"
   printf '  tokens: %s   duration: %s\n' "$tok_label" "$dur_label"
   printf '  window: %s → %s\n' "${ts_min:-?}" "${ts_max:-?}"
+  printf '  providers: %s\n' "$providers_str"
+  printf '  review: %s\n' "$review_str"
 done

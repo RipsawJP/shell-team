@@ -1,0 +1,32 @@
+# liveness-reasons.txt — the closed, plugin-shipped vocabulary a human-gate
+# declaration's `reason` field draws from (T-1056; GitHub issue #227;
+# .shell-team/specs/T-1056-loop-liveness.md's "## Declaration reason
+# registry"). Resolved by bin/check-liveness.sh from ITS OWN installed
+# directory (one level above, then into templates/) — never from an
+# adopter's working tree, the same shape templates/durability-records.txt
+# and templates/prompt-blocks/registry.txt already use for their own
+# checkers.
+#
+# Format (whitespace-delimited, one row per token; `#` comments and blank
+# lines are skipped):
+#
+#   <reason-token> <gate-kind>
+#
+#   <reason-token>   ^[a-z][a-z0-9-]*$, unique in this file
+#   <gate-kind>      one of the closed set: approval | ratification | escalation
+#
+# A `reason` value not in this file makes a declaration a refusal
+# (`declaration-unknown-reason`), never a guess. Each token here is spelled
+# by at least one of skills/run/SKILL.md and skills/goal/SKILL.md (no row
+# exists with no writer) — the two-directional set equality
+# templates/prompt-blocks/liveness-declaration.md and
+# bin/check-prompt-sync.sh hold between them.
+
+merge-go approval
+push-go approval
+fast-follow-approval approval
+intent-ratification ratification
+gate-escalation escalation
+stop-escalation escalation
+same-class-2 escalation
+advisory-escalation escalation

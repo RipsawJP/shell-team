@@ -1,0 +1,713 @@
+#!/usr/bin/env bash
+# run.sh — fixture suite for bin/check-liveness.sh (T-1056's fail-closed,
+# out-of-band loop-liveness classifier; GitHub issue #227;
+# .shell-team/specs/T-1056-loop-liveness.md).
+#
+# .shell-team/specs/T-1056-loop-liveness.md's own `- check:` lines exercise
+# every acceptance criterion directly against this script; this suite is a
+# second, independently-authored surface (the repository's standing
+# convention: check-binding.sh, check-adapter.sh and others each carry one)
+# covering every verdict, every one of the closed 18 refusal tokens, and
+# adversarial fixtures beyond the frozen criteria's own coverage — boundary
+# arithmetic, regex/character-set anchoring on the declaration grammar and
+# the --task shape, and "did this really run" positive controls beside every
+# mutation.
+#
+# No git init scratch repositories are built here (a deliberate departure
+# from a suggestion in the spec's own Notes for engineer — recorded in this
+# task's provenance file): every git-band case instead measures THIS
+# checkout's own real HEAD committer epoch live, at run time, and derives
+# $LIVENESS_NOW relative to it — which reaches every git band exactly as
+# well as a scratch repository would, without the sandboxed nested-.git
+# write restriction this repository's test-recipe already documents
+# (T-1001's entry). The declaration/state-file scratch fixtures still live
+# under a plain (non-git) $TMP.
+#
+# v2 (Codex round-2 REQUEST_CHANGES; pre-commitment trigger fired; the
+# spec's own first droppable executed): the vocabulary collapses to three
+# values (RUNNING/WAITING/STALLED — v1's retired fourth value, its second
+# threshold and flag, and the now-unreachable ordering refusal are all gone)
+# and the shipped LIVENESS_TEST_RACE_MTIME_BUMP production test seam is
+# deleted outright (DP9a: no write path to an observed input, under any
+# environment). Race coverage that the seam used to provide now lives
+# entirely in this suite via a PATH-shadowed `awk` helper that forwards to
+# the real tool and performs the mutation from the TEST PROCESS, between
+# the classifier's own reads — the technique QA round-2 proved live, never
+# a hook shipped in the classifier itself.
+#
+# Case ids (grouped; searched by `check-acs.sh`'s AC15 for the four verdict
+# tokens and by this file's own token-presence for all 18 refusal tokens —
+# `unclassified` is the one token this suite documents rather than reaches
+# behaviourally: it is the script's own internal fall-through backstop,
+# unreachable through any CLI input, and AC19(a)'s producer-run mutation
+# self-check is what actually proves it fires):
+#
+#   cl-help-sane, cl-ci-wiring                    — static/CI sanity
+#   cl-no-eval-source-static, cl-emit-count-static,
+#   cl-sibling-name-static                        — structural self-checks
+#   cl-running*, cl-stalled*                       — ladder + boundaries
+#   cl-race-*                                      — TOCTOU coverage via the
+#                                                     test-process shadow, not
+#                                                     a production seam
+#   cl-waiting*                                    — categorical, non-git-safe
+#   cl-superseded*                                 — falls through, not an error
+#   cl-decl-*                                      — the closed declaration
+#                                                     refusal vocabulary
+#   cl-registry-*                                  — plugin-shipped, decoy-proof
+#   cl-clock-*, cl-threshold-*, cl-usage-*,
+#   cl-state-*, cl-git-unreadable, cl-out-*        — the rest of the 18 tokens
+#   cl-readonly-inputs, cl-canary-*                 — read-only + no-eval proof
+#   cl-task-*                                       — --task composition/shape
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$HERE/../.." && pwd)"
+CHECKER="$REPO_ROOT/bin/check-liveness.sh"
+WORKFLOW="$REPO_ROOT/.github/workflows/check-handoff.yml"
+
+# The fixture root MUST resolve outside this checkout, unconditionally: the
+# cl-waiting-nogit and cl-git-unreadable cases below build a scratch
+# directory that must NOT be inside any git repository, and this repo
+# itself is one. The `$HERE`-relative fallback other suites use when
+# $TMPDIR is unset (e.g. tests/check-refreeze-class/run.sh) is wrong for
+# THIS suite specifically, because it lands the whole fixture root inside
+# tests/check-liveness/ -- fine for a suite indifferent to git context, not
+# for one whose nogit cases depend on being outside one. GitHub's
+# ubuntu-latest runners leave $TMPDIR unset, so this bit CI (PR #231) while
+# never reproducing locally, where the sandbox always sets $TMPDIR. Match
+# the frozen spec's own check lines instead, which all use this exact
+# ${TMPDIR:-/tmp} idiom uniformly and never the $HERE fallback.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-liveness-fixtures.XXXXXX")"
+trap 'rm -rf "$TMP"' EXIT
+
+fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
+pass() { printf 'PASS: %s\n' "$1"; }
+
+OUT_FILE="$TMP/.stdout"
+ERR_FILE="$TMP/.stderr"
+CL_RC=0
+
+# call_cl_in <cwd> <LIVENESS_NOW|''> <checker args...> — runs the real
+# checker with cwd set to <cwd> (so its internal `git` calls resolve against
+# THAT directory), captures stdout/stderr into the shared files, and leaves
+# the exit code in $CL_RC. `set +e`/`set -e` bracket the call so a non-zero
+# exit never aborts this suite (T-1024's guard idiom).
+call_cl_in() {
+  local cwd="$1" now="$2"
+  shift 2
+  set +e
+  if [ -n "$now" ]; then
+    ( cd "$cwd" && LIVENESS_NOW="$now" bash "$CHECKER" "$@" > "$OUT_FILE" 2> "$ERR_FILE" )
+  else
+    ( cd "$cwd" && bash "$CHECKER" "$@" > "$OUT_FILE" 2> "$ERR_FILE" )
+  fi
+  CL_RC=$?
+  set -e
+}
+
+# call_cl <LIVENESS_NOW|''> <checker args...> — the common case: run from
+# THIS repository's own root, so ladder cases resolve against its real HEAD.
+call_cl() {
+  local now="$1"
+  shift
+  call_cl_in "$REPO_ROOT" "$now" "$@"
+}
+
+# assert_verdict <id> <want-exit> <want-token> — checks $CL_RC and that
+# $OUT_FILE is EXACTLY one line carrying the bare token (never a substring
+# match — DP1's "byte equality, not a substring search").
+assert_verdict() {
+  local id="$1" want_rc="$2" want_token="$3"
+  [ "$CL_RC" = "$want_rc" ] \
+    || fail "$id: expected exit $want_rc, got $CL_RC (stdout=$(cat "$OUT_FILE" 2>/dev/null); stderr=$(cat "$ERR_FILE" 2>/dev/null))"
+  grep -qxF -- "$want_token" "$OUT_FILE" \
+    || fail "$id: expected stdout exactly '$want_token', got: $(cat "$OUT_FILE" 2>/dev/null)"
+  [ "$(grep -c . "$OUT_FILE" 2>/dev/null || true)" = "1" ] \
+    || fail "$id: stdout carried other than exactly one line"
+  pass "$id"
+}
+
+assert_stderr_has() {  # <id> <substring>
+  grep -q -- "$2" "$ERR_FILE" \
+    || fail "$1: expected stderr to contain '$2', got: $(cat "$ERR_FILE" 2>/dev/null)"
+}
+
+# assert_refusal <id> <reason-token> — the OBSERVE_ERROR shape: exit 2, stdout
+# exactly OBSERVE_ERROR, stderr names the reason token.
+assert_refusal() {
+  assert_verdict "$1" 2 OBSERVE_ERROR
+  assert_stderr_has "$1" "$2"
+}
+
+# mk_state <path> <start_epoch> — a well-formed /goal state file.
+mk_state() {
+  printf 'start_epoch=%s\niteration=4\nprev_sig=\n' "$2" > "$1"
+}
+
+# state_mtime <path> — portable mtime read (GNU then BSD; this suite's own
+# copy of the same fallback the checker itself carries).
+state_mtime() {
+  stat -c %Y -- "$1" 2>/dev/null || stat -f %m -- "$1" 2>/dev/null
+}
+
+# mk_decl <path> <task> <reason> <run-epoch> <declared-epoch> — a well-formed
+# human-gate declaration.
+mk_decl() {
+  printf '%s\n' 'gate-declaration 1' "task $2" "reason $3" "run-epoch $4" "declared-epoch $5" 'gate-declaration-end' > "$1"
+}
+
+# =============================================================================
+# --help sanity (AC3 / AC8's own machine-readable requirements, independently
+# re-derived here)
+# =============================================================================
+h="$TMP/help.txt"
+bash "$CHECKER" --help > "$h" 2>&1 || fail "cl-help-sane: --help did not exit 0"
+[ -s "$h" ] || fail "cl-help-sane: --help produced no output"
+for t in RUNNING WAITING STALLED OBSERVE_ERROR; do
+  grep -qF -- "$t" "$h" || fail "cl-help-sane: --help does not name $t"
+done
+# The retired fourth token's own absence from --help is AC3's frozen clause
+# to make (this suite is scoped to zero occurrences of that literal itself,
+# per AC10, so it is not independently re-asserted here); the retired flag's
+# name IS suite-permitted (AC10 scopes that absence to the classifier alone)
+# and is checked below.
+[ "$(grep -cF -- 'dead-after' "$h" || true)" = "0" ] || fail "cl-help-sane: --help still names the retired dead-after flag"
+grep -qF -- 'exit 1' "$h" || fail "cl-help-sane: --help does not carry the literal 'exit 1'"
+grep -qF -- 'no verdict' "$h" || fail "cl-help-sane: --help does not carry the literal 'no verdict'"
+grep -qxE '  default stall-after: [0-9]{1,9}' "$h" || fail "cl-help-sane: --help missing the exact 'default stall-after: <n>' line"
+pass "cl-help-sane"
+
+# =============================================================================
+# CI wiring self-assertion
+# =============================================================================
+[ -r "$WORKFLOW" ] || fail "cl-ci-wiring: cannot read $WORKFLOW"
+grep -qF -- 'bin/check-liveness.sh' "$WORKFLOW" || fail "cl-ci-wiring: check-handoff.yml does not name bin/check-liveness.sh"
+grep -qF -- 'tests/check-liveness/run.sh' "$WORKFLOW" || fail "cl-ci-wiring: check-handoff.yml does not name tests/check-liveness/run.sh"
+grep -qF -- 'bash tests/check-liveness/run.sh' "$WORKFLOW" || fail "cl-ci-wiring: check-handoff.yml carries no suite-run step"
+grep -qE 'bin/check-liveness\.sh --help' "$WORKFLOW" || fail "cl-ci-wiring: check-handoff.yml carries no --help dogfood step"
+pass "cl-ci-wiring"
+
+# =============================================================================
+# structural self-checks (independent copies of AC1/AC4/AC7/AC10's static clauses)
+# =============================================================================
+[ "$(grep -cE '(^|[;&|(]|\$\()[[:space:]]*(jq|python3|python|perl|node|yq|curl|wget|gh|osascript|mail|sendmail)([[:space:]]|$)' "$CHECKER" || true)" = "0" ] \
+  || fail "cl-no-interpreter-static: an interpreter/transport appears in command position"
+pass "cl-no-interpreter-static"
+
+[ "$(grep -cE '(^|[;&|(])[[:space:]]*eval([[:space:]]|$)' "$CHECKER" || true)" = "0" ] \
+  || fail "cl-no-eval-source-static: eval appears in command position"
+[ "$(grep -cE '(^|[;&|(])[[:space:]]*(source|\.)[[:space:]]' "$CHECKER" || true)" = "0" ] \
+  || fail "cl-no-eval-source-static: source/. appears in command position"
+pass "cl-no-eval-source-static"
+
+[ "$(grep -cE '(emit|verdict|printf)[^#]*RUNNING' "$CHECKER" || true)" = "1" ] \
+  || fail "cl-emit-count-static: RUNNING is not emitted from exactly one site"
+pass "cl-emit-count-static"
+
+sib_bad=0
+for p in $(git -C "$REPO_ROOT" ls-tree -r --name-only HEAD bin/ | sed -n 's#^bin/##p'); do
+  case "$p" in
+    team-paths.sh|check-liveness.sh) continue ;;  # team-paths.sh is the one permitted sibling; check-liveness.sh is this script's OWN name, not a sibling
+    *.sh) ;;
+    *) continue ;;
+  esac
+  n="$(grep -cF -- "$p" "$CHECKER" || true)"
+  [ "$n" = "0" ] || { sib_bad=1; printf 'cl-sibling-name-static: %s appears %s time(s) in %s\n' "$p" "$n" "$CHECKER" >&2; }
+done
+[ "$sib_bad" = "0" ] || fail "cl-sibling-name-static: a sibling bin/*.sh filename other than team-paths.sh is named"
+grep -qF -- 'team-paths.sh' "$CHECKER" || fail "cl-sibling-name-static: team-paths.sh is never named (would make the sibling clause vacuous)"
+pass "cl-sibling-name-static"
+
+# =============================================================================
+# RUNNING: the positive-evidence cell, plus boundary
+# =============================================================================
+n0="$(date +%s)"
+S="$TMP/s"; mk_state "$S" "$((n0 - 600))"
+MT="$(state_mtime "$S")"
+
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-running 0 RUNNING
+
+call_cl "$((MT + 899))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-running-boundary-under-stall 0 RUNNING
+
+call_cl "$((MT + 901))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-stalled-boundary-over-stall 4 STALLED
+
+call_cl "$((MT + 3600))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-stalled-boundary-far-past 4 STALLED
+
+# =============================================================================
+# STALLED at extreme age — measured against THIS checkout's own real HEAD,
+# live, rather than a scratch git repository (see this file's header note
+# and the provenance file for why). Two ages three-plus orders of magnitude
+# apart, both STALLED, is the v2 collapse's own observable signature (AC9).
+# =============================================================================
+HC="$(git -C "$REPO_ROOT" log -1 --format=%ct HEAD)"
+OLD="$TMP/old"
+mk_state "$OLD" "946684800"
+touch -t 200001010000 "$OLD"
+OM="$(state_mtime "$OLD")"
+[ "$((HC - OM))" -gt 31536000 ] || fail "cl-stalled-extreme-age-near: fixture precondition failed (backdated file is not >1 year behind HEAD)"
+
+call_cl "$((HC + 60))" --state "$OLD" --declaration "$TMP/none"
+assert_verdict cl-stalled-extreme-age-near 4 STALLED
+
+call_cl "$((HC + 100000))" --state "$OLD" --declaration "$TMP/none"
+assert_verdict cl-stalled-extreme-age-far 4 STALLED
+
+# =============================================================================
+# M1 (Codex round-1 Major, race-closing fix) + DP9a (v2, round-2 Major: the
+# fix's own v1 test seam wrote to an observed input and is deleted outright).
+# Race coverage now lives entirely here, via a PATH-shadowed `awk` that
+# forwards to the REAL awk and then mutates the state file's mtime FROM THE
+# TEST PROCESS, between the classifier's own content read and its
+# confirming re-stat -- the technique QA round-2 proved live. No production
+# hook, no sleep, no background process.
+# =============================================================================
+REAL_AWK="$(command -v awk)" || fail "cl-race-shadow-touch-running: no awk found on PATH to shadow"
+SHADOW_DIR="$TMP/shadow-awk"
+mkdir -p "$SHADOW_DIR"
+
+# The no-op shadow: forwards only, never mutates -- a vacuity control
+# proving the shadow mechanism itself changes nothing when it doesn't touch.
+cat > "$SHADOW_DIR/awk-noop" <<SHADOWEOF
+#!/bin/sh
+exec "$REAL_AWK" "\$@"
+SHADOWEOF
+chmod +x "$SHADOW_DIR/awk-noop"
+
+# The touching shadow: forwards, THEN touches the last argument (the file
+# awk was asked to read -- exactly \$STATE_PATH in every call the classifier
+# makes), simulating a rewrite landing between the content read and the
+# confirming re-stat.
+cat > "$SHADOW_DIR/awk-touch" <<SHADOWEOF
+#!/bin/sh
+"$REAL_AWK" "\$@"
+rc=\$?
+n=\$#
+if [ "\$n" -gt 0 ]; then
+  shift \$((n - 1))
+  touch -- "\$1" 2>/dev/null || true
+fi
+exit "\$rc"
+SHADOWEOF
+chmod +x "$SHADOW_DIR/awk-touch"
+
+RACE_OLD="$TMP/race-old"
+mk_state "$RACE_OLD" "946684800"
+touch -t 200001010000 "$RACE_OLD"
+ROM="$(state_mtime "$RACE_OLD")"
+
+# A fixed clock, captured once and given a generous forward buffer, rather
+# than letting the classifier call `date +%s` internally: the touching
+# shadow's `touch` sets the file's mtime to REAL wall-clock time at the
+# instant it fires, mid-invocation -- comparing that against an
+# un-buffered "now" captured a moment earlier is exactly the kind of
+# second-boundary race this suite's own conventions avoid (no sleep, no
+# real-time comparison without a margin). $RACE_NOW is comfortably after
+# any delay between capturing it and the shadow's touch actually running.
+RACE_NOW=$(( $(date +%s) + 30 ))
+
+# control: the no-op shadow changes nothing -- same STALLED as the real awk.
+mkdir -p "$SHADOW_DIR/noop"; ln -sf "$SHADOW_DIR/awk-noop" "$SHADOW_DIR/noop/awk"
+set +e
+( cd "$REPO_ROOT" && PATH="$SHADOW_DIR/noop:$PATH" LIVENESS_NOW="$RACE_NOW" bash "$CHECKER" --state "$RACE_OLD" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-race-shadow-noop-control-stalled 4 STALLED
+ROM2="$(state_mtime "$RACE_OLD")"
+[ "$ROM" = "$ROM2" ] || fail "cl-race-shadow-noop-control-stalled: the no-op shadow unexpectedly changed the file's mtime"
+
+# the race itself: the touching shadow lands a mutation mid-read; the
+# classifier's own bounded consistency re-read must pick up the FRESH mtime
+# it produces, landing RUNNING rather than leaking the stale, pre-touch one.
+mkdir -p "$SHADOW_DIR/touch"; ln -sf "$SHADOW_DIR/awk-touch" "$SHADOW_DIR/touch/awk"
+set +e
+( cd "$REPO_ROOT" && PATH="$SHADOW_DIR/touch:$PATH" LIVENESS_NOW="$RACE_NOW" bash "$CHECKER" --state "$RACE_OLD" --declaration "$TMP/none" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-race-shadow-touch-running 0 RUNNING
+ROM3="$(state_mtime "$RACE_OLD")"
+[ "$ROM" != "$ROM3" ] || fail "cl-race-shadow-touch-running: fixture precondition failed (the touching shadow never actually touched the file)"
+[ "$((RACE_NOW - ROM3))" -ge 0 ] || fail "cl-race-shadow-touch-running: fixture precondition failed (the touched mtime is still after the buffered clock -- widen the buffer)"
+
+# =============================================================================
+# threshold override moves the one surviving boundary
+# =============================================================================
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 5
+assert_verdict cl-threshold-override-stalled 4 STALLED
+
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 100
+assert_verdict cl-threshold-override-running 0 RUNNING
+
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 0900
+assert_verdict cl-threshold-leading-zero-running 0 RUNNING
+
+call_cl "$((MT + 901))" --state "$S" --declaration "$TMP/none" --stall-after 0900
+assert_verdict cl-threshold-leading-zero-stalled 4 STALLED
+
+# =============================================================================
+# WAITING — categorical, outranks every stillness band, needs no git
+# =============================================================================
+D_FRESH="$TMP/d-fresh"
+mk_decl "$D_FRESH" "T-901" "merge-go" "$((n0 - 600))" "$((MT + 10))"
+
+for now_off in 30 1200 100000; do
+  call_cl "$((MT + now_off))" --state "$S" --declaration "$D_FRESH"
+  assert_verdict "cl-waiting-band-$now_off" 3 WAITING
+done
+
+# positive control: same three clocks, declaration ABSENT — attributable to the declaration
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-waiting-control-running 0 RUNNING
+call_cl "$((MT + 1200))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-waiting-control-stalled 4 STALLED
+call_cl "$((MT + 100000))" --state "$S" --declaration "$TMP/none"
+assert_verdict cl-waiting-control-far-stalled 4 STALLED
+
+mkdir -p "$TMP/nogit"
+if git -C "$TMP/nogit" rev-parse --show-toplevel >/dev/null 2>&1; then
+  fail "cl-waiting-nogit: fixture precondition failed ($TMP/nogit is inside a git repository)"
+fi
+call_cl_in "$TMP/nogit" "$((MT + 30))" --state "$S" --declaration "$D_FRESH"
+assert_verdict cl-waiting-nogit 3 WAITING
+
+call_cl_in "$TMP/nogit" "$((MT + 30))" --state "$S" --declaration "$TMP/none"
+assert_refusal cl-git-unreadable git-unreadable
+
+# =============================================================================
+# superseded — falls through to the ladder, never WAITING, never an error
+# =============================================================================
+D_SUP="$TMP/d-sup"
+mk_decl "$D_SUP" "T-901" "merge-go" "$((n0 - 600))" "$((MT - 100))"
+call_cl "$((MT + 30))" --state "$S" --declaration "$D_SUP"
+assert_verdict cl-superseded-running 0 RUNNING
+assert_stderr_has cl-superseded-running-context declaration-superseded
+
+call_cl "$((MT + 1200))" --state "$S" --declaration "$D_SUP"
+assert_verdict cl-superseded-stalled 4 STALLED
+assert_stderr_has cl-superseded-stalled-context declaration-superseded
+
+# =============================================================================
+# the declaration refusal vocabulary — each mutation proved to differ from
+# the unmutated base before being judged (T-1001's tolerance-proof discipline)
+# =============================================================================
+D_BASE="$TMP/d-base"
+mk_decl "$D_BASE" "T-901" "merge-go" "$((n0 - 600))" "$((MT + 10))"
+call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE"
+assert_verdict cl-decl-base-control 3 WAITING
+
+mut() {  # <id> <reason-token> <mutated-file>
+  cmp -s "$D_BASE" "$3" && fail "$1: mutated fixture is byte-identical to the base (mutation did not apply)"
+  call_cl "$((MT + 30))" --state "$S" --declaration "$3"
+  assert_refusal "$1" "$2"
+}
+
+C="$TMP/c1"; grep -v '^gate-declaration-end$' "$D_BASE" > "$C"
+mut cl-decl-unterminated declaration-unterminated "$C"
+
+C="$TMP/c2"; grep -v '^gate-declaration 1$' "$D_BASE" > "$C"
+mut cl-decl-version-missing declaration-malformed "$C"
+
+C="$TMP/c3"
+{ grep -v '^gate-declaration 1$' "$D_BASE" | grep -v '^gate-declaration-end$'; printf '%s\n' 'gate-declaration 1' 'gate-declaration-end'; } > "$C"
+mut cl-decl-version-moved declaration-malformed "$C"
+
+C="$TMP/c4"; sed 's/^gate-declaration 1$/gate-declaration 9/' "$D_BASE" > "$C"
+mut cl-decl-version-unsupported declaration-malformed "$C"
+
+C="$TMP/c5"; grep -v '^task ' "$D_BASE" > "$C"
+mut cl-decl-field-missing declaration-malformed "$C"
+
+C="$TMP/c6"
+{ head -n2 "$D_BASE"; sed -n '2p' "$D_BASE"; tail -n +3 "$D_BASE"; } > "$C"
+mut cl-decl-field-duplicate declaration-malformed "$C"
+
+C="$TMP/c7"
+{ head -n5 "$D_BASE"; printf '%s\n' 'escalated yes'; tail -n1 "$D_BASE"; } > "$C"
+mut cl-decl-unrecognized-directive declaration-malformed "$C"
+
+C="$TMP/c8"; sed 's/^reason merge-go$/reason zz-not-a-reason/' "$D_BASE" > "$C"
+mut cl-decl-unknown-reason declaration-unknown-reason "$C"
+
+C="$TMP/c9"; sed 's/^reason merge-go$/reason MERGE-GO/' "$D_BASE" > "$C"
+mut cl-decl-reason-shape-uppercase declaration-malformed "$C"
+
+C="$TMP/c10"; sed "s/^run-epoch .*/run-epoch $((n0 - 599))/" "$D_BASE" > "$C"
+mut cl-decl-foreign-run declaration-foreign-run "$C"
+
+C="$TMP/c11"; sed "s/^declared-epoch .*/declared-epoch $((n0 - 601))/" "$D_BASE" > "$C"
+mut cl-decl-precedes-run declaration-precedes-run "$C"
+
+C="$TMP/c12"; cp "$D_BASE" "$C"; chmod 000 "$C"
+call_cl "$((MT + 30))" --state "$S" --declaration "$C"
+assert_refusal cl-decl-unreadable declaration-unreadable
+chmod 644 "$C"
+
+# =============================================================================
+# the reason registry — plugin-shipped, resolved from the checker's own
+# installed directory, decoy- and corruption-proof
+# =============================================================================
+grep -qF -- 'zz-decoy-reason' "$REPO_ROOT/templates/liveness-reasons.txt" && fail "cl-registry-decoy-ignored: fixture precondition failed (decoy token already in the real registry)"
+
+DECOY_ROOT="$TMP/decoy"
+mkdir -p "$DECOY_ROOT/templates"
+printf '%s\n' 'zz-decoy-reason approval' > "$DECOY_ROOT/templates/liveness-reasons.txt"
+[ -r "$DECOY_ROOT/templates/liveness-reasons.txt" ] || fail "cl-registry-decoy-ignored: decoy file not readable"
+grep -q 'zz-decoy-reason' "$DECOY_ROOT/templates/liveness-reasons.txt" || fail "cl-registry-decoy-ignored: decoy file does not carry its own token"
+
+D_DECOY="$TMP/d-decoy"
+mk_decl "$D_DECOY" "T-901" "zz-decoy-reason" "$((n0 - 600))" "$((MT + 10))"
+call_cl_in "$DECOY_ROOT" "$((MT + 30))" --state "$S" --declaration "$D_DECOY"
+assert_refusal cl-registry-decoy-ignored declaration-unknown-reason
+
+# a scratch "install" of the checker + its sibling resolver, so
+# registry-unreadable/registry-malformed can be exercised against a
+# corrupted registry without touching the real shipped one
+SCRATCH="$TMP/scratch-install"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/templates"
+cp "$CHECKER" "$SCRATCH/bin/check-liveness.sh"
+cp "$REPO_ROOT/bin/team-paths.sh" "$SCRATCH/bin/team-paths.sh"
+chmod 755 "$SCRATCH/bin/check-liveness.sh" "$SCRATCH/bin/team-paths.sh"
+
+set +e
+LIVENESS_NOW="$((MT + 30))" bash "$SCRATCH/bin/check-liveness.sh" --state "$S" --declaration "$D_BASE" > "$OUT_FILE" 2> "$ERR_FILE"
+CL_RC=$?
+set -e
+assert_refusal cl-registry-unreadable registry-unreadable
+
+printf '%s\n' 'onlyonetoken' > "$SCRATCH/templates/liveness-reasons.txt"
+set +e
+LIVENESS_NOW="$((MT + 30))" bash "$SCRATCH/bin/check-liveness.sh" --state "$S" --declaration "$D_BASE" > "$OUT_FILE" 2> "$ERR_FILE"
+CL_RC=$?
+set -e
+assert_refusal cl-registry-malformed-wrong-field-count registry-malformed
+
+printf '%s\n' 'merge-go approval' 'merge-go escalation' > "$SCRATCH/templates/liveness-reasons.txt"
+set +e
+LIVENESS_NOW="$((MT + 30))" bash "$SCRATCH/bin/check-liveness.sh" --state "$S" --declaration "$D_BASE" > "$OUT_FILE" 2> "$ERR_FILE"
+CL_RC=$?
+set -e
+assert_refusal cl-registry-malformed-duplicate-token registry-malformed
+
+# =============================================================================
+# clock handling: $LIVENESS_NOW shape, and clock-skew in both directions
+# =============================================================================
+call_cl "zzz" --state "$S" --declaration "$TMP/none"
+assert_refusal cl-clock-unreadable-nonnumeric clock-unreadable
+call_cl "-1" --state "$S" --declaration "$TMP/none"
+assert_refusal cl-clock-unreadable-negative clock-unreadable
+call_cl "123456789012" --state "$S" --declaration "$TMP/none"
+assert_refusal cl-clock-unreadable-overwide clock-unreadable
+
+call_cl "$((MT - 5))" --state "$S" --declaration "$TMP/none"
+assert_refusal cl-clock-skew-state clock-skew
+
+call_cl "$((OM + 5))" --state "$OLD" --declaration "$TMP/none"
+assert_refusal cl-clock-skew-git clock-skew
+
+# =============================================================================
+# thresholds: shape and boundary width. The v1 ordering-refusal token is
+# retired outright at v2 -- one threshold has no ordering relation left to
+# violate (DP6) -- so there is no case for it here; --dead-after's own retirement is covered
+# under usage below, since it now falls to the generic unknown-flag arm.
+# =============================================================================
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after abc
+assert_refusal cl-threshold-invalid-nonnumeric threshold-invalid
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after -5
+assert_refusal cl-threshold-invalid-negative threshold-invalid
+call_cl "$((MT + 30))" --state "$S" --declaration "$TMP/none" --stall-after 1234567890123
+assert_refusal cl-threshold-invalid-overwide threshold-invalid
+
+# =============================================================================
+# usage: every rejected invocation shape
+# =============================================================================
+call_cl "" ; assert_refusal cl-usage-no-args usage
+call_cl "" --state "$S" ; assert_refusal cl-usage-state-only usage
+call_cl "" --declaration "$TMP/none" ; assert_refusal cl-usage-decl-only usage
+call_cl "" --task T-901 --state "$S" ; assert_refusal cl-usage-task-plus-state usage
+call_cl "" --task T-901 --declaration "$TMP/none" ; assert_refusal cl-usage-task-plus-decl usage
+call_cl "" --task nope ; assert_refusal cl-usage-bad-task-shape usage
+call_cl "" --task "T-" ; assert_refusal cl-usage-task-no-digits usage
+call_cl "" --task "t-1" ; assert_refusal cl-usage-task-lowercase usage
+call_cl "" --frobnicate ; assert_refusal cl-usage-unknown-flag usage
+call_cl "" "$S" ; assert_refusal cl-usage-bare-positional usage
+
+# the retired --dead-after flag (v2, DP6/AC8): refused usage through the
+# generic unknown-flag arm, alone and alongside the surviving flag, never
+# accepted and silently ignored.
+call_cl "" --state "$S" --declaration "$TMP/none" --dead-after 3600
+assert_refusal cl-usage-dead-after-alone usage
+call_cl "" --state "$S" --declaration "$TMP/none" --stall-after 900 --dead-after 3600
+assert_refusal cl-usage-dead-after-with-stall-after usage
+
+# --task with a valid, unusual (but shape-legal) digit run is ACCEPTED at the
+# argument-shape layer — it fails later, on state-missing, never on usage.
+TASK_ROOT="$TMP/task-root"
+mkdir -p "$TASK_ROOT/.ops"
+[ ! -d "$TASK_ROOT/.ops/runs" ] || fail "cl-task-id-leading-zero: fixture precondition failed (runs dir already exists)"
+set +e
+( cd "$TASK_ROOT" && TEAM_RUN_BASE=.ops LIVENESS_NOW=1000000000 bash "$CHECKER" --task T-0901 > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_refusal cl-task-id-leading-zero state-missing
+assert_stderr_has cl-task-id-leading-zero-composed-path '.ops/runs/goal-T-0901.state'
+
+# =============================================================================
+# --task composition: state-missing names the resolver-composed path, never
+# a hardcoded literal (measured from a scratch root under TEAM_RUN_BASE)
+# =============================================================================
+set +e
+( cd "$TASK_ROOT" && TEAM_RUN_BASE=.ops LIVENESS_NOW=1000000000 bash "$CHECKER" --task T-901 > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_refusal cl-task-compose-state-missing state-missing
+assert_stderr_has cl-task-compose-state-missing-path '.ops/runs/goal-T-901.state'
+
+# =============================================================================
+# state file refusals
+# =============================================================================
+call_cl "$((MT + 30))" --state "$TMP/does-not-exist" --declaration "$TMP/none"
+assert_refusal cl-state-missing state-missing
+assert_stderr_has cl-state-missing-names-path "$TMP/does-not-exist"
+
+C="$TMP/s-unreadable"; cp "$S" "$C"; chmod 000 "$C"
+call_cl "$((MT + 30))" --state "$C" --declaration "$TMP/none"
+assert_refusal cl-state-unreadable state-unreadable
+chmod 644 "$C"
+
+C="$TMP/s-noepoch"; grep -v '^start_epoch=' "$S" > "$C"
+call_cl "$((MT + 30))" --state "$C" --declaration "$TMP/none"
+assert_refusal cl-state-malformed-no-start-epoch state-malformed
+
+C="$TMP/s-badepoch"; sed 's/^start_epoch=.*/start_epoch=x9/' "$S" > "$C"
+call_cl "$((MT + 30))" --state "$C" --declaration "$TMP/none"
+assert_refusal cl-state-malformed-bad-start-epoch state-malformed
+
+C="$TMP/s-baditer"; sed 's/^iteration=.*/iteration=y/' "$S" > "$C"
+call_cl "$((MT + 30))" --state "$C" --declaration "$TMP/none"
+assert_refusal cl-state-malformed-bad-iteration state-malformed
+
+# =============================================================================
+# --out: atomic, self-describing, replace semantics, symlink refusal, and
+# leaves nothing behind when omitted
+# =============================================================================
+EMPTY="$TMP/out-empty"
+mkdir -p "$EMPTY"
+[ "$(find "$EMPTY" -mindepth 1 | grep -c . || true)" = "0" ] || fail "cl-out-none-no-sideeffect: fixture precondition failed (scratch dir not empty)"
+call_cl_in "$EMPTY" "$((MT + 30))" --state "$S" --declaration "$TMP/none"
+[ "$(find "$EMPTY" -mindepth 1 | grep -c . || true)" = "0" ] || fail "cl-out-none-no-sideeffect: a file appeared with no --out"
+pass "cl-out-none-no-sideeffect"
+
+V="$TMP/verdict.doc"
+[ ! -e "$V" ] || fail "cl-out-shape: fixture precondition failed ($V already exists)"
+call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$V"
+assert_verdict cl-out-shape-verdict 3 WAITING
+[ -s "$V" ] || fail "cl-out-shape: --out document was not created"
+head -n1 "$V" | grep -qxF 'liveness-verdict 1' || fail "cl-out-shape: missing version line"
+grep -qxF 'verdict WAITING' "$V" || fail "cl-out-shape: missing verdict line"
+for k in reason state-age git-age; do
+  grep -qE "^$k " "$V" || fail "cl-out-shape: missing $k line"
+done
+tail -n1 "$V" | grep -qxF 'liveness-verdict-end' || fail "cl-out-shape: missing terminator"
+pass "cl-out-shape"
+
+call_cl "$((MT + 1200))" --state "$S" --declaration "$TMP/none" --out "$V"
+assert_verdict cl-out-replace-verdict 4 STALLED
+grep -qxF 'verdict STALLED' "$V" || fail "cl-out-replace: verdict not updated"
+[ "$(grep -c '^verdict ' "$V" || true)" = "1" ] || fail "cl-out-replace: more than one verdict line after replace"
+pass "cl-out-replace"
+
+LINK="$TMP/out-link"; NOWHERE="$TMP/out-nowhere"
+ln -s "$NOWHERE" "$LINK"
+[ ! -e "$NOWHERE" ] || fail "cl-out-symlink-refused: fixture precondition failed (target unexpectedly exists)"
+call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$LINK"
+assert_refusal cl-out-symlink-refused out-unwritable
+[ ! -e "$NOWHERE" ] || fail "cl-out-symlink-refused: the symlink target was created (it must never be followed)"
+
+# =============================================================================
+# M2 (Codex round-1 Major): the --out occupancy lattice. `mv` treats an
+# existing directory as "move INTO it" and returns success -- refused now,
+# the same way a symlink already was, and generalized to any non-regular
+# type (the `[ ! -f ]` test is false for all of them, not just directories).
+# =============================================================================
+OUTDIR="$TMP/out-existing-dir"
+mkdir -p "$OUTDIR"
+[ "$(find "$OUTDIR" -mindepth 1 | grep -c . || true)" = "0" ] || fail "cl-out-directory-refused: fixture precondition failed (dir not empty)"
+call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$OUTDIR"
+assert_refusal cl-out-directory-refused out-unwritable
+[ -d "$OUTDIR" ] || fail "cl-out-directory-refused: the target is no longer a directory"
+[ "$(find "$OUTDIR" -mindepth 1 | grep -c . || true)" = "0" ] || fail "cl-out-directory-refused: a file was created INSIDE the directory (mv moved into it)"
+
+if command -v mkfifo >/dev/null 2>&1; then
+  OUTFIFO="$TMP/out-existing-fifo"
+  mkfifo -- "$OUTFIFO"
+  call_cl "$((MT + 30))" --state "$S" --declaration "$D_BASE" --out "$OUTFIFO"
+  assert_refusal cl-out-fifo-refused out-unwritable
+  [ -p "$OUTFIFO" ] || fail "cl-out-fifo-refused: the target is no longer a fifo"
+else
+  pass "cl-out-fifo-refused (skipped: mkfifo unavailable on this host)"
+fi
+
+# =============================================================================
+# read-only proof: the state file's and the declaration's git-hash-object
+# values are identical before and after every invocation above that read them
+# =============================================================================
+H_S_AFTER="$(git hash-object "$S")"
+H_D_AFTER="$(git hash-object "$D_BASE")"
+# recompute the ORIGINAL hashes independently (never trusted from memory) —
+# the base fixtures were never rewritten above, so a fresh write with the
+# same content must hash identically.
+mk_state "$TMP/s-hash-check" "$((n0 - 600))"
+H_S_EXPECT="$(git hash-object "$TMP/s-hash-check")"
+mk_decl "$TMP/d-hash-check" "T-901" "merge-go" "$((n0 - 600))" "$((MT + 10))"
+H_D_EXPECT="$(git hash-object "$TMP/d-hash-check")"
+[ "$H_S_AFTER" = "$H_S_EXPECT" ] || fail "cl-readonly-inputs: the state file's content changed across this suite's invocations"
+[ "$H_D_AFTER" = "$H_D_EXPECT" ] || fail "cl-readonly-inputs: the declaration file's content changed across this suite's invocations"
+pass "cl-readonly-inputs"
+
+# =============================================================================
+# no-eval CANARY: a shell-metacharacter payload in a declaration or state
+# field is refused, never executed
+# =============================================================================
+mkdir -p "$TMP/canary-cwd"
+# The literal text $(>CANARY) below is the payload under test — it must NOT
+# expand here; expanding it in THIS script would create the canary itself
+# and invalidate the test.
+C="$TMP/p1"
+# shellcheck disable=SC2016
+sed 's/^reason merge-go$/reason $(>CANARY)/' "$D_BASE" > "$C"
+cmp -s "$D_BASE" "$C" && fail "cl-canary-dollar-paren: mutated fixture is byte-identical to the base"
+set +e
+( cd "$TMP/canary-cwd" && LIVENESS_NOW="$((MT + 30))" bash "$CHECKER" --state "$S" --declaration "$C" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-canary-dollar-paren 2 OBSERVE_ERROR
+grep -qE 'declaration-(malformed|unknown-reason)' "$ERR_FILE" || fail "cl-canary-dollar-paren: unexpected refusal token"
+
+C="$TMP/p2"; sed 's/^reason merge-go$/reason ;>CANARY;/' "$D_BASE" > "$C"
+cmp -s "$D_BASE" "$C" && fail "cl-canary-semicolon: mutated fixture is byte-identical to the base"
+set +e
+( cd "$TMP/canary-cwd" && LIVENESS_NOW="$((MT + 30))" bash "$CHECKER" --state "$S" --declaration "$C" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_verdict cl-canary-semicolon 2 OBSERVE_ERROR
+grep -qE 'declaration-(malformed|unknown-reason)' "$ERR_FILE" || fail "cl-canary-semicolon: unexpected refusal token"
+
+C="$TMP/p3"
+# shellcheck disable=SC2016
+sed 's/^start_epoch=.*/start_epoch=$(>CANARY)/' "$S" > "$C"
+cmp -s "$S" "$C" && fail "cl-canary-state: mutated fixture is byte-identical to the base"
+set +e
+( cd "$TMP/canary-cwd" && LIVENESS_NOW="$((MT + 30))" bash "$CHECKER" --state "$C" --declaration "$D_BASE" > "$OUT_FILE" 2> "$ERR_FILE" )
+CL_RC=$?
+set -e
+assert_refusal cl-canary-state state-malformed
+
+[ "$(find "$TMP" -name CANARY | grep -c . || true)" = "0" ] || fail "cl-canary: a CANARY file was created — a payload was evaluated"
+pass "cl-canary-no-side-effect"
+
+printf '\ncheck-liveness suite: all assertions passed\n'
+exit 0

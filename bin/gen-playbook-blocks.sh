@@ -63,16 +63,19 @@ fail() { printf 'gen-playbook-blocks: %s\n' "$1" >&2 || true; exit 1; }
 
 # Resolve this script's own directory (symlink-safe) so the sibling
 # check-playbook.sh can be invoked regardless of cwd — same pattern as
-# close-out.sh / gen-project-status.sh.
+# close-out.sh / gen-project-status.sh. `cd DIR && pwd -P` (T-1057, issue
+# #218), not a bare logical `pwd`: an ANCESTOR directory symlink (an
+# adopter's `bin/` symlinked into the plugin's real `bin/`) would otherwise
+# survive untouched and could misresolve a sibling script's location.
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")"
   case "$link_target" in
     /*) script_path="$link_target" ;;
-    *)  script_path="$(cd "$(dirname "$script_path")" && pwd)/$link_target" ;;
+    *)  script_path="$(cd "$(dirname "$script_path")" && pwd -P)/$link_target" ;;
   esac
 done
-SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
 ROOT="."
 LESSONS=""

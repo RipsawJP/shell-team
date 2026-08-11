@@ -105,6 +105,24 @@ bash "$CHECK_CONTRACT" "$T1/.shell-team/loops/shell-team.contract.yaml" >/dev/nu
   || fail "AC1: generated contract does not pass check-contract"
 pass "AC1: generated shell-team.contract.yaml passes check-contract"
 
+# --- T-1057 AC14: the executor-binding specimen is scaffolded INERT --------
+BINDING_TEMPLATE="$REPO_ROOT/templates/binding-template.conf"
+[ -f "$T1/.shell-team/binding.conf.example" ] \
+  || fail "T-1057: binding.conf.example was not scaffolded under the base dir"
+[ ! -e "$T1/.shell-team/binding.conf" ] \
+  || fail "T-1057: team-init must never scaffold binding.conf itself (that would silently change the default executor assignment)"
+[ ! -e "$T1/binding.conf" ] && [ ! -e "$T1/binding.conf.example" ] \
+  || fail "T-1057: the binding specimen must not appear at the host root"
+cmp -s "$BINDING_TEMPLATE" "$T1/.shell-team/binding.conf.example" \
+  || fail "T-1057: scaffolded binding.conf.example is not byte-identical to templates/binding-template.conf"
+bash "$INIT" --help 2>&1 | grep -qF 'binding.conf.example' \
+  || fail "T-1057: team-init --help does not name the scaffolded binding.conf.example path"
+h0="$(git -C "$REPO_ROOT" hash-object "$T1/.shell-team/binding.conf.example")"
+init "$T1" >/dev/null 2>&1 || fail "T-1057: team-init exited non-zero on a binding.conf.example re-run"
+h1="$(git -C "$REPO_ROOT" hash-object "$T1/.shell-team/binding.conf.example")"
+[ "$h0" = "$h1" ] || fail "T-1057: re-running team-init changed binding.conf.example (not idempotent)"
+pass "T-1057: binding.conf.example is scaffolded inert (byte-identical to the specimen, never binding.conf, --help names it, idempotent)"
+
 # --- AC2: host root is NOT mutated ------------------------------------------
 [ ! -e "$T1/CLAUDE.md" ]  || fail "AC2: team-init must not create a host CLAUDE.md"
 [ ! -e "$T1/.gitignore" ] || fail "AC2: team-init must not create a host-root .gitignore"
@@ -157,11 +175,23 @@ pass "AC4: pre-existing CLAUDE.md and root .gitignore left byte-for-byte untouch
 
 # --- AC5: generated files are generic (no repo-specific bake-in) -----------
 # T-[0-9]{3,} catches any concrete task id; the literal placeholder `T-XXX` in
-# the todo Format block is intentionally allowed.
-if grep -rEi "ripsawjp|loop-engineering|T-[0-9]{3,}" "$T1/.shell-team" >/dev/null 2>&1; then
-  fail "AC5: repo-specific token leaked into generated files"
-fi
+# the todo Format block is intentionally allowed. binding.conf.example (T-1057)
+# is byte-copied from templates/binding-template.conf, which this task must
+# not edit (DP10) and which carries its own authorship citation (`T-1054`) in
+# its header, exactly the same class of provenance-not-bake-in citation
+# templates/liveness-reasons.txt carries for `T-1056` — so it is excluded from
+# this sweep by name, never by a widened pattern, and its exclusion is proven
+# non-vacuous by the positive control immediately below.
+leaked="$(find "$T1/.shell-team" -type f ! -name 'binding.conf.example' -print0 \
+  | xargs -0 grep -lEi 'ripsawjp|loop-engineering|T-[0-9]{3,}' 2>/dev/null || true)"
+[ -z "$leaked" ] || fail "AC5: repo-specific token leaked into generated files: $leaked"
 pass "AC5: generated files are generic (no ripsawjp / loop-engineering / concrete T-NNN)"
+
+# T-1057: the ONE excluded file is excluded for the stated reason, not because
+# it happens to be free of the pattern — prove the pattern actually matches it.
+grep -qE 'T-[0-9]{3,}' "$T1/.shell-team/binding.conf.example" \
+  || fail "T-1057: fixture control failed — binding.conf.example does not carry the T-1054 provenance citation this exclusion exists for"
+pass "T-1057: binding.conf.example's sole exclusion from the AC5 sweep is the byte-untouched specimen's own provenance citation, confirmed present"
 
 # --- override: $TEAM_RUN_BASE relocates the scaffold ------------------------
 T_OV="$TMP/override"
@@ -269,6 +299,31 @@ init "$T_SYM_KEEP" >/dev/null 2>&1 || fail "T-061 AC3: team-init exited non-zero
 [ -L "$T_SYM_KEEP/.shell-team/runs/.gitkeep" ] \
   || fail "T-061 AC3: the pre-existing dangling symlink at runs/.gitkeep should be preserved untouched"
 pass "T-061 AC3: ensure_gitkeep() skips a dangling symlink at the destination (no write-through, no base escape)"
+
+# --- T-1057 ancestor-symlink (issue #218): scaffolding through an
+# ANCESTOR-symlinked bin/ must still read the plugin's own shipped
+# templates/, never a decoy planted in the adopter's own templates/ dir.
+# adopter/bin -> the real, un-symlinked $REPO_ROOT/bin (ordinary vendoring,
+# no hostile action) — the topology a plain `cd && pwd` bootstrap survives
+# untouched, silently resolving TEMPLATES_DIR inside the ADOPTER's tree.
+T_ANC="$TMP/ancestor-symlink"
+mkdir -p "$T_ANC/decoyroot/adopter/templates" "$T_ANC/target"
+ln -s "$REPO_ROOT/bin" "$T_ANC/decoyroot/adopter/bin"
+[ -L "$T_ANC/decoyroot/adopter/bin" ] || fail "ancestor-symlink-team-init: adopter/bin was not created as a symlink"
+for f in todo-template.md shell-team.contract.yaml shell-team.gitignore AGENTS.md test-recipe.md binding-template.conf; do
+  cp "$REPO_ROOT/templates/$f" "$T_ANC/decoyroot/adopter/templates/$f"
+done
+printf '\n<!-- DECOY-MARKER-DO-NOT-SHIP -->\n' >> "$T_ANC/decoyroot/adopter/templates/todo-template.md"
+cmp -s "$REPO_ROOT/templates/todo-template.md" "$T_ANC/decoyroot/adopter/templates/todo-template.md" \
+  && fail "ancestor-symlink-team-init: fixture control failed — the decoy template is byte-identical to the real one"
+env -u TEAM_RUN_BASE bash "$T_ANC/decoyroot/adopter/bin/team-init.sh" "$T_ANC/target" >/dev/null 2>&1 \
+  || fail "ancestor-symlink-team-init: team-init exited non-zero through an ancestor-symlinked bin/"
+if grep -qF 'DECOY-MARKER-DO-NOT-SHIP' "$T_ANC/target/.shell-team/todo.md"; then
+  fail "ancestor-symlink-team-init: scaffold consumed the adopter's own decoy templates/ dir instead of the plugin's shipped templates/ (ancestor-directory-symlink escape)"
+fi
+cmp -s "$REPO_ROOT/templates/todo-template.md" "$T_ANC/target/.shell-team/todo.md" \
+  || fail "ancestor-symlink-team-init: scaffolded todo.md is not byte-identical to the plugin's real shipped template"
+pass "ancestor-symlink-team-init — an ancestor-symlinked bin/ (adopter/bin -> real bin/) still scaffolds from the plugin's own shipped templates/, never a decoy planted in the adopter's own templates/ dir"
 
 # --- argument handling -----------------------------------------------------
 set +e
