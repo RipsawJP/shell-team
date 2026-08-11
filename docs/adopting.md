@@ -110,9 +110,11 @@ you want to assign specific executors to all six:
    `<base>/binding.conf` by hand. **Its six rows carry placeholder model
    tokens** — `model-1` on the five `claude` rows, `model-2` on
    `codex-reviewer` — that name no real model: replace **every** row
-   before relying on it, or transcribe the shipped default's rows below
-   for any role you are not changing. Editing one row and stopping there
-   ships five placeholder bindings into resolution and telemetry.
+   before relying on it, or transcribe the actual rows from
+   `templates/binding-default.conf` (**not** the grammar example below,
+   which is a custom-binding illustration with different values) for any
+   role you are not changing. Editing one row and stopping there ships
+   five placeholder bindings into resolution and telemetry.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role.
 3. `bash check-binding.sh --config <base>/binding.conf` — with the plugin
@@ -154,10 +156,13 @@ the shipped Codex invocation passes no model flag at all, while every
 other role's column carries that role's own `agents/<role>.md` pin, from
 the plugin's own agent definitions.
 
-`resolve-executor.sh` enforces four fail-closed refusals from a closed
-set. Three of them are things an ordinary config edit can trigger; the
-fourth is a contract the two shipped adapters already both satisfy, so it
-is not reachable by binding to either of them today:
+`resolve-executor.sh`'s refusal set is closed and has **five** tokens;
+`usage` is a bad invocation (a CLI-argument error), not a config state,
+so it sits outside this adopter workflow. The other four are
+config-condition refusals: three of them are things an ordinary config
+edit can trigger; the fourth is a contract the two shipped adapters
+already both satisfy, so it is not reachable by binding to either of
+them today:
 
 - `binding-unresolved` (exit code `2`) — the effective binding failed to
   resolve to a well-formed, trustworthy form. Two ordinary-edit causes:

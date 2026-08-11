@@ -199,9 +199,11 @@ is refused, not completed from the default.
    `<base>/binding.conf` by hand. **Its six rows carry placeholder model
    tokens** — `model-1` on the five `claude` rows, `model-2` on
    `codex-reviewer` — that name no real model: replace **every** row
-   before relying on it, or transcribe the shipped default's rows below
-   for any role you are not changing. Editing one row and stopping there
-   ships five placeholder bindings into resolution and telemetry.
+   before relying on it, or transcribe the actual rows from
+   `templates/binding-default.conf` (**not** the grammar example below,
+   which is a custom-binding illustration with different values) for any
+   role you are not changing. Editing one row and stopping there ships
+   five placeholder bindings into resolution and telemetry.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role — to assign the executor you want. `effort` is
    positionally required; spell "no value" as a literal `-`, never by

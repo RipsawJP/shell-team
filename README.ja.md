@@ -200,9 +200,11 @@ per-role の merge・layering・fallback は存在しないため、6 役割そ�
    モデルトークン**を持っています——`claude` 系の 5 行に `model-1`、
    `codex-reviewer` に `model-2`——これらは実在するモデルを指しません。
    これに依拠する前に**全ての行**を置き換えるか、変更しない役割の行は
-   下記の shipped default の行をそのまま転記してください。1 行だけ編集
-   して止めると、残り 5 役割にプレースホルダーの紐付けが resolution と
-   telemetry にそのまま入ってしまいます。
+   `templates/binding-default.conf` の実際の行を転記してください
+   （**下記の grammar example ではありません**——それは異なる値を持つ
+   custom-binding の例示です）。1 行だけ編集して止めると、残り 5 役割に
+   プレースホルダーの紐付けが resolution と telemetry にそのまま入って
+   しまいます。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集して割り当てたい executor を指定する。`effort` は
    位置的に必須で、「値なし」はフィールドを省略せず常にリテラル `-` で

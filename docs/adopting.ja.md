@@ -114,9 +114,11 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    ホルダーのモデルトークン**を持っています——`claude` 系の 5 行に
    `model-1`、`codex-reviewer` に `model-2`——これらは実在するモデルを
    指しません。これに依拠する前に**全ての行**を置き換えるか、変更しない
-   役割の行は下記の shipped default の行をそのまま転記してください。
-   1 行だけ編集して止めると、残り 5 役割にプレースホルダーの紐付けが
-   resolution と telemetry にそのまま入ってしまいます。
+   役割の行は `templates/binding-default.conf` の実際の行を転記して
+   ください（**下記の grammar example ではありません**——それは異なる
+   値を持つ custom-binding の例示です）。1 行だけ編集して止めると、
+   残り 5 役割にプレースホルダーの紐付けが resolution と telemetry に
+   そのまま入ってしまいます。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集する。
 3. `bash check-binding.sh --config <base>/binding.conf` ——プラグインを
@@ -159,10 +161,12 @@ host の `<base>/binding.conf` が全く無い場合——設定していない�
 の列は、その役割自身の `agents/<role>.md`（プラグイン自身の agent
 定義）の pin をそのまま持つ。
 
-`resolve-executor.sh` は 4 つの fail-closed refusal を閉じた集合として
-enforce する。うち 3 つは通常の config 編集で到達しうるが、4 つ目は
-出荷済みの 2 つの adapter がすでに双方満たしている契約であり、どちらに
-紐付けても今日は到達できない:
+`resolve-executor.sh` の refusal 集合は閉じており、**5 つ**のトークンを
+持つ——`usage` は不正な呼び出し（CLI 引数エラー）であり config の状態
+ではないため、この adopter workflow の対象外です。残る 4 つが
+config-condition refusal で、うち 3 つは通常の config 編集で到達しうる
+が、4 つ目は出荷済みの 2 つの adapter がすでに双方満たしている契約であり、
+どちらに紐付けても今日は到達できない:
 
 - `binding-unresolved`（exit code `2`）— 有効な紐付けが well-formed で
   信頼できる形に解決しなかった場合。通常の編集で到達しうる原因は 2 つ:
