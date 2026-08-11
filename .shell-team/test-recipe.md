@@ -719,6 +719,23 @@ that file's order.
   "<content>"}` and inspect the returned HTML for `<ul><li>` vs `<pre><code>` —
   `api.github.com` is on this environment's network allow-list and needs no
   authentication for this endpoint.
+- T-1060: purely a documentation task — no new `bin/` script, no new test suite,
+  no workflow edit, no config-grammar or checker change. The mechanical gates
+  that matter are `bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`
+  (11 `check:`-bearing criteria; AC12 is runtime `SKIP` by design, reported
+  item by item in the hand-off) and `bash bin/check-intent.sh
+  .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`
+  (confirms the frozen intent block is untouched). Validating a documented
+  grammar example before committing it: write it to a scratch file (not
+  `/tmp` directly — this sandbox denies writes there; use `$TMPDIR` or the
+  session scratchpad) and run `bash bin/check-binding.sh --config <that
+  file>`; exit `0` confirms the example is not merely illustrative but
+  actually accepted by the shipped validator. AC1/AC2's fenced-block
+  extraction concatenates the content of *every* triple-backtick block in
+  the section (not just the first), so a section meant to carry exactly one
+  config example must not include a second, unrelated fenced block (e.g. a
+  standalone shell-command block) or its `bind`/`schema` line count and
+  byte-identity comparisons will pick up unintended lines.
 - T-1058: no new CI wiring needed — `bin/log-run.sh`, `bin/check-run.sh` and
   `bin/rollup-runs.sh`, and their three suites (`tests/log-run/run.sh`,
   `tests/check-run/run.sh`, `tests/rollup-runs/run.sh`), were already in

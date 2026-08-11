@@ -176,6 +176,51 @@ build sha と uptime を返す /healthz を shell-team で追加して
 
 この運用規律がどう進化したかは [docs/history.ja.md](docs/history.ja.md) を参照。
 
+## 役割と executor の紐付け
+
+6 つの inner-loop 役割 — `tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
+`codex-reviewer`・`ui-designer` — は、`<base>/binding.conf`
+（`<base>` は `bin/team-paths.sh --get base` で解決）を通じて、それぞれ
+executor（provider + model + effort + adapter）を host が個別に割り当て
+られます。host 設定が無い場合、`bin/resolve-executor.sh` はプラグイン
+出荷時の既定である `templates/binding-default.conf` にフォールバックします
+——これが**出荷時の既定**で、存在する場合の `<base>/binding.conf` が
+resolver の優先する host override です。両者は決して同じファイルでは
+ありません。
+
+1. スキャフォールドされた `<base>/binding.conf.example`（`team-init` が
+   `templates/binding-template.conf` から書き出す）を
+   `<base>/binding.conf` にリネームする——`team-init` がまだ走っていない
+   場合は `templates/binding-template.conf` を手動でコピーする。
+2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
+   1 行）を編集して割り当てたい executor を指定する。`effort` は
+   位置的に必須で、「値なし」はフィールドを省略せず常にリテラル `-` で
+   綴る（この「未設定」の綴り方は effort 列だけのもの——model 列は
+   常に英数字始まりが必要）。
+3. `bash bin/check-binding.sh --config <base>/binding.conf`（exit `0` =
+   valid）で検証し、`bash bin/resolve-executor.sh --print-resolved` で
+   有効な紐付けを確認する。
+
+実際の validator が受理する設定例:
+
+```
+schema 1
+
+bind tech-lead      claude opus   high claude-cli
+bind pm-spec        claude opus   high claude-cli
+bind engineer       claude sonnet -    claude-cli
+bind qa-verifier    claude sonnet -    claude-cli
+bind ui-designer    claude sonnet -    claude-cli
+bind codex-reviewer codex  gpt-5  -    codex-cli
+```
+
+**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する**
+executor と**テレメトリ**が記録する値が変わる。ただし別 executor への
+**呼び出し経路**が配線されるわけでは**ない**——役割の実際の呼び出しは、
+その役割自身が固定するモデル値を今なお経由する。それを変える退役は
+issue **#236**。reviewer 行自身の出荷時の既定とその理由は
+[設計上の選択](#設計上の選択) を参照。
+
 ## run のリプレイ
 
 1 run のテレメトリ（span 行 + event 行）は、1 枚の自己完結した HTML ページとしてリプレイできる — ネットワークも外部アセットもビルドステップも不要で、`file://` URL からそのまま開ける。

@@ -29,6 +29,7 @@
 ├── AGENTS.md                    # クロスツール向けポインタ doc（下記参照）— 真実源ではない
 ├── test-recipe.md               # repo 固有のテスト実行レシピ（engineer/QA が最初に読み、
 │                                #   確立した手順を追記。--force でも上書きされない）
+├── binding.conf.example         # 不活性な executor-binding specimen；binding.conf にリネームで opt-in
 └── .gitignore                   # 自己完結。runs/ テレメトリを無視
 ```
 
@@ -91,6 +92,70 @@ pin してください。
 ループは Plan → Specify → Implement → Validate → Review を回し、各フェーズゲートで
 ボード（`<base>/todo.md`）の status flag を進め、マージ/プッシュの前に人間のために
 一時停止します。
+
+## 役割と executor の紐付け
+
+`team-init` は不活性な `<base>/binding.conf.example`
+（`<base>` は `bin/team-paths.sh --get base` で解決）をスキャフォールド
+します——これは `templates/binding-template.conf` のコピーです。6 つの
+inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
+`codex-reviewer`・`ui-designer`）のいずれかに特定の executor を割り当て
+たいときに `<base>/binding.conf` を作成します:
+
+1. `mv <base>/binding.conf.example <base>/binding.conf` ——`team-init` が
+   まだ走っていない場合は `templates/binding-template.conf` を手動で
+   `<base>/binding.conf` へコピーする。
+2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
+   1 行）を編集する。
+3. `bash bin/check-binding.sh --config <base>/binding.conf`
+4. `bash bin/resolve-executor.sh --print-resolved`
+
+実際の validator が受理する設定例:
+
+```
+schema 1
+
+bind tech-lead      claude opus   high claude-cli
+bind pm-spec        claude opus   high claude-cli
+bind engineer       claude sonnet -    claude-cli
+bind qa-verifier    claude sonnet -    claude-cli
+bind ui-designer    claude sonnet -    claude-cli
+bind codex-reviewer codex  gpt-5  -    codex-cli
+```
+
+host の `<base>/binding.conf` が全く無い場合——設定していない通常の
+ケース——`resolve-executor.sh` はプラグイン出荷時の既定
+`templates/binding-default.conf` にフォールバックする。その `model` 列は
+`codex-reviewer` に限り `provider-configured` を持つ——出荷時の Codex
+呼び出しが model フラグを一切渡さないという境界を表す——それ以外の各役割
+の列は、その役割自身の `agents/<role>.md` の pin をそのまま持つ。
+
+adopter の編集が到達しうる 4 つの fail-closed refusal（`resolve-executor.sh`
+から）:
+
+- `binding-unresolved`（exit code `2`）— `<base>/binding.conf` に存在する
+  ものが通常ファイルでない場合（ディレクトリ・FIFO・dangling symlink
+  など）；出荷時の既定へ黙って fallback することは決してなく、それは
+  「本当に存在しない」場合専用。
+- `capability-unsupported`（exit code `1`）— 役割が、紐付けられた
+  adapter が宣言していない effort 値を要求した場合。
+- `contract-violation`（exit code `1`）— write / propose の
+  board-authority を持つ役割が、board-transition チャンネルを持たない
+  adapter に紐付けられた場合。
+- `executor-unavailable`（exit code `1`）— 紐付けられた executor に到達
+  できない場合——例えば `Codex` CLI が `PATH` に無い、または read-only
+  probe に失敗する場合。
+
+各 adapter は自分自身の effort 語彙を宣言しており、共有リストは存在
+しない: `claude-cli` は `low`・`medium`・`high`・`xhigh`・`max` を、
+`codex-cli` は `none`・`minimal`・`low`・`medium`・`high`・`xhigh`・
+`max` を受理する。
+
+**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する**
+executor と**テレメトリ**が記録する値が変わる。ただし別 executor への
+**呼び出し経路**が配線されるわけでは**ない**——役割の実際の呼び出しは、
+その役割自身が固定するモデル値を今なお経由する。それを変える退役は
+issue **#236**。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 

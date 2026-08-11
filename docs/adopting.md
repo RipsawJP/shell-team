@@ -28,6 +28,7 @@ that already uses the legacy `tasks/` + `docs/specs/` layout is detected and reu
 ├── AGENTS.md                    # cross-tool pointer doc (see below) — not a source of truth
 ├── test-recipe.md               # per-repo test-run recipe (engineer/QA read first, append
 │                                #   established procedures; never overwritten, even with --force)
+├── binding.conf.example         # inert executor-binding specimen; rename to binding.conf to opt in
 └── .gitignore                   # self-contained; ignores runs/ telemetry
 ```
 
@@ -89,6 +90,69 @@ it, point that tool at `<base>/AGENTS.md` explicitly.
 The loop runs Plan → Specify → Implement → Validate → Review, advancing a status
 flag in the board (`<base>/todo.md`) at each phase gate, and pauses for a human
 before merge/push.
+
+## Binding roles to executors
+
+`team-init` scaffolds an inert `<base>/binding.conf.example`
+(`<base>` resolves via `bin/team-paths.sh --get base`) — a copy of
+`templates/binding-template.conf`. Author a `<base>/binding.conf` when you
+want to assign a specific executor to one or more of the six inner-loop
+roles (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `codex-reviewer`,
+`ui-designer`):
+
+1. `mv <base>/binding.conf.example <base>/binding.conf` — or, if
+   `team-init` has not run yet, copy `templates/binding-template.conf` to
+   `<base>/binding.conf` by hand.
+2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
+   one per role.
+3. `bash bin/check-binding.sh --config <base>/binding.conf`
+4. `bash bin/resolve-executor.sh --print-resolved`
+
+A config the real validator accepts:
+
+```
+schema 1
+
+bind tech-lead      claude opus   high claude-cli
+bind pm-spec        claude opus   high claude-cli
+bind engineer       claude sonnet -    claude-cli
+bind qa-verifier    claude sonnet -    claude-cli
+bind ui-designer    claude sonnet -    claude-cli
+bind codex-reviewer codex  gpt-5  -    codex-cli
+```
+
+With no host `<base>/binding.conf` at all — the ordinary, unconfigured
+case — `resolve-executor.sh` falls back to the plugin-shipped default,
+`templates/binding-default.conf`; its `model` column carries
+`provider-configured` only for `codex-reviewer`, naming the boundary that
+the shipped Codex invocation passes no model flag at all, while every
+other role's column carries its own `agents/<role>.md` pin.
+
+An adopter edit can reach four fail-closed refusals from
+`resolve-executor.sh`:
+
+- `binding-unresolved` (exit code `2`) — an occupant at
+  `<base>/binding.conf` that is not a regular file (a directory, a FIFO, a
+  dangling symlink); never silently substituted with the shipped default,
+  which is reserved for true absence.
+- `capability-unsupported` (exit code `1`) — a role requests an effort
+  value its bound adapter does not declare.
+- `contract-violation` (exit code `1`) — a role with write or propose
+  board authority is bound to an adapter that does not carry a
+  board-transition channel.
+- `executor-unavailable` (exit code `1`) — the bound executor is not
+  reachable — for example, the `Codex` CLI is missing from `PATH` or fails
+  its read-only probe.
+
+Each adapter declares its own effort vocabulary; there is no shared list:
+`claude-cli` accepts `low`, `medium`, `high`, `xhigh`, `max`; `codex-cli`
+accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`.
+
+**The honest boundary**: rebinding a role changes which executor
+`resolve-executor.sh` **resolves** and which value **telemetry** records
+for it. It does **not** wire an alternate-executor **invocation path** — a
+role's actual invocation still routes through that role's own pinned model
+value. The retirement that would change that is issue **#236**.
 
 ## Conversational usage (no slash commands)
 

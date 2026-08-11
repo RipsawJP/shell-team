@@ -176,6 +176,51 @@ The agent pipeline above is the **inner loop**. An **outer loop** of operating d
 
 See [docs/history.md](docs/history.md) for how this operating discipline evolved.
 
+## Binding roles to executors
+
+Each of the six inner-loop roles — `tech-lead`, `pm-spec`, `engineer`,
+`qa-verifier`, `codex-reviewer`, `ui-designer` — is host-assignable to a
+specific executor (provider + model + effort + adapter) through a
+`<base>/binding.conf` (`<base>` resolves via `bin/team-paths.sh --get base`).
+With no host config, `bin/resolve-executor.sh` falls back to the
+plugin-shipped default, `templates/binding-default.conf` — the **shipped
+default**; `<base>/binding.conf`, when present, is the **host override**
+`resolve-executor.sh` prefers instead. The two are never the same file.
+
+1. Rename the scaffolded `<base>/binding.conf.example` (written by
+   `team-init` from `templates/binding-template.conf`) to
+   `<base>/binding.conf` — or, if `team-init` has not run yet, copy
+   `templates/binding-template.conf` to `<base>/binding.conf` by hand.
+2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
+   one per role — to assign the executor you want. `effort` is
+   positionally required; spell "no value" as a literal `-`, never by
+   omitting the field (only the effort column spells "unset" that way —
+   the model column always needs a leading alphanumeric).
+3. Validate with `bash bin/check-binding.sh --config <base>/binding.conf`
+   (exit `0` = valid) and inspect the effective binding with
+   `bash bin/resolve-executor.sh --print-resolved`.
+
+A config the real validator accepts:
+
+```
+schema 1
+
+bind tech-lead      claude opus   high claude-cli
+bind pm-spec        claude opus   high claude-cli
+bind engineer       claude sonnet -    claude-cli
+bind qa-verifier    claude sonnet -    claude-cli
+bind ui-designer    claude sonnet -    claude-cli
+bind codex-reviewer codex  gpt-5  -    codex-cli
+```
+
+**The honest boundary**: rebinding a role changes which executor
+`resolve-executor.sh` **resolves** and which value **telemetry** records
+for it. It does **not** wire an alternate-executor **invocation path** — a
+role's actual invocation still routes through that role's own pinned model
+value. The retirement that would change that is issue **#236**. See
+[Design choices](#design-choices) for the reviewer row's own shipped
+default and its rationale.
+
 ## Replaying a run
 
 A run's telemetry (span rows plus event rows) replays as one self-contained HTML page — no network, no external asset, no build step; it opens straight from a `file://` URL.
