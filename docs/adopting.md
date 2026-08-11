@@ -105,8 +105,12 @@ roles (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `codex-reviewer`,
    `<base>/binding.conf` by hand.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role.
-3. `bash bin/check-binding.sh --config <base>/binding.conf`
-4. `bash bin/resolve-executor.sh --print-resolved`
+3. `bash check-binding.sh --config <base>/binding.conf` — with the plugin
+   loaded, `bin/` is on `PATH`, so this resolves with no `bin/` prefix;
+   inside a checkout with no plugin loaded, run `bash bin/check-binding.sh
+   ...` instead.
+4. `bash resolve-executor.sh --print-resolved` (same `bin/`-on-`PATH` note
+   as step 3).
 
 A config the real validator accepts:
 

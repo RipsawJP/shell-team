@@ -107,8 +107,12 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    `<base>/binding.conf` へコピーする。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集する。
-3. `bash bin/check-binding.sh --config <base>/binding.conf`
-4. `bash bin/resolve-executor.sh --print-resolved`
+3. `bash check-binding.sh --config <base>/binding.conf` ——プラグインを
+   ロードしていれば `bin/` は `PATH` に載るので `bin/` 接頭辞なしで
+   解決する。プラグインをロードしていないチェックアウト内では
+   `bash bin/check-binding.sh ...` を使う。
+4. `bash resolve-executor.sh --print-resolved`（step 3 と同じ
+   `bin/`-on-`PATH` の注記）。
 
 実際の validator が受理する設定例:
 

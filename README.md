@@ -196,9 +196,11 @@ default**; `<base>/binding.conf`, when present, is the **host override**
    positionally required; spell "no value" as a literal `-`, never by
    omitting the field (only the effort column spells "unset" that way —
    the model column always needs a leading alphanumeric).
-3. Validate with `bash bin/check-binding.sh --config <base>/binding.conf`
+3. Validate with `bash check-binding.sh --config <base>/binding.conf`
    (exit `0` = valid) and inspect the effective binding with
-   `bash bin/resolve-executor.sh --print-resolved`.
+   `bash resolve-executor.sh --print-resolved` — with the plugin loaded,
+   `bin/` is on `PATH`, so both resolve with no `bin/` prefix; inside a
+   checkout with no plugin loaded, prefix each with `bin/` instead.
 
 A config the real validator accepts:
 

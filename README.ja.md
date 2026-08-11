@@ -197,9 +197,12 @@ resolver の優先する host override です。両者は決して同じファ�
    位置的に必須で、「値なし」はフィールドを省略せず常にリテラル `-` で
    綴る（この「未設定」の綴り方は effort 列だけのもの——model 列は
    常に英数字始まりが必要）。
-3. `bash bin/check-binding.sh --config <base>/binding.conf`（exit `0` =
-   valid）で検証し、`bash bin/resolve-executor.sh --print-resolved` で
-   有効な紐付けを確認する。
+3. `bash check-binding.sh --config <base>/binding.conf`（exit `0` =
+   valid）で検証し、`bash resolve-executor.sh --print-resolved` で
+   有効な紐付けを確認する——プラグインをロードしていれば `bin/` は
+   `PATH` に載るのでどちらも `bin/` 接頭辞なしで解決する。プラグインを
+   ロードしていないチェックアウト内では、それぞれ `bin/` を付けて
+   実行する。
 
 実際の validator が受理する設定例:
 
