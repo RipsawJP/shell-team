@@ -97,16 +97,26 @@ pin してください。
 
 `team-init` は不活性な `<base>/binding.conf.example`
 （`<base>` は `bin/team-paths.sh --get base` で解決）をスキャフォールド
-します——これは `templates/binding-template.conf` のコピーです。6 つの
+します——これは `templates/binding-template.conf` のコピーです。host の
+`<base>/binding.conf` は**丸ごと**採用されます: 出荷時の既定に対する
+per-role の merge・layering・fallback は存在しないため、6 つの
 inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
-`codex-reviewer`・`ui-designer`）のいずれかに特定の executor を割り当て
-たいときに `<base>/binding.conf` を作成します:
+`codex-reviewer`・`ui-designer`）それぞれに `bind` 行を 1 本ずつ、多くも
+少なくもなく持つ必要があります。部分的なファイルは既定から補完される
+のではなく refuse されます。6 役割すべてに executor を割り当てたいとき
+に作成します:
 
 1. `mv <base>/binding.conf.example <base>/binding.conf` ——`team-init` が
    まだ走っていない場合は、プラグイン自身の
    `templates/binding-template.conf`（プラグインのインストール先
    ディレクトリから解決される——自リポジトリ配下のパスではない）を
-   手動で `<base>/binding.conf` へコピーする。
+   手動で `<base>/binding.conf` へコピーする。**この 6 行はプレース
+   ホルダーのモデルトークン**を持っています——`claude` 系の 5 行に
+   `model-1`、`codex-reviewer` に `model-2`——これらは実在するモデルを
+   指しません。これに依拠する前に**全ての行**を置き換えるか、変更しない
+   役割の行は下記の shipped default の行をそのまま転記してください。
+   1 行だけ編集して止めると、残り 5 役割にプレースホルダーの紐付けが
+   resolution と telemetry にそのまま入ってしまいます。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集する。
 3. `bash check-binding.sh --config <base>/binding.conf` ——プラグインを
@@ -115,12 +125,20 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    `bash bin/check-binding.sh ...` を使う。
 4. `bash resolve-executor.sh --print-resolved`（step 3 と同じ
    `bin/`-on-`PATH` の注記）——6 役割すべての有効な紐付けを解決するが、
-   **availability probe を一切行わない**。これだけでは紐付けた
-   executor が実際に到達可能かを確認できない（下記の
-   `executor-unavailable` 参照——これは `resolve-executor.sh --role
-   <role>` でのみ検査される）。
+   **availability probe を一切行わない**。`resolve-executor.sh --role
+   <role>` はさらに検査するが、その probe は紐付けられた provider に
+   よって決まる: **out-of-process** な provider（`codex`）については
+   `codex --version` が `PATH` 上で観測可能かを確認し、その read-only
+   probe を実行する。**in-process** な provider（`claude`）については
+   **availability の判定を一切行わない**——probe kind を表示するだけで、
+   根拠を持てる判定（harness 自身のサブエージェント呼び出し失敗）を
+   下すのは呼び出し側に委ねる。出荷時の既定では 6 役割のうち 5 つが
+   `claude` に紐付いているため、`resolve-executor.sh --role
+   codex-reviewer` だけが実際に何かを probe する唯一の呼び出しになる
+   （下記の `executor-unavailable` 参照）。
 
-実際の validator が受理する設定例:
+実際の validator が受理する設定例——採用される config が持つべき
+6 役割すべてを示す:
 
 ```
 schema 1
@@ -159,11 +177,14 @@ enforce する。うち 3 つは通常の config 編集で到達しうるが、4
   な行の場合、より具体的な原因を報告する。
 - `capability-unsupported`（exit code `1`）— 役割が、紐付けられた
   adapter が宣言していない effort 値を要求した場合。
-- `executor-unavailable`（exit code `1`）— 紐付けられた executor に到達
-  できない場合——例えば `codex`/`codex-cli` に紐付けたのに `Codex` CLI
-  が入っていない場合。`resolve-executor.sh --role <role>` でのみ検査
-  され、`--print-resolved`（上記 step 4）は probe を行わないため検出
-  できない。
+- `executor-unavailable`（exit code `1`）— `--role <role>` モードでのみ
+  発生する（`--print-resolved`、上記 step 4、は決して発生させない）。
+  かつ **out-of-process** な provider について、その probe コマンドが
+  `PATH` 上で観測できない、またはその read-only 検査が失敗した場合に
+  限る——例えば `codex`/`codex-cli` に紐付けたのに `Codex` CLI が入って
+  いない場合。**in-process** な provider（`claude`）に対しては `--role`
+  は availability の検査を一切行わないため、`claude` に紐付けた役割は
+  probe 経路からはこの refusal に到達しない。
 - `contract-violation`（exit code `1`）— write / propose の
   board-authority を持つ役割が、board-transition チャンネルを持たない
   adapter に紐付けられた場合に enforce される。出荷済みの 2 adapter

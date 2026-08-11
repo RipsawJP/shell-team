@@ -186,14 +186,23 @@ executor（provider + model + effort + adapter）を host が個別に割り当�
 出荷時の既定である `templates/binding-default.conf` にフォールバックします
 ——これが**出荷時の既定**で、存在する場合の `<base>/binding.conf` が
 resolver の優先する host override です。両者は決して同じファイルでは
-ありません。
+ありません。**host config は丸ごと採用されます**: 出荷時の既定に対する
+per-role の merge・layering・fallback は存在しないため、6 役割それぞれに
+`bind` 行を 1 本ずつ、多くも少なくもなく持つ必要があります。部分的な
+ファイルは既定から補完されるのではなく refuse されます。
 
 1. スキャフォールドされた `<base>/binding.conf.example`（`team-init` が
    `templates/binding-template.conf` から書き出す）を
    `<base>/binding.conf` にリネームする——`team-init` がまだ走っていない
    場合は、プラグイン自身の `templates/binding-template.conf`（プラグイン
    のインストール先ディレクトリから解決される——自リポジトリ配下の
-   パスではない）を手動でコピーする。
+   パスではない）を手動でコピーする。**この 6 行はプレースホルダーの
+   モデルトークン**を持っています——`claude` 系の 5 行に `model-1`、
+   `codex-reviewer` に `model-2`——これらは実在するモデルを指しません。
+   これに依拠する前に**全ての行**を置き換えるか、変更しない役割の行は
+   下記の shipped default の行をそのまま転記してください。1 行だけ編集
+   して止めると、残り 5 役割にプレースホルダーの紐付けが resolution と
+   telemetry にそのまま入ってしまいます。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集して割り当てたい executor を指定する。`effort` は
    位置的に必須で、「値なし」はフィールドを省略せず常にリテラル `-` で
@@ -204,11 +213,20 @@ resolver の優先する host override です。両者は決して同じファ�
    有効な紐付けを確認する——プラグインをロードしていれば `bin/` は
    `PATH` に載るのでどちらも `bin/` 接頭辞なしで解決する。プラグインを
    ロードしていないチェックアウト内では、それぞれ `bin/` を付けて
-   実行する。`--print-resolved` は **availability probe を一切行わない**
-   ので、これだけでは紐付けた executor が実際に到達可能かを確認できない
-   ——それには `resolve-executor.sh --role <role>` が必要。
+   実行する。`--print-resolved` は **availability probe を一切行わない**。
+   `resolve-executor.sh --role <role>` はさらに検査するが、その probe は
+   紐付けられた provider によって決まる: **out-of-process** な provider
+   （`codex`）については `codex --version` が `PATH` 上で観測可能かを
+   確認し、その read-only probe を実行する。**in-process** な provider
+   （`claude`）については **availability の判定を一切行わない**——probe
+   kind を表示するだけで、根拠を持てる判定（harness 自身のサブエージェント
+   呼び出し失敗）を下すのは呼び出し側に委ねる。出荷時の既定では 6 役割
+   のうち 5 つが `claude` に紐付いているため、`resolve-executor.sh
+   --role codex-reviewer` だけが実際に何かを probe する唯一の呼び出しに
+   なる。
 
-実際の validator が受理する設定例:
+実際の validator が受理する設定例——採用される config が持つべき
+6 役割すべてを示す:
 
 ```
 schema 1

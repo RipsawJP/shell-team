@@ -95,16 +95,24 @@ before merge/push.
 
 `team-init` scaffolds an inert `<base>/binding.conf.example`
 (`<base>` resolves via `bin/team-paths.sh --get base`) — a copy of
-`templates/binding-template.conf`. Author a `<base>/binding.conf` when you
-want to assign a specific executor to one or more of the six inner-loop
-roles (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `codex-reviewer`,
-`ui-designer`):
+`templates/binding-template.conf`. A host `<base>/binding.conf` is
+adopted **whole**: there is no per-role merge, layering or fallback
+against the shipped default, so it must carry exactly one `bind` row for
+each of the six inner-loop roles (`tech-lead`, `pm-spec`, `engineer`,
+`qa-verifier`, `codex-reviewer`, `ui-designer`) — no more, no fewer. A
+partial file is refused, not completed from the default. Author one when
+you want to assign specific executors to all six:
 
 1. `mv <base>/binding.conf.example <base>/binding.conf` — or, if
    `team-init` has not run yet, copy the plugin's own
    `templates/binding-template.conf` (resolved from the plugin's
    installed directory, not a path under your own repository) to
-   `<base>/binding.conf` by hand.
+   `<base>/binding.conf` by hand. **Its six rows carry placeholder model
+   tokens** — `model-1` on the five `claude` rows, `model-2` on
+   `codex-reviewer` — that name no real model: replace **every** row
+   before relying on it, or transcribe the shipped default's rows below
+   for any role you are not changing. Editing one row and stopping there
+   ships five placeholder bindings into resolution and telemetry.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role.
 3. `bash check-binding.sh --config <base>/binding.conf` — with the plugin
@@ -113,11 +121,19 @@ roles (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `codex-reviewer`,
    ...` instead.
 4. `bash resolve-executor.sh --print-resolved` (same `bin/`-on-`PATH` note
    as step 3) — this resolves all six roles' effective bindings but runs
-   **no availability probe at all**, so it cannot by itself confirm any
-   bound executor is actually reachable (see `executor-unavailable`
-   below, which only `resolve-executor.sh --role <role>` checks).
+   **no availability probe at all**. `resolve-executor.sh --role <role>`
+   goes further, but only for an **out-of-process** provider (`codex`) —
+   checking `codex --version` is observable on `PATH` and then running
+   that read-only probe; for an **in-process** provider (`claude`) it
+   performs **no availability check at all**, printing the probe kind
+   and leaving grounding the harness's own sub-agent invocation failure
+   to the caller. Under the shipped default, five of the six roles bind
+   `claude`, so `resolve-executor.sh --role codex-reviewer` is the only
+   one of the six invocations that actually probes anything (see
+   `executor-unavailable` below).
 
-A config the real validator accepts:
+A config the real validator accepts — all six roles, as an adopted
+config must carry:
 
 ```
 schema 1
@@ -156,11 +172,14 @@ is not reachable by binding to either of them today:
   reason when it's a malformed row.
 - `capability-unsupported` (exit code `1`) — a role requests an effort
   value its bound adapter does not declare.
-- `executor-unavailable` (exit code `1`) — the bound executor is not
-  reachable — for example, binding a role to `codex`/`codex-cli` without
-  the `Codex` CLI installed. Checked only by `resolve-executor.sh --role
-  <role>`; `--print-resolved` (step 4 above) never probes, so it cannot
-  surface this one.
+- `executor-unavailable` (exit code `1`) — raised only in `--role <role>`
+  mode (`--print-resolved`, step 4 above, never raises it) and only for
+  an **out-of-process** provider whose probe command isn't observable on
+  `PATH` or fails its read-only check — for example, binding a role to
+  `codex`/`codex-cli` without the `Codex` CLI installed. For an
+  **in-process** provider (`claude`) `--role` performs no availability
+  check at all, so binding a role to `claude` never reaches this refusal
+  through the probe path.
 - `contract-violation` (exit code `1`) — enforced for any role with write
   or propose board authority bound to an adapter that does not carry a
   board-transition channel. Both shipped adapters, `claude-cli` and

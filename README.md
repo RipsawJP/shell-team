@@ -186,13 +186,22 @@ With no host config, `bin/resolve-executor.sh` falls back to the
 plugin-shipped default, `templates/binding-default.conf` — the **shipped
 default**; `<base>/binding.conf`, when present, is the **host override**
 `resolve-executor.sh` prefers instead. The two are never the same file.
+**A host config is adopted whole**: there is no per-role merge, layering
+or fallback against the shipped default, so it must carry exactly one
+`bind` row for each of the six roles — no more, no fewer. A partial file
+is refused, not completed from the default.
 
 1. Rename the scaffolded `<base>/binding.conf.example` (written by
    `team-init` from `templates/binding-template.conf`) to
    `<base>/binding.conf` — or, if `team-init` has not run yet, copy the
    plugin's own `templates/binding-template.conf` (resolved from the
    plugin's installed directory, not a path under your own repository) to
-   `<base>/binding.conf` by hand.
+   `<base>/binding.conf` by hand. **Its six rows carry placeholder model
+   tokens** — `model-1` on the five `claude` rows, `model-2` on
+   `codex-reviewer` — that name no real model: replace **every** row
+   before relying on it, or transcribe the shipped default's rows below
+   for any role you are not changing. Editing one row and stopping there
+   ships five placeholder bindings into resolution and telemetry.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role — to assign the executor you want. `effort` is
    positionally required; spell "no value" as a literal `-`, never by
@@ -203,11 +212,20 @@ default**; `<base>/binding.conf`, when present, is the **host override**
    `bash resolve-executor.sh --print-resolved` — with the plugin loaded,
    `bin/` is on `PATH`, so both resolve with no `bin/` prefix; inside a
    checkout with no plugin loaded, prefix each with `bin/` instead.
-   `--print-resolved` runs **no availability probe at all**, so it cannot
-   by itself confirm a bound executor is actually reachable; that needs
-   `resolve-executor.sh --role <role>` instead.
+   `--print-resolved` runs **no availability probe at all**.
+   `resolve-executor.sh --role <role>` goes further, but its probe is
+   keyed by the bound provider: for an **out-of-process** provider
+   (`codex`) it checks that `codex --version` is observable on `PATH` and
+   then runs that read-only probe; for an **in-process** provider
+   (`claude`) it performs **no availability check at all** — it prints
+   the probe kind and leaves grounding the harness's own sub-agent
+   invocation failure to the caller. Under the shipped default, five of
+   the six roles bind `claude`, so `resolve-executor.sh --role
+   codex-reviewer` is the only one of the six invocations that actually
+   probes anything.
 
-A config the real validator accepts:
+A config the real validator accepts — all six roles, as an adopted
+config must carry:
 
 ```
 schema 1
