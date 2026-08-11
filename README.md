@@ -242,9 +242,16 @@ bind codex-reviewer codex  gpt-5  -    codex-cli
 
 **The honest boundary**: rebinding a role changes which executor
 `resolve-executor.sh` **resolves** and which value **telemetry** records
-for it. It does **not** wire an alternate-executor **invocation path** — a
-role's actual invocation still routes through that role's own pinned model
-value. The retirement that would change that is issue **#236**. See
+for it. It does **not** wire an alternate-executor **invocation path**,
+and that is two separate limits. The **model**: a role's invocation still
+takes its model from that role's own `agents/<role>.md` pin, not from the
+resolved row — issue **#236** tracks retiring those pins, for the five
+`claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
+whose pin configures the Claude wrapper that shells out to the Codex CLI
+rather than the model that reviews. The **executor**: which provider and
+adapter a role is actually invoked through is not routed by resolution at
+all, for any role, and no issue tracks changing that — so a rebind across
+providers moves what is reported and recorded, never what runs. See
 [Design choices](#design-choices) for the reviewer row's own shipped
 default and its rationale.
 

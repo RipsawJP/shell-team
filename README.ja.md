@@ -241,12 +241,20 @@ bind ui-designer    claude sonnet -    claude-cli
 bind codex-reviewer codex  gpt-5  -    codex-cli
 ```
 
-**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する**
-executor と**テレメトリ**が記録する値が変わる。ただし別 executor への
-**呼び出し経路**が配線されるわけでは**ない**——役割の実際の呼び出しは、
-その役割自身が固定するモデル値を今なお経由する。それを変える退役は
-issue **#236**。reviewer 行自身の出荷時の既定とその理由は
-[設計上の選択](#設計上の選択) を参照。
+**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する** executor
+と**テレメトリ**が記録する値が変わる。ただし別 executor への
+**呼び出し経路**が配線されるわけでは**ない**——そしてこれは 2 つの別々
+の限界である。**model について**: 役割の実際の呼び出しは、resolved row
+ではなく、その役割自身の `agents/<role>.md` の pin から model を取る。
+issue **#236** はその pin の退役を追跡しているが、対象は `claude-cli`
+に紐付く 5 役割のみで、`codex-reviewer` は意図的に除外されている——
+その pin は Codex CLI を呼び出す Claude 側の wrapper を設定するもので
+あって、レビューを行うモデルではないため。**executor について**: どの
+provider / adapter 経由で役割が実際に呼び出されるかは、どの役割につい
+ても resolution が経路制御していない。これを変える issue は存在しない
+——したがって provider をまたぐ rebind が動かすのは、報告される値と
+記録される値であって、実際に走るものではない。reviewer 行自身の出荷時
+の既定とその理由は [設計上の選択](#設計上の選択) を参照。
 
 ## run のリプレイ
 

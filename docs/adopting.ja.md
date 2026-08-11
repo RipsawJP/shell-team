@@ -202,11 +202,19 @@ config-condition refusal で、うち 3 つは通常の config 編集で到達�
 `codex-cli` は `none`・`minimal`・`low`・`medium`・`high`・`xhigh`・
 `max` を受理する。
 
-**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する**
-executor と**テレメトリ**が記録する値が変わる。ただし別 executor への
-**呼び出し経路**が配線されるわけでは**ない**——役割の実際の呼び出しは、
-その役割自身が固定するモデル値を今なお経由する。それを変える退役は
-issue **#236**。
+**正直な境界線**: rebind すると `resolve-executor.sh` が**解決する** executor
+と**テレメトリ**が記録する値が変わる。ただし別 executor への
+**呼び出し経路**が配線されるわけでは**ない**——そしてこれは 2 つの別々
+の限界である。**model について**: 役割の実際の呼び出しは、resolved row
+ではなく、その役割自身の `agents/<role>.md` の pin から model を取る。
+issue **#236** はその pin の退役を追跡しているが、対象は `claude-cli`
+に紐付く 5 役割のみで、`codex-reviewer` は意図的に除外されている——
+その pin は Codex CLI を呼び出す Claude 側の wrapper を設定するもので
+あって、レビューを行うモデルではないため。**executor について**: どの
+provider / adapter 経由で役割が実際に呼び出されるかは、どの役割につい
+ても resolution が経路制御していない。これを変える issue は存在しない
+——したがって provider をまたぐ rebind が動かすのは、報告される値と
+記録される値であって、実際に走るものではない。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
