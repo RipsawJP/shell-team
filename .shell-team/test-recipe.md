@@ -698,6 +698,27 @@ that file's order.
   `cb-ancestor-symlink-registry-ignored` (an `adopter/bin -> $REPO_ROOT/bin`
   directory symlink, plus a decoy in the adopter's own `templates/`, that
   must have zero effect on which shipped file the checker actually reads).
+- T-1059: purely a documentation task — no new `bin/` script, no new test suite,
+  no workflow edit. The mechanical gates that matter are `bash
+  bin/check-acs.sh .shell-team/specs/T-1059-docs-release-notes.md` (all 10
+  `check:` lines), `bash bin/check-intent.sh
+  .shell-team/specs/T-1059-docs-release-notes.md .shell-team/todo.md`
+  (confirms the frozen intent block is untouched), and `bash
+  tests/team-init/run.sh` (the one suite that content-asserts the scaffolded
+  `AGENTS.md` this task rewrites — it must still match `Codex`
+  case-insensitively and carry no `YYYY-MM-DD` date after the rewrite). A
+  `## Cutting a release` bullet count is a **base-relative delta**
+  (branch-point count + 2), never an absolute literal — re-derive it live
+  rather than hardcoding a number, the same discipline the population-count
+  entries elsewhere in this file already establish. Observing whether a
+  two-space-indented `CHANGELOG.md` sub-bullet (this task's own
+  `docs/templates/release-notes-template.md` instructs transcribing it
+  verbatim into `## Highlights`) renders as a Markdown list rather than an
+  indented code block can be checked without a browser: POST the candidate
+  text to `https://api.github.com/markdown` with `{"mode":"gfm","text":
+  "<content>"}` and inspect the returned HTML for `<ul><li>` vs `<pre><code>` —
+  `api.github.com` is on this environment's network allow-list and needs no
+  authentication for this endpoint.
 - T-1058: no new CI wiring needed — `bin/log-run.sh`, `bin/check-run.sh` and
   `bin/rollup-runs.sh`, and their three suites (`tests/log-run/run.sh`,
   `tests/check-run/run.sh`, `tests/rollup-runs/run.sh`), were already in
