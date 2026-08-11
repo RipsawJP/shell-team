@@ -164,4 +164,91 @@ set -e
 [ -f "$REAL/runs/real-check.jsonl" ] || fail "real check-run.sh present: row should still be appended"
 pass "real sibling check-run.sh present -> valid row still appends cleanly (exit 0)"
 
+# =====================================================================
+# T-1058: the resolved binding (--provider / --effort / --adapter) —
+# span-only, nullable, validated, and refused in event mode by presence.
+# =====================================================================
+
+BIND_DIR="$TMP/binding"
+mkdir -p "$BIND_DIR"
+
+# --- writer: all three flags record the expected values ---
+set +e
+RUNS_DIR="$BIND_DIR" bash "$LOGRUN" bindloop --run-id R1 --seq 1 --span engineer --phase implement \
+  --iteration 1 --attempt 1 --status success --provider claude --effort high --adapter claude-cli >/dev/null 2>&1
+bind_rc=$?
+set -e
+[ "$bind_rc" -eq 0 ] || fail "log-run --provider/--effort/--adapter expected exit 0, got $bind_rc"
+grep -qF -- '"provider":"claude"' "$BIND_DIR/bindloop.jsonl" || fail "log-run did not record --provider claude"
+grep -qF -- '"effort":"high"' "$BIND_DIR/bindloop.jsonl" || fail "log-run did not record --effort high"
+grep -qF -- '"adapter":"claude-cli"' "$BIND_DIR/bindloop.jsonl" || fail "log-run did not record --adapter claude-cli"
+pass "log-run --provider/--effort/--adapter records all three values"
+
+# --- writer: appended AFTER parent_span_id, frozen 17 keys unmoved ---
+bind_keys="$(grep -oE '"[a-z_]+":' "$BIND_DIR/bindloop.jsonl" | tr -d '":' | tr '\n' ' ')"
+[ "$bind_keys" == "loop_id run_id seq ts span phase iteration attempt status model tokens tool_uses duration_ms verdict usd error parent_span_id provider effort adapter " ] \
+  || fail "log-run binding row key order unexpected: $bind_keys"
+pass "log-run appends provider/effort/adapter after parent_span_id, frozen 17 keys unmoved"
+
+# --- writer: --effort - records null, never the two-character string "-" ---
+set +e
+RUNS_DIR="$BIND_DIR" bash "$LOGRUN" bindloop --run-id R1 --seq 2 --span codex-reviewer --phase review \
+  --iteration 1 --attempt 1 --status success --provider codex --effort - --adapter codex-cli >/dev/null 2>&1
+dash_rc=$?
+set -e
+[ "$dash_rc" -eq 0 ] || fail "log-run --effort - expected exit 0, got $dash_rc"
+grep -qF -- '"effort":null' "$BIND_DIR/bindloop.jsonl" || fail "log-run --effort - did not record null"
+[ "$(grep -cF -- '"effort":"-"' "$BIND_DIR/bindloop.jsonl" || true)" -eq 0 ] || fail "log-run --effort - leaked the two-character string"
+pass "log-run --effort - records null, never the two-character string"
+
+# --- writer: omitted binding flags render as null (never required) ---
+set +e
+RUNS_DIR="$BIND_DIR" bash "$LOGRUN" bindloop --run-id R1 --seq 3 --span engineer --phase implement \
+  --iteration 1 --attempt 1 --status success >/dev/null 2>&1
+omit_rc=$?
+set -e
+[ "$omit_rc" -eq 0 ] || fail "log-run with binding flags omitted expected exit 0, got $omit_rc"
+for k in provider effort adapter; do
+  grep -qF -- "\"$k\":null" "$BIND_DIR/bindloop.jsonl" || fail "log-run omitted --$k did not render null"
+done
+pass "log-run omitted --provider/--effort/--adapter all render as null"
+
+# --- writer: malformed binding values are validation errors, nothing written ---
+before_bind="$(wc -l < "$BIND_DIR/bindloop.jsonl")"
+i=0
+for bad in '--provider Claude' '--provider -' '--provider a_b' '--adapter x/y' '--effort High'; do
+  i=$((i + 1))
+  set +e
+  # shellcheck disable=SC2086  # intentional word-splitting: $bad is a
+  # "--flag value" pair that must reach log-run.sh as two argv words.
+  RUNS_DIR="$BIND_DIR/x$i" bash "$LOGRUN" bindloop --run-id R1 --seq 9 --span engineer --phase implement \
+    --iteration 1 --attempt 1 --status success $bad >/dev/null 2>&1
+  bad_rc=$?
+  set -e
+  [ "$bad_rc" -eq 2 ] || fail "log-run '$bad' expected exit 2, got $bad_rc"
+  [ ! -e "$BIND_DIR/x$i" ] || fail "log-run '$bad' created a runs dir despite validation failure"
+done
+after_bind="$(wc -l < "$BIND_DIR/bindloop.jsonl")"
+[ "$before_bind" -eq "$after_bind" ] || fail "log-run wrote a row despite a malformed binding value"
+pass "log-run rejects malformed --provider/--effort/--adapter values (exit 2, nothing written)"
+
+# --- writer: all three binding flags are forbidden in event mode (exit 2) ---
+for fl in --provider --effort --adapter; do
+  set +e
+  RUNS_DIR="$BIND_DIR/ev" bash "$LOGRUN" bindloop --run-id R1 --seq 9 --event handoff --from a --to b "$fl" x >/dev/null 2>&1
+  ev_bind_rc=$?
+  set -e
+  [ "$ev_bind_rc" -eq 2 ] || fail "log-run $fl in event mode expected exit 2, got $ev_bind_rc"
+done
+[ ! -e "$BIND_DIR/ev" ] || fail "log-run binding flag in event mode created a runs dir"
+pass "log-run rejects --provider/--effort/--adapter in event mode (exit 2, nothing written)"
+
+# --- writer's own header documents all three flags ---
+HDR_TMP="$TMP/log-run-header.txt"
+awk 'NR>1 && /^#/{print} NR>1 && !/^#/{exit}' "$LOGRUN" > "$HDR_TMP"
+for f in provider effort adapter; do
+  grep -qF -- "--$f" "$HDR_TMP" || fail "log-run header does not document --$f"
+done
+pass "log-run's own header comment documents --provider/--effort/--adapter"
+
 printf '\nAll log-run resolution assertions passed.\n'
