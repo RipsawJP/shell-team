@@ -34,14 +34,15 @@ one people read.
   access needs a stated reason in the pull request.
 - **The reviewer's cross-provider binding is the shipped default, not an
   unconditional invariant.** `codex-reviewer` ships bound to the Codex CLI in
-  `binding.conf` because a model reviewing output from its own family shares
-  its blind spots. A host may rebind `codex-reviewer` to a same-family
-  executor in its own `binding.conf`; doing so changes which executor
-  `bin/resolve-executor.sh` resolves and which value telemetry records for the
-  role — it does not wire up an alternate-executor invocation path, and the
-  loop does not guarantee cross-provider review once that rebind exists. Never
-  substitute another executor when resolution itself refuses: an unavailable
-  or unauthenticated Codex CLI is `BLOCKED` with the exact error.
+  the plugin's shipped `templates/binding-default.conf` because a model
+  reviewing output from its own family shares its blind spots. A host may
+  rebind `codex-reviewer` to a same-family executor in its own `binding.conf`;
+  doing so changes which executor `bin/resolve-executor.sh` resolves and which
+  value telemetry records for the role — it does not wire up an
+  alternate-executor invocation path, and the loop does not guarantee
+  cross-provider review once that rebind exists. Never substitute another
+  executor when resolution itself refuses: an unavailable or unauthenticated
+  Codex CLI is `BLOCKED` with the exact error.
 - **Done means both gates are green** — QA reaching `READY_FOR_REVIEW` *and* the
   cross-provider review reaching `READY_FOR_MERGE`. One green gate is not done.
 - **`bin/` stays pure bash, zero-dependency, and shellcheck-clean.** CI lints
