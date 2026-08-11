@@ -143,10 +143,17 @@ set. Three of them are things an ordinary config edit can trigger; the
 fourth is a contract the two shipped adapters already both satisfy, so it
 is not reachable by binding to either of them today:
 
-- `binding-unresolved` (exit code `2`) — an occupant at
-  `<base>/binding.conf` that is not a regular file (a directory, a FIFO, a
-  dangling symlink); never silently substituted with the shipped default,
-  which is reserved for true absence.
+- `binding-unresolved` (exit code `2`) — the effective binding failed to
+  resolve to a well-formed, trustworthy form. Two ordinary-edit causes:
+  an occupant at `<base>/binding.conf` that is not a regular file (a
+  directory, a FIFO, a dangling symlink) — never silently substituted
+  with the shipped default, which is reserved for true absence — or the
+  config itself is malformed in a way `check-binding.sh`'s own grammar
+  refuses, such as a `bind` row with the wrong field count or an
+  unrecognized provider/adapter/role token. `resolve-executor.sh` folds
+  both causes into this one token; `check-binding.sh --config
+  <base>/binding.conf` (step 3) reports the more specific underlying
+  reason when it's a malformed row.
 - `capability-unsupported` (exit code `1`) — a role requests an effort
   value its bound adapter does not declare.
 - `executor-unavailable` (exit code `1`) — the bound executor is not
@@ -159,7 +166,7 @@ is not reachable by binding to either of them today:
   board-transition channel. Both shipped adapters, `claude-cli` and
   `codex-cli`, declare `carries board-transition`, so binding a role to
   either one cannot reach this refusal today; it stays part of the closed
-  set because a future or custom adapter could declare otherwise.
+  set because a future shipped adapter could declare otherwise.
 
 Each adapter declares its own effort vocabulary; there is no shared list:
 `claude-cli` accepts `low`, `medium`, `high`, `xhigh`, `max`; `codex-cli`

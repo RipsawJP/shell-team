@@ -146,10 +146,17 @@ enforce する。うち 3 つは通常の config 編集で到達しうるが、4
 出荷済みの 2 つの adapter がすでに双方満たしている契約であり、どちらに
 紐付けても今日は到達できない:
 
-- `binding-unresolved`（exit code `2`）— `<base>/binding.conf` に存在する
-  ものが通常ファイルでない場合（ディレクトリ・FIFO・dangling symlink
-  など）；出荷時の既定へ黙って fallback することは決してなく、それは
-  「本当に存在しない」場合専用。
+- `binding-unresolved`（exit code `2`）— 有効な紐付けが well-formed で
+  信頼できる形に解決しなかった場合。通常の編集で到達しうる原因は 2 つ:
+  `<base>/binding.conf` に存在するものが通常ファイルでない場合
+  （ディレクトリ・FIFO・dangling symlink など）——出荷時の既定へ黙って
+  fallback することは決してなく、それは「本当に存在しない」場合専用
+  ——、または config 自体が `check-binding.sh` 自身の grammar が refuse
+  する形で malformed な場合、例えば `bind` 行のフィールド数が誤って
+  いる、あるいは provider/adapter/role トークンが未知の場合。
+  `resolve-executor.sh` はこの 2 つの原因を同じ 1 つのトークンに畳み込む
+  ——`check-binding.sh --config <base>/binding.conf`（step 3）は malformed
+  な行の場合、より具体的な原因を報告する。
 - `capability-unsupported`（exit code `1`）— 役割が、紐付けられた
   adapter が宣言していない effort 値を要求した場合。
 - `executor-unavailable`（exit code `1`）— 紐付けられた executor に到達
@@ -162,7 +169,7 @@ enforce する。うち 3 つは通常の config 編集で到達しうるが、4
   adapter に紐付けられた場合に enforce される。出荷済みの 2 adapter
   （`claude-cli`・`codex-cli`）はいずれも `carries board-transition` を
   宣言しているため、どちらに紐付けても今日この refusal には到達しない
-  ——将来のカスタム adapter がそう宣言しない可能性があるため、closed
+  ——将来出荷される adapter がそう宣言しない可能性があるため、closed
   set の一員として引き続き記載する。
 
 各 adapter は自分自身の effort 語彙を宣言しており、共有リストは存在
