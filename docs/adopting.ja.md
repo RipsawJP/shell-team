@@ -205,12 +205,18 @@ config-condition refusal で、うち 3 つは通常の config 編集で到達�
 `max` を受理する。
 
 **正直な境界線**には 2 つの軸があり、これを混ぜることが誤解の元になる。
-**呼び出しが行われるかどうか**——ここは binding が制御しており、rebind
-によって呼び出しを完全に止めることができる。resolution はあらゆる
-invocation の前に走り、refusal は何かにフォールバックするのではなく
-フェーズを停止させる blocker である: 通常の編集で `binding-unresolved`・
-`capability-unsupported`・`executor-unavailable` に到達しうる（いずれも
-上記参照）。**行われる呼び出しがどう実行されるか**——こちらで binding
+**呼び出しが行われるかどうか**——ここは binding が**それを参照する
+ループにおいて**制御しており、rebind によって呼び出しを完全に止める
+ことができる。`/shell-team:run` と `/shell-team:goal` のループでは、
+各役割の executor があらゆる invocation の前に解決され、refusal は
+何かにフォールバックするのではなくフェーズを停止させる blocker である:
+通常の編集で `binding-unresolved`・`capability-unsupported`・
+`executor-unavailable` に到達しうる（いずれも上記参照）。一方、単体で
+使う `/shell-team:review` と `/shell-team:review-response` は**現時点
+では binding を参照しない**——プラグインが出荷したままの reviewer が
+走るので、rebind はこれらに対して**どちらの方向にも**何の影響も与え
+ない。これらに resolution を配線することは issue **#245** が追跡して
+いる。**行われる呼び出しがどう実行されるか**——こちらで binding
 が変えるのは、`resolve-executor.sh` が解決して報告する値と**テレメトリ**
 が記録する値**だけ**であり（provider・model・effort・adapter のいずれも
 同じ）、実行そのものは何も変わらない。したがって別 executor への

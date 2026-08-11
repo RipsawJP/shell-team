@@ -188,11 +188,14 @@ effort values live in [docs/adopting.md](docs/adopting.md) — the single
 canonical detail surface for this mechanism — and in `bash
 resolve-executor.sh --help`, which is that script's own header and
 cannot drift from it. **The honest boundary** has two axes: the binding
-gates **whether** a call proceeds — resolution runs first and a refusal
-stops the phase rather than falling back, so a rebind can stop a call
-outright — and it never changes **how** a proceeding call is executed,
-where it moves only what resolution reports and what **telemetry**
-records, provider, model, effort and adapter alike, so no
+gates **whether** a call proceeds in the loops that consult it — in
+`/shell-team:run` and `/shell-team:goal`, resolution runs first and a
+refusal stops the phase rather than falling back, so a rebind can stop a
+call outright, while the standalone review commands do not consult the
+binding today (issue **#245**) — and it never changes **how** a
+proceeding call is executed, where it moves only what resolution reports
+and what **telemetry** records, provider, model, effort and adapter
+alike, so no
 alternate-executor **invocation path** is wired. Illustratively, on that
 second axis: the model still comes from the role's own `agents/<role>.md`
 pin (issue **#236** tracks retiring those pins for the five

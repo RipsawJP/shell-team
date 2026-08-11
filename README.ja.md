@@ -187,10 +187,13 @@ fail-closed な refusal・各 adapter 自身の effort 値は
 [docs/adopting.ja.md](docs/adopting.ja.md)——この機構について唯一の
 正典となる詳細面——と `bash resolve-executor.sh --help`（スクリプト
 自身のヘッダであり、そこから乖離しえない）にある。**正直な境界線**には
-2 つの軸がある: binding は呼び出しが**行われるかどうか**を制御する——
-resolution が先に走り、refusal はフォールバックせずフェーズを停止させる
-ので、rebind によって呼び出しを完全に止めることができる——一方で、
-行われる呼び出しが**どう実行されるか**は決して変えない。そちらで動くの
+2 つの軸がある: binding は、それを参照するループにおいて呼び出しが
+**行われるかどうか**を制御する——`/shell-team:run` と `/shell-team:goal`
+では resolution が先に走り、refusal はフォールバックせずフェーズを停止
+させるので、rebind によって呼び出しを完全に止めることができる。一方、
+単体で使う review 系コマンドは現時点では binding を参照しない
+（issue **#245**）——そして、行われる呼び出しが**どう実行されるか**は
+決して変えない。そちらで動くの
 は resolution が報告する値と**テレメトリ**が記録する値だけ（provider・
 model・effort・adapter のいずれも同じ）であり、別 executor への
 **呼び出し経路**は配線されない。第 2 軸の例示として、model は今なお

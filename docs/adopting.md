@@ -201,11 +201,17 @@ accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`.
 
 **The honest boundary** has two axes, and collapsing them is what makes
 this easy to get wrong. **Whether a call proceeds** — the binding gates
-that, and a rebind can stop one outright. Resolution runs before any
-invocation, and a refusal is a blocker that stops the phase rather than
-falling back to anything: an ordinary edit can reach `binding-unresolved`,
-`capability-unsupported` and `executor-unavailable`, each described
-above. **How a proceeding call is executed** — there the binding changes
+that **in the loops that consult it**, and a rebind can stop a call
+outright. In the `/shell-team:run` and `/shell-team:goal` loops each
+role's executor is resolved before any invocation, and a refusal is a
+blocker that stops the phase rather than falling back to anything: an
+ordinary edit can reach `binding-unresolved`, `capability-unsupported`
+and `executor-unavailable`, each described above. The standalone
+`/shell-team:review` and `/shell-team:review-response` commands **do not
+consult the binding today** — they run the reviewer as the plugin ships
+it, so a rebind changes nothing about them in either direction; issue
+**#245** tracks wiring resolution into them. **How a proceeding call is
+executed** — there the binding changes
 **only** what `resolve-executor.sh` resolves and reports and what
 **telemetry** records, provider, model, effort and adapter alike, and
 nothing about the execution itself, so no alternate-executor
