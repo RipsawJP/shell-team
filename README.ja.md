@@ -191,7 +191,9 @@ resolver の優先する host override です。両者は決して同じファ�
 1. スキャフォールドされた `<base>/binding.conf.example`（`team-init` が
    `templates/binding-template.conf` から書き出す）を
    `<base>/binding.conf` にリネームする——`team-init` がまだ走っていない
-   場合は `templates/binding-template.conf` を手動でコピーする。
+   場合は、プラグイン自身の `templates/binding-template.conf`（プラグイン
+   のインストール先ディレクトリから解決される——自リポジトリ配下の
+   パスではない）を手動でコピーする。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集して割り当てたい executor を指定する。`effort` は
    位置的に必須で、「値なし」はフィールドを省略せず常にリテラル `-` で
@@ -202,7 +204,9 @@ resolver の優先する host override です。両者は決して同じファ�
    有効な紐付けを確認する——プラグインをロードしていれば `bin/` は
    `PATH` に載るのでどちらも `bin/` 接頭辞なしで解決する。プラグインを
    ロードしていないチェックアウト内では、それぞれ `bin/` を付けて
-   実行する。
+   実行する。`--print-resolved` は **availability probe を一切行わない**
+   ので、これだけでは紐付けた executor が実際に到達可能かを確認できない
+   ——それには `resolve-executor.sh --role <role>` が必要。
 
 実際の validator が受理する設定例:
 

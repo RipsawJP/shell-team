@@ -101,7 +101,9 @@ roles (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `codex-reviewer`,
 `ui-designer`):
 
 1. `mv <base>/binding.conf.example <base>/binding.conf` — or, if
-   `team-init` has not run yet, copy `templates/binding-template.conf` to
+   `team-init` has not run yet, copy the plugin's own
+   `templates/binding-template.conf` (resolved from the plugin's
+   installed directory, not a path under your own repository) to
    `<base>/binding.conf` by hand.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role.
@@ -110,7 +112,10 @@ roles (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `codex-reviewer`,
    inside a checkout with no plugin loaded, run `bash bin/check-binding.sh
    ...` instead.
 4. `bash resolve-executor.sh --print-resolved` (same `bin/`-on-`PATH` note
-   as step 3).
+   as step 3) — this resolves all six roles' effective bindings but runs
+   **no availability probe at all**, so it cannot by itself confirm any
+   bound executor is actually reachable (see `executor-unavailable`
+   below, which only `resolve-executor.sh --role <role>` checks).
 
 A config the real validator accepts:
 
@@ -130,10 +135,13 @@ case — `resolve-executor.sh` falls back to the plugin-shipped default,
 `templates/binding-default.conf`; its `model` column carries
 `provider-configured` only for `codex-reviewer`, naming the boundary that
 the shipped Codex invocation passes no model flag at all, while every
-other role's column carries its own `agents/<role>.md` pin.
+other role's column carries that role's own `agents/<role>.md` pin, from
+the plugin's own agent definitions.
 
-An adopter edit can reach four fail-closed refusals from
-`resolve-executor.sh`:
+`resolve-executor.sh` enforces four fail-closed refusals from a closed
+set. Three of them are things an ordinary config edit can trigger; the
+fourth is a contract the two shipped adapters already both satisfy, so it
+is not reachable by binding to either of them today:
 
 - `binding-unresolved` (exit code `2`) — an occupant at
   `<base>/binding.conf` that is not a regular file (a directory, a FIFO, a
@@ -141,12 +149,17 @@ An adopter edit can reach four fail-closed refusals from
   which is reserved for true absence.
 - `capability-unsupported` (exit code `1`) — a role requests an effort
   value its bound adapter does not declare.
-- `contract-violation` (exit code `1`) — a role with write or propose
-  board authority is bound to an adapter that does not carry a
-  board-transition channel.
 - `executor-unavailable` (exit code `1`) — the bound executor is not
-  reachable — for example, the `Codex` CLI is missing from `PATH` or fails
-  its read-only probe.
+  reachable — for example, binding a role to `codex`/`codex-cli` without
+  the `Codex` CLI installed. Checked only by `resolve-executor.sh --role
+  <role>`; `--print-resolved` (step 4 above) never probes, so it cannot
+  surface this one.
+- `contract-violation` (exit code `1`) — enforced for any role with write
+  or propose board authority bound to an adapter that does not carry a
+  board-transition channel. Both shipped adapters, `claude-cli` and
+  `codex-cli`, declare `carries board-transition`, so binding a role to
+  either one cannot reach this refusal today; it stays part of the closed
+  set because a future or custom adapter could declare otherwise.
 
 Each adapter declares its own effort vocabulary; there is no shared list:
 `claude-cli` accepts `low`, `medium`, `high`, `xhigh`, `max`; `codex-cli`

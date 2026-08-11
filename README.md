@@ -189,8 +189,10 @@ default**; `<base>/binding.conf`, when present, is the **host override**
 
 1. Rename the scaffolded `<base>/binding.conf.example` (written by
    `team-init` from `templates/binding-template.conf`) to
-   `<base>/binding.conf` — or, if `team-init` has not run yet, copy
-   `templates/binding-template.conf` to `<base>/binding.conf` by hand.
+   `<base>/binding.conf` — or, if `team-init` has not run yet, copy the
+   plugin's own `templates/binding-template.conf` (resolved from the
+   plugin's installed directory, not a path under your own repository) to
+   `<base>/binding.conf` by hand.
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role — to assign the executor you want. `effort` is
    positionally required; spell "no value" as a literal `-`, never by
@@ -201,6 +203,9 @@ default**; `<base>/binding.conf`, when present, is the **host override**
    `bash resolve-executor.sh --print-resolved` — with the plugin loaded,
    `bin/` is on `PATH`, so both resolve with no `bin/` prefix; inside a
    checkout with no plugin loaded, prefix each with `bin/` instead.
+   `--print-resolved` runs **no availability probe at all**, so it cannot
+   by itself confirm a bound executor is actually reachable; that needs
+   `resolve-executor.sh --role <role>` instead.
 
 A config the real validator accepts:
 

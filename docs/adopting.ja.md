@@ -103,8 +103,10 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
 たいときに `<base>/binding.conf` を作成します:
 
 1. `mv <base>/binding.conf.example <base>/binding.conf` ——`team-init` が
-   まだ走っていない場合は `templates/binding-template.conf` を手動で
-   `<base>/binding.conf` へコピーする。
+   まだ走っていない場合は、プラグイン自身の
+   `templates/binding-template.conf`（プラグインのインストール先
+   ディレクトリから解決される——自リポジトリ配下のパスではない）を
+   手動で `<base>/binding.conf` へコピーする。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集する。
 3. `bash check-binding.sh --config <base>/binding.conf` ——プラグインを
@@ -112,7 +114,11 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    解決する。プラグインをロードしていないチェックアウト内では
    `bash bin/check-binding.sh ...` を使う。
 4. `bash resolve-executor.sh --print-resolved`（step 3 と同じ
-   `bin/`-on-`PATH` の注記）。
+   `bin/`-on-`PATH` の注記）——6 役割すべての有効な紐付けを解決するが、
+   **availability probe を一切行わない**。これだけでは紐付けた
+   executor が実際に到達可能かを確認できない（下記の
+   `executor-unavailable` 参照——これは `resolve-executor.sh --role
+   <role>` でのみ検査される）。
 
 実際の validator が受理する設定例:
 
@@ -132,10 +138,13 @@ host の `<base>/binding.conf` が全く無い場合——設定していない�
 `templates/binding-default.conf` にフォールバックする。その `model` 列は
 `codex-reviewer` に限り `provider-configured` を持つ——出荷時の Codex
 呼び出しが model フラグを一切渡さないという境界を表す——それ以外の各役割
-の列は、その役割自身の `agents/<role>.md` の pin をそのまま持つ。
+の列は、その役割自身の `agents/<role>.md`（プラグイン自身の agent
+定義）の pin をそのまま持つ。
 
-adopter の編集が到達しうる 4 つの fail-closed refusal（`resolve-executor.sh`
-から）:
+`resolve-executor.sh` は 4 つの fail-closed refusal を閉じた集合として
+enforce する。うち 3 つは通常の config 編集で到達しうるが、4 つ目は
+出荷済みの 2 つの adapter がすでに双方満たしている契約であり、どちらに
+紐付けても今日は到達できない:
 
 - `binding-unresolved`（exit code `2`）— `<base>/binding.conf` に存在する
   ものが通常ファイルでない場合（ディレクトリ・FIFO・dangling symlink
@@ -143,12 +152,18 @@ adopter の編集が到達しうる 4 つの fail-closed refusal（`resolve-exec
   「本当に存在しない」場合専用。
 - `capability-unsupported`（exit code `1`）— 役割が、紐付けられた
   adapter が宣言していない effort 値を要求した場合。
+- `executor-unavailable`（exit code `1`）— 紐付けられた executor に到達
+  できない場合——例えば `codex`/`codex-cli` に紐付けたのに `Codex` CLI
+  が入っていない場合。`resolve-executor.sh --role <role>` でのみ検査
+  され、`--print-resolved`（上記 step 4）は probe を行わないため検出
+  できない。
 - `contract-violation`（exit code `1`）— write / propose の
   board-authority を持つ役割が、board-transition チャンネルを持たない
-  adapter に紐付けられた場合。
-- `executor-unavailable`（exit code `1`）— 紐付けられた executor に到達
-  できない場合——例えば `Codex` CLI が `PATH` に無い、または read-only
-  probe に失敗する場合。
+  adapter に紐付けられた場合に enforce される。出荷済みの 2 adapter
+  （`claude-cli`・`codex-cli`）はいずれも `carries board-transition` を
+  宣言しているため、どちらに紐付けても今日この refusal には到達しない
+  ——将来のカスタム adapter がそう宣言しない可能性があるため、closed
+  set の一員として引き続き記載する。
 
 各 adapter は自分自身の effort 語彙を宣言しており、共有リストは存在
 しない: `claude-cli` は `low`・`medium`・`high`・`xhigh`・`max` を、
