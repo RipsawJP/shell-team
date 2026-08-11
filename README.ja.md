@@ -191,9 +191,10 @@ fail-closed な refusal・各 adapter 自身の effort 値は
 **行われるかどうか**を制御する——`/shell-team:run` と `/shell-team:goal`
 では resolution が先に走り、refusal はフォールバックせずフェーズを停止
 させるので、rebind によって呼び出しを完全に止めることができる。一方、
-単体で使う review 系コマンドは現時点では binding を参照しない
-（issue **#245**）——そして、行われる呼び出しが**どう実行されるか**は
-決して変えない。そちらで動くの
+`/shell-team:review` は binding を一切参照せず、
+`/shell-team:review-response` は run ループへ引き渡す rework 経由でのみ
+参照する（issue **#245**）——そして、行われる呼び出しが**どう実行される
+か**は決して変えない。そちらで動くの
 は resolution が報告する値と**テレメトリ**が記録する値だけ（provider・
 model・effort・adapter のいずれも同じ）であり、別 executor への
 **呼び出し経路**は配線されない。第 2 軸の例示として、model は今なお

@@ -191,8 +191,9 @@ cannot drift from it. **The honest boundary** has two axes: the binding
 gates **whether** a call proceeds in the loops that consult it — in
 `/shell-team:run` and `/shell-team:goal`, resolution runs first and a
 refusal stops the phase rather than falling back, so a rebind can stop a
-call outright, while the standalone review commands do not consult the
-binding today (issue **#245**) — and it never changes **how** a
+call outright, while `/shell-team:review` never consults the binding and
+`/shell-team:review-response` consults it only through the rework it
+hands to the run loop (issue **#245**) — and it never changes **how** a
 proceeding call is executed, where it moves only what resolution reports
 and what **telemetry** records, provider, model, effort and adapter
 alike, so no

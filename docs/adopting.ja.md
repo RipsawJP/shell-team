@@ -211,12 +211,18 @@ config-condition refusal で、うち 3 つは通常の config 編集で到達�
 各役割の executor があらゆる invocation の前に解決され、refusal は
 何かにフォールバックするのではなくフェーズを停止させる blocker である:
 通常の編集で `binding-unresolved`・`capability-unsupported`・
-`executor-unavailable` に到達しうる（いずれも上記参照）。一方、単体で
-使う `/shell-team:review` と `/shell-team:review-response` は**現時点
-では binding を参照しない**——プラグインが出荷したままの reviewer が
-走るので、rebind はこれらに対して**どちらの方向にも**何の影響も与え
-ない。これらに resolution を配線することは issue **#245** が追跡して
-いる。**行われる呼び出しがどう実行されるか**——こちらで binding
+`executor-unavailable` に到達しうる（いずれも上記参照）。単体で使う
+2 つの review 系コマンドは同じケースではなく、違いは 1 つの委譲ステップ
+にある。`/shell-team:review` は reviewer を直接呼ぶだけで **binding を
+一切参照しない**——rebind はこれに対してどちらの方向にも何の影響も
+与えない。`/shell-team:review-response` も**自身の review ステップでは**
+binding を参照しないが、最後のステップで採用した findings を
+`/shell-team:run` に引き渡し、その pipeline は他の run と同様に
+resolution を参照する——したがって rebind は `review-response` に
+**そのステップ経由でのみ**到達し、refuse によってそれを停止させること
+もある。review ステップ自体に resolution を配線することは issue
+**#245** が追跡している。**行われる呼び出しがどう実行されるか**——
+こちらで binding
 が変えるのは、`resolve-executor.sh` が解決して報告する値と**テレメトリ**
 が記録する値**だけ**であり（provider・model・effort・adapter のいずれも
 同じ）、実行そのものは何も変わらない。したがって別 executor への

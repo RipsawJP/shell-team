@@ -206,11 +206,17 @@ outright. In the `/shell-team:run` and `/shell-team:goal` loops each
 role's executor is resolved before any invocation, and a refusal is a
 blocker that stops the phase rather than falling back to anything: an
 ordinary edit can reach `binding-unresolved`, `capability-unsupported`
-and `executor-unavailable`, each described above. The standalone
-`/shell-team:review` and `/shell-team:review-response` commands **do not
-consult the binding today** — they run the reviewer as the plugin ships
-it, so a rebind changes nothing about them in either direction; issue
-**#245** tracks wiring resolution into them. **How a proceeding call is
+and `executor-unavailable`, each described above. The two standalone
+review commands are not the same case, and the difference is one
+delegated step. `/shell-team:review` invokes the reviewer directly and
+**never consults the binding** — a rebind changes nothing about it, in
+either direction. `/shell-team:review-response` does not consult the
+binding **for its own review step** either, but its last step hands the
+findings you accept to `/shell-team:run`, and that pipeline consults
+resolution like any other run — so a rebind **does** reach
+`review-response`, through that step and only through it, including by
+refusing and stopping it. Issue **#245** tracks wiring resolution into
+the review steps themselves. **How a proceeding call is
 executed** — there the binding changes
 **only** what `resolve-executor.sh` resolves and reports and what
 **telemetry** records, provider, model, effort and adapter alike, and
