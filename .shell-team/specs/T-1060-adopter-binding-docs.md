@@ -126,6 +126,7 @@ Two corollaries, both learned from the three rounds:
 
 - **A reachability claim is a separate claim from an existence claim.** "The resolver has refusal X" and "an adopter can reach refusal X" are two different sentences with two different sources; r1 conflated them. Every row below that mentions a refusal states its reachability explicitly, and `unreachable-today` rows must be written as unreachable.
 - **A contrast is two claims, and both need rows.** "`--print-resolved` does not check availability, `--role` does" was wrong not in its first half but in its second; r3. Never write a contrast whose second half has no row.
+- **A row whose subject is a user-invocable command carries its call-graph edges in its source column** (added after round 8). Citing only the command's own file is under-sourced by construction: `/shell-team:review-response` bypasses the binding in its own review step and consults it through the `shell-team:run` call at `skills/review-response/SKILL.md:101`, and four consecutive rounds of confidence-boundary defects came from modelling commands as atomic. The enumerated edges live in `## Round-9 design input`'s truth table; a command-level claim is written from that table, never from a grep of one file.
 
 ### The claim→source table
 
@@ -607,6 +608,88 @@ Minimal edits: only the axis-one sentence changes on each surface. Axis two, the
 **AC12** is frozen and has **no check line** (runtime `SKIP` by design), so nothing machine-readable will ever catch this. Its item (a) still instructs mutation probes against AC1/AC2 clauses the v3 ratification removed: *"delete one `bind` row from the README grammar example (AC1 red on **both** the row-count equality and the `check-binding.sh --config` validation)"*, *"change one adapter token in the grammar example"*, and *"translate one word inside a Japanese code block (AC2 red on the byte-identity clause)"*. Those three probes now have no clause to redden — the README sections carry no grammar example and no code block, by AC1/AC2's own zero-fence locks. The engineer should report them as **inapplicable-by-ratification, named individually with that reason**, never as passes and never by silent omission. The live substitutes are the zero-fence locks themselves (add a fenced block to either README section → AC1 or AC2 red) and the anchor-total equality (drop one anchor from one language → AC2 red on both the per-side `4` and the equality).
 
 This is the frozen-prose-goes-stale class: a sentence with no check line, describing criteria that moved. Per the corpus's own disposition it is **disclosed here and left for the batched editorial pass** rather than spending a third ratification cycle on a paragraph nobody disputes. It does not block round 8.
+
+## Round-9 design input — the command→binding call graph, and a v5 delta presented for GO
+
+**Outside the intent-block markers. Nothing frozen has been changed this round.** The v5 delta below is a *proposal*: after the operator's framing correction, every frozen change is presented for GO before it is applied.
+
+### The class, named
+
+Rounds 5, 6, 7 and 8 each produced a confidence-boundary-class defect, and the reviewer's adversarial pass identified the shared root cause rather than a fourth instance of bad luck: **the verification has been treating a command as an atomic unit and checking selected invocation sites, instead of tracing the command's full call graph.** Round 7 read `skills/review-response/SKILL.md`'s Step 2, missed its Step 4 edge into `shell-team:run`, and v4 froze that incomplete model. A fifth composite surprise is not prevented by writing the sentence more carefully; it is prevented by writing the sentence **from a table of edges**. That table is below, and it is the class closure.
+
+**Two disciplines the table itself enforces**, both of which caught something:
+
+1. **An edge is an invocation instruction, never a printed command name.** `skills/team-init/SKILL.md` lines 48-52 tell the *user* they can now run `/shell-team:run`. A search for command names would score team-init as a delegating surface; it is not one — the file contains **zero** occurrences of `Agent tool`, `Skill tool` or `invoke`. This is the mirror image of the atomic-command error and would have produced a false positive rather than a false negative.
+2. **A surface that invokes only non-bindable roles cannot consult the binding even though it invokes agents.** `scrum-master`, `triage-orchestrator` and `drift-evaluator` have no `bind` row at all (T-1057's DP6 and AC5: three advisory roles, deliberately not bindable). No row below currently turns on this, but it is recorded so a future surface is judged by the right test rather than by whether it happens to name `resolve-executor.sh`.
+
+### Population and method, stated so the completeness claim is falsifiable
+
+Population: **six** user-invocable surfaces, enumerated by the glob `skills/*/SKILL.md` — `run`, `goal`, `review`, `review-response`, `loop-triage`, `team-init`. Method: each file read for edges, plus a `skills/`-wide search for the four edge idioms (`Agent tool`, `subagent_type`, `Skill tool`, `invoke`) and for `resolve-executor.sh --role`. **Read end to end** (because a "never consults" verdict can be overturned by one unread line): `skills/review/SKILL.md` (10 lines), `skills/loop-triage/SKILL.md` (69 lines). **Read at the relevant region plus a whole-file zero-hit edge search**: `skills/team-init/SKILL.md`. **Not read end to end**: `skills/run/SKILL.md`, `skills/review-response/SKILL.md`, `skills/goal/SKILL.md` — and the asymmetry is deliberate rather than a shortcut: an unread region can only *add* edges, so it cannot overturn a "consults" verdict, whereas it is exactly what can overturn a "never" verdict. Row 4's own-step verdict rests on the two edges its file states as its steps; if a third edge exists in an unread region, that is a finding this method invites rather than hides.
+
+### The command→binding-consultation truth table
+
+| # | Surface | Edges (what it invokes), file:line | Consults the binding? | Evidence / reason |
+|---|---|---|---|---|
+| 1 | `/shell-team:run` | `tech-lead`, `pm-spec`, `ui-designer`, `engineer`, `qa-verifier`, `codex-reviewer` — `skills/run/SKILL.md:41`, `:42`, `:56`, `:59`, `:66`, `:79` | **Directly — yes** | `skills/run/SKILL.md:103` carries `resolve-executor.sh --role` (telemetry consumption at `:129`, `:131`); `templates/prompt-blocks/registry.txt:43` contains `executor-resolution.md` into this file. Resolution runs immediately before each bound role's invocation. |
+| 2 | `/shell-team:goal` | `engineer`, `qa-verifier`, `codex-reviewer` — `skills/goal/SKILL.md:49`, `:80`, `:81` | **Directly — yes** | `skills/goal/SKILL.md:281`, `:283` carry `resolve-executor.sh --role`; same containment row, `templates/prompt-blocks/registry.txt:43`. |
+| 3 | `/shell-team:review` | exactly one: `codex-reviewer`, invoked directly — `skills/review/SKILL.md:5` | **Never** | The whole file is 10 lines, read end to end: one direct invocation, no resolution reference, and **no delegation to any skill**. Confirmed by the zero-hit measurement for `resolve-executor`/`binding.conf`/`binding-default` across this file. |
+| 4 | `/shell-team:review-response` | **two** edges: Step 2 → `codex-reviewer` via Agent tool (`skills/review-response/SKILL.md:36`); Step 4 → `shell-team:run` via Skill tool (`skills/review-response/SKILL.md:101`), conditional on there being adopted findings | **Own review step — no. Via delegation — yes** | This is the composite the atomic model missed. Line 101: *"invoke `shell-team` (Skill tool, `shell-team:run`) once … `shell-team` then runs its own PM→Engineer→QA→Codex pipeline"*. That pipeline is row 1, so it consults resolution for every bound role. The verdict is **inherited from row 1** and changes if and only if row 1 changes. |
+| 5 | `/shell-team:loop-triage` | **none** — no agent and no skill. Runs `bin/discover-work.sh` (`skills/loop-triage/SKILL.md:24-28`) and writes a proposal file (`:37-44`) | **Never, structurally** | Read end to end: it invokes no bound role at all, so there is nothing for resolution to resolve. Measured detail worth recording: it does **not** invoke `agents/triage-orchestrator.md` either, although that agent exists — the skill calls the script directly. |
+| 6 | `/shell-team:team-init` | **none** — no agent and no skill. Runs the scaffolder; **prints** `/shell-team:run` to the user as a next step (`skills/team-init/SKILL.md:48-52`) | **Never** | Zero occurrences of `Agent tool`, `Skill tool` or `invoke` in the file. The command name at line 51 is output addressed to a human, not an invocation — discipline 1 above. |
+
+**Transitive closure, stated once so no future sentence has to re-derive it**: rows 1 and 2 consult directly; row 4 consults *only* through row 1 and *only* when its Step 4 fires; rows 3, 5 and 6 never consult. Issue **#245** changes the own-step column of rows 3 and 4. It does **not** change row 4's delegated column, which is already yes, and it does not touch rows 5 or 6.
+
+### Frozen verdict: the v4 sentence **over-claims and must move**
+
+The v4 axis-one sentence ends: *"…; the standalone review commands do not consult the binding today, which issue #245 tracks."*
+
+`/shell-team:review-response` **is** a standalone review command, and running it can cause the binding to be consulted for six roles — whenever Step 4 fires. The sentence is therefore true only under an unstated "own steps only" reading. That is the fourth time on this paragraph that a sentence has survived solely by a strained reading, and the disposition established at v3 applies unchanged: **stop needing one.** Two further reasons make this not a judgement call. The frozen Goal is the baseline drift is measured against, so leaving the bundled claim there while the surfaces state the precise one would score the correct prose as the drift. And the surfaces' current *"a rebind changes nothing about them in either direction"* is flatly false for review-response — a rebind that refuses can stop its rework step outright.
+
+**Verdict: must move.** Minimal v5, confined to the trailing clause of the axis-one sentence; the axis-two sentence, the three instances, the universality clause and the closing rule are untouched.
+
+*Old bytes* (v4, the axis-one sentence's trailing clause):
+
+> ; the standalone review commands do not consult the binding today, which issue #245 tracks.
+
+*New bytes* (v5, **proposed — not applied**):
+
+> ; `/shell-team:review` never consults the binding, and `/shell-team:review-response`'s own review step does not either, though the accepted rework it hands to the run loop does — that step is run-loop work; issue #245 tracks wiring resolution into the review steps themselves.
+
+*Why, in plain language*: the v4 clause treats the two review commands as one thing. They are not. `review` really does bypass the binding entirely. `review-response` bypasses it while it reviews, then hands whatever you accept to the ordinary run loop — and that part consults the binding like any other run, so a bad binding can stop it. The v5 clause says exactly that, and keeps #245 pointed at the part that is still missing: resolution inside the review steps themselves.
+
+*Check-line impact: **zero***. No `- check:` line reads this sentence; the anchors are `shipped default`, `telemetry`, `invocation path`, `#236`, `Design choices`/`設計上の選択`, the role names, the refusal tokens and codes, the effort values and the structural clauses — none is a fragment of it. Criterion count stays 12 and `- check:` count stays 11, so a v5 attestation re-measures the identical set. Classifier expectation: **class-b** (Goal prose only).
+
+### Surface wording, drafted per command from the table
+
+Only the axis-one sentence's tail changes on each surface. `#245`'s citation stays; the *"in either direction"* clause is kept for `review` (where the table says it is true) and **corrected** for `review-response` (where it is false).
+
+**`docs/adopting.md`**:
+
+> The two standalone review commands are not the same case, and the difference is one delegated step. `/shell-team:review` invokes the reviewer directly and **never consults the binding** — a rebind changes nothing about it, in either direction. `/shell-team:review-response` does not consult the binding **for its own review step** either, but its last step hands the findings you accept to `/shell-team:run`, and that pipeline consults resolution like any other run — so a rebind **does** reach `review-response`, through that step and only through it, including by refusing and stopping it. Issue **#245** tracks wiring resolution into the review steps themselves.
+
+**`docs/adopting.ja.md`**:
+
+> 単体で使う 2 つの review 系コマンドは同じケースではなく、違いは 1 つの委譲ステップにある。`/shell-team:review` は reviewer を直接呼ぶだけで **binding を一切参照しない**——rebind はこれに対してどちらの方向にも何の影響も与えない。`/shell-team:review-response` も**自身の review ステップでは** binding を参照しないが、最後のステップで採用した findings を `/shell-team:run` に引き渡し、その pipeline は他の run と同様に resolution を参照する——したがって rebind は `review-response` に**そのステップ経由でのみ**到達し、refuse によってそれを停止させることもある。review ステップ自体に resolution を配線することは issue **#245** が追跡している。
+
+**`README.md`** — the pointer's axis-one clause:
+
+> …while `/shell-team:review` never consults the binding and `/shell-team:review-response` consults it only through the rework it hands to the run loop (issue **#245**) — …
+
+**`README.ja.md`**:
+
+> …一方、`/shell-team:review` は binding を一切参照せず、`/shell-team:review-response` は run ループへ引き渡す rework 経由でのみ参照する（issue **#245**）——…
+
+**Anchors, re-verified**: `#236`, `invocation path`/`呼び出し経路`, `telemetry`/`テレメトリ` all sit in the untouched axis-two sentence; `shipped default`/`出荷時の既定`, `Design choices`/`設計上の選択`, the six role names, `regular file`/`通常ファイル`, `Codex` are in untouched regions; `blind spot`/`盲点` stay at zero; no fenced block is added, so AC1/AC2's zero-fence locks hold; AC7 is unaffected (the refusal bullets keep their token-and-digit lines).
+
+### What else the table caught
+
+**Nothing requiring a surface correction beyond `review-response` — and that is a measured result, not an absence of looking.** Rows 5 and 6 (`loop-triage`, `team-init`) never consult the binding, and neither is mentioned on any of the four sections, so no sentence about them exists to be wrong. Row 3 (`review`) is confirmed accurate as currently written. The two by-products worth keeping are the disciplines above: team-init would have been a **false positive** under command-name grepping, and the non-bindable advisory roles give a structural test for any surface added later.
+
+### Retro input — the reviewer's gray zone, and the verification lesson
+
+**The gray zone, recorded because the reviewer weighed it explicitly rather than asserting a defect.** *Reading B* (not a defect): the preceding sentence already says `/shell-team:run` consults the binding, and review-response's own file says Step 4 calls `run`, so a reader who has both can compose the right conclusion — a comprehension problem, not a documentation defect. *Reading A* (genuine defect, adopted by both the reviewer's primary and adversarial passes): the sentence asserts unconditionally, about the command as a whole, that nothing changes in either direction, with no words scoping it to Step 2 and none excepting Step 4 — and the honest-boundary paragraph exists precisely so a reader can predict what a refused binding stops, which is the one place composition must not be left to them. Reading A is right, and the general form is worth promoting: **in a paragraph whose purpose is letting a reader predict a failure, requiring them to compose two separated facts is a defect even when both facts are present.**
+
+**The verification lesson, and it is the candidate this round should carry into the retro**: *a behavioural claim about a user-invocable command is verified against the command's full call graph, not against its own file.* Four consecutive rounds of the same class came from modelling a command as atomic; the composite that broke it was two lines apart from the step that was read. The mechanised form is the table above, and the discipline that generalises it: **a claim-table row whose subject is a command carries its call-graph edges as part of its source column** — a row citing only the command's own file is under-sourced by construction. That amendment is recorded against the claim→source discipline in `## Round-4 design note`, which is where the transcription rule lives.
 
 ## Decision points
 
