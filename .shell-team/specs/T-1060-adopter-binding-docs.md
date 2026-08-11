@@ -221,6 +221,118 @@ Finding 1's **mechanism** half is out of scope here (instruction 1) and is a rea
 >
 > **Option space to decide at planning** (not decided here): scaffold the specimen from `templates/binding-default.conf`'s real values instead of the placeholder template; or give the resolver a per-role merge against the default (a resolution-semantics change, design-review scale); or have `bin/check-binding.sh` warn on placeholder-shaped model tokens; or leave the mechanism and rely on the documentation warning T-1060 ships. T-1060 documents the hazard; it does not close it.
 
+## Round-6 ratification package — class B, v1 → v2
+
+**This section is outside the intent-block markers.** It is a *proposal*. The frozen region is untouched and stays untouched until the operator gives GO; the coordinating session presents this package and only then edits the block, appends the `- intent-ratified` record and replaces the hash.
+
+### What was measured, first-hand, for this package
+
+- `.shell-team/specs/T-1057-loop-integration.md` **DP6** (read in full) — *"**Branch B** — it does not, and the frontmatter pin is the only thing that routes a sub-agent's model: the pins **stay** … pin retirement then travels to an issue naming the harness capability as its blocker."* And, in the same paragraph: *"**`codex-reviewer` is excluded from both branches, deliberately**: its `model: sonnet` configures the Claude **wrapper** that shells out to the Codex CLI, not the model that reviews."* DP6's subject is, throughout, **the model a role runs at** — never which executor it is invoked through.
+- `.shell-team/specs/T-1057-loop-integration.md` **AC5** and its `## Summarized sources` line for `agents/*.md` — the retirement question concerns the **five `claude-cli`-bound** roles; `codex-reviewer`'s pin and the three advisory pins are asserted byte-unchanged.
+- `.shell-team/todo.md` line 283, T-1057's own fast-follow disposition — *"**filed as issue #236** (DP6 Branch B's deferred pin retirement, blocker = harness per-invocation model capability; #235 retires with it)"*. This is the repository's own primary record of what #236 is, and it says pin retirement.
+- **Relayed, not re-fetched here**: issue #236's body itself. This role has no network. The two sources above are the repository-side canon and they agree; if the issue body says something wider, that is a contradiction to surface rather than a licence to keep the current wording, and the freeze run should report the measured body beside this note.
+- **Provenance, and it matters**: the over-claim is not the engineer's. It traces verbatim to GitHub issue #244's own parenthetical, *"the pin retirement that would make it route invocation is #236"* — operator-authored, transcribed into the routing map, into this spec's frozen Goal and DP4, and from there into all four surfaces. Five rounds of review read the docs against `executor-resolution.md` and `task-envelope.md` and found them faithful, because they *were* faithful — to a premise none of those two sources contains. The defect entered above the loop and every gate below it inherited it. That is the reason the correction cannot stop at the docs.
+
+### The truthful statement
+
+Two limits are being collapsed into one sentence, and they have different scopes and different futures. **First, the model**: a role's actual invocation still takes its model from that role's own `agents/<role>.md` frontmatter pin, not from the resolved binding row — so a rebind's model column is recorded as telemetry rather than executed. Issue **#236** is the tracked retirement of exactly those pins, for the **five `claude-cli`-bound roles only**, blocked on the harness accepting a per-invocation model for a sub-agent; `codex-reviewer` is deliberately excluded from it, because its pin configures the Claude wrapper that shells out to the Codex CLI rather than the model that reviews. **Second, the executor**: which executor — provider and adapter — a role is actually invoked through is not routed by resolution at all, for any of the six roles, and **no issue tracks changing that**. #236 would not. So even after #236 lands, rebinding a role to a different provider still changes only what resolution reports and what telemetry records. The current sentence attaches #236 to the second limit, which is the limit #236 does not touch.
+
+### Frozen-Goal verdict: **the Goal is false as written and must move**
+
+Not a matter of emphasis. The Goal's closing appositive — *"does **not** wire an alternate-executor invocation path — the pin retirement that would is issue #236"* — asserts that #236 is the retirement that *would* wire an alternate-executor invocation path. DP6 and the board's own filing line both say #236 retires five model pins. A model pin retiring does not make any role invocable through a different executor, and DP6 excludes the one role whose executor is a different provider. The frozen sentence therefore carries the same over-claim the four surfaces are being corrected for.
+
+Three consequences, stated plainly:
+
+1. **Correcting only the docs is not an option.** It would leave the frozen intent asserting one thing and the shipped prose asserting the opposite — the "repository asserting two incompatible things about the same mechanism" state this task's own never-dropped item ① calls worse than either alone.
+2. **Drift is measured against the frozen intent, not against the docs.** Leaving a false Goal in place would make every future drift evaluation of this task compare correct prose against an incorrect baseline, and score the correct prose as the drift.
+3. This is **class B** under `bin/check-refreeze-class.sh` — the delta touches Goal prose and Input-space prose, not a `- check:` line. It cannot be routed through the class-M standing-grant path, and no amount of the check lines staying untouched changes that.
+
+### The v1 → v2 delta
+
+Two frozen lines move. Both are meaning-correcting; neither changes the task's scope, adds an obligation to the engineer, or touches a criterion.
+
+**Delta 1 — `## Goal`, the honest-boundary clause (the file's line 33, the single Goal paragraph).**
+
+*Old bytes* (the clause; the rest of the paragraph is unchanged):
+
+> and does **not** wire an alternate-executor invocation path — the pin retirement that would is issue #236.
+
+*New bytes*:
+
+> and does **not** wire an alternate-executor invocation path — two separate limits, stated separately on every surface: a role's invocation still takes its **model** from that role's own `agents/<role>.md` pin rather than from the resolved row, and issue #236 is the tracked retirement of those pins for the five `claude-cli`-bound roles only, `codex-reviewer` deliberately excluded; and which **executor** a role is invoked through is not routed by resolution at all, with no issue tracking that.
+
+*Why*: the old appositive states a falsehood about #236's scope, measured against T-1057 DP6 and `.shell-team/todo.md` line 283. The new text says what each limit is and which of them #236 addresses. It is the smallest edit that removes the false claim rather than hedging it.
+
+**Delta 2 — `## Input space`, out-of-scope bullet 2 (the file's line 99), trailing clause.**
+
+*Old bytes*:
+
+> the four adopter-visible refusals named in AC3/AC4/AC7 are the ones an ordinary adopter edit reaches.
+
+*New bytes*:
+
+> of the four refusals named in AC3/AC4/AC7, three — `binding-unresolved`, `capability-unsupported`, `executor-unavailable` — are reachable by an ordinary adopter edit, while `contract-violation` is not, because both shipped adapters declare a carried board-transition channel and the allowlist is closed to those two; the fourth is in scope as a documented member of the closed set rather than as a reachable one.
+
+*Why*: this is the defect disclosed in `## Round-4 design note` and left for the editorial batch. Round 1 established that `contract-violation` is unreachable and the four surfaces were corrected accordingly in round 2; the frozen clause was not, so it still makes the round-1 over-claim inside the region drift is measured against. Same defect class as Delta 1 — a frozen sentence asserting a scope/reachability fact its primary source contradicts.
+
+### Bundling: recommended, with the alternative stated
+
+**Recommendation: ratify both deltas as one v1→v2.** One human GO, one hash bump, one `- intent-ratified` record. The two are the same defect class, both are meaning-correcting rather than scope-changing, and Delta 2 is already measured, already disclosed and already agreed — it needs a ratification cycle, not a decision. Riding this re-freeze costs the operator nothing beyond reading one more paragraph.
+
+**Alternative, if the operator prefers the narrower change**: ratify Delta 1 alone as v1→v2 and leave Delta 2 in the editorial batch. The cost is a second full ratification cycle later, and a known-false clause staying inside the frozen region until that batch runs. Nothing breaks either way; the recommendation is about cycles spent, not about risk.
+
+There is **no third option in which nothing moves**. Delta 1 is required for round 6 to produce non-contradictory prose.
+
+### Check-line and anchor impact: **zero**
+
+All 11 `- check:` lines are unaffected, and no criterion's text changes. Verified anchor by anchor against the corrected surface wording drafted below:
+
+| Anchor | Required by | Survives? |
+|---|---|---|
+| `#236` | AC1 (README EN), AC2 (README JA), AC3 (adopting EN), AC4 (adopting JA) | **Yes** — still present on all four, now attached to the model-pin limit. |
+| `invocation path` / `呼び出し経路` | AC1/AC3 (EN), AC2/AC4 (JA) | **Yes** — the headline clause is unchanged in both languages. |
+| `telemetry` / `テレメトリ` | AC1-AC4 | **Yes** — unchanged. |
+| `shipped default` / `出荷時の既定` | AC1-AC4 | **Yes** — unaffected; it lives outside the boundary paragraph as well. |
+| `blind spot` = 0 / `盲点` = 0 | AC1, AC2 (README sections only) | **Yes** — the corrected wording introduces neither. |
+| `Design choices` / `設計上の選択` | AC1, AC2 | **Yes** — the cross-reference sentence is untouched. |
+| Six role names | AC7, all four sections | **Yes** — `codex-reviewer` now additionally appears in the boundary paragraph. |
+| fenced-block byte-identity EN↔JA | AC2, AC4 | **Yes** — the correction is prose only; no code block is added or changed. |
+| `- check:` line count = 11 | `bin/check-intent.sh` attestation total | **Yes** — no `- check:` line is added, removed or edited by either delta. |
+
+One completeness note the operator should see: Delta 1's new Goal text says the two limits are "stated separately on every surface", and **no `- check:` line measures that** — the anchors measure presence of `#236` and `invocation path`, not that the two limits are distinguished. This is the same disposition the body-to-AC table already records for DP4 row 10 (*info-only; the semantic half is the cross-provider reviewer's primary judgement*), and it is deliberate rather than an oversight: a criterion that could tell the two limits apart would have to read meaning, which is what five rounds have shown no grep does. After ratification, add the matching row to `## Body-to-AC correspondence` (a mutable section) recording the exemption and its reason.
+
+### Post-ratification mechanics, for the coordinating session
+
+1. Apply both deltas inside the markers. Nothing else in the block changes.
+2. `bash bin/check-refreeze-class.sh` — expect **class B**; if it reports class M, stop, because something other than what this package describes moved.
+3. Append to the board's T-1060 entry: `- intent-ratified (YYYY-MM-DD): v1→v2 — <the operator's GO record> — the frozen Goal's #236 appositive over-stated that issue's scope, measured against T-1057 DP6 and .shell-team/todo.md's own #236 filing line; and the Input space out-of-scope bullet asserted all four refusals adopter-reachable when contract-violation is not. Both corrected in one delta.`
+4. **Replace** the existing `- intent-hash (v1): …` sub-bullet with `- intent-hash (v2): <value from bash bin/check-intent.sh --print-hash .shell-team/specs/T-1060-adopter-binding-docs.md>`. Replace, never add a second hash record — `bin/check-intent.sh` requires exactly one well-formed record per task, and a duplicate is precisely what round 1's Blocker was.
+5. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md` — expect `aligned … v2`.
+6. Then, and only then, hand round 6 to the engineer with the corrected surface wording below.
+
+### Corrected surface wording, drafted (rows 35 and 37 of the claim→source table)
+
+The claim→source table gains one row and one amendment; the engineer transcribes rather than authors, per that section's rule.
+
+- **Row 35, amended** — the honest boundary now has two limits, and `#236` attaches to the first only. Source: `templates/prompt-blocks/executor-resolution.md` line 1 (the model clause); `.shell-team/specs/T-1057-loop-integration.md` DP6 (#236's scope and `codex-reviewer`'s exclusion); `.shell-team/todo.md` line 283 (#236's filing description).
+- **Row 37, new** — *which executor a role is invoked through is not routed by resolution for any role, and no issue tracks changing it.* Source: `bin/resolve-executor.sh` header 96-98 (*"this script decides WHETHER an invocation may proceed, never performs one"*); DP6 (silent on provider/adapter routing); `.shell-team/todo.md` line 283 (#236 is pin retirement). **Bound**: do not name #236 here, and do not invent an issue number for it.
+
+**English, both `README.md` and `docs/adopting.md`** (the README keeps its trailing `Design choices` sentence; the adopting page does not have one):
+
+> **The honest boundary**: rebinding a role changes which executor `resolve-executor.sh` **resolves** and which value **telemetry** records for it. It does **not** wire an alternate-executor **invocation path**, and that is two separate limits. The **model**: a role's invocation still takes its model from that role's own `agents/<role>.md` pin, not from the resolved row — issue **#236** tracks retiring those pins, for the five `claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`, whose pin configures the Claude wrapper that shells out to the Codex CLI rather than the model that reviews. The **executor**: which provider and adapter a role is actually invoked through is not routed by resolution at all, for any role, and no issue tracks changing that — so a rebind across providers moves what is reported and recorded, never what runs.
+
+**Japanese, both `README.ja.md` and `docs/adopting.ja.md`** (a Japanese statement of the same facts, machine tokens verbatim):
+
+> **正直な境界線**: rebind すると `resolve-executor.sh` が**解決する** executor と**テレメトリ**が記録する値が変わる。ただし別 executor への**呼び出し経路**が配線されるわけでは**ない**——そしてこれは 2 つの別々の限界である。**model について**: 役割の実際の呼び出しは、resolved row ではなく、その役割自身の `agents/<role>.md` の pin から model を取る。issue **#236** はその pin の退役を追跡しているが、対象は `claude-cli` に紐付く 5 役割のみで、`codex-reviewer` は意図的に除外されている——その pin は Codex CLI を呼び出す Claude 側の wrapper を設定するものであって、レビューを行うモデルではないため。**executor について**: どの provider / adapter 経由で役割が実際に呼び出されるかは、どの役割についても resolution が経路制御していない。これを変える issue は存在しない——したがって provider をまたぐ rebind が動かすのは、報告される値と記録される値であって、実際に走るものではない。
+
+### One question this analysis surfaces, for the operator rather than for round 6
+
+The corrected wording asserts, on four shipped surfaces, that **no issue tracks provider/adapter-level invocation routing**. That is measured true today. If the operator wants such an issue to exist, filing it makes the sentence stale the moment it lands, and the sentence must then cite it. Either decision is fine; what is not fine is filing it and leaving the sentence. Recommend deciding at close-out and recording the decision on the board.
+
+### Trigger A accounting
+
+Round 5's finding is Trigger A occurrence **1**. This package is a design response rather than a prose patch, so round 6's transcription is what the trigger's second-occurrence test applies to. If round 6 draws a **new** confidence-boundary-class finding, Trigger A has fired at two consecutive rounds and the pre-decided drop in `## Pre-commitment` executes — it is not reopened, and the smallness of the finding is exactly the reasoning that trigger exists to overrule.
+
 ## Decision points
 
 | DP | Decision |
