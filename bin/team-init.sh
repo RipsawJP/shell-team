@@ -32,18 +32,28 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Locate the shell-team repository root (where this script lives), so the
-# templates resolve regardless of cwd / symlinks.
+# templates resolve regardless of cwd / symlinks. Every `cd DIR && pwd` here
+# is `cd DIR && pwd -P` (T-1057, issue #218): a bare logical `pwd` preserves
+# an ANCESTOR directory symlink in the reported path (an adopter's `bin/`
+# symlinked into the plugin's real `bin/` — ordinary vendoring, no hostile
+# action), which would silently resolve TEMPLATES_DIR below inside the
+# ADOPTER's own tree and let a decoy templates/ there stand in for the
+# plugin's shipped templates — a mis-scaffold this script, of all of them,
+# must not risk, since it COPIES those files into an adopter's repository.
+# `pwd -P` reports the OS-canonical path regardless of how many symlinks —
+# final-component or ancestor — were crossed getting there, the same fix
+# shape bin/check-binding.sh and bin/check-adapter.sh already carry.
 # ---------------------------------------------------------------------------
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")"
   case "$link_target" in
     /*) script_path="$link_target" ;;
-    *)  script_path="$(cd "$(dirname "$script_path")" && pwd)/$link_target" ;;
+    *)  script_path="$(cd "$(dirname "$script_path")" && pwd -P)/$link_target" ;;
   esac
 done
-SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 TEMPLATES_DIR="$REPO_ROOT/templates"
 
 # ---------------------------------------------------------------------------
@@ -73,6 +83,10 @@ override with $TEAM_RUN_BASE; an existing tasks/ layout is detected and reused):
   <base>/test-recipe.md                 (from templates/test-recipe.md; per-repo test-run
                                          recipe — protected: never overwritten, even with --force)
   <base>/.gitignore                     (ignores runs/ telemetry; host root untouched)
+  <base>/binding.conf.example           (from templates/binding-template.conf; scaffolded
+                                         INERT — never binding.conf, so resolve-executor.sh's
+                                         own default lookup never finds it and no adopter's
+                                         executor assignment silently changes)
 Does NOT modify <target_path>/CLAUDE.md or <target_path>/.gitignore.
 
 Options:
@@ -124,7 +138,7 @@ esac
 
 [ -e "$TARGET" ] || die "target path does not exist: $TARGET (mkdir is intentionally not done; create it first)"
 [ -d "$TARGET" ] || die "target path is not a directory: $TARGET"
-TARGET="$(cd "$TARGET" && pwd)"
+TARGET="$(cd "$TARGET" && pwd -P)"
 
 # Verify the templates we rely on are present (defensive against layout drift).
 TODO_TPL="$TEMPLATES_DIR/todo-template.md"
@@ -132,7 +146,8 @@ CONTRACT_TPL="$TEMPLATES_DIR/shell-team.contract.yaml"
 GITIGNORE_TPL="$TEMPLATES_DIR/shell-team.gitignore"
 AGENTS_TPL="$TEMPLATES_DIR/AGENTS.md"
 RECIPE_TPL="$TEMPLATES_DIR/test-recipe.md"
-for tpl in "$TODO_TPL" "$CONTRACT_TPL" "$GITIGNORE_TPL" "$AGENTS_TPL" "$RECIPE_TPL"; do
+BINDING_TPL="$TEMPLATES_DIR/binding-template.conf"
+for tpl in "$TODO_TPL" "$CONTRACT_TPL" "$GITIGNORE_TPL" "$AGENTS_TPL" "$RECIPE_TPL" "$BINDING_TPL"; do
   [ -f "$tpl" ] || die "template missing: $tpl (shell-team layout drift?)"
 done
 
@@ -237,6 +252,13 @@ copy_template "$AGENTS_TPL"   "$TEAM_RUN_BASE/AGENTS.md"
 # first and extend across tasks — protected: never overwritten, even by --force.
 copy_template_protected "$RECIPE_TPL" "$TEAM_RUN_BASE/test-recipe.md"
 copy_template "$GITIGNORE_TPL" "$TEAM_RUN_BASE/.gitignore"
+# Executor-binding specimen (T-1057), scaffolded INERT: this is
+# binding.conf.example, never binding.conf, so bin/resolve-executor.sh's own
+# default lookup (<base>/binding.conf) never finds it — scaffolding a repo
+# never silently changes which executor a role is bound to. An adopter who
+# wants a host-authored binding renames this file deliberately; until then
+# the plugin-shipped templates/binding-default.conf keeps resolving.
+copy_template "$BINDING_TPL" "$TEAM_RUN_BASE/binding.conf.example"
 
 # ---------------------------------------------------------------------------
 # Summary + adoption nudge. The host's CLAUDE.md and root .gitignore are
@@ -255,6 +277,8 @@ printf 'Telemetry (%s/) is ignored via %s/.gitignore — commit the rest if you 
 printf 'Cross-tool pointer doc: %s/AGENTS.md (points other tools at the truth sources; not a root convention file).\n' \
   "$TEAM_RUN_BASE"
 printf 'Test recipe: %s/test-recipe.md (engineer/QA read it first, append established procedures; never overwritten).\n' \
+  "$TEAM_RUN_BASE"
+printf 'Executor binding specimen: %s/binding.conf.example (inert — rename to binding.conf to opt in; see bin/resolve-executor.sh --help).\n' \
   "$TEAM_RUN_BASE"
 # shellcheck disable=SC2016  # backticks here are literal text for the user, not a subshell.
 printf 'Next: run `/shell-team:run <your request>` from the target repo. See docs/adopting.md.\n'

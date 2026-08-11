@@ -15,7 +15,7 @@
 # this spec's pre-commitment trigger fired a second time (DP18) — the
 # fail-closed effort rule and the board-transition authority rule now
 # ship as normative statements in the contract document instead, with
-# their enforcement inherited by a successor issue and by T-1056.
+# their enforcement inherited by a successor issue and by T-1057.
 #
 # The task envelope itself is a CONTRACT, never an instance: nothing in
 # this script (or anywhere else in this task) serializes, parses, or writes
@@ -159,7 +159,7 @@ set -euo pipefail
 # authority join, not the shipped specimen's agreement with the shipped
 # definitions. Both rules the mode once enforced survive as byte-frozen
 # `- normative: ` statements in the contract document (pinned by AC6),
-# with their enforcement inherited by a successor issue and by T-1056 —
+# with their enforcement inherited by a successor issue and by T-1057 —
 # not a fast-follow to revisit here.
 #
 # Never spelled anywhere in this file, in code or in a comment: the name of
