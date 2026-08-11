@@ -618,3 +618,51 @@ that file's order.
   test (all lines are `bound` rows) breaks immediately against the real
   producer's own leading `schema` line, which its own spec's `## Summarized
   sources` already documented.
+- T-1056: `bash tests/check-liveness/run.sh` is `bin/check-liveness.sh`'s
+  fixture suite (the fail-closed, out-of-band loop-liveness classifier). No
+  new prerequisite: pure bash + git + coreutils, the two-arm
+  `TMPDIR`-then-`$HERE` `mktemp -d ... XXXXXX` idiom (the same shape
+  `tests/check-refreeze-class/run.sh:82-87` uses). Deliberately **no git
+  init scratch repository**: every git-band case (`STALLED` via a stale
+  state file with a fresh `HEAD`, `DEAD` via both clocks old) instead
+  measures THIS checkout's own real `HEAD` committer epoch live
+  (`git log -1 --format=%ct HEAD`) and derives `$LIVENESS_NOW` relative to
+  it — reaching the same cells a scratch repository would, without the
+  sandboxed nested-`.git` write restriction the T-1001 entry above already
+  documents. Every threshold boundary is exercised through `$LIVENESS_NOW`
+  (no `sleep` anywhere, matching this checker's own design). Two portability
+  notes specific to this checker: **(1)** its reason registry
+  (`templates/liveness-reasons.txt`) is resolved from the checker's own
+  installed directory (`$SCRIPT_DIR/..`), never the working directory — to
+  exercise `registry-unreadable`/`registry-malformed` against a
+  deliberately corrupted registry, build a scratch "install" (a copy of
+  `bin/check-liveness.sh` plus `bin/team-paths.sh` under a scratch `bin/`,
+  with a scratch `templates/liveness-reasons.txt` beside it) rather than
+  editing the shipped file. **(2)** a `sed` pattern deliberately containing
+  literal `$(...)`/`;...;` text (the no-eval CANARY proof) needs
+  `# shellcheck disable=SC2016` on its own line, immediately above a
+  single-statement line — shellcheck does not honor the directive when it
+  shares a `;`-joined line with a preceding assignment.
+- T-1056 (Codex round-1 rework): `exec N< file` (or any bare `exec` with
+  redirections and no command word) applies EVERY redirection it is given
+  to the CURRENT shell PERSISTENTLY, not scoped to that one statement —
+  writing `exec 3< "$path" 2>/dev/null || refuse ...` to suppress a
+  diagnostic on open failure silently and permanently redirects the
+  script's own stderr to `/dev/null` for the rest of its run **on the
+  success path too**, since the `2>/dev/null` isn't scoped to the `exec`
+  call, it just becomes the shell's new stderr. This produced a real bug
+  (a downstream `printf ... >&2` after a successful guarded `exec` open
+  went silently missing) that a live invocation caught (empty stderr,
+  correct verdict) — the frozen fixture suite's own coverage of that
+  stderr line did not, since it happened to grep an ERROR path this
+  particular success-path bug never touched. Fix: never attach a trailing
+  redirect to a bare `exec` used only to open/close a numbered fd; let a
+  failed open print bash's own diagnostic (harmless — no `- check:` line
+  or fixture in this repo asserts an EXACT stderr line, only substring
+  containment) and catch the failure via `||` on the `exec` itself.
+  Before shipping any new bare `exec <N>{<,>} file` fd-management site,
+  grep the same file for every OTHER site using the pattern and confirm a
+  live run's stderr still carries every message emitted before AND after
+  that site — a suite that only asserts "the expected message is present
+  somewhere" cannot by itself catch "and every OTHER message after this
+  point silently vanished" the way this bug did.
