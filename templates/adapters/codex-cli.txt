@@ -1,0 +1,66 @@
+# codex-cli.txt — adapter definition for the `codex-cli` adapter (T-1055;
+# GitHub issue #203; .shell-team/specs/T-1055-adapter-envelope.md).
+#
+# Paired provider (per templates/binding-adapters.txt): codex. This
+# definition's own `adapter` value must equal this file's basename minus
+# `.txt` (DP6) and its `provider` value must equal the provider
+# templates/binding-adapters.txt registers for that adapter token. The
+# generalized invocation pattern this definition describes is the one
+# agents/codex-reviewer.md already runs: a bare-first-token
+# `codex exec --sandbox read-only --cd <repo> ...` call whose request is a
+# prompt and whose working dir is an argv value, with results returned as
+# files (an `-o` last-message capture, a JSONL event stream) and as board
+# tokens inside a verdict block the orchestrator transcribes — never
+# written to the board by this adapter itself.
+#
+# Declarative only: every value below is a bare token. Nothing here is a
+# command string, an argv list, an environment assignment or a path to an
+# executable; the concrete invocation shape is prose in
+# docs/loop-engineering/task-envelope.md, never a value in this file.
+#
+# effort capability — MEASURED, not guessed (DP7), 2026-08-10:
+# `codex --version` reports `codex-cli 0.145.0`. The Codex CLI has no
+# dedicated `--effort`/`--reasoning` flag (absent from `codex --help` and
+# `codex exec --help`); the per-invocation mechanism is its generic config
+# override, `-c model_reasoning_effort=<value>` (confirmed present and
+# already set to `high` in this machine's own `~/.codex/config.toml`). The
+# CLI itself performs no client-side validation of the value — passing a
+# deliberately invalid one (`-c model_reasoning_effort=not-a-real-value`)
+# reached the provider and was refused there, with the API's own error
+# message enumerating the complete accepted set:
+#   [ReasoningEffortParam] [reasoning.effort] [invalid_enum_value] Invalid
+#   value: 'not-a-real-value'. Supported values are: 'none', 'minimal',
+#   'low', 'medium', 'high', 'xhigh', and 'max'.
+# Those seven values are transcribed verbatim below. See the contract
+# document's "Effort mechanism measurements" section for the full
+# transcript and command.
+
+adapter codex-cli
+provider codex
+adapter-version 1
+envelope-schema 1
+
+carries task-id prompt
+carries role prompt
+carries phase prompt
+carries request prompt
+carries artifact-paths prompt
+carries working-dir argv
+carries resolved-binding argv
+carries status exit-status
+carries verdict file
+carries produced-artifacts file
+carries board-transition file
+carries usage file
+carries error-class stderr
+carries adapter-version file
+
+capability effort supported
+effort-mechanism cli-config-override
+effort-value none
+effort-value minimal
+effort-value low
+effort-value medium
+effort-value high
+effort-value xhigh
+effort-value max

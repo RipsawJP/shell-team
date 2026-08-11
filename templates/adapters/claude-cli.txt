@@ -1,0 +1,59 @@
+# claude-cli.txt — adapter definition for the `claude-cli` adapter (T-1055;
+# GitHub issue #203; .shell-team/specs/T-1055-adapter-envelope.md).
+#
+# Paired provider (per templates/binding-adapters.txt): claude. This
+# definition's own `adapter` value must equal this file's basename minus
+# `.txt` (DP6) and its `provider` value must equal the provider
+# templates/binding-adapters.txt registers for that adapter token.
+#
+# Declarative only: every value below is a bare token. Nothing here is a
+# command string, an argv list, an environment assignment or a path to an
+# executable; the concrete invocation shape (a `claude -p --output-format
+# json ...` style non-interactive CLI call) is prose in
+# docs/loop-engineering/task-envelope.md, never a value in this file.
+#
+# `carries board-transition stdout` (DP13, v2): this declares only where
+# the board-transition FIELD's own VALUE travels — this adapter's headless
+# invocation reports it on stdout, exactly like `verdict`/`usage`/
+# `produced-artifacts`. It says nothing about who may write the board:
+# that is decided solely by the bound role's `role-board-authority` row.
+# `claude-cli` binds roles of every authority (`writes`, `proposes` and
+# `none`); a `writes` role's own board edit is a side effect of that role
+# acting as itself, never a claim this adapter definition makes.
+#
+# effort capability — MEASURED, not guessed (DP7), 2026-08-10:
+# `claude --help` (Claude Code CLI v2.1.226) documents a first-class flag:
+#   --effort <level>   Effort level for the current session (low, medium,
+#                       high, xhigh, max)
+# This is a dedicated CLI flag (not a generic config override), so its
+# effort-mechanism is `cli-flag`; the five accepted values are transcribed
+# verbatim from that help text. See the contract document's "Effort
+# mechanism measurements" section for the full transcript and command.
+
+adapter claude-cli
+provider claude
+adapter-version 1
+envelope-schema 1
+
+carries task-id prompt
+carries role argv
+carries phase prompt
+carries request prompt
+carries artifact-paths prompt
+carries working-dir argv
+carries resolved-binding argv
+carries status exit-status
+carries verdict stdout
+carries produced-artifacts stdout
+carries board-transition stdout
+carries usage stdout
+carries error-class stderr
+carries adapter-version file
+
+capability effort supported
+effort-mechanism cli-flag
+effort-value low
+effort-value medium
+effort-value high
+effort-value xhigh
+effort-value max

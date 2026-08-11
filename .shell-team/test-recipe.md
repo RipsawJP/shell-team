@@ -561,3 +561,60 @@ that file's order.
   signal.SIG_DFL)` (or `SIG_IGN`, to compare) in the child BEFORE
   `os.execvp`, close the pipe's read end first, then exec into the target
   shell command with its stdout `dup2`'d onto the write end.
+- T-1055: `bash tests/check-adapter/run.sh` is `bin/check-adapter.sh`'s
+  fixture suite (the T-1055 fail-closed task-envelope contract + adapter
+  definition validator, plus its `--print-contract`/`--adapter`/
+  `--definitions`/`--contract`/`--binding` modes). No new prerequisite: pure
+  bash + git, same synthetic-fixture-in-a-scratch-dir convention as
+  `tests/check-binding/run.sh` (the two-arm `TMPDIR`-then-`$HERE` `mktemp -d
+  ... XXXXXX` idiom, no static `fixtures/` directory - this suite builds no
+  `git init` repositories). One authoring trap this suite's own fixtures
+  hit: a spec `- check:` line that asserts a `carries <field> <channel>`
+  row via a single-literal-space regex (`grep -cE "^carries $fl
+  [a-z][a-z0-9-]*$"`) means the SHIPPED definition files must themselves be
+  single-space-delimited on that directive - a visually column-aligned
+  `carries` row (extra internal whitespace for readability) reads fine to
+  the checker's own `read -r -a f` field splitting but silently fails a
+  frozen criterion's exact-single-space grep. Author every `carries` row
+  (and any other directive a frozen `- check:` line greps by fixed
+  whitespace shape) single-space from the start rather than aligning
+  columns. Measuring an executor's real effort/reasoning mechanism (DP7 of
+  `.shell-team/specs/T-1055-adapter-envelope.md`) for the Codex CLI: its
+  `--help`/`exec --help` document no dedicated `--effort` flag, only a
+  generic `-c key=value` config override with NO client-side validation -
+  passing a deliberately invalid `-c model_reasoning_effort=<garbage>`
+  value reaches the provider, which refuses it with a 400 whose message
+  enumerates the complete accepted value set verbatim; that provider-side
+  refusal message, not documentation, is the measurement. Separately: a
+  spec's own `## Blast radius` full-population diff (running
+  `bin/check-acs.sh` against every `.shell-team/specs/*.md` file at both
+  the base ref, via a disposable `git worktree add --detach`, and at HEAD)
+  takes on the order of ten-plus minutes per side on this machine - poll a
+  backgrounded run's output file for row-count growth rather than waiting
+  on a single long timeout, and NEVER launch a second background attempt
+  of the identical script "just in case" the first one's own launch looked
+  suspicious (e.g. a `nice(5) failed: operation not permitted` warning from
+  a manual `&`-backgrounding attempt) without first confirming, from the
+  output file itself, that only one instance is actually running - two
+  concurrent instances of the same script race to truncate-then-append the
+  same output file, producing silently duplicated rows for whichever specs
+  both instances processed before one finished, which is easy to miss
+  since the corruption is partial (only the early portion of the file) and
+  every individual line still looks well-formed.
+- T-1055 (round 2 / v2 rework): a doc's "canon region" delimited by a
+  marker-comment pair that itself sits inside a fenced code block (e.g.
+  `` ``` ``, then `<!-- BEGIN X -->`, content, `<!-- END X -->`, then
+  `` ``` `` again) must have the FENCE lines OUTSIDE the marker pair, not
+  inside it — an `awk` extraction keyed on the marker lines (not the fence
+  lines) captures the fence lines too if they sit between the markers,
+  which then fails a byte-identity comparison against a command's raw
+  output that never included them. Verify a marker-plus-fence layout by
+  running the actual extraction command against the first draft, not by
+  reasoning about which delimiter nests inside which. Separately: when
+  writing a NEW shape-check against another script's own canonical output
+  format (here, `bin/check-binding.sh --print-binding`'s `schema <version>`
+  line followed by N `bound` rows), re-read that format's full grammar
+  before parsing it — a check written to expect only the row type under
+  test (all lines are `bound` rows) breaks immediately against the real
+  producer's own leading `schema` line, which its own spec's `## Summarized
+  sources` already documented.
