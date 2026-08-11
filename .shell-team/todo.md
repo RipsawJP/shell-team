@@ -11,6 +11,13 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1059** Documentation: the reviewer's cross-provider property is restated as a shipped default with its rationale and its honest limits, and the release presentation gets a shipped notes template plus two procedure bullets — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1059-docs-release-notes.md
+  - source: sprint v2.0.0 feature task 7 of 7. Second half acts on GitHub issue #223 (operator-ratified 2026-08-10); no new issue was filed for it because #223 already carries the ratified rules and names this sprint's docs task as its disposition — the pull request carries `Closes #223` and the close happens at the sprint batch merge. First half has no issue of its own: it is the documentation consequence of T-1054–T-1058 making the executor binding configurable, scoped by this sprint's goal.
+  - stacked: branches from T-1058's tip; T-1053 through T-1058 tips are all ancestors. Merges in order at the sprint batch GO.
+  - freeze sweep (v1, 2026-08-11, coordinating session): all 10 check lines run live pre-implementation — 3 PASS (AC4 canonical-source identity, AC7 negative scope, AC10 blast-radius parse at population 64) / 7 deliverable-absent FAILs, each decomposed to its absence reason. The dual-candidate branch-point resolution verified: `feature/1058-telemetry` is the ref that resolves (the `-binding` candidate does not exist), and all three canonical files resolve at it. The relayed zero-executable-blast-radius claim pm-spec refuted is recorded in `.shell-team/interventions/T-1059.md`.
+  - freeze-attestation (v1, 2026-08-11): lines=10/10 sweep=mutual-satisfiability verdict=3P/7F owner=coordinating session (orchestrator)
+  - intent-hash (v1): 6df163c62176b355b16b5a9d9b8165aa77e10de9
+
 ## Done
 
 - [x] **T-1058** Telemetry: the resolved binding recorded on every span, provider relations derived at aggregation — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1058-telemetry-binding.md
