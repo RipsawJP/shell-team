@@ -759,32 +759,21 @@ that file's order.
   never from a different fixture — the shape `bin/log-run.sh`'s own
   header and this task's AC5 check already use for the identical
   invariance property.
-- T-1061: `tests/check-adopter-docs/run.sh` is the new suite (`bin/check-adopter-docs.sh`,
-  the freeze-time adopter-docs gate). Scratch-root arm: the two-arm
-  `TMPDIR`-then-`$HERE` `mktemp -d … XXXXXX` idiom, matching
-  `tests/check-refreeze-class/run.sh` / `tests/check-binding/run.sh` /
-  `tests/check-adapter/run.sh` — this suite builds no `git init` repositories,
-  so the plain scratch-dir arm is the right one. Fence-tracking probe
-  procedure (AC16(b) — do these adversarially, not just the happy path, on
-  every future edit to the fence tracker): (1) an opening fence line carrying
-  an info string (`` ```bash ``) must still open the fence — the toggle
-  applies to the run of 3+ backticks regardless of what follows on that same
-  line; (2) an unterminated fence (no closer before EOF) swallows everything
-  after it, INCLUDING a real intent-block END marker — this must surface as
-  `intent-block-missing`, never as a lucky pass that happens to ignore the
-  fence state; (3) a declaration on the line immediately after BEGIN, and one
-  on the line immediately before `## Non-goals`, are both VALID placements —
-  test both boundary lines explicitly, not just an interior one; (4) a line
-  matching the grammar inside an HTML comment (`<!-- - user-visible: ... -->`)
-  is never counted, because the anchor requires the line to START with the
-  token itself and an HTML comment's own leading `<!--` defeats that by
-  construction — no special-case code is needed, but a regression fixture
-  should still exist so a future rewrite of the anchor regex cannot
-  reintroduce the hole silently. Wiring into CI: this task's new
-  `bin/check-adopter-docs.sh` and `tests/check-adopter-docs/run.sh` are
-  shellchecked in a SECOND, separate `shellcheck (T-1061 additions)` step —
-  not appended to the pre-existing single-line `shellcheck` step — because
-  that pre-existing step is one gigantic single physical YAML line and
-  extending it in place changes its bytes, which breaks a byte-survival
-  criterion elsewhere in this task's own spec; a second step is additive and
-  keeps the original line's bytes untouched.
+- T-1061 (corrected round 3, 2026-08-12 — no suite ships): a standalone
+  checker (`bin/check-adopter-docs.sh`) and its 42-case suite
+  (`tests/check-adopter-docs/run.sh`) were built in rounds 1-2, then reverted
+  in round 3 (`git rm` — both remain recoverable from git history at commits
+  `b731f44`/`a9459e5`/`62e53aa`) when this task's own pre-commitment trigger
+  fired at Codex round 2 (two consecutive rounds of independent Majors
+  against the checker's discharge-marker scan). The mechanical gate, all
+  three rounds' findings, the fence-tracking probe procedure this entry used
+  to document, and the fixed inventories (7 positional requirements, the
+  10-token refusal set, the 42-case class inventory) are carried instead as
+  fast-follow issue **#250**'s requirement list — nothing under `bin/` or
+  `tests/` ships for T-1061, and `.github/workflows/check-handoff.yml` is
+  byte-identical to the branch point. The gate itself now ships as two prose
+  duties only (`agents/pm-spec.md`'s spec-completion self-check,
+  `skills/run/SKILL.md`'s bootstrap-freeze sweep item) plus this task's own
+  inline dogfood (AC10) — there is no test recipe to run here until #250
+  rebuilds the checker as a state machine over the fence/scope cross-product,
+  per the redesign guidance recorded in that issue.

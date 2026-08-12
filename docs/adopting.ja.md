@@ -266,25 +266,23 @@ user-visible capability には adopter-docs 用の surface が無い」ことを
 どちらかの marker を付けることは refuse される。これは `no` の宣言が
 単独で pass することと対をなす原則である。
 
-ゲートは `bin/check-adopter-docs.sh <spec.md>` である: 宣言が存在し、`yes`
-であれば discharge 済みのとき exit `0`; 宣言の欠落・不正形・重複・誤配置、
-discharge されていない obligation、空の waiver 理由、surface/waiver の
-衝突など content refusal では exit `1`; 入力そのものを評価できない場合
-（読めない spec path、解決できない intent-block marker pair）は exit `2`
-である。すべての refusal は stderr 上のトークン 1 つ・stdout は 0 バイト
-で、推測は一切しない。このチェッカーは spec が名付けた surface を
-**開かない**——resolve も validate もしない。ある surface が本当に
-adopter 向けかどうかを機械的に判定することは、reviewing gates と人間の
-役割であって、この mechanical check の役割ではない。path の allowlist を
-作れば adopter のリポジトリをこの repository のレイアウトに強制することに
-なる。このゲートはタスクの bootstrap freeze でのみ適用され、すでに記録
-済みのハッシュの re-freeze では適用されない。
-
-このコマンドに到達する実行コンテキストは 2 つある: この repository 自身の
-checkout ルートからは `bash bin/check-adopter-docs.sh <spec.md>` を実行
-する; プラグインをロードした adopter 側の repository からは、どのカレント
-ディレクトリからでも `check-adopter-docs.sh` を `PATH` 上のベア名で呼び
-出せる。
+現時点の強制は**チェッカーではなく duty** である。タスクの最初の凍結時に、
+coordinating session がこの宣言領域を自分で読み、宣言がちょうど 1 行・
+rationale が非空であることを要求し、`yes` の場合は criterion 配下の
+`- adopter-surface:` 行か非空の `- adopter-docs-waiver:` 行のいずれか一方
+（両方は不可、`no` に付けるのも不可）を要求する。それ以外は凍結を refuse
+し、spec を著者に差し戻す。**機械的なチェッカーはまだ出荷されていない。**
+一度実装したが、scan のスコープ判定に独立した欠陥が 2 ラウンド連続で
+見つかったため、T-1061 自身の pre-commitment に従って issue #250 へ切り
+出した——refuse すべき spec を pass させるゲートを出荷することは、正直な
+prose の duty を出荷することより悪い。したがって 3 回目のパッチではなく
+再設計を待つ。境界はどちらの形でも変わらない: この sweep は spec が名付け
+た surface を**開かない**——resolve も validate もしない。ある surface が
+本当に adopter 向けかどうかは reviewing gates と人間の役割であり、
+mechanical check の役割ではない。path の allowlist を作れば adopter の
+リポジトリをこの repository のレイアウトに強制することになる。この duty
+はタスクの bootstrap freeze でのみ適用され、すでに記録済みのハッシュの
+re-freeze では適用されない。
 
 ## 運用ルール
 
