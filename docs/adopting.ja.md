@@ -252,6 +252,40 @@ adapter）経由で役割が呼び出されるかは、どの役割について�
 ください — `team-init` はそれを自動で追加しません（`CLAUDE.md` に一切手を触れない）。
 ルーティングポリシーを採用するかどうかはあなたの判断です。
 
+## adopter 向けドキュメントの宣言
+
+T-1061 以降に凍結するすべての spec は、凍結された intent block 内の 1 行で、
+その deliverable が **user-visible capability**（adopter に見える機能）か
+どうかを宣言する: トップレベルの bullet `- user-visible: yes — <rationale>`
+または `- user-visible: no — <rationale>`。`yes` の宣言は次の 2 通りの
+いずれか一方でのみ discharge される: acceptance criterion 側に indent
+された `- adopter-surface: <ドキュメントの置き場所>` 行を持たせるか、spec
+側にトップレベルの `- adopter-docs-waiver: <reason>` 行を持たせて「この
+user-visible capability には adopter-docs 用の surface が無い」ことを
+明示する——これは回避策ではなく、一級の結果である。`no` の宣言に対して
+どちらかの marker を付けることは refuse される。これは `no` の宣言が
+単独で pass することと対をなす原則である。
+
+ゲートは `bin/check-adopter-docs.sh <spec.md>` である: 宣言が存在し、`yes`
+であれば discharge 済みのとき exit `0`; 宣言の欠落・不正形・重複・誤配置、
+discharge されていない obligation、空の waiver 理由、surface/waiver の
+衝突など content refusal では exit `1`; 入力そのものを評価できない場合
+（読めない spec path、解決できない intent-block marker pair）は exit `2`
+である。すべての refusal は stderr 上のトークン 1 つ・stdout は 0 バイト
+で、推測は一切しない。このチェッカーは spec が名付けた surface を
+**開かない**——resolve も validate もしない。ある surface が本当に
+adopter 向けかどうかを機械的に判定することは、reviewing gates と人間の
+役割であって、この mechanical check の役割ではない。path の allowlist を
+作れば adopter のリポジトリをこの repository のレイアウトに強制することに
+なる。このゲートはタスクの bootstrap freeze でのみ適用され、すでに記録
+済みのハッシュの re-freeze では適用されない。
+
+このコマンドに到達する実行コンテキストは 2 つある: この repository 自身の
+checkout ルートからは `bash bin/check-adopter-docs.sh <spec.md>` を実行
+する; プラグインをロードした adopter 側の repository からは、どのカレント
+ディレクトリからでも `check-adopter-docs.sh` を `PATH` 上のベア名で呼び
+出せる。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。
