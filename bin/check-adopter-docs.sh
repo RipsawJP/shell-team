@@ -40,6 +40,37 @@
 # line up to and including a matching-or-longer-run CLOSER (0-3-space-indented,
 # nothing but trailing whitespace after the run) is inert.
 #
+# Discharge-marker SCOPE (T-1061 round-1 rework, Codex Major #1): both markers
+# are read only from INSIDE the frozen intent block (strictly between the
+# BEGIN and END markers) — a well-formed marker sitting in mutable prose after
+# END (a `## Notes for engineer` example, an `## Assumptions` aside) is
+# invisible, exactly as if absent, because it is not part of what the freeze
+# actually hashes. `- adopter-surface:` is read only when it is an indented
+# continuation line immediately nested under a real, unindented
+# `- [ ] **ACn**`-shaped bullet — "an acceptance criterion carries an indented
+# ... line", never a floating indented line anywhere else in the block. Scope
+# tracking is a small state machine mirroring this repo's own board-entry
+# continuation canon (`bin/check-intent.sh`'s extract_task_records): an
+# indented, non-blank line keeps the current AC scope open (and is checked for
+# a surface match while that scope is open); a blank line is neutral and
+# changes nothing; any other non-indented, non-blank line closes the current
+# scope first and opens a new one only if that same line is itself an
+# AC-bullet. `- adopter-docs-waiver:` needs no such nesting (the Goal's own
+# words are "the spec carries a top-level ... line") — only the intent-block
+# window applies to it. A fenced line participates in neither scope tracking
+# nor matching (skipped outright), the same universal inertness every other
+# element in this file already gets.
+#
+# Discharge-marker VALUE RETENTION (T-1061 round-1 rework, Codex Major #2):
+# both `- adopter-surface:` and `- adopter-docs-waiver:` are legal to occur
+# more than once in scope (this spec ships no duplicate-marker refusal token
+# for either — multiple criteria may each carry their own surface, and this
+# script never judges which one is "the real" documentation). Discharge is
+# therefore "at least one IN-SCOPE occurrence carries a non-whitespace value",
+# never "the first occurrence's value" — a value is read and trimmed AT EACH
+# occurrence as the scan proceeds, so the verdict does not depend on which
+# occurrence happens to come first in the file.
+#
 # Usage:
 #   check-adopter-docs.sh [--] <spec.md>
 #     Read <spec.md>'s frozen intent block for the declaration above. Exit 0
@@ -328,30 +359,59 @@ case "$DECL_VALUE" in
 esac
 [ -n "$rationale" ] || refuse declaration-malformed 1
 
-# --- 5. discharge markers: search the WHOLE FILE (fence-aware) for the two
-# marker shapes — `- adopter-docs-waiver:` (top-level / unindented) and
-# `- adopter-surface:` (indented, under an acceptance criterion) ------------
+# --- 5. discharge markers: scoped to INSIDE the intent block only (strictly
+# between BEGIN and END), fence-aware throughout. `- adopter-docs-waiver:` is
+# top-level (unindented); `- adopter-surface:` is read only when nested,
+# as an indented continuation line, directly under a real AC-bullet-shaped
+# line — never a bare whole-file scan (T-1061 round-1 rework, Major #1).
+# Value retention is "any in-scope occurrence has a non-whitespace value",
+# never "the first occurrence's value" (Major #2) — applied identically to
+# both markers, since both are legal to occur more than once.
 WAIVER_RE='^- adopter-docs-waiver:(.*)$'
 SURFACE_RE='^[[:space:]]+- adopter-surface:(.*)$'
+# AC_BULLET_RE mirrors bin/check-acs.sh's own CANDIDATE_RE shape
+# (`^- \[[ xX]\] \*\*AC`) — a column-0 "is this AC-bullet-shaped at all" test,
+# deliberately permissive (this script never re-validates the bullet's own
+# grammar; it only needs to know a surface line sits under something that at
+# least LOOKS like an acceptance criterion, per the Goal's own wording).
+AC_BULLET_RE='^- \[[ xX]\] \*\*AC'
+INDENT_NONBLANK_RE='^[[:space:]]+[^[:space:]]'
+BLANK_RE='^[[:space:]]*$'
 
 waiver_count=0
-waiver_value=""
+waiver_has_value=0
 surface_count=0
-surface_value=""
-i=1
-while [ "$i" -le "$NLINES" ]; do
-  if [ "${FENCED[i]}" -eq 0 ]; then
-    if [[ "${LINES[i]}" =~ $WAIVER_RE ]]; then
-      waiver_count=$((waiver_count + 1))
-      if [ "$waiver_count" -eq 1 ]; then
-        waiver_value="${BASH_REMATCH[1]}"
-      fi
-    fi
-    if [[ "${LINES[i]}" =~ $SURFACE_RE ]]; then
+surface_has_value=0
+in_ac=0
+i=$((begin_ln + 1))
+while [ "$i" -lt "$end_ln" ]; do
+  if [ "${FENCED[i]}" -eq 1 ]; then
+    i=$((i + 1))
+    continue
+  fi
+  line="${LINES[i]}"
+  if [[ "$line" =~ $BLANK_RE ]]; then
+    : # neutral: a blank line changes neither in_ac nor anything else
+  elif [[ "$line" =~ $INDENT_NONBLANK_RE ]]; then
+    # An indented, non-blank line is the ONLY thing that keeps an AC scope
+    # open — mirroring bin/check-intent.sh's own board-entry continuation
+    # canon. Only checked for a surface match while that scope is open.
+    if [ "$in_ac" -eq 1 ] && [[ "$line" =~ $SURFACE_RE ]]; then
       surface_count=$((surface_count + 1))
-      if [ "$surface_count" -eq 1 ]; then
-        surface_value="${BASH_REMATCH[1]}"
-      fi
+      val="$(trim "${BASH_REMATCH[1]}")"
+      [ -n "$val" ] && surface_has_value=1
+    fi
+  else
+    # Any other non-indented, non-blank line closes any open AC scope first,
+    # then opens a new one only if the SAME line is itself AC-bullet-shaped.
+    in_ac=0
+    if [[ "$line" =~ $AC_BULLET_RE ]]; then
+      in_ac=1
+    fi
+    if [[ "$line" =~ $WAIVER_RE ]]; then
+      waiver_count=$((waiver_count + 1))
+      val="$(trim "${BASH_REMATCH[1]}")"
+      [ -n "$val" ] && waiver_has_value=1
     fi
   fi
   i=$((i + 1))
@@ -372,14 +432,12 @@ if [ "$waiver_count" -ge 1 ] && [ "$surface_count" -ge 1 ]; then
 fi
 
 if [ "$waiver_count" -ge 1 ]; then
-  waiver_reason="$(trim "$waiver_value")"
-  [ -n "$waiver_reason" ] || refuse waiver-reason-empty 1
+  [ "$waiver_has_value" -eq 1 ] || refuse waiver-reason-empty 1
   exit 0
 fi
 
 if [ "$surface_count" -ge 1 ]; then
-  surface_val="$(trim "$surface_value")"
-  [ -n "$surface_val" ] || refuse obligation-undischarged 1
+  [ "$surface_has_value" -eq 1 ] || refuse obligation-undischarged 1
   exit 0
 fi
 

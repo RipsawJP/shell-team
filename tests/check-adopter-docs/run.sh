@@ -37,6 +37,16 @@
 #                         comment (never counted — the anchor requires the
 #                         line to START with the token, which an HTML
 #                         comment's own leading `<!--` defeats)
+#   cad-scope-*          — round-1 rework (Codex Major #1, class-closure):
+#                         discharge markers outside the intent block (a
+#                         '## Notes for engineer' / '## Assumptions' example,
+#                         surface and waiver each), and a surface line inside
+#                         the block but not nested under any AC-bullet-shaped
+#                         line — none of these discharge
+#   cad-order-*          — round-1 rework (Codex Major #2, class-closure):
+#                         two in-scope occurrences of the same marker, one
+#                         blank and one valid, in both orders — surface and
+#                         waiver each — the verdict must not depend on order
 #   cad-dogfood          — this task's own spec passes with zero output
 
 set -euo pipefail
@@ -309,6 +319,84 @@ UNTERMINATED="$TMP/unterminated.md"
   printf 'Goal prose.\n\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** placeholder\n\n## Input space\n\nnot applicable.\n\n<!-- END intent-block: T-999 -->\n'
 } > "$UNTERMINATED"
 assert_case "cad-fence-unterminated" 2 intent-block-missing "$UNTERMINATED"
+
+# --- round-1 rework regressions (Codex Major #1 + #2, class-closure) --------------
+# Major #1 (Codex-reproduced): a bare AC with no discharge, plus an UNFENCED
+# example line sitting in '## Notes for engineer' (outside the intent block,
+# after the END marker) must NOT discharge — the whole-file scan the round-1
+# checker used could see it; the scoped scan must not.
+NOTES_SURFACE="$TMP/notes-surface.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf 'Goal prose.\n\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** placeholder\n\n## Input space\n\nnot applicable.\n\n<!-- END intent-block: T-999 -->\n\n## Notes for engineer\n\nIllustrative metadata:\n  - adopter-surface: docs/adopting.md\n'
+} > "$NOTES_SURFACE"
+assert_case "cad-scope-notes-unfenced-surface" 1 obligation-undischarged "$NOTES_SURFACE"
+
+# Same class, waiver side (Codex adversarial pass confirmed this independently):
+# a top-level waiver line after END must likewise not discharge.
+NOTES_WAIVER="$TMP/notes-waiver.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf 'Goal prose.\n\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** placeholder\n\n## Input space\n\nnot applicable.\n\n<!-- END intent-block: T-999 -->\n\n## Assumptions\n\n- adopter-docs-waiver: this line is prose, not a discharge\n'
+} > "$NOTES_WAIVER"
+assert_case "cad-scope-notes-unfenced-waiver" 1 obligation-undischarged "$NOTES_WAIVER"
+
+# Class-closure: a surface line that IS inside the intent block, and IS
+# indented, but is NOT nested under any AC-bullet-shaped line (it sits right
+# after the '## Acceptance criteria' heading, before AC1) must not discharge —
+# "an acceptance criterion carries" the line, per the Goal's own wording.
+NOT_UNDER_AC="$TMP/not-under-ac.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf 'Goal prose.\n\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n  - adopter-surface: docs/adopting.md\n\n- [ ] **AC1** placeholder\n\n## Input space\n\nnot applicable.\n\n<!-- END intent-block: T-999 -->\n'
+} > "$NOT_UNDER_AC"
+assert_case "cad-scope-surface-not-under-ac" 1 obligation-undischarged "$NOT_UNDER_AC"
+
+# Major #2 (Codex-reproduced): two AC-nested surface lines, one blank and one
+# valid — the verdict must be the SAME (a clean PASS) regardless of which one
+# comes first. Both orders are asserted, matching the reviewer's own two-order
+# fixture pair.
+ORDER_A="$TMP/order-a.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf 'Goal prose.\n\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** first\n  - adopter-surface:\n\n- [ ] **AC2** second\n  - adopter-surface: docs/adopting.md\n\n## Input space\n\nnot applicable.\n\n<!-- END intent-block: T-999 -->\n'
+} > "$ORDER_A"
+assert_case "cad-order-surface-blank-then-valid" 0 "" "$ORDER_A"
+
+ORDER_B="$TMP/order-b.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf 'Goal prose.\n\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** first\n  - adopter-surface: docs/adopting.md\n\n- [ ] **AC2** second\n  - adopter-surface:\n\n## Input space\n\nnot applicable.\n\n<!-- END intent-block: T-999 -->\n'
+} > "$ORDER_B"
+assert_case "cad-order-surface-valid-then-blank" 0 "" "$ORDER_B"
+
+# Same class-closure audit, applied to waiver (two top-level waiver lines in
+# scope, one blank and one valid, both orders) — the spec ships no
+# duplicate-waiver refusal token either, so the same any-valid semantics apply.
+WAIVER_ORDER_A="$TMP/waiver-order-a.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf -- '- adopter-docs-waiver:\n\n'
+  printf -- '- adopter-docs-waiver: this repository ships no adopter-readable surface\n\n'
+  body ""
+} > "$WAIVER_ORDER_A"
+assert_case "cad-order-waiver-blank-then-valid" 0 "" "$WAIVER_ORDER_A"
+
+WAIVER_ORDER_B="$TMP/waiver-order-b.md"
+{
+  head_
+  printf -- '- user-visible: yes — ships a new command\n\n'
+  printf -- '- adopter-docs-waiver: this repository ships no adopter-readable surface\n\n'
+  printf -- '- adopter-docs-waiver:\n\n'
+  body ""
+} > "$WAIVER_ORDER_B"
+assert_case "cad-order-waiver-valid-then-blank" 0 "" "$WAIVER_ORDER_B"
 
 # --- dogfood: this task's own spec ------------------------------------------------
 SELF_SPEC="$REPO_ROOT/.shell-team/specs/T-1061-adopter-docs-gate.md"
