@@ -759,3 +759,32 @@ that file's order.
   never from a different fixture — the shape `bin/log-run.sh`'s own
   header and this task's AC5 check already use for the identical
   invariance property.
+- T-1061: `tests/check-adopter-docs/run.sh` is the new suite (`bin/check-adopter-docs.sh`,
+  the freeze-time adopter-docs gate). Scratch-root arm: the two-arm
+  `TMPDIR`-then-`$HERE` `mktemp -d … XXXXXX` idiom, matching
+  `tests/check-refreeze-class/run.sh` / `tests/check-binding/run.sh` /
+  `tests/check-adapter/run.sh` — this suite builds no `git init` repositories,
+  so the plain scratch-dir arm is the right one. Fence-tracking probe
+  procedure (AC16(b) — do these adversarially, not just the happy path, on
+  every future edit to the fence tracker): (1) an opening fence line carrying
+  an info string (`` ```bash ``) must still open the fence — the toggle
+  applies to the run of 3+ backticks regardless of what follows on that same
+  line; (2) an unterminated fence (no closer before EOF) swallows everything
+  after it, INCLUDING a real intent-block END marker — this must surface as
+  `intent-block-missing`, never as a lucky pass that happens to ignore the
+  fence state; (3) a declaration on the line immediately after BEGIN, and one
+  on the line immediately before `## Non-goals`, are both VALID placements —
+  test both boundary lines explicitly, not just an interior one; (4) a line
+  matching the grammar inside an HTML comment (`<!-- - user-visible: ... -->`)
+  is never counted, because the anchor requires the line to START with the
+  token itself and an HTML comment's own leading `<!--` defeats that by
+  construction — no special-case code is needed, but a regression fixture
+  should still exist so a future rewrite of the anchor regex cannot
+  reintroduce the hole silently. Wiring into CI: this task's new
+  `bin/check-adopter-docs.sh` and `tests/check-adopter-docs/run.sh` are
+  shellchecked in a SECOND, separate `shellcheck (T-1061 additions)` step —
+  not appended to the pre-existing single-line `shellcheck` step — because
+  that pre-existing step is one gigantic single physical YAML line and
+  extending it in place changes its bytes, which breaks a byte-survival
+  criterion elsewhere in this task's own spec; a second step is additive and
+  keeps the original line's bytes untouched.
