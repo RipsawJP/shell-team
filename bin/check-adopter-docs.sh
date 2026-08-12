@@ -105,8 +105,16 @@ set -euo pipefail
 # resolve to the symlink's directory rather than this file's real location.
 # Ported (bootstrap shape) from bin/check-intent.sh / bin/check-interventions.sh
 # (2026-07-14 lesson: reuse the proven symlink-safe resolver instead of
-# hand-rolling one). This script has no sibling script to call; SELF is used
-# only to source --help's text from this file's own header comment.
+# hand-rolling one) — with one deliberate departure from that ported shape:
+# every `pwd` below is `pwd -P` (physical, every symlink resolved), never the
+# bare logical `pwd` the ported original used, matching the repo's own more
+# recent convention (`bin/check-binding.sh`, `bin/resolve-executor.sh`): a
+# plain `cd && pwd` only follows a symlink on the FINAL path component, so an
+# ANCESTOR directory being a symlink (an adopter's `bin/` symlinked into the
+# plugin's real `bin/`) survives untouched and this script's own directory
+# could silently resolve inside the wrong tree. This script has no sibling
+# script to call; SELF is used only to source --help's text from this file's
+# own header comment.
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")" \
@@ -116,7 +124,7 @@ while [ -L "$script_path" ]; do
     *)
       link_dir_raw="$(dirname "$script_path")" \
         || { printf 'usage\n' >&2 || true; exit 2; }
-      link_dir="$(cd "$link_dir_raw" && pwd)" \
+      link_dir="$(cd "$link_dir_raw" && pwd -P)" \
         || { printf 'usage\n' >&2 || true; exit 2; }
       script_path="$link_dir/$link_target"
       ;;
@@ -124,7 +132,7 @@ while [ -L "$script_path" ]; do
 done
 script_dir_raw="$(dirname "$script_path")" \
   || { printf 'usage\n' >&2 || true; exit 2; }
-SCRIPT_DIR="$(cd "$script_dir_raw" && pwd)" \
+SCRIPT_DIR="$(cd "$script_dir_raw" && pwd -P)" \
   || { printf 'usage\n' >&2 || true; exit 2; }
 self_name="$(basename "$script_path")" \
   || { printf 'usage\n' >&2 || true; exit 2; }
