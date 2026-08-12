@@ -11,7 +11,13 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1060** Adopter-facing documentation for the executor binding config: the capability, the three-step how-to, and its honest boundary, on all four adopter surfaces — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1060-adopter-binding-docs.md
+### Local test result
+`bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
+
+## Done
+
+- [x] **T-1060** Adopter-facing documentation for the executor binding config: the capability, the three-step how-to, and its honest boundary, on all four adopter surfaces — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1060-adopter-binding-docs.md
+  - closed: 2026-08-12, PR #246 → develop, closes #244 — sprint v2.0.1 task 1 of 5; merges at the sprint batch GO; both gates green at round 9 (QA PASS x6, Codex APPROVE); frozen intent v5 after two operator-ratified re-freezes plus the v1 bootstrap
   - source: GitHub issue **#244** (operator-framed, release-completing: "a major version whose core capability is not shown to humans has shipped effectively nothing"). No new issue was filed for the task itself — #244 is the tracker item and this is its whole scope minus requirement 4, which #244 itself assigns to a separate task. Sprint v2.0.1 feature task 1.
   - stacked: **first task of sprint v2.0.1**, so it branches directly from `develop` at `d01ab30` and that commit **is** the merge base — no predecessor tips, and every base-side read in the spec resolves unambiguously through `git merge-base develop HEAD`. Branch `feature/1060-adopter-binding-docs`; PR base `develop`; the PR stays open and merges at the sprint batch GO.
   - the problem in one sentence: v2.0.0 shipped a host-authored executor binding (`check-binding.sh`, `resolve-executor.sh`, an inert `<base>/binding.conf.example` written by `team-init`, two adapter definitions declaring their own effort vocabularies) and **no adopter-facing surface documents any of it** — `README.md` names `binding.conf` only inside the reviewer design-choices bullet, and `docs/adopting.md` neither mentions it nor lists the specimen in its `<base>/` tree.
@@ -234,10 +240,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - **Anchors**: `#236`, `#245`, `invocation path`/`呼び出し経路`, `telemetry`/`テレメトリ`, `shipped default`/`出荷時の既定` present ≥1 on all four surfaces; `blind spot`/`盲点` — **zero** on all four. Zero fenced-block-opening lines in both README sections. Heading counts unchanged (README 14/14, adopting 6/6). Bilingual semantics equivalent — confirmed via the same exact-match transcription check, which by construction verifies both languages carry the identical drafted content.
   - **Discipline**: `git status --short` clean at finish; all reads via direct file/`git show`/`git diff` and scratch under `${TMPDIR}`; no destructive git command; no commits amended. `bash bin/check-provenance.sh` → conformant, 11 entries (unchanged, correctly — pure transcription). `bash bin/check-interventions.sh` → conformant, 4 entries (unchanged from round 8).
   - Risk notes for reviewer, disclosed (non-blocking, spec-internal only): the `## Round-9 design input`'s "Population and method" section states `skills/review/SKILL.md (10 lines)` and `skills/loop-triage/SKILL.md` (69 lines) in its narration; independently measured both at one line fewer each (9 and 68 respectively, via `cat -n`/`wc -l`). This is an off-by-one in the design input's own descriptive prose (outside the intent block, no `- check:` line, does not affect the truth table's actual verdicts — which I independently re-derived and confirmed accurate regardless of the exact line count) — same class as the previously-disclosed "line 208" and DP4 staleness items, recommended for the same batched editorial pass.
-### Local test result
-`bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
-
-## Done
 
 - [x] **T-1059** Documentation: the reviewer's cross-provider property is restated as a shipped default with its rationale and its honest limits, and the release presentation gets a shipped notes template plus two procedure bullets — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1059-docs-release-notes.md
   - closed: 2026-08-11, PR #241 → develop, closes #223 — sprint v2.0.0 feature task 7 of 7 — the sprint's last; both gates green (QA round-2 PASS, Codex round-2 APPROVE); merges at the sprint batch GO after PR 239; the retro rides this branch
