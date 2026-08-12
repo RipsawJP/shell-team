@@ -248,6 +248,38 @@ chat, copy the opt-in routing block from
 into your repo's `CLAUDE.md` — `team-init` does not add it for you (it never
 touches your `CLAUDE.md`); whether to adopt the routing policy is your call.
 
+## Declaring adopter-facing documentation
+
+Every spec frozen from T-1061 onward declares, on one line inside its own
+frozen intent block, whether its deliverable is a **user-visible capability**:
+a top-level bullet `- user-visible: yes — <rationale>` or
+`- user-visible: no — <rationale>`. A `yes` declaration is discharged in
+exactly one of two ways: an acceptance criterion carries an indented
+`- adopter-surface: <where the documentation lands>` line, or the spec
+carries a top-level `- adopter-docs-waiver: <reason>` line for a
+user-visible capability with no adopter-docs surface — a first-class
+outcome, not a workaround. Carrying either marker beside a `no` declaration
+is refused, on the same footing as a `no` declaration passing on its own.
+
+`bin/check-adopter-docs.sh <spec.md>` is the gate: it exits `0` when the
+declaration is present and, for `yes`, discharged; it exits `1` for a
+content refusal (a missing, malformed, duplicated or misplaced
+declaration, an undischarged obligation, an empty waiver reason, or a
+surface/waiver conflict); it exits `2` when the input itself could not be
+evaluated (an unreadable spec path, or no resolvable intent-block marker
+pair). Every refusal is one token on stderr with zero bytes on stdout,
+never a guess. The checker **does not open**, resolve or validate the
+surface a spec names — whether a named surface is really adopter-facing is
+a matter for the reviewing gates and the human, never for this mechanical
+check; a path allowlist would coerce every adopter's repository into this
+one's layout. The gate runs at a task's bootstrap freeze only, never at a
+re-freeze of an already-recorded hash.
+
+Two execution contexts both reach for this command: from this repository's
+own checkout root, run `bash bin/check-adopter-docs.sh <spec.md>`; from an
+adopter's own repository with the plugin loaded, `check-adopter-docs.sh` is
+reached by bare name from `PATH`, from any working directory.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
