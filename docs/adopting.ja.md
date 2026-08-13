@@ -252,6 +252,38 @@ adapter）経由で役割が呼び出されるかは、どの役割について�
 ください — `team-init` はそれを自動で追加しません（`CLAUDE.md` に一切手を触れない）。
 ルーティングポリシーを採用するかどうかはあなたの判断です。
 
+## adopter 向けドキュメントの宣言
+
+T-1061 以降に凍結するすべての spec は、凍結された intent block 内の 1 行で、
+その deliverable が **user-visible capability**（adopter に見える機能）か
+どうかを宣言する: トップレベルの bullet `- user-visible: yes — <rationale>`
+または `- user-visible: no — <rationale>`。`yes` の宣言は次の 2 通りの
+いずれか一方でのみ discharge される: acceptance criterion 側に indent
+された `- adopter-surface: <ドキュメントの置き場所>` 行を持たせるか、spec
+側にトップレベルの `- adopter-docs-waiver: <reason>` 行を持たせて「この
+user-visible capability には adopter-docs 用の surface が無い」ことを
+明示する——これは回避策ではなく、一級の結果である。`no` の宣言に対して
+どちらかの marker を付けることは refuse される。これは `no` の宣言が
+単独で pass することと対をなす原則である。
+
+現時点の強制は**チェッカーではなく duty** である。タスクの最初の凍結時に、
+coordinating session がこの宣言領域を自分で読み、宣言がちょうど 1 行・
+rationale が非空であることを要求し、`yes` の場合は criterion 配下の
+`- adopter-surface:` 行か非空の `- adopter-docs-waiver:` 行のいずれか一方
+（両方は不可、`no` に付けるのも不可）を要求する。それ以外は凍結を refuse
+し、spec を著者に差し戻す。**機械的なチェッカーはまだ出荷されていない。**
+一度実装したが、scan のスコープ判定に独立した欠陥が 2 ラウンド連続で
+見つかったため、T-1061 自身の pre-commitment に従って issue #250 へ切り
+出した——refuse すべき spec を pass させるゲートを出荷することは、正直な
+prose の duty を出荷することより悪い。したがって 3 回目のパッチではなく
+再設計を待つ。境界はどちらの形でも変わらない: この sweep は spec が名付け
+た surface を**開かない**——resolve も validate もしない。ある surface が
+本当に adopter 向けかどうかは reviewing gates と人間の役割であり、
+mechanical check の役割ではない。path の allowlist を作れば adopter の
+リポジトリをこの repository のレイアウトに強制することになる。この duty
+はタスクの bootstrap freeze でのみ適用され、すでに記録済みのハッシュの
+re-freeze では適用されない。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。

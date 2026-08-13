@@ -42,6 +42,7 @@ contain interventions-classes.md          bin/check-interventions.sh skills/run/
 contain liveness-declaration.md           skills/run/SKILL.md skills/goal/SKILL.md
 contain executor-resolution.md            skills/run/SKILL.md skills/goal/SKILL.md
 contain telemetry-binding.md              skills/run/SKILL.md skills/goal/SKILL.md
+contain adopter-docs-declaration.md       agents/pm-spec.md skills/run/SKILL.md
 marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
 marker  playbook-engineer.md               agents/engineer.md
 marker  playbook-qa-verifier.md            agents/qa-verifier.md

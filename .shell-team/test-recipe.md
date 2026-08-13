@@ -759,3 +759,21 @@ that file's order.
   never from a different fixture — the shape `bin/log-run.sh`'s own
   header and this task's AC5 check already use for the identical
   invariance property.
+- T-1061 (corrected round 3, 2026-08-12 — no suite ships): a standalone
+  checker (`bin/check-adopter-docs.sh`) and its 42-case suite
+  (`tests/check-adopter-docs/run.sh`) were built in rounds 1-2, then reverted
+  in round 3 (`git rm` — both remain recoverable from git history at commits
+  `b731f44`/`a9459e5`/`62e53aa`) when this task's own pre-commitment trigger
+  fired at Codex round 2 (two consecutive rounds of independent Majors
+  against the checker's discharge-marker scan). The mechanical gate, all
+  three rounds' findings, the fence-tracking probe procedure this entry used
+  to document, and the fixed inventories (7 positional requirements, the
+  10-token refusal set, the 42-case class inventory) are carried instead as
+  fast-follow issue **#250**'s requirement list — nothing under `bin/` or
+  `tests/` ships for T-1061, and `.github/workflows/check-handoff.yml` is
+  byte-identical to the branch point. The gate itself now ships as two prose
+  duties only (`agents/pm-spec.md`'s spec-completion self-check,
+  `skills/run/SKILL.md`'s bootstrap-freeze sweep item) plus this task's own
+  inline dogfood (AC10) — there is no test recipe to run here until #250
+  rebuilds the checker as a state machine over the fence/scope cross-product,
+  per the redesign guidance recorded in that issue.

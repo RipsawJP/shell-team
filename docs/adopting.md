@@ -248,6 +248,38 @@ chat, copy the opt-in routing block from
 into your repo's `CLAUDE.md` — `team-init` does not add it for you (it never
 touches your `CLAUDE.md`); whether to adopt the routing policy is your call.
 
+## Declaring adopter-facing documentation
+
+Every spec frozen from T-1061 onward declares, on one line inside its own
+frozen intent block, whether its deliverable is a **user-visible capability**:
+a top-level bullet `- user-visible: yes — <rationale>` or
+`- user-visible: no — <rationale>`. A `yes` declaration is discharged in
+exactly one of two ways: an acceptance criterion carries an indented
+`- adopter-surface: <where the documentation lands>` line, or the spec
+carries a top-level `- adopter-docs-waiver: <reason>` line for a
+user-visible capability with no adopter-docs surface — a first-class
+outcome, not a workaround. Carrying either marker beside a `no` declaration
+is refused, on the same footing as a `no` declaration passing on its own.
+
+Enforcement today is a **duty, not a checker**. At a task's first freeze
+the coordinating session reads that declaration region itself, requires
+exactly one declaration with a non-empty rationale, and — for `yes` —
+requires either the `- adopter-surface:` line under a criterion or a
+non-empty `- adopter-docs-waiver:`, never both and never either beside a
+`no`; anything else refuses the freeze and routes the spec back to its
+author. **no mechanical checker ships for it yet.** One was built and
+then carved out to issue #250 under T-1061's own pre-commitment, after
+two consecutive review rounds found independent defects in its
+scan-scoping logic; shipping a gate that passes a spec it should refuse
+is worse than shipping an honest prose duty, so the mechanism waits for a
+redesign rather than a third patch. The boundary is unchanged in either
+form: the sweep **does not open**, resolve or validate the surface a spec
+names — whether a named surface is really adopter-facing is a matter for
+the reviewing gates and the human, never for a mechanical check, and a
+path allowlist would coerce every adopter's repository into this one's
+layout. The duty applies at a task's bootstrap freeze only, never at a
+re-freeze of an already-recorded hash.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
