@@ -800,3 +800,18 @@ that file's order.
   naive positional pairing of duplicate-labelled rows between two runs can
   produce spurious differences unless the verdicts are paired by matching
   value (not by row order) before comparing.
+- T-1064: a delta on the T-1056 and T-1057 entries above, not a restatement
+  of them. `bin/check-durability.sh` resolves its registry from its own
+  script directory (`$SCRIPT_DIR/..` → `templates/durability-records.txt`)
+  and its path resolver from the same directory (`$SCRIPT_DIR/team-paths.sh`),
+  failing `structural` on either — so a scratch copy of the checker alone is
+  unusable by construction, and the fixture shape is the scratch "install"
+  the T-1056 entry above already prescribes for `bin/check-liveness.sh`: the
+  script plus `bin/team-paths.sh` under a scratch `bin/`, with
+  `templates/durability-records.txt` beside it. The `--records` flag is
+  documented in the script's own header as a testing affordance for the
+  malformed-registry case; pointing a scratch copy at a real registry with
+  it bypasses the resolution path the shipped invocation takes, so it
+  proves nothing about the resolver and is not the workaround to reach for.
+  The ancestor-symlink property of this same resolver is covered by the
+  T-1057 entry above (issue #218) and is not restated here.
