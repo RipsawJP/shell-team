@@ -4,6 +4,12 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.0.1**
+  - **binding config のドキュメントが、読者が探す場所に着地した。** 両 README に executor アサイン機能の存在と正典ドキュメントの所在を示すポインタ節が追加され、adopting ガイド（英日）が単一の正典 how-to になった — 設定文法の実例、誤設定が到達しうる全拒否、有効な effort 値、rebind が変えるもの・変えないものの 2 軸境界まで。
+  - **ユーザー可視の変更は、凍結時点で adopter 向けドキュメントを宣言するようになった。** 新しい spec は理由つきの `user-visible` 宣言を必ず持ち、`yes` はドキュメントの着地面の名指し（または明示的な waiver）を追加で要求し、満たさない凍結は拒否される — 出荷される機能がドキュメントを黙ってスコープアウトしたままリリースに到達することはもうできない。
+  - **リリースノート template の compare link が正しい範囲を指すようになった。** `Full changelog` の compare URL は前リリースのタグと新リリースのタグを取る — 起草者が気づく必要のあったプレースホルダのペアではなく。
+  - **出荷済みの文章が、それが記述する機構と一致するようになった。** 出荷済み prompt・skill・docs・記録の正確性一括修正: durability 確認は board タスク不在時に（再パラメータ化でなく）スキップされることを明記し、テストレシピは durability checker の scratch コピーが必要とする 2 つの sibling を記録し、oversight ページは instantiation list の境界を決定し（列挙パスは機構的に強制される面であり、助言的な指示ソースも基準の届く範囲として名指しされる）、grep-scope 規約は `git grep` の実際の symlink 挙動（tracked symlink エントリを丸ごとスキップする）を述べる — 誤った機構主張ではなく。
+
 - **v2.0.0**
   - **executor のアサインがホスト設定可能になった: binding config・adapter contract・fail-closed な resolver が「どの役割を誰が実行するか」をホスト所有のファイルに接続する。** 行指向の `binding.conf`（閉じた拒否語彙と固定 exit code を持つ新 checker が検証）が各 inner-loop 役割を `{provider, model, effort, adapter}` に束縛し、task-envelope 契約文書と出荷済み adapter 定義 2 点（`claude-cli`・`codex-cli`）が executor の受け取る・返す・対応するものを宣言し、役割単位の resolver が各起動の直前に「この役割はどの executor が実行し、起動してよいか」に答える — ホストの config が最優先・無ければプラグイン出荷の v1 相当既定 — config の無いリポジトリはこれまでと完全に同じ挙動を保つ。失敗は常に代替でなく拒否: adapter が宣言しない effort 値・board 権限とチャネルの矛盾・executor 不在・使用不能な config。
   - **クロスプロバイダレビューは「無条件の不変条件」から「理由つきの出荷時既定」になった。** レビュアーは出荷既定 binding で Codex CLI に束縛される — 同一ファミリーの出力をレビューするモデルは盲点を共有するため。ホストは rebind できるが、それで変わるのは resolution の報告値と telemetry の記録値であり、ドキュメントはちょうどその範囲だけを主張する。レビュアー executor の不在・未認証は今もループを止める — 静かな代替は決して起きない。

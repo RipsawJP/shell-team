@@ -719,6 +719,23 @@ that file's order.
   "<content>"}` and inspect the returned HTML for `<ul><li>` vs `<pre><code>` —
   `api.github.com` is on this environment's network allow-list and needs no
   authentication for this endpoint.
+- T-1060: purely a documentation task — no new `bin/` script, no new test suite,
+  no workflow edit, no config-grammar or checker change. The mechanical gates
+  that matter are `bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`
+  (11 `check:`-bearing criteria; AC12 is runtime `SKIP` by design, reported
+  item by item in the hand-off) and `bash bin/check-intent.sh
+  .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`
+  (confirms the frozen intent block is untouched). Validating a documented
+  grammar example before committing it: write it to a scratch file (not
+  `/tmp` directly — this sandbox denies writes there; use `$TMPDIR` or the
+  session scratchpad) and run `bash bin/check-binding.sh --config <that
+  file>`; exit `0` confirms the example is not merely illustrative but
+  actually accepted by the shipped validator. AC1/AC2's fenced-block
+  extraction concatenates the content of *every* triple-backtick block in
+  the section (not just the first), so a section meant to carry exactly one
+  config example must not include a second, unrelated fenced block (e.g. a
+  standalone shell-command block) or its `bind`/`schema` line count and
+  byte-identity comparisons will pick up unintended lines.
 - T-1058: no new CI wiring needed — `bin/log-run.sh`, `bin/check-run.sh` and
   `bin/rollup-runs.sh`, and their three suites (`tests/log-run/run.sh`,
   `tests/check-run/run.sh`, `tests/rollup-runs/run.sh`), were already in
@@ -742,3 +759,59 @@ that file's order.
   never from a different fixture — the shape `bin/log-run.sh`'s own
   header and this task's AC5 check already use for the identical
   invariance property.
+- T-1061 (corrected round 3, 2026-08-12 — no suite ships): a standalone
+  checker (`bin/check-adopter-docs.sh`) and its 42-case suite
+  (`tests/check-adopter-docs/run.sh`) were built in rounds 1-2, then reverted
+  in round 3 (`git rm` — both remain recoverable from git history at commits
+  `b731f44`/`a9459e5`/`62e53aa`) when this task's own pre-commitment trigger
+  fired at Codex round 2 (two consecutive rounds of independent Majors
+  against the checker's discharge-marker scan). The mechanical gate, all
+  three rounds' findings, the fence-tracking probe procedure this entry used
+  to document, and the fixed inventories (7 positional requirements, the
+  10-token refusal set, the 42-case class inventory) are carried instead as
+  fast-follow issue **#250**'s requirement list — nothing under `bin/` or
+  `tests/` ships for T-1061, and `.github/workflows/check-handoff.yml` is
+  byte-identical to the branch point. The gate itself now ships as two prose
+  duties only (`agents/pm-spec.md`'s spec-completion self-check,
+  `skills/run/SKILL.md`'s bootstrap-freeze sweep item) plus this task's own
+  inline dogfood (AC10) — there is no test recipe to run here until #250
+  rebuilds the checker as a state machine over the fence/scope cross-product,
+  per the redesign guidance recorded in that issue.
+- T-1062 (2026-08-13): a spec's AC7(c)-style "full-population diff" (running
+  `bin/check-acs.sh` once per merged spec at a base ref via a detached
+  `git worktree add --detach`, and once more per spec at HEAD, then
+  differencing every `(spec, AC)` verdict pair) takes real wall-clock time
+  once the corpus reaches this size — roughly 45-plus minutes end to end for
+  66 base specs plus 67 head specs on this machine, since several specs'
+  own `- check:` lines shell out to git and to other suites in turn. Budget
+  for it accordingly rather than assuming it finishes inside a single
+  interactive command: run the base-side and head-side sweeps as two
+  separate background jobs (one `bash bin/check-acs.sh <spec>` per spec,
+  appending `<spec>\t<AC-line>` to a shared log file) and poll the log's
+  distinct-spec count against the population total rather than polling on a
+  fixed sleep, so a slow but still-progressing run is not mistaken for a
+  stall. Separately: `bin/check-acs.sh` is not fence-aware — a spec that
+  quotes an illustrative example AC inside a fenced code block (as
+  `.shell-team/specs/T-1061-adopter-docs-gate.md`'s `## Round-3
+  drop-execution package` section does) gets that example's `**AC1**` label
+  matched a second time, with its literal `check: ...` placeholder text
+  run as if it were a real command (exit 127) — deterministic and identical
+  on both sides of any diff, not evidence of flakiness, but it means a
+  naive positional pairing of duplicate-labelled rows between two runs can
+  produce spurious differences unless the verdicts are paired by matching
+  value (not by row order) before comparing.
+- T-1064: a delta on the T-1056 and T-1057 entries above, not a restatement
+  of them. `bin/check-durability.sh` resolves its registry from its own
+  script directory (`$SCRIPT_DIR/..` → `templates/durability-records.txt`)
+  and its path resolver from the same directory (`$SCRIPT_DIR/team-paths.sh`),
+  failing `structural` on either — so a scratch copy of the checker alone is
+  unusable by construction, and the fixture shape is the scratch "install"
+  the T-1056 entry above already prescribes for `bin/check-liveness.sh`: the
+  script plus `bin/team-paths.sh` under a scratch `bin/`, with
+  `templates/durability-records.txt` beside it. The `--records` flag is
+  documented in the script's own header as a testing affordance for the
+  malformed-registry case; pointing a scratch copy at a real registry with
+  it bypasses the resolution path the shipped invocation takes, so it
+  proves nothing about the resolver and is not the workaround to reach for.
+  The ancestor-symlink property of this same resolver is covered by the
+  T-1057 entry above (issue #218) and is not restated here.

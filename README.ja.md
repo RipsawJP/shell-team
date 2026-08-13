@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.0.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.0.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -175,6 +175,36 @@ build sha と uptime を返す /healthz を shell-team で追加して
 - **モデルルーティング** — エージェントの役割はモデル tier（計画 / 実行 / 別プロバイダレビュー）に振り分けられ、コストが各役割の判断負荷に追従する。モデル環境やコスト構造が変わればいつでも再評価する明示トリガ付き。
 
 この運用規律がどう進化したかは [docs/history.ja.md](docs/history.ja.md) を参照。
+
+## 役割と executor の紐付け
+
+6 つの inner-loop 役割 — `tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
+`codex-reviewer`・`ui-designer` — は、`<base>/binding.conf` を通じて
+それぞれ executor（provider + model + effort + adapter）を host が個別に
+割り当てられる。host 設定が無い場合は、プラグイン**出荷時の既定**
+`templates/binding-default.conf` が使われる。手順・設定の文法・
+fail-closed な refusal・各 adapter 自身の effort 値は
+[docs/adopting.ja.md](docs/adopting.ja.md)——この機構について唯一の
+正典となる詳細面——と `bash resolve-executor.sh --help`（スクリプト
+自身のヘッダであり、そこから乖離しえない）にある。**正直な境界線**には
+2 つの軸がある: binding は、それを参照するループにおいて呼び出しが
+**行われるかどうか**を制御する——`/shell-team:run` と `/shell-team:goal`
+では resolution が先に走り、refusal はフォールバックせずフェーズを停止
+させるので、rebind によって呼び出しを完全に止めることができる。一方、
+`/shell-team:review` は binding を一切参照せず、
+`/shell-team:review-response` は run ループへ引き渡す rework 経由でのみ
+参照する（issue **#245**）——そして、行われる呼び出しが**どう実行される
+か**は決して変えない。そちらで動くの
+は resolution が報告する値と**テレメトリ**が記録する値だけ（provider・
+model・effort・adapter のいずれも同じ）であり、別 executor への
+**呼び出し経路**は配線されない。第 2 軸の例示として、model は今なお
+役割自身の `agents/<role>.md` の pin から来る（issue **#236** はその
+pin の退役を追跡するが対象は `claude-cli` に紐付く 5 役割のみ・
+`codex-reviewer` は除外）。宣言された effort は記録されるがどの呼び出し
+にも適用されず、executor レベルの経路は resolution が制御していない。
+紐付けられた値はすべて宣言された値であって、実行されたものの観測では
+ない。reviewer 行自身の出荷時の既定とその理由は
+[設計上の選択](#設計上の選択) を参照。
 
 ## run のリプレイ
 
