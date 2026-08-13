@@ -220,7 +220,7 @@ The norm this task ships has two halves. Half **P** is the pricing tier (issue #
 git grep -lF -e agents/pm-spec.md -e skills/run/SKILL.md -e skills/goal/SKILL.md -- '.shell-team/specs/*.md'
 ```
 
-- read-set-specs: <n> specs — the engineer replaces the placeholder with the live count from the command above, as a bare decimal with no surrounding backticks (AC8 matches `^- read-set-specs: [0-9]+ specs` and compares the declared value against a live re-derivation, so a backticked, transcribed or stale number reads red).
+- read-set-specs: 45 specs — the live count from the command above, re-run at engineer implementation time (`git grep -lF -e agents/pm-spec.md -e skills/run/SKILL.md -e skills/goal/SKILL.md -- '.shell-team/specs/*.md' | wc -l` = 45), as a bare decimal with no surrounding backticks (AC8 matches `^- read-set-specs: [0-9]+ specs` and compares the declared value against a live re-derivation, so a backticked, transcribed or stale number reads red).
 - Base-side verdicts are read from the base ref's committed blobs — a disposable `git worktree add --detach` at the base, or `git show <base>:<path>` — never from the working tree, whose bytes at read time are not that ref's.
 - **Indirection class, named and discharged**: a criterion that reaches its target through a path built at run time (`bin/team-paths.sh --get todo`, a file named only through a variable) matches no search for a literal path and is invisible to the derivation above in principle. Discharge: additionally derive `git grep -lF -e 'team-paths.sh --get todo' -- '.shell-team/specs/*.md'` and run those criteria too; whatever remains after both derivations is disclosed as unmeasured rather than claimed clean.
 
