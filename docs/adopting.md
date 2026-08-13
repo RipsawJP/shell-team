@@ -81,6 +81,39 @@ host-root-untouched guarantee and treat `AGENTS.md` purely as a portable pointer
 doc rather than an auto-loaded root convention file. If you want a tool to read
 it, point that tool at `<base>/AGENTS.md` explicitly.
 
+## Pricing a spec's verification by task class
+
+Every spec's own frozen intent block additionally carries a one-line
+declaration of its deliverable's verification class: a top-level bullet
+`- verification-class: mechanism — <rationale>` or
+`- verification-class: no-mechanism — <rationale>`. **`mechanism`** is the
+default whenever the task's diff can reach an executing surface — any path
+under `bin/`, `tests/`, `templates/`, a CI workflow, or the semantics of a
+checker — and for that class the full verification protocol applies
+exactly as before: a full-population downstream-impact diff over every
+merged spec, the whole CI-equivalent step list, and a mutation-probe matrix
+over the spec's own criteria.
+
+**`no-mechanism`** is for a task that changes no executing surface —
+wording, prose, editorial or documentation deliverables — and it prices
+three things down. The downstream-impact inventory is taken as a
+**read-set**-scoped analysis instead of a **full-population** diff:
+mechanically derive the set of merged criteria that read any path the task
+edits, and difference their verdicts at the base ref and at HEAD. CI
+equivalence runs only for the steps whose inputs the task's diff can
+reach. Mutation probes are required only for the `- check:` lines the
+task adds or changes, not for the whole spec. A `no-mechanism` spec
+correspondingly declares as an explicit non-goal that it runs no
+full-population sweep, no whole CI-equivalent re-run and no behaviour
+verification of a mechanism it does not touch.
+
+Enforcement today is a **duty, not a checker**: the declaration is
+performed by the authoring role at spec-completion time and read by both
+review gates and by the human — **no mechanical checker ships for this**,
+because judging whether a task honestly belongs to the class it declares
+is a reading judgment, not something a machine can verify from the diff
+alone.
+
 ## How to run
 
 ```

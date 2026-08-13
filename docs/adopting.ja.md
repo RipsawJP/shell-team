@@ -83,6 +83,38 @@ pin してください。
 なく、純粋に可搬なポインタ doc として扱います。あるツールにこれを読ませたい
 場合は、そのツールに `<base>/AGENTS.md` を明示的に指し示してください。
 
+## タスククラスによる検証の価格付け
+
+すべての spec の凍結された intent block は、その deliverable の
+verification class を宣言する 1 行もあわせて持つ: トップレベルの bullet
+`- verification-class: mechanism — <rationale>` または
+`- verification-class: no-mechanism — <rationale>`。**`mechanism`** は、
+そのタスクの diff が実行対象の surface（`bin/`、`tests/`、`templates/`
+配下のいずれかのパス、CI workflow、または checker の semantics）に届き
+うる場合の既定であり、このクラスでは検証プロトコル全体がこれまで通り
+適用される: 既にマージ済みの spec すべてに対する **full-population** な
+downstream-impact diff、CI と同等のステップ全部、そして spec 自身の
+criteria 全体に対する mutation-probe マトリクスである。
+
+**`no-mechanism`** は、実行対象の surface を一切変更しないタスク——
+wording・prose・editorial・documentation の deliverable——のためのもの
+であり、3 つのコストを引き下げる。downstream-impact の inventory は
+**full-population** diff の代わりに **read-set** でスコープされた分析と
+して行う: タスクが編集するパスのいずれかを読む merged criteria の集合を
+機械的に導出し、その集合について base ref と HEAD の verdict を差分する。
+CI の同等性検証は、タスクの diff が入力に届きうるステップに限って走らせる。
+mutation probe は、そのタスクが追加・変更した `- check:` 行だけに対して
+要求され、spec 全体には要求されない。`no-mechanism` の spec は、それに
+対応して、full-population な sweep も、CI 相当ステップ全体の再実行も、
+このタスクが変更しないメカニズムの挙動検証も行わないことを明示的な
+non-goal として宣言する。
+
+現時点の強制は**チェッカーではなく duty** である: この宣言は spec
+完成時に著者役割が行い、両方の review gate と人間がそれを読む——
+**機械的なチェッカーは出荷されない**。あるタスクが自ら宣言したクラスに
+正直に属しているかどうかを判定するのは読解による判断であり、diff だけ
+から機械的に検証できるものではないからである。
+
 ## 実行方法
 
 ```
