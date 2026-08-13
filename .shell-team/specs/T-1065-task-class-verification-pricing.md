@@ -228,14 +228,14 @@ Predicted rows, to be **measured** rather than inherited (each stated as `base:`
 
 | Merged criterion | Prediction | Why |
 |---|---|---|
-| T-1053 **AC3** | base: PASS → head: PASS | The `BLAST` line stays byte-identical and stays inside the section (AC2 asserts it) |
+| T-1053 **AC3** | **corrected**: base: FAIL → head: FAIL (originally predicted PASS → PASS) | Measured live (AC12(c)): every one of T-1053's own criteria resolves its base as `git merge-base develop HEAD`, and `develop`'s tip has since absorbed T-1053's own merge — so the positive control asserting the base blob carries zero copies of `BLAST` no longer holds (the base blob already carries it, post-merge). Pre-existing, not caused by this task. |
 | T-1053 **AC5** | base: FAIL → head: FAIL | Pre-existing: it asserts `.shell-team/lessons.md` and `templates/prompt-blocks/` unchanged against `git merge-base develop HEAD`, and the lesson-promotion car in this task's own base changed both |
-| T-1053 **AC1**, **AC2** | base: PASS → head: PASS | `POST`/`SING` untouched; AC5 of this spec asserts both still occur exactly once |
-| T-1053 **AC4**, **AC6** | base: FAIL → head: FAIL | Merge-point-scoped in their own bodies and resolved against `develop`; already stale at this branch point |
-| T-1061 **AC12** | base: PASS → head: FAIL | It asserts `skills/goal/SKILL.md` byte-identical to that task's branch point; this task edits it. Disclosed, not repaired (DP8) |
+| T-1053 **AC1**, **AC2** | **corrected**: base: FAIL → head: FAIL (originally predicted PASS → PASS) | Measured live (AC12(c)): the same develop-tip-already-absorbed-the-merge staleness as AC3 above — `POST`/`SING`'s base-blob zero-occurrence positive controls no longer hold. Pre-existing, not caused by this task. |
+| T-1053 **AC4**, **AC6** | base: FAIL → head: FAIL | Merge-point-scoped in their own bodies and resolved against `develop`; already stale at this branch point — the same staleness that in fact governs the whole spec (AC1/AC2/AC3/AC5 too), not only these two as originally assumed |
+| T-1061 **AC12** | **corrected**: base: FAIL → head: FAIL (originally predicted PASS → FAIL) | Measured live (AC12(c)): already red at the base ref, for reasons unrelated to this task — several of the files T-1061's AC12 pins byte-identical to its own branch point (`README.md`, `README.ja.md`, `docs/tuning-oversight.md`, `CHANGELOG.md`, `CHANGELOG.ja.md`, `.claude-plugin/plugin.json`, `.shell-team/lessons.md`) have since diverged through the v2.0.0/v2.0.1 release and lesson-promotion cars. This task's edit to `skills/goal/SKILL.md` adds one more diverged file to an already-broken set; it deepens, not causes, the red. |
 | T-1061 **AC11** | base: PASS → head: PASS | AC6 preserves the heading-total equality, the ordinal equality and both pinned adjacencies |
-| T-1060 **AC3** and its Japanese sibling | base: PASS → head: PASS | AC6 preserves the `How to run` → `Binding roles to executors` → `Conversational usage` chain |
-| T-1063 / T-1064 scope locks and `skills/run/SKILL.md`-unchanged clauses | base: FAIL → head: FAIL | Already red from the preceding cars of this sprint train; deepened, not caused, here |
+| T-1060 **AC3** and its Japanese sibling (**AC4**) | base: PASS → head: PASS | AC6 preserves the `How to run` → `Binding roles to executors` → `Conversational usage` chain |
+| T-1063 **AC5**, **AC10** and T-1064's own scope lock (**AC11**, not AC10 — AC10 is that spec's records-hygiene criterion, measured base: PASS → head: PASS and unaffected) | base: FAIL → head: FAIL | Already red from the preceding cars of this sprint train; deepened, not caused, here |
 | Population criteria counting `.shell-team/specs/*.md` (T-1054 AC15, T-1055 AC16, T-1059 AC10, T-1060 AC11) | base: FAIL → head: FAIL | Already red; this task's own spec moves each count by one more |
 
 ## Assumptions
