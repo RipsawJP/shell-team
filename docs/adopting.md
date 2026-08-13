@@ -83,8 +83,9 @@ it, point that tool at `<base>/AGENTS.md` explicitly.
 
 ## Pricing a spec's verification by task class
 
-Every spec's own frozen intent block additionally carries a one-line
-declaration of its deliverable's verification class: a top-level bullet
+Every spec frozen from T-1065 onward additionally carries, on one line
+inside its own frozen intent block, a declaration of its deliverable's
+verification class: a top-level bullet
 `- verification-class: mechanism — <rationale>` or
 `- verification-class: no-mechanism — <rationale>`. **`mechanism`** is the
 default whenever the task's diff can reach an executing surface — any path

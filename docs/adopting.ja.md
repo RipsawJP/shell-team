@@ -85,8 +85,8 @@ pin してください。
 
 ## タスククラスによる検証の価格付け
 
-すべての spec の凍結された intent block は、その deliverable の
-verification class を宣言する 1 行もあわせて持つ: トップレベルの bullet
+T-1065 以降に凍結するすべての spec は、凍結された intent block 内の 1 行で、
+その deliverable の verification class を宣言する: トップレベルの bullet
 `- verification-class: mechanism — <rationale>` または
 `- verification-class: no-mechanism — <rationale>`。**`mechanism`** は、
 そのタスクの diff が実行対象の surface（`bin/`、`tests/`、`templates/`
