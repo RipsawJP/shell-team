@@ -70,7 +70,7 @@ Do not add conversational gates on top of it:
   cannot restore.
 ```
 
-That path list is this repository's own instantiation of the criterion, not the criterion itself — substitute the surfaces that execute in your own repository before you paste this block.
+That path list is this repository's own instantiation of the criterion, not the criterion itself — substitute the surfaces that execute in your own repository before you paste this block. The surfaces to substitute include the ones nothing mechanically enforces: a tracked file your own agents are instructed to read before they act belongs on that list even though no script parses it.
 
 ## Example — more checkpoints
 
@@ -90,7 +90,7 @@ For a team that wants to be consulted earlier:
 
 Two stops earn their cost regardless of preference:
 
-- **A merge that changes what runs** — anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`, `.shell-team/loops/`, `CLAUDE.md`, or the workflow, in this repository's own terms. A merge of records only — a retro, a board close-out, a provenance record — needs no stop, for the same reason the example above does not ask for one.
+- **A merge that changes what runs** — anything under `bin/`, `agents/`, `skills/`, `templates/prompt-blocks/`, `.shell-team/loops/`, `CLAUDE.md`, or the workflow, in this repository's own terms. Those paths are the **mechanically enforced** surfaces — a script that runs, a prompt that ships, a contract a checker parses — and the criterion reaches further than they do: `.shell-team/test-recipe.md` is a tracked **advisory instruction source** that this repository's own `CLAUDE.md` requires an agent to read before running suites, so merging a change to it changes what an agent subsequently does with nothing mechanically enforcing it. The list mixes those two enforcement strengths on purpose; what governs is the criterion — does merging this change what runs — and not membership of the list. A merge of records only — a retro, a board close-out, a provenance record — needs no stop, for the same reason the example above does not ask for one.
 - **Anything git cannot undo** — force-pushing, deleting untracked files,
   overwriting a file whose only copy is the one being replaced. When a step is
   safe only because something was preserved first, that preservation should be
