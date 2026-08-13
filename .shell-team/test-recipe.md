@@ -777,3 +777,26 @@ that file's order.
   inline dogfood (AC10) — there is no test recipe to run here until #250
   rebuilds the checker as a state machine over the fence/scope cross-product,
   per the redesign guidance recorded in that issue.
+- T-1062 (2026-08-13): a spec's AC7(c)-style "full-population diff" (running
+  `bin/check-acs.sh` once per merged spec at a base ref via a detached
+  `git worktree add --detach`, and once more per spec at HEAD, then
+  differencing every `(spec, AC)` verdict pair) takes real wall-clock time
+  once the corpus reaches this size — roughly 45-plus minutes end to end for
+  66 base specs plus 67 head specs on this machine, since several specs'
+  own `- check:` lines shell out to git and to other suites in turn. Budget
+  for it accordingly rather than assuming it finishes inside a single
+  interactive command: run the base-side and head-side sweeps as two
+  separate background jobs (one `bash bin/check-acs.sh <spec>` per spec,
+  appending `<spec>\t<AC-line>` to a shared log file) and poll the log's
+  distinct-spec count against the population total rather than polling on a
+  fixed sleep, so a slow but still-progressing run is not mistaken for a
+  stall. Separately: `bin/check-acs.sh` is not fence-aware — a spec that
+  quotes an illustrative example AC inside a fenced code block (as
+  `.shell-team/specs/T-1061-adopter-docs-gate.md`'s `## Round-3
+  drop-execution package` section does) gets that example's `**AC1**` label
+  matched a second time, with its literal `check: ...` placeholder text
+  run as if it were a real command (exit 127) — deterministic and identical
+  on both sides of any diff, not evidence of flakiness, but it means a
+  naive positional pairing of duplicate-labelled rows between two runs can
+  produce spurious differences unless the verdicts are paired by matching
+  value (not by row order) before comparing.

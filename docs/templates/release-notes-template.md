@@ -29,7 +29,9 @@ verbatim, then fill it in per the instructions beside each section.
   omitted, not left empty: delete the heading and everything under it rather
   than leaving an empty section under a heading that is still present.
 - **`## Install / update`** and **`## Links`** are static boilerplate below;
-  copy them unchanged.
+  copy them unchanged — except the compare URL in `## Links`, where `vPREV`
+  takes the previous release's tag and `vX.Y.Z` this release's, the same
+  fill-in notation the title rule above uses.
 
 <!-- BEGIN release-body -->
 ## Highlights
