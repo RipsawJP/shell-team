@@ -176,6 +176,36 @@ build sha と uptime を返す /healthz を shell-team で追加して
 
 この運用規律がどう進化したかは [docs/history.ja.md](docs/history.ja.md) を参照。
 
+## 役割と executor の紐付け
+
+6 つの inner-loop 役割 — `tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
+`codex-reviewer`・`ui-designer` — は、`<base>/binding.conf` を通じて
+それぞれ executor（provider + model + effort + adapter）を host が個別に
+割り当てられる。host 設定が無い場合は、プラグイン**出荷時の既定**
+`templates/binding-default.conf` が使われる。手順・設定の文法・
+fail-closed な refusal・各 adapter 自身の effort 値は
+[docs/adopting.ja.md](docs/adopting.ja.md)——この機構について唯一の
+正典となる詳細面——と `bash resolve-executor.sh --help`（スクリプト
+自身のヘッダであり、そこから乖離しえない）にある。**正直な境界線**には
+2 つの軸がある: binding は、それを参照するループにおいて呼び出しが
+**行われるかどうか**を制御する——`/shell-team:run` と `/shell-team:goal`
+では resolution が先に走り、refusal はフォールバックせずフェーズを停止
+させるので、rebind によって呼び出しを完全に止めることができる。一方、
+`/shell-team:review` は binding を一切参照せず、
+`/shell-team:review-response` は run ループへ引き渡す rework 経由でのみ
+参照する（issue **#245**）——そして、行われる呼び出しが**どう実行される
+か**は決して変えない。そちらで動くの
+は resolution が報告する値と**テレメトリ**が記録する値だけ（provider・
+model・effort・adapter のいずれも同じ）であり、別 executor への
+**呼び出し経路**は配線されない。第 2 軸の例示として、model は今なお
+役割自身の `agents/<role>.md` の pin から来る（issue **#236** はその
+pin の退役を追跡するが対象は `claude-cli` に紐付く 5 役割のみ・
+`codex-reviewer` は除外）。宣言された effort は記録されるがどの呼び出し
+にも適用されず、executor レベルの経路は resolution が制御していない。
+紐付けられた値はすべて宣言された値であって、実行されたものの観測では
+ない。reviewer 行自身の出荷時の既定とその理由は
+[設計上の選択](#設計上の選択) を参照。
+
 ## run のリプレイ
 
 1 run のテレメトリ（span 行 + event 行）は、1 枚の自己完結した HTML ページとしてリプレイできる — ネットワークも外部アセットもビルドステップも不要で、`file://` URL からそのまま開ける。

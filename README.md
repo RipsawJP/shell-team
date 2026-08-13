@@ -176,6 +176,36 @@ The agent pipeline above is the **inner loop**. An **outer loop** of operating d
 
 See [docs/history.md](docs/history.md) for how this operating discipline evolved.
 
+## Binding roles to executors
+
+Each of the six inner-loop roles — `tech-lead`, `pm-spec`, `engineer`,
+`qa-verifier`, `codex-reviewer`, `ui-designer` — is host-assignable to a
+specific executor (provider + model + effort + adapter) through a
+`<base>/binding.conf`; with no host config, the plugin-shipped
+`templates/binding-default.conf` is the **shipped default**. The how-to,
+the config grammar, the fail-closed refusals and each adapter's own
+effort values live in [docs/adopting.md](docs/adopting.md) — the single
+canonical detail surface for this mechanism — and in `bash
+resolve-executor.sh --help`, which is that script's own header and
+cannot drift from it. **The honest boundary** has two axes: the binding
+gates **whether** a call proceeds in the loops that consult it — in
+`/shell-team:run` and `/shell-team:goal`, resolution runs first and a
+refusal stops the phase rather than falling back, so a rebind can stop a
+call outright, while `/shell-team:review` never consults the binding and
+`/shell-team:review-response` consults it only through the rework it
+hands to the run loop (issue **#245**) — and it never changes **how** a
+proceeding call is executed, where it moves only what resolution reports
+and what **telemetry** records, provider, model, effort and adapter
+alike, so no
+alternate-executor **invocation path** is wired. Illustratively, on that
+second axis: the model still comes from the role's own `agents/<role>.md`
+pin (issue **#236** tracks retiring those pins for the five
+`claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
+effort is recorded but applied to no call, and executor-level routing is
+not resolved at all. Every bound value is declared, never an observation
+of what executed. See [Design choices](#design-choices) for the reviewer
+row's own shipped default and its rationale.
+
 ## Replaying a run
 
 A run's telemetry (span rows plus event rows) replays as one self-contained HTML page — no network, no external asset, no build step; it opens straight from a `file://` URL.
