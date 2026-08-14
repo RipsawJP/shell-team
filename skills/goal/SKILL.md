@@ -85,6 +85,7 @@ later ticks — the state file already exists.
      actually produce the claimed output); `codex-reviewer` verifies
      formulaically/statically (boundary conditions, arithmetic, structural
      edge cases) — an orthogonal detection surface, not a duplicate of QA's.
+   - **Verdict scope and severity calibration in the review briefing (referenced, not restated)**: the same briefing discipline `skills/run/SKILL.md`'s Review step carries applies to this loop's own `codex-reviewer` invocation — scope the verdict to the deliverable's correctness plus the frozen mandatory items, state the severity calibration up front, name what a `- verification-class: no-mechanism` declaration rules out when the spec carries one, and leave the reviewer's independence over findings untouched. The wording is not restated here: read that step's own bullet, so one norm cannot ship as two drifting sentences.
    The gate is **green** only when all applicable layers pass — six when an
    intent block exists, otherwise five — check-acs PASS + check-intent.sh
    aligned (when the spec carries an intent block) +
