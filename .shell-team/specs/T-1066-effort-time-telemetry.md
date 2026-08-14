@@ -191,6 +191,24 @@ git grep -lF -e docs/loop-engineering -e .shell-team/runs -- '.shell-team/specs/
 - **Indirection class, named and discharged**: a criterion reaching its target through a path built at run time (`bin/team-paths.sh --get todo`, `--get runs`, a file named only through a variable) matches no search for a literal path and is invisible to the derivation above **in principle**. Discharge: additionally derive `git grep -lF -e 'team-paths.sh --get' -- '.shell-team/specs/*.md'` and run those criteria too; whatever remains after both derivations is disclosed as unmeasured rather than claimed clean.
 - **Expected class of red, to be measured rather than inherited**: every merged criterion whose subject is a population count over `.shell-team/specs/*.md` moves by one when this spec lands, and every criterion in the two preceding cars of this sprint train that resolves its base against `develop` is already red at this branch point for reasons predating this task. Each is disclosed as `base: <verdict> → head: <verdict>` with its measurement, and none is repaired (DP9).
 
+**Read-set derivation, measured live (engineer, 2026-08-14):**
+
+```
+git grep -lF -e docs/loop-engineering -e .shell-team/runs -- '.shell-team/specs/*.md' | wc -l
+```
+→ **33** (includes this task's own spec, which already carries both literals). Indirection discharge:
+```
+git grep -lF -e 'team-paths.sh --get' -- '.shell-team/specs/*.md' | wc -l
+```
+→ **60**. A targeted search inside that union for a criterion whose `- check:` line itself counts a spec population over `.shell-team/specs/*.md` (`git grep -n "'.shell-team/specs/\*\.md'" -- '.shell-team/specs/*.md'`) finds exactly one other spec doing so: `.shell-team/specs/T-1065-task-class-verification-pricing.md`'s own **AC8**, which is the concrete instance of the "population count moves by one" class named above. No other spec in either derivation's union counts a spec-directory population or a `docs/loop-engineering/` directory listing (checked: no `- check:` line combining `docs/loop-engineering` with `wc -l`/`ls`/`find` outside `T-1008-lessons-corpus-import.md`, whose four such lines all count fixed *content* inside its own named file, `docs/loop-engineering/lessons-import-disposition.md`, not a directory listing — unaffected by a new sibling file). Whatever a criterion reaches through some other indirection this two-command derivation cannot see is disclosed here as **unmeasured**, not claimed clean.
+
+| Criterion | Disclosure | Measurement |
+|---|---|---|
+| T-1065 **AC8** | **disclosed [measured]**: base: PASS → head: FAIL | AC8 compares its own frozen declared line `- read-set-specs: 45 specs` against a live re-derivation of `git grep -lF -e agents/pm-spec.md -e skills/run/SKILL.md -e skills/goal/SKILL.md -- '.shell-team/specs/*.md' \| wc -l`. This task's own spec names all three of `agents/pm-spec.md`, `skills/run/SKILL.md` and `skills/goal/SKILL.md` (in `## Summarized sources` and elsewhere), so the live count moved from 45 to **46** once this spec was committed — measured directly: `bash bin/check-acs.sh .shell-team/specs/T-1065-task-class-verification-pricing.md` reports `AC8: FAIL` at this task's own `HEAD`, and `AC8: PASS` in a scratch `git worktree add --detach` at this task's own base ref `0cbc2d5b20a669ee21b411ec2b20814e42fa7876` (where this spec's file does not yet exist). This is exactly the "population count over `.shell-team/specs/*.md` moves by one" class predicted above, not a defect this task introduces — T-1065's own AC8 is a value-independent invariant by design (DP9 applies: disclosed, not repaired). |
+| T-1065 **AC10** | **disclosed [measured, expected]**: base: PASS → head: FAIL | AC10 is T-1065's own scope lock, explicitly declared in its own body as "merge-point-scoped and expected to go stale after merge — once a later task's files land on the same ref... its expected set no longer describes reality." This task's own commits (its spec, board entry, provenance and interventions files) land on the same stacked branch on top of T-1065's tip, which is exactly the condition that criterion names as its own expected staleness trigger. Measured directly the same way as AC8 above (`bash bin/check-acs.sh` at `HEAD` vs. at the scratch worktree of the base ref): PASS at base, FAIL at `HEAD`. Pre-declared by T-1065 itself, not repaired here (DP9). |
+
+No other criterion in either derivation's union was found to move as a result of this task's diff (the search for spec-population and `docs/loop-engineering`-directory-listing checks above was exhaustive over the union; a criterion reached through an indirection neither derivation's literal search can see is disclosed as unmeasured, per the indirection-class discharge above, rather than claimed clean).
+
 ## Assumptions
 
 **Measured by this role, first-hand, with the file-reading tools available to it** (no shell, no network):
