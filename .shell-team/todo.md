@@ -11,7 +11,17 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1068** Concurrent multi-agent operation: a feasibility investigation — overlap candidates priced against re-derived phase cost, shared state classified over a closed inventory, one pilot probe in a scratch clone, and six invariants locked — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1068-agent-concurrency.md
+
+### Local test result — T-1062
+`bash bin/check-acs.sh .shell-team/specs/T-1062-release-notes-compare-link.md`: 6 passed, 0 failed, 1 skipped (AC7, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1062-release-notes-compare-link.md .shell-team/todo.md`: aligned, hash unchanged (`68c4b19c...`). `bash bin/check-acs.sh .shell-team/specs/T-1059-docs-release-notes.md` AC5: PASS (exit 0) — the merged criterion this task is most at risk of breaking stays green. `bash bin/check-pii-shapes.sh --base "$(git merge-base feature/1061-adopter-docs-gate HEAD)"`: clean. `bash bin/check-provenance.sh .shell-team/provenance/T-1062.md`: conformant (2 decision entries, 0 sentinel). `bash bin/check-interventions.sh --task T-1062 -- .shell-team/interventions/T-1062.md`: conformant (0 entries, 1 sentinel, unchanged from the orchestrator's original).
+
+### Local test result
+`bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
+
+## Done
+
+- [x] **T-1068** Concurrent multi-agent operation: a feasibility investigation — overlap candidates priced against re-derived phase cost, shared state classified over a closed inventory, one pilot probe in a scratch clone, and six invariants locked — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1068-agent-concurrency.md
+  - closed: 2026-08-15, closes #252
   - source: sprint v2.0.2 task 5 of 5, from **issue #252** (filed during sprint v2.0.1, operator-directed, flagged high-priority planning input). The issue already exists, so no new issue was filed from this role — which has no network path in any case; the issue body reached this spec verbatim through the coordinating session and is recorded as **RELAYED** in `## Summarized sources`.
   - stacked: branches from `feature/1067-context-lifecycle`'s tip (`29c35d9`, relayed — the freeze run reports the measured value), **not** from `develop`. Every base-side blob read in the spec resolves `git merge-base feature/1067-context-lifecycle HEAD` and no 40-hex literal is written into any criterion. Branch `feature/1068-agent-concurrency`; PR base stays `develop`, held open and **merges at the sprint batch GO after PR #272**.
   - declarations read at authoring time (T-1065's shipped self-check items): `- user-visible: no` — one internal loop-engineering note, no command, no configuration mechanism, no adopter-observable behavior, so neither an adopter-surface line nor a waiver is carried; and `- verification-class: no-mechanism` — the diff reaches one file under `docs/` plus this task's own records, nothing under `bin/`, `tests/`, `templates/`, `.github/`, `agents/`, `skills/`, and no checker's semantics move. Of the adopter-docs gate's three legal outcomes, the one read at authoring is **a conformant `no`** (exactly one `- user-visible: no — <rationale>` line between the `BEGIN` marker and `## Non-goals`, zero line-initial adopter-surface / adopter-docs-waiver markers anywhere in the spec).
@@ -78,14 +88,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - Spot-verified both blocker sentences against the real files: `agents/qa-verifier.md` line 57 ("Test-only edits (adding a missing test case) are OK; flag them in the verdict.") and `agents/codex-reviewer.md` line 31 ("reads the working tree directly ... `<base>` is whatever base ref the caller resolves") -- both exact matches to the note's citations. Confirmed the 25.05% headline is now labelled "conditional on all six named contract surfaces," Stage 0 (the six-surface redesign) is present in the recommendation as a hard precondition nothing runs before, and the typo fix is correct: `test -d tests/retro-inputs` exists, `test -d tests/retro-inventory` does not (`ls tests/ | grep -i retro` = `check-retro`, `retro-inputs` only).
   - **Standard**: `bash bin/check-acs.sh .shell-team/specs/T-1068-agent-concurrency.md` = 10/10; `bash bin/check-intent.sh` = aligned, hash unchanged (`a2547b53...`); `bash bin/check-pii-shapes.sh --base 29c35d97ed1c9468cc82c38598f75f4be1d842ab` = clean; `bash bin/check-provenance.sh` = conformant (25 decisions, 0 sentinel); `bash bin/check-interventions.sh` = conformant (2 entries, unchanged); scope lock since `3137a3c` (`git diff --name-only` + untracked) = exactly 5 allow-listed paths: the note, this spec (mutable region), the board, provenance, and Codex's review commit `132a971` -- no stray path.
   - No FAIL-worthy defect found. Per the operator's stop condition this finalizes the task as-is; no further rework round is warranted on prose grounds alone.
-
-### Local test result — T-1062
-`bash bin/check-acs.sh .shell-team/specs/T-1062-release-notes-compare-link.md`: 6 passed, 0 failed, 1 skipped (AC7, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1062-release-notes-compare-link.md .shell-team/todo.md`: aligned, hash unchanged (`68c4b19c...`). `bash bin/check-acs.sh .shell-team/specs/T-1059-docs-release-notes.md` AC5: PASS (exit 0) — the merged criterion this task is most at risk of breaking stays green. `bash bin/check-pii-shapes.sh --base "$(git merge-base feature/1061-adopter-docs-gate HEAD)"`: clean. `bash bin/check-provenance.sh .shell-team/provenance/T-1062.md`: conformant (2 decision entries, 0 sentinel). `bash bin/check-interventions.sh --task T-1062 -- .shell-team/interventions/T-1062.md`: conformant (0 entries, 1 sentinel, unchanged from the orchestrator's original).
-
-### Local test result
-`bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
-
-## Done
 
 - [x] **T-1067** Context lifecycle across a sprint: the three accumulation sites named and labelled, measured cross-sectionally, and the three reset options priced on three cost axes — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1067-context-lifecycle.md
   - closed: 2026-08-14, closes #249
