@@ -153,7 +153,7 @@ One row per normative directive stated in the body prose, mapped to the criterio
 
 | # | Body directive | Source | Carried by |
 |---|---|---|---|
-| 1 | The deliverable is one note at `docs/loop-engineering/agent-concurrency.md` with a fixed nine-section skeleton | Goal, DP4 | **AC1** |
+| 1 | The deliverable is one note at `docs/loop-engineering/agent-concurrency.md` with a fixed ten-section skeleton | Goal, DP4 | **AC1** |
 | 2 | No mechanism of any kind ships; nothing under `bin/`, `tests/`, `templates/`, `.github/`, `agents/`, `skills/` or `.shell-team/lessons.md` moves | Non-goals, DP4 | **AC9** (the allow-list admits no such path) |
 | 3 | Three overlap candidates are priced, each with a safety precondition and an `S\|M\|L` cost | Goal, issue #252 items 1–2 | **AC2** |
 | 4 | Every candidate has exactly one paired saving line, and none is left unpriced | Goal, DP2 | **AC2** (set equality between candidate ids and saving ids) |
