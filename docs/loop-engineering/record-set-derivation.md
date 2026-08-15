@@ -179,3 +179,174 @@ need `ce4a7d2437f4fd38e69b7d9bbcc411e1fd1edde7` to still be a reachable
 commit in this repository's history — true as long as this task's own PR
 merges, since a merge keeps every one of its commits reachable from the
 target branch even after the source branch ref is deleted.
+
+## AC15 — runtime, reported item by item
+
+AC15 is `SKIP` by design (no command can prove a command was run), so this
+section is that criterion's evidence, committed rather than left in an
+ephemeral hand-off message — the same discipline `check-handoff-scaling.md`'s
+own `## AC14` section already establishes for T-1070.
+
+### (a) Mutation self-check — every probe, one line each
+
+All sixteen mutations below were made on a `git worktree add --detach`
+scratch copy at `HEAD` (a throwaway path under `${TMPDIR:-/tmp}`, outside
+this working tree), each observed red via `bash bin/check-acs.sh --root
+<scratch> .shell-team/specs/T-1071-record-set-derivation.md`, restored to
+the pre-mutation byte-identical content (diffed to confirm), and observed
+green again before the next probe. The worktree was removed afterward
+(`git worktree remove --force`).
+
+1. **AC2** — renamed the `- union: items:` field key to `- union: itemz:` in the emitted block → `AC2: FAIL` (collaterally also failed AC3/AC5/AC8, which parse that same line); restored → `AC2: PASS`.
+2. **AC2** — reordered two fields on the `- set:` line (swapped `status`/`lines`, label and value together) → `AC2: FAIL` (collaterally AC3/AC4/AC5/AC8/AC9); restored → `AC2: PASS`.
+3. **AC3** — dropped the first item from one bucket's printed listing (`tail -n +2` on the bucket's item file before printing) while leaving its declared count untouched → `AC3: FAIL`, confirmed manually on **both** halves the criterion tests: the `comm -23` oracle comparison for bucket `A` mismatched (the block's bucket A was missing ` leading-space`), and the count re-derivation disagreed (declared union `8` vs. `5` actual printed item lines, declared bucket-count sum `8` vs. `5` actual) — both assertions fail from the one mutation, as the criterion's own text anticipates; restored → `AC3: PASS`.
+4. **AC3** — made the union count disagree with the listing (`$((union_count + 1))` in the `- union: items:` printf) → `AC3: FAIL` (collaterally AC2/AC5/AC8); restored → `AC3: PASS`.
+5. **AC4** — emitted an item under two buckets (appended a synthetic `ZZZ-BOGUS-BUCKET<TAB><existing item>` row before the final sort, so that item's line prints twice — once under its real bucket, once under the bogus one) → `AC4: FAIL` on the duplicate arm (collaterally AC1/AC2/AC5/AC8/AC9); restored → `AC4: PASS`.
+6. **AC4** — separately dropped one item from the union entirely (`sed -i '1d'` on the pre-sort membership file, before `union_count` is computed, so the tool's own internal accounting stays self-consistent but disagrees with the independent `sort -u` oracle over the raw fixtures) → `AC4: FAIL` on the gap arm (collaterally AC2/AC3/AC5/AC6/AC8/AC9); restored → `AC4: PASS`.
+7. **AC5** — made a non-zero unaccepted status exit as if accepted (`if false && ! status_ok ...`, short-circuiting the refusal check) → `AC5: FAIL` (collaterally AC9); restored → `AC5: PASS`.
+8. **AC5** — made an accepted-status empty set report as a refusal (`status_ok()` short-circuited to accept only status `0`, ignoring any `--accept-status` declaration) → `AC5: FAIL` (collaterally AC1, from an unreachable-code shellcheck warning in the mutated file — not a defect in the real script); restored → `AC5: PASS`.
+9. **AC6** — removed the `LC_ALL=C` pin (commented out the `export` line) → `AC6: FAIL` (collaterally AC9, whose locale-pin case depends on the same guarantee); restored → `AC6: PASS`.
+10. **AC7** — deleted one consumer (`agents/codex-reviewer.md`) from the registry row → `AC7: FAIL` (collaterally AC8, whose own "consumers" derivation reads that same row); restored → `AC7: PASS`.
+11. **AC7** — separately deleted the canonical bullet from one consumer file (`agents/engineer.md`) while leaving the registry row intact → `AC7: FAIL` only; restored → `AC7: PASS`.
+12. **AC8** — hand-edited a number inside the note's own stored block (`- bucket: all-agents — items: 4` → `items: 5`, this file's own committed content) → `AC8: FAIL` only; restored → `AC8: PASS`.
+13. **AC9** — deleted one case id from the suite (renamed every `single-set` occurrence to `alpha-case`, which shares no substring with the original id, unlike a first attempt that renamed to `single-setX` and left the check vacuously passing since `grep -F` still matched the substring — the fixed mutation confirms the check's own precision) → `AC9: FAIL` only; restored → `AC9: PASS`.
+14. **AC10** — removed `bin/derive-populations.sh tests/derive-populations/run.sh` from the workflow's single shellcheck line → `AC10: FAIL` only; restored → `AC10: PASS`.
+15. **AC11** — deleted the `## 母集団の導出` section from `README.ja.md` → `AC11: FAIL` only; restored → `AC11: PASS`.
+16. **AC13** — added an untracked stray file (`stray-file.txt`) at the scratch worktree root → `AC13: FAIL` only; removed → `AC13: PASS`.
+
+(The spec's own AC15(a) prose enumerates these same sixteen mutations across
+eleven distinct AC labels, in this same order; none were skipped. AC1,
+AC12 and AC14 carry no dedicated mutation of their own in AC15(a)'s
+enumeration — each was still observed to flip red at least once as a
+collateral effect of a mutation above (AC1 at rows 5 and 8; AC12 and AC14
+were not observed to flip in any of the sixteen rows above, consistent with
+neither being targeted or collaterally reached by them).)
+
+### (b) Execution-context matrix
+
+The one shipped, adopter-facing command this task's records and READMEs
+point a reader at is `derive-populations.sh`. Verified in both contexts,
+each run rather than read:
+
+| context | invocation | result |
+|---|---|---|
+| checkout root, plugin not on `PATH` | `bash bin/derive-populations.sh --help` | exit 0, non-empty usage |
+| adopter-shaped repo, plugin loaded (`bin/` on `PATH`, bare name, different cwd) | `cd /tmp && derive-populations.sh --label matrix-test --set "a=echo x" --set "b=echo y"` | exit 0, well-formed block, byte-shape identical to the checkout-root form modulo the label/sets supplied |
+
+### (c) Full CI-wired step list, run locally in workflow order
+
+`.github/workflows/check-handoff.yml` carries **73** named steps
+(`awk '/^      - name: /{c++} END{print c}' .github/workflows/check-handoff.yml`
+= 73). Two are not applicable to a local run, named individually with their
+reason: **`Checkout`** (this is already a checkout of the repository) and
+**`Install shellcheck (pinned — must match local dev version)`** (shellcheck
+0.11.0 is already present and version-verified on this host). The remaining
+**71** were run directly, strictly sequentially (no suite started before the
+previous one exited), in the workflow's own order, and every one passed on
+the first clean pass after this task's one self-caught fix (see the
+disclosed deviation below): 71 `RESULT: PASS`, 0 `RESULT: FAIL`
+(`grep -c '^RESULT: PASS' <log>` = 71, `grep -c '^RESULT: FAIL' <log>` = 0).
+The full per-step list is the same 73-row list `.github/workflows/
+check-handoff.yml` itself enumerates, in the same order, with the two named
+exceptions above; it is not re-transcribed here to avoid a second source of
+truth for the same ordered list.
+
+**One disclosed self-caught deviation.** The first full run found ONE
+failure: step "Run errexit-safe regression suite" (`bash
+tests/errexit-safe/run.sh`), whose completeness self-audit flagged
+`derive-populations.sh`'s `die_usage()`/`die_refuse()` as carrying an
+unregistered errexit-unsafe candidate (`printf ... >&2` immediately followed
+by `exit N`, with no `|| true` guard) — a genuine defect: under a closed
+stderr, the write's own failure would trigger `errexit` and the script would
+exit 1 instead of the intended 2 (usage) or 1 (refusal, coincidentally the
+same value there but not for the usage path), silently breaking the
+documented 0/1/2 exit-code contract. Fixed by guarding both `printf`
+statements with `|| true` (committed separately: `955f901`); the second full
+run (whose 71/0 tally is the one reported above) was clean.
+
+### (d) `## Blast radius` production, narrated
+
+Already committed in the spec itself (`## Blast radius`, outside the frozen
+intent block) — not duplicated here to avoid two sources of truth. In
+summary: population enumerated with `git ls-tree -r --name-only
+"$(git merge-base feature/1070-check-handoff-performance HEAD)" --
+.shell-team/specs | grep '\.md$'` = 75, matching the spec's declared value
+exactly (re-confirmed live by this task's own AC14 check). Every criterion
+of two of those 75 specs is disclosed as `head: FAIL` in the spec's
+`## Blast radius` table — `T-1019-is-span-row-parity.md` AC10 and
+`T-1020-lessons-supersede-sweep.md` AC14 — both predicted `base: FAIL` as
+well (T-1070's own base-side measurement, inherited unchanged since this
+task's base includes T-1070), so **neither is a newly-reddened row**; the
+spec's declared `- predicted-red: 2` names the two criteria expected to
+newly flip `base: PASS → head: FAIL` (an `agents/*.md`-or-
+`templates/prompt-blocks/`-pinning criterion in a merged spec, and
+`T-1061-adopter-docs-gate.md`'s AC12) rather than these two whole-`bin/`-tree
+locks. The remaining 73 population specs are not individually re-run at
+both refs in this task (a full per-spec double-run, as T-1062's own
+test-recipe entry records, takes on the order of tens of minutes for a
+corpus this size); they are named here, collectively, as unmeasured beyond
+the two rows the spec's own table already discloses and the one this task
+independently confirmed live (`T-1061-adopter-docs-gate.md` AC12, read and
+quoted in item (g) below — its own pinned-surface list overlaps exactly the
+four surfaces this task edits, so its `head: FAIL` is a structural certainty
+rather than a measurement this task chose to skip).
+
+### (e) Measured 40-hex values
+
+- `git merge-base feature/1070-check-handoff-performance HEAD` = `ce4a7d2437f4fd38e69b7d9bbcc411e1fd1edde7`
+- `git rev-parse feature/1070-check-handoff-performance` = `ce4a7d2437f4fd38e69b7d9bbcc411e1fd1edde7` (identical to the merge-base — this branch's point of divergence is that branch's own tip)
+- `git rev-parse develop` = `627a90259a1c878f3c57b8591c2733db7eb7c622`
+- Branch-point-vs-`develop` inequality this stacked premise rests on: `ce4a7d2437f4fd38e69b7d9bbcc411e1fd1edde7` ≠ `627a90259a1c878f3c57b8591c2733db7eb7c622` — confirmed unequal, satisfying AC13's own premise check.
+- `git branch --show-current` = `feature/1071-record-set-derivation`
+
+### (f) Every `## Assumptions` bullet, re-measured and reported individually
+
+The spec carries seven `## Assumptions` bullets. Each is addressed below by
+its own order in the spec.
+
+1. **RELAYED — issue #268's body.** Re-fetched directly by this role via `https://api.github.com/repos/RipsawJP/shell-team/issues/268` (a public, unauthenticated GET). Title: "Set-population claims in loop records need machine derivation, not hand-written prose." State: `open`. Body confirms every distinction the spec's `## Summarized sources` carries over: (i) the four T-1065 instances are records prose, never the deliverable (a CI-equivalence step-count error, a "two" vs. "three" miscount, a class-closure inventory omission, and a widened-command set-delta under-disclosure); (ii) instance 4 is named the decisive datum precisely because it post-dates two premise changes; (iii) the ticket's own ask is literally "A helper (e.g. `bin/derive-populations.sh` or similar)... And/or a norm plus checker... Where the tier lands... is design work for the implementing task." No criterion in this task depends on any figure from the issue, so this confirmation is provenance only — nothing contradicted.
+2. **RELAYED, and partially re-measured here — the board's totality-word population.** Re-measured live: `grep -woiE 'every|all|none|complete|exhaustive|entire|whole' .shell-team/todo.md | wc -l` (word-boundary, `LC_ALL=C`) = **3,818**; `grep -oiE 'every|all|none|complete|exhaustive|entire|whole' .shell-team/todo.md | wc -l` (substring, no boundary, same locale) = **6,233**. Both are larger than the spec's relayed 1,503/1,781 — expected, not a discrepancy: the board is append-only and has grown substantially (further sprint tasks, this task's own entry) since those figures were measured at T-1071's authoring time. No criterion in this task depends on either figure.
+3. **MEASURED at authoring time** — re-confirmed: `sed -n '131p' bin/check-handoff.sh` reads exactly `CONTINUATION_RE='^[[:space:]]+[^[:space:]]'`. Matches the spec's quotation exactly.
+4. **MEASURED at authoring time** — `.shell-team/specs/` population; superseded by, and re-confirmed identical to, AC14's own ref-pinned re-derivation (75, item (d) above).
+5. **RELAYED — the branch point's 40-hex value and this task's stacked-train position.** Re-confirmed in item (e) above (`ce4a7d2437f4fd38e69b7d9bbcc411e1fd1edde7`, identical to `feature/1070-check-handoff-performance`'s own tip), and independently confirmed via `https://api.github.com/repos/RipsawJP/shell-team/pulls/281`: state `open`, head `feature/1070-check-handoff-performance`, base `develop`, title beginning "T-1070: check-handoff.sh runtime scaling..." — matches the spec's PR #281 claim exactly.
+6. **RELAYED — the existence of the orchestrator-owned `.shell-team/interventions/T-1071.md`.** Confirmed present and conformant: `bash bin/check-interventions.sh --task T-1071 -- .shell-team/interventions/T-1071.md` → `check-interventions: conformant: .shell-team/interventions/T-1071.md (1 entries, 0 sentinel)`; confirmed untouched by this role throughout (`git status --short .shell-team/interventions/T-1071.md`, empty at every check during this task). Separately re-verified the intervention's own claim that issue #268's body appears nowhere in this repository: `git grep -c "Mechanize set-population accounting" -- .` (a phrase from the fetched body) returned no match anywhere in the tree — confirmed, not contradicted.
+7. **ASSUMED, stated as unverified — bash 3.2 build reachable.** Not merely assumed here: this host's stock `/bin/bash` **is** 3.2.57(1)-release (`bash --version`), the floor itself, exercised throughout this entire task's own work. A **second**, higher floor was also exercised — a leftover bash 4.4.0(1)-release build at `/private/tmp/claude/bashsrc/bash` (built by T-1070's own prior session on this same host, never installed onto `PATH`) — `bash tests/derive-populations/run.sh` and `bash bin/derive-populations.sh --help` both run clean under it (12/12 `PASS`, `grep -c '^PASS' <log>` = 12), matching the bash-3.2 run byte-for-byte in every case checked.
+8. **ASSUMED, stated as unverified — UTF-8 locale present.** Not merely assumed: `locale -a | grep -iE '^(C|en_US|ja_JP)\.utf-?8$'` returns three matches on this host (`en_US.UTF-8`, `C.UTF-8`, `ja_JP.UTF-8`) — AC6 exercised the first of these live and passed.
+
+### (g) Per-source report — every `## Summarized sources` entry
+
+The spec carries twenty distinct sources (counting the combined
+issue-plus-interventions pair as two). Each is addressed below.
+
+1. **Issue #268's body — RELAYED.** Opened first-hand (item (f)1 above). Confirmed, not contradicted.
+2. **`.shell-team/interventions/T-1071.md`** — opened and read first-hand; its "the body is quoted nowhere in this repository" claim independently re-verified (item (f)6 above). Nothing contradicted.
+3. **`bin/check-prompt-sync.sh`** — opened and read end to end (176 lines) before authoring the registry row. Confirmed: `marker`/`contain` mode distinction, exit codes 0/1/2, check-only design (never rewrites a consumer — verified in practice: this task hand-edited all five agent files itself), and the registered-consumers-only scope limit. Nothing contradicted; `bash bin/check-prompt-sync.sh` exits 0 throughout.
+4. **`templates/prompt-blocks/registry.txt`** — opened and read end to end. Confirmed the whitespace-separated row grammar and the `adopter-docs-declaration.md` precedent row this task's own row follows in shape. Nothing contradicted.
+5. **`templates/prompt-blocks/adopter-docs-declaration.md`** — opened and read first-hand (3 lines). Confirmed the "short, self-contained, line-per-rule" shape; `derived-populations.md` mirrors it at 3 lines. Nothing contradicted.
+6. **`bin/check-handoff.sh` lines 87–131** — opened and read first-hand; `CONTINUATION_RE` re-confirmed at line 131 (item (f)3 above). Nothing contradicted.
+7. **`.github/workflows/check-handoff.yml`** — opened and read end to end, and executed in full (item (c) above). Confirmed the single physical shellcheck line, one-step-per-suite shape, and the `check-prompt-sync` dogfood-step precedent this task's own `derive-populations` dogfood step follows. Nothing contradicted; byte-identical additions confirmed by AC10.
+8. **`tests/bin-exec-bit/run.sh` header** — opened and read first-hand. Confirmed the `bin/` 100755 rule and the `tests/` bidirectional shebang rule; both new files pass `bash tests/bin-exec-bit/run.sh`. Nothing contradicted.
+9. **`tests/check-handoff/run.sh` lines 1–60** — opened and read first-hand. Confirmed the committed-fixture-driven suite shape and the explicit `mktemp "${TMPDIR:-/tmp}/…XXXXXX"` template convention; this task's own suite follows both. Nothing contradicted.
+10. **`tests/check-pii-shapes/run.sh` header** — opened and read first-hand (this task's own session). Confirmed its runtime-fixture-generation reason is specific to the PII constraint and does not apply here — this task ships committed fixtures instead, as the spec directs. Nothing contradicted.
+11. **`bin/check-acs.sh` lines 141–294** — the exact `AC_RE` and `CHECK_RE` patterns and the backtick-rejection comment block re-confirmed live via targeted `grep`, matching the spec's quotations exactly, and exercised in practice throughout this task's own verification (every `check-acs.sh` run in this hand-off). Nothing contradicted.
+12. **`bin/team-paths.sh` header** — the "bash plus standard POSIX tools only" zero-dependency floor re-confirmed via `grep`. Nothing contradicted; this task's own helper inherits the same floor.
+13. **`bin/retro-inputs.sh` header** — opened and read in full. Confirmed the ` — `-separated, free-form-field-last ledger grammar and the read/empty/unavailable distinction; this task's helper's `- set:` line follows the identical free-form-field-last discipline (the command is always last). Nothing contradicted.
+14. **`.shell-team/lessons.md`, two 2026-08-15 entries** — both re-confirmed present verbatim: the completeness-claim entry (`grep -n "A completeness claim is written only as the extraction command"` matches, superseded-by note present at two consumer sites) and the checker-runtime-cost entry (`## 2026-08-15 — A checker's runtime cost is recorded only from a measurement whose locale and input size are stated`, confirmed present). Nothing contradicted.
+15. **`.shell-team/specs/T-1070-check-handoff-scaling.md`** — opened and read first-hand. Confirmed the branch-point discriminator convention and the blast-radius shape, both reused verbatim in this task's own spec and note. Nothing contradicted.
+16. **`.shell-team/specs/T-1019-is-span-row-parity.md` AC10** — opened and read first-hand; the "not one byte changes under `bin/`..." quotation re-confirmed byte-for-byte via `grep`. Nothing contradicted; this criterion's predicted `head: FAIL` (not newly reddened) is confirmed accurate — item (d) above.
+17. **`.shell-team/specs/T-1061-adopter-docs-gate.md` AC12** — opened and read first-hand; re-confirmed it pins `README.md`, `README.ja.md`, `.github/workflows/check-handoff.yml` and `bin/check-handoff.sh` byte-identical to its own branch point and requires zero `bin/`/`tests/` paths in the changed set. This task edits three of those four surfaces (all but `bin/check-handoff.sh` itself) plus adds a `bin/` file, so this criterion's `head: FAIL` is a structural certainty rather than a coin-flip prediction. Nothing contradicted.
+18. **`README.md` / `README.ja.md`** — opened and read first-hand (`## Layout`, `## Replaying a run` / `## 構成`, `## run のリプレイ`). Confirmed the curated (non-exhaustive) `bin/` tree listing and the READMEs' section-for-section mirroring, including the bare-name invocation convention this task's own new sections follow. Nothing contradicted.
+19. **`.shell-team/test-recipe.md`** — opened and read first-hand. Confirmed the `## Appended by tasks` append-only convention; this task appended one entry under it. Nothing contradicted.
+20. **`.shell-team/todo.md` lines 1–29`** — opened and read first-hand; this is a historical observation about the board's state at spec-authoring time (an empty `## Active`), not a claim this task's own read re-derives — superseded by this task's own board edit. Not applicable to re-confirm as a live fact.
+
+### (h) Bash versions exercised
+
+- **bash 3.2.57(1)-release** (`arm64-apple-darwin25`) — this host's stock `/bin/bash`, exercised throughout this entire task (every `check-acs.sh` run, every mutation probe, the fixture suite, the CI-equivalent sweep).
+- **bash 4.4.0(1)-release** (`arm-apple-darwin25.5.0`) — a leftover build from T-1070's own prior session on this host (`/private/tmp/claude/bashsrc/bash`, never installed onto `PATH` or a package manager). `bash tests/derive-populations/run.sh` under it: 12/12 `PASS` (`grep -c '^PASS' <log>` = 12), byte-identical case-by-case behavior to the 3.2.57 run.
+
+Both floors this task's own Input space names (bash 3.2 and bash 5) are
+approximated here exactly as T-1070's disclosed the same substitution: no
+bash 5 package or static binary was reachable within this session's network
+allow-list, so the 4.4.0 build (the newest available on this host, carried
+over rather than rebuilt) stands in as the "second, higher" floor, disclosed
+rather than silently treated as bash 5.
