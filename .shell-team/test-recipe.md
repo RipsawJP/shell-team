@@ -954,3 +954,25 @@ that file's order.
   run the whole suite once, back to back, so budget at least
   2×167s ≈ 340s for those two criteria alone before any of the spec's
   other checks run).
+- T-1076 round 2 (rework, Codex review round 1): the suite grew three cases
+  (`seq-auto-escaping`, `signal-race-acquire-side`, `signal-race-release-side`
+  — the Major #1 and Blocker regression pins) and now measures
+  **~189s wall-clock** end to end on this host (`bash tests/log-run/run.sh`,
+  timed, exit 0) — up from round 1's ~167s, almost entirely the two new
+  signal-race cases' own deliberate multi-second `sleep`-widened windows
+  (each choreography holds a lock for several seconds on purpose so a real
+  `kill -TERM` can be aimed inside it deterministically). Re-budget
+  `CHECK_ACS_TIMEOUT` accordingly (this round used 400, still comfortable).
+  A bash-3.2.57-specific pitfall found and worked around while building
+  these fixtures: `${content//"$pat"/"$rep"}` — quoting BOTH the pattern
+  and the replacement — either leaks literal `"` characters into the
+  replacement text or, for a multi-line pattern spanning this script's own
+  ~600-line body, hangs outright (this repo's own super-quadratic
+  string-substitution ceiling, recorded above for `bin/check-run.sh`,
+  generalizes to bash's own glob engine here too). The working fixture
+  technique is line-range replacement via `awk` keyed on unique anchor
+  lines (`$0 == start` / `$0 == end`, both verified unique with
+  `grep -cFx` before use), not a bash pattern substitution — fast and
+  correct regardless of content size, and the technique to reach for
+  first the next time a test needs to patch a specific span inside an
+  existing `bin/` script rather than a single line.

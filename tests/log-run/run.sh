@@ -349,37 +349,74 @@ NEG_PAYLOAD_BYTES=16384
 
 # run_contention_writer <writer-path> <runs-dir> <loop-id> <run-id> <n> <m> [<error-payload>]
 # — launches <n> background writer processes, each appending <m> rows
-# with --seq auto and its own --instance tag, then waits for all of
-# them. Never asserts anything itself: the caller judges the result,
-# since the positive and negative arms below judge the SAME shape
-# differently.
+# with --seq auto and its own --instance tag, then waits for EACH ONE
+# INDIVIDUALLY and records how many exited non-zero. Never asserts
+# anything itself: the caller judges the result, since the positive and
+# negative arms below judge the SAME shape differently.
+#
+# T-1076 round 2 (Codex Major #2): a bare `wait` (no pid) discards every
+# background job's own exit status, so a writer that crashed outright
+# (argv/process-launch/filesystem failure — plausible under the negative
+# control's own 16KB+ --error payload) could silently produce a short line
+# count that the caller then misreads as the MUTANT's own interleaved-append
+# corruption rather than as a broken fixture. Each of the <n> subshells
+# below now itself exits non-zero if ANY of its <m> sequential writer
+# invocations failed (not just the last one — `writer_rc` latches the first
+# non-zero it sees across the whole inner loop), and the caller captures
+# each subshell's PID and waits on it individually, populating
+# WRITER_FAILED_COUNT / WRITER_FAILED_PIDS for the caller to read and report
+# BEFORE it interprets any line-count or seq-set mismatch as corruption.
+WRITER_FAILED_COUNT=0
+WRITER_FAILED_PIDS=()
 run_contention_writer() {
   local writer="$1" runsdir="$2" loop="$3" runid="$4" n="$5" m="$6" errpayload="${7:-}"
   mkdir -p "$runsdir"
-  local i j
+  local i j pid
+  local -a pids=()
+  WRITER_FAILED_COUNT=0
+  WRITER_FAILED_PIDS=()
   for i in $(seq 1 "$n"); do
     (
+      writer_failed=0
       # shellcheck disable=SC2034  # j is the loop counter only, never read
       for j in $(seq 1 "$m"); do
         if [ -n "$errpayload" ]; then
-          TEAM_RUNS_DIR="$runsdir" TEAM_LOG_LOCK_TIMEOUT=30 bash "$writer" "$loop" \
-            --run-id "$runid" --seq auto --span s --phase p --iteration 0 --attempt 1 \
-            --status success --instance "w$i" --error "$errpayload" >/dev/null 2>&1
+          if ! TEAM_RUNS_DIR="$runsdir" TEAM_LOG_LOCK_TIMEOUT=30 bash "$writer" "$loop" \
+              --run-id "$runid" --seq auto --span s --phase p --iteration 0 --attempt 1 \
+              --status success --instance "w$i" --error "$errpayload" >/dev/null 2>&1; then
+            writer_failed=1
+          fi
         else
-          TEAM_RUNS_DIR="$runsdir" TEAM_LOG_LOCK_TIMEOUT=30 bash "$writer" "$loop" \
-            --run-id "$runid" --seq auto --span s --phase p --iteration 0 --attempt 1 \
-            --status success --instance "w$i" >/dev/null 2>&1
+          if ! TEAM_RUNS_DIR="$runsdir" TEAM_LOG_LOCK_TIMEOUT=30 bash "$writer" "$loop" \
+              --run-id "$runid" --seq auto --span s --phase p --iteration 0 --attempt 1 \
+              --status success --instance "w$i" >/dev/null 2>&1; then
+            writer_failed=1
+          fi
         fi
       done
+      exit "$writer_failed"
     ) &
+    pids+=("$!")
   done
-  wait
+  for pid in "${pids[@]}"; do
+    if ! wait "$pid"; then
+      WRITER_FAILED_COUNT=$((WRITER_FAILED_COUNT + 1))
+      WRITER_FAILED_PIDS+=("$pid")
+    fi
+  done
 }
 
 # --- the positive contention arm: real writer, real lock, no payload --------
 POS_DIR="$TMP/contention-pos"
 run_contention_writer "$LOGRUN" "$POS_DIR" contloop SHARED "$CONT_N" "$CONT_M"
 POS_FILE="$POS_DIR/contloop.jsonl"
+
+# T-1076 round 2 (Codex Major #2): the positive arm runs a REAL writer under
+# a REAL lock with no chaos payload, so every one of the N writer subshells
+# is expected to exit 0 — if one didn't, that is a fixture/setup bug, not a
+# lock defect, and must fail loudly here rather than surface later as a
+# confusing line-count or seq-set mismatch below.
+[ "$WRITER_FAILED_COUNT" -eq 0 ] || fail "T-1076 contention-writer-exit-status: $WRITER_FAILED_COUNT of $CONT_N positive-arm writers exited non-zero (pids: ${WRITER_FAILED_PIDS[*]:-none}) — a writer/fixture failure, not lock contention"
 
 pass "T-1076 contention-parameters — N=$CONT_N — M=$CONT_M — payload_bytes=$NEG_PAYLOAD_BYTES"
 
@@ -422,11 +459,12 @@ pass "T-1076 lock-timeout-refusal"
 
 # --- a writer killed while holding the lock releases it (D3) ---------------
 # A scratch copy of the real writer with one line patched (a `sleep 5`
-# injected right after LOCK_ACQUIRED=1) so there is a window to signal it
-# mid-hold; the EXIT/INT/TERM trap this task adds must still fire.
+# injected right after the acquire loop exits — lock held, traps back to
+# normal, before any critical-section work) so there is a window to signal
+# it mid-hold; the EXIT/INT/TERM trap this task adds must still fire.
 SIG_BIN_DIR="$TMP/lockrelease-bin"
 mkdir -p "$SIG_BIN_DIR"
-sed 's/^LOCK_ACQUIRED=1$/LOCK_ACQUIRED=1\nsleep 5/' "$LOGRUN" > "$SIG_BIN_DIR/log-run.sh"
+sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/sleep 5\n&/' "$LOGRUN" > "$SIG_BIN_DIR/log-run.sh"
 grep -q '^sleep 5$' "$SIG_BIN_DIR/log-run.sh" || fail "T-1076 lock-released-on-signal setup: the sleep injection did not apply to the scratch copy"
 
 SIG_DIR="$TMP/lockrelease-runs"
@@ -455,6 +493,299 @@ sig_followup_rc=$?
 pass "T-1076 lock-released-on-signal"
 
 # =====================================================================
+# T-1076 round 2 (Codex Major #1 fix): --seq auto correctly continues the
+# per-run_id counter for a run_id containing JSON-escape-significant
+# characters (backslash, double-quote). Regression for the raw-vs-escaped
+# comparison bug, which was coupled to a regex-truncation bug (the old
+# `[^"]*` capture stopped at an ESCAPED quote's own `"` byte): comparing
+# escaped-vs-raw silently restarted the counter at 1 for any such run_id.
+# =====================================================================
+ESC_DIR="$TMP/escid"
+mkdir -p "$ESC_DIR"
+ESC_FILE="$ESC_DIR/escloop.jsonl"
+
+for esc_rid in 'a\b' 'a"b' 'a\"b' 'a\\b'; do
+  set +e
+  TEAM_RUNS_DIR="$ESC_DIR" bash "$LOGRUN" escloop --run-id "$esc_rid" --seq 1 --span s --phase p \
+    --iteration 0 --attempt 1 --status success >/dev/null 2>&1
+  esc_r1=$?
+  TEAM_RUNS_DIR="$ESC_DIR" bash "$LOGRUN" escloop --run-id "$esc_rid" --seq 2 --span s --phase p \
+    --iteration 0 --attempt 1 --status success >/dev/null 2>&1
+  esc_r2=$?
+  TEAM_RUNS_DIR="$ESC_DIR" bash "$LOGRUN" escloop --run-id "$esc_rid" --seq auto --span s --phase p \
+    --iteration 0 --attempt 1 --status success >/dev/null 2>&1
+  esc_r3=$?
+  set -e
+  [ "$esc_r1" -eq 0 ] || fail "T-1076 seq-auto-escaping setup: seeding seq 1 for run_id '$esc_rid' failed (exit $esc_r1)"
+  [ "$esc_r2" -eq 0 ] || fail "T-1076 seq-auto-escaping setup: seeding seq 2 for run_id '$esc_rid' failed (exit $esc_r2)"
+  [ "$esc_r3" -eq 0 ] || fail "T-1076 seq-auto-escaping: --seq auto for run_id '$esc_rid' failed (exit $esc_r3)"
+  # Mirror jesc's own two-step transform (backslash first, then quote) to
+  # build the expected on-disk (escaped) bytes for a fixed-string grep —
+  # this is the SAME order bin/log-run.sh's jesc() applies, not a shortcut
+  # around it.
+  esc_expected="$(printf '%s' "$esc_rid" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  esc_cnt3="$(grep -cF "\"run_id\":\"${esc_expected}\",\"seq\":3" "$ESC_FILE" || true)"
+  [ "$esc_cnt3" -eq 1 ] || fail "T-1076 seq-auto-escaping: run_id '$esc_rid' expected exactly one seq:3 row from --seq auto (continuing the count), got count=$esc_cnt3 — the escaped-vs-raw comparison bug would restart the count at 1 instead"
+done
+pass "T-1076 seq-auto-escaping — --seq auto continues the count for run_ids containing backslash/quote characters"
+
+# =====================================================================
+# T-1076 round 2 (Codex Blocker fix) — signal-timing race regression on
+# the LOCK_ACQUIRED guard. Two windows, each pinned by an A/B comparison:
+# an OLD-SHAPE mutant that structurally reproduces round-1's reviewed
+# code (no `trap '' INT TERM` masking around the transition) against a
+# FIXED-SHAPE mutant carrying the SAME artificially-widened window but
+# with this round's masking intact. Both mutants in a pair inject an
+# identical `sleep 3` at the transition so the otherwise-nanosecond-scale
+# race becomes a deterministic multi-second window a real signal can be
+# aimed into — the comparison is the test: same window, different shape,
+# different (and opposite) outcome.
+# =====================================================================
+
+# replace_range SRC DST START-LINE END-LINE REPLFILE — replaces every line
+# STRICTLY BETWEEN the first line exactly matching START-LINE and the next
+# line exactly matching END-LINE with REPLFILE's contents (START-LINE and
+# END-LINE themselves are copied through unchanged). Line-oriented (awk),
+# not a bash pattern substitution: measured on this repo's own dev host
+# (bash 3.2.57) that a `${content//"$pat"/"$rep"}` substitution against
+# this script's own ~600-line, multi-KB text either corrupts the result
+# (quoting both sides leaks literal `"` characters into the output around
+# the replacement) or hangs outright once the pattern spans several lines
+# — this repo's own README precedent for a super-quadratic string-matching
+# ceiling (bin/check-run.sh's unbalanced-quote scan, this task's own
+# provenance record) generalizes to bash's own glob-pattern engine here,
+# not just to that one script. Both START-LINE and END-LINE must be exact,
+# single-occurrence literal lines in SRC (verified below at each call site
+# via a positive control before this function is trusted to have targeted
+# the right span) — awk's own line-by-line scan has none of that
+# pathology.
+replace_range() {
+  local src="$1" dst="$2" start="$3" end="$4" replfile="$5"
+  awk -v start="$start" -v end="$end" -v replfile="$replfile" '
+    $0 == start { print; in_range=1
+      while ((getline line < replfile) > 0) print line
+      close(replfile)
+      next
+    }
+    in_range && $0 == end { print; in_range=0; next }
+    in_range { next }
+    { print }
+  ' "$src" > "$dst"
+}
+
+# --- acquire-side window: signal between `mkdir` success and LOCK_ACQUIRED=1 ---
+ACQ_START='while :; do'
+# shellcheck disable=SC2016  # single-quoted deliberately: this is the
+# literal SOURCE line to match in bin/log-run.sh, not an expansion here.
+ACQ_END='  [ "$LOCK_ACQUIRED" = "1" ] && break'
+[ "$(grep -cFx "$ACQ_START" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-acquire-side setup: start anchor is not a unique line in $LOGRUN"
+[ "$(grep -cFx "$ACQ_END" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-acquire-side setup: end anchor is not a unique line in $LOGRUN"
+
+ACQ_OLD_REPL="$TMP/acq-old-body.txt"
+cat > "$ACQ_OLD_REPL" <<'EOF'
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    sleep 3
+    LOCK_ACQUIRED=1
+  fi
+EOF
+ACQ_FIXED_REPL="$TMP/acq-fixed-body.txt"
+cat > "$ACQ_FIXED_REPL" <<'EOF'
+  trap '' INT TERM
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    sleep 3
+    LOCK_ACQUIRED=1
+  fi
+  trap 'on_lock_signal INT 130' INT
+  trap 'on_lock_signal TERM 143' TERM
+EOF
+
+ACQ_OLD_BIN="$TMP/acqrace-old.sh"
+ACQ_FIXED_BIN="$TMP/acqrace-fixed.sh"
+replace_range "$LOGRUN" "$ACQ_OLD_BIN" "$ACQ_START" "$ACQ_END" "$ACQ_OLD_REPL"
+replace_range "$LOGRUN" "$ACQ_FIXED_BIN" "$ACQ_START" "$ACQ_END" "$ACQ_FIXED_REPL"
+bash -n "$ACQ_OLD_BIN" || fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant has a syntax error"
+bash -n "$ACQ_FIXED_BIN" || fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant has a syntax error"
+cmp -s "$LOGRUN" "$ACQ_OLD_BIN" && fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant is byte-identical to the real writer"
+cmp -s "$LOGRUN" "$ACQ_FIXED_BIN" && fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant is byte-identical to the real writer"
+grep -q '^    sleep 3$' "$ACQ_OLD_BIN" || fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant's sleep injection did not apply"
+grep -q '^    sleep 3$' "$ACQ_FIXED_BIN" || fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant's sleep injection did not apply"
+
+# OLD-shape: mkdir succeeds, enters the injected sleep with NO trap mask —
+# an on_lock_signal fired here sees LOCK_ACQUIRED still 0, skips the
+# rmdir, and the lock is orphaned; exit 143.
+AOR_DIR="$TMP/acqrace-old-runs"
+mkdir -p "$AOR_DIR"
+TEAM_RUNS_DIR="$AOR_DIR" bash "$ACQ_OLD_BIN" acqrace --run-id A --seq 1 --span s --phase p \
+  --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+aor_pid=$!
+aor_w=0
+while [ ! -d "$AOR_DIR/.acqrace.jsonl.lock" ] && [ "$aor_w" -lt 15 ]; do
+  sleep 1
+  aor_w=$((aor_w + 1))
+done
+[ -d "$AOR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant's lock directory never appeared"
+kill -TERM "$aor_pid" 2>/dev/null || true
+set +e
+wait "$aor_pid" 2>/dev/null
+aor_rc=$?
+set -e
+[ "$aor_rc" -eq 143 ] || fail "T-1076 signal-race-acquire-side: OLD-shape mutant expected exit 143 (killed by TERM), got $aor_rc"
+[ -d "$AOR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side: OLD-shape mutant's lock directory should have been ORPHANED (reproducing the pre-fix bug) but it is gone"
+[ ! -e "$AOR_DIR/acqrace.jsonl" ] || fail "T-1076 signal-race-acquire-side: OLD-shape mutant should not have appended a row"
+
+# FIXED-shape: mkdir succeeds inside the masked bracket; the injected sleep
+# still lives entirely inside `trap '' INT TERM` .. re-arm, so the SAME
+# signal, sent at the SAME point, is dropped by the kernel rather than
+# observed — the mutant finishes normally: row written, lock released,
+# exit 0.
+AFR_DIR="$TMP/acqrace-fixed-runs"
+mkdir -p "$AFR_DIR"
+TEAM_RUNS_DIR="$AFR_DIR" bash "$ACQ_FIXED_BIN" acqrace --run-id A --seq 1 --span s --phase p \
+  --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+afr_pid=$!
+afr_w=0
+while [ ! -d "$AFR_DIR/.acqrace.jsonl.lock" ] && [ "$afr_w" -lt 15 ]; do
+  sleep 1
+  afr_w=$((afr_w + 1))
+done
+[ -d "$AFR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant's lock directory never appeared"
+kill -TERM "$afr_pid" 2>/dev/null || true
+set +e
+wait "$afr_pid" 2>/dev/null
+afr_rc=$?
+set -e
+[ "$afr_rc" -eq 0 ] || fail "T-1076 signal-race-acquire-side: FIXED-shape mutant expected exit 0 (signal masked/dropped), got $afr_rc"
+[ ! -d "$AFR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side: FIXED-shape mutant should have released its lock cleanly, not left it behind"
+[ -f "$AFR_DIR/acqrace.jsonl" ] || fail "T-1076 signal-race-acquire-side: FIXED-shape mutant should still have appended its row despite the signal"
+pass "T-1076 signal-race-acquire-side — OLD-shape orphans the lock on a plain TERM (exit 143), FIXED-shape absorbs the identical signal and completes cleanly (exit 0)"
+
+# --- release-side window (the more severe one): signal between `rmdir`
+#     success and LOCK_ACQUIRED reset, racing a SUCCESSOR that has since
+#     acquired the SAME path -----------------------------------------------
+REL_START='release_lock() {'
+REL_END='trap release_lock EXIT'
+[ "$(grep -cFx "$REL_START" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-release-side setup: start anchor is not a unique line in $LOGRUN"
+[ "$(grep -cFx "$REL_END" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-release-side setup: end anchor is not a unique line in $LOGRUN"
+
+REL_OLD_REPL="$TMP/rel-old-body.txt"
+cat > "$REL_OLD_REPL" <<'EOF'
+  if [ "$LOCK_ACQUIRED" = "1" ]; then
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    : > "${LOCK_DIR}.rel-probe-marker"
+    sleep 3
+    LOCK_ACQUIRED=0
+  fi
+}
+EOF
+REL_FIXED_REPL="$TMP/rel-fixed-body.txt"
+cat > "$REL_FIXED_REPL" <<'EOF'
+  trap '' INT TERM
+  if [ "$LOCK_ACQUIRED" = "1" ]; then
+    LOCK_ACQUIRED=0
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    : > "${LOCK_DIR}.rel-probe-marker"
+    sleep 3
+  fi
+  trap 'on_lock_signal INT 130' INT
+  trap 'on_lock_signal TERM 143' TERM
+}
+EOF
+
+replace_range "$LOGRUN" "$TMP/relrace-old-raw.sh" "$REL_START" "$REL_END" "$REL_OLD_REPL"
+replace_range "$LOGRUN" "$TMP/relrace-fixed-raw.sh" "$REL_START" "$REL_END" "$REL_FIXED_REPL"
+
+# A SECOND, independent injection layered on top of the release-side one:
+# P1 must hold the lock long enough for the choreography below to reliably
+# OBSERVE it doing so (poll granularity is whole seconds) before P1 even
+# reaches its release call — a single, uncontended row write completes in
+# well under a second, which measurably raced the poll loop before this
+# was added. Reuses the exact same anchor/technique as the
+# lock-released-on-signal fixture above (a plain sleep inserted right
+# before the critical-section comment), just with its own duration.
+REL_OLD_BIN="$TMP/relrace-old.sh"
+REL_FIXED_BIN="$TMP/relrace-fixed.sh"
+sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/sleep 2\n&/' \
+  "$TMP/relrace-old-raw.sh" > "$REL_OLD_BIN"
+sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/sleep 2\n&/' \
+  "$TMP/relrace-fixed-raw.sh" > "$REL_FIXED_BIN"
+grep -q '^sleep 2$' "$REL_OLD_BIN" || fail "T-1076 signal-race-release-side setup: OLD-shape mutant's pre-write hold injection did not apply"
+grep -q '^sleep 2$' "$REL_FIXED_BIN" || fail "T-1076 signal-race-release-side setup: FIXED-shape mutant's pre-write hold injection did not apply"
+bash -n "$REL_OLD_BIN" || fail "T-1076 signal-race-release-side setup: OLD-shape mutant has a syntax error"
+bash -n "$REL_FIXED_BIN" || fail "T-1076 signal-race-release-side setup: FIXED-shape mutant has a syntax error"
+cmp -s "$LOGRUN" "$REL_OLD_BIN" && fail "T-1076 signal-race-release-side setup: OLD-shape mutant is byte-identical to the real writer"
+cmp -s "$LOGRUN" "$REL_FIXED_BIN" && fail "T-1076 signal-race-release-side setup: FIXED-shape mutant is byte-identical to the real writer"
+grep -q 'rel-probe-marker' "$REL_OLD_BIN" || fail "T-1076 signal-race-release-side setup: OLD-shape mutant's marker injection did not apply"
+grep -q 'rel-probe-marker' "$REL_FIXED_BIN" || fail "T-1076 signal-race-release-side setup: FIXED-shape mutant's marker injection did not apply"
+
+# relrace_choreograph <p1-bin> <runs-dir> <loop> <expect-p1-rc> <expect-lock-survives>
+# — runs the shared choreography (P1 acquires+writes+releases with the
+# injected marker/sleep, a slow SUCCESSOR P2 waits and then holds the
+# freed path for 5s, P1 is TERM'd the instant its post-rmdir marker
+# appears) and asserts the two outcomes that distinguish the two shapes.
+relrace_choreograph() {
+  local p1bin="$1" runsdir="$2" loop="$3" expect_rc="$4" expect_survive="$5"
+  local lockdir="$runsdir/.${loop}.jsonl.lock"
+  local marker="${lockdir}.rel-probe-marker"
+  mkdir -p "$runsdir"
+
+  TEAM_RUNS_DIR="$runsdir" bash "$p1bin" "$loop" --run-id P1 --seq 1 --span s --phase p \
+    --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+  local p1_pid=$!
+
+  local w=0
+  while [ ! -d "$lockdir" ] && [ "$w" -lt 15 ]; do sleep 1; w=$((w + 1)); done
+  [ -d "$lockdir" ] || fail "T-1076 signal-race-release-side setup: P1 never acquired the lock"
+
+  # P2: the real, unmodified fixed writer, with the SAME "hold after
+  # acquire" injection the lock-released-on-signal fixture already uses
+  # (SIG_BIN_DIR/log-run.sh, 5s hold) — a slow successor that will still
+  # be sitting on the freed path when we check it below.
+  TEAM_LOG_LOCK_TIMEOUT=30 TEAM_RUNS_DIR="$runsdir" bash "$SIG_BIN_DIR/log-run.sh" "$loop" --run-id P2 --seq 1 \
+    --span s --phase p --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+  local p2_pid=$!
+
+  w=0
+  while [ ! -f "$marker" ] && [ "$w" -lt 15 ]; do sleep 1; w=$((w + 1)); done
+  [ -f "$marker" ] || fail "T-1076 signal-race-release-side setup: P1 never reached its post-rmdir marker"
+
+  kill -TERM "$p1_pid" 2>/dev/null || true
+
+  # give the successor a moment to have (re)acquired the just-freed path
+  w=0
+  while [ ! -d "$lockdir" ] && [ "$w" -lt 5 ]; do sleep 1; w=$((w + 1)); done
+  [ -d "$lockdir" ] || fail "T-1076 signal-race-release-side setup: successor never (re)acquired the freed lock path"
+
+  set +e
+  wait "$p1_pid" 2>/dev/null
+  local p1_rc=$?
+  set -e
+  [ "$p1_rc" -eq "$expect_rc" ] || fail "T-1076 signal-race-release-side ($p1bin): expected P1 exit $expect_rc, got $p1_rc"
+
+  # Check shortly after signaling P1, well before the successor's own
+  # natural 5s hold would end — this is the window in which the OLD-shape
+  # mutant's reentrant release_lock() would have already rmdir'd the
+  # successor's live lock out from under it.
+  sleep 1
+  local survives=1
+  [ -d "$lockdir" ] || survives=0
+  if [ "$expect_survive" = "1" ]; then
+    [ "$survives" -eq 1 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor's live lock did not survive — it should not have been touched"
+  else
+    [ "$survives" -eq 0 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor's live lock survived — the OLD-shape reentrant rmdir should have deleted it (reproducing the pre-fix bug)"
+  fi
+
+  set +e
+  wait "$p2_pid" 2>/dev/null
+  local p2_rc=$?
+  set -e
+  [ "$p2_rc" -eq 0 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor writer itself should still exit 0"
+}
+
+relrace_choreograph "$REL_OLD_BIN" "$TMP/relrace-old-runs" relrace 143 0
+relrace_choreograph "$REL_FIXED_BIN" "$TMP/relrace-fixed-runs" relrace 0 1
+pass "T-1076 signal-race-release-side — OLD-shape's reentrant release deletes a live successor's lock (never-steal violated), FIXED-shape's masked release leaves it untouched"
+
+# =====================================================================
 # T-1076 AC10: the negative control. A lock-disabled mutant, built
 # under $TMP (never the working tree), run at the SAME writer/row
 # floors as the positive arm above, but with the large --error payload
@@ -468,8 +799,8 @@ mkdir -p "$NEG_BIN_DIR"
 # shellcheck disable=SC2016  # single-quoted sed program: the literal text
 # `$LOCK_DIR` is the pattern being matched in the SOURCE file, not an
 # expansion in THIS script.
-sed 's/^until mkdir "\$LOCK_DIR" 2>\/dev\/null; do$/until true; do/' "$LOGRUN" > "$NEG_BIN_DIR/log-run.sh"
-grep -q '^until true; do$' "$NEG_BIN_DIR/log-run.sh" \
+sed 's/^  if mkdir "\$LOCK_DIR" 2>\/dev\/null; then$/  if true; then/' "$LOGRUN" > "$NEG_BIN_DIR/log-run.sh"
+grep -q '^  if true; then$' "$NEG_BIN_DIR/log-run.sh" \
   || fail "T-1076 negative-control setup: the lock-disabling patch did not apply to the scratch copy"
 if cmp -s "$LOGRUN" "$NEG_BIN_DIR/log-run.sh"; then
   fail "T-1076 negative-control setup: the mutant is byte-identical to the real writer (patch had no effect)"
@@ -487,9 +818,21 @@ NEG_DIR="$TMP/contention-neg"
 run_contention_writer "$NEG_BIN_DIR/log-run.sh" "$NEG_DIR" contloop SHARED "$CONT_N" "$CONT_M" "$NEG_ERR"
 NEG_FILE="$NEG_DIR/contloop.jsonl"
 
+# T-1076 round 2 (Codex Major #2): report a writer-process failure as its
+# OWN named finding, separate from the line-count/seq-set clauses below —
+# a writer that crashed outright (plausible under this arm's own 16KB+
+# --error payload and disabled lock) is a DIFFERENT thing from the mutant
+# producing a torn or duplicated row, and the two must not be folded into
+# one another's evidence. Both still route to the same `detected` token
+# (AC10's own grammar allows only two), since either is a genuine
+# deviation from the positive arm's fully-clean baseline; the TEXT is what
+# keeps them distinguishable to a human or a provenance reader.
 neg_findings=""
+if [ "$WRITER_FAILED_COUNT" -gt 0 ]; then
+  neg_findings="writer-process-failure=$WRITER_FAILED_COUNT/$CONT_N writer(s) exited non-zero (infrastructure, not necessarily interleaved-append corruption)"
+fi
 if [ ! -s "$NEG_FILE" ]; then
-  neg_findings="empty-output"
+  neg_findings="${neg_findings}${neg_findings:+, }empty-output"
 else
   neg_total="$(grep -c . "$NEG_FILE" || true)"
   if [ "$neg_total" -ne "$((CONT_N * CONT_M))" ]; then

@@ -397,15 +397,29 @@ jnum() { if [[ -z "$2" ]]; then printf '"%s":null' "$1"; else printf '"%s":%s' "
 # D4) — it neither raises the max nor aborts the scan. Read-only; never
 # called outside the append lock (D4: the scan and the append happen under
 # one acquisition, so no second writer can take the same number in between).
+#
+# T-1076 round 2 (Codex Major #1): the file stores `run_id` JESC-ESCAPED
+# (backslash doubled, `"` escaped as `\"`), so the comparison must be
+# against that SAME escaped form — comparing the file's escaped text
+# against the caller's raw argument silently restarted the counter at 1 for
+# any run_id containing a backslash or a double-quote. The extraction
+# pattern is ALSO widened, from a plain `[^\"]*` (which stops at the `"`
+# byte inside an escaped `\"`, truncating the captured value before its
+# true end) to one that treats an escaped pair (`\\.` — a literal backslash
+# followed by any one character) as a single atomic unit, so an embedded
+# `\"` or `\\` in the stored value can never be mistaken for the field's
+# closing quote.
 compute_auto_seq() {
-  local file="$1" want_run_id="$2" max=0 line rid seqval
+  local file="$1" want_run_id="$2" max=0 line rid seqval want_run_id_esc
+  local run_id_field_re='[{,]"run_id":"((\\.|[^"\\])*)"'
+  want_run_id_esc="$(jesc "$want_run_id")"
   if [[ -f "$file" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
       line="${line%$'\r'}"
       [[ -z "$line" ]] && continue
-      [[ "$line" =~ [\{,]\"run_id\":\"([^\"]*)\" ]] || continue
+      [[ "$line" =~ $run_id_field_re ]] || continue
       rid="${BASH_REMATCH[1]}"
-      [[ "$rid" == "$want_run_id" ]] || continue
+      [[ "$rid" == "$want_run_id_esc" ]] || continue
       [[ "$line" =~ [\{,]\"seq\":([0-9]+) ]] || continue
       seqval="${BASH_REMATCH[1]}"
       if [[ "$((10#$seqval))" -gt "$((10#$max))" ]]; then
@@ -522,12 +536,41 @@ lock_mtime() {
 # destroy contents a sibling process left inside the lock directory.
 # Installed before the acquisition loop so a signal during the bounded wait
 # is still handled (harmlessly: LOCK_ACQUIRED is still 0 at that point).
+#
+# T-1076 round 2 (Codex Blocker): the mkdir-then-flag-set transition below
+# and the flag-reset-then-rmdir transition inside release_lock are each ONE
+# atomic unit as far as signal delivery is concerned. Bash defers a caught
+# INT/TERM until the currently-running command returns, then runs the trap
+# BEFORE the next statement executes — so a signal landing in the
+# single-statement gap between `mkdir` succeeding and `LOCK_ACQUIRED=1`
+# used to see the flag still 0 and skip the `rmdir`, orphaning the lock on
+# an ordinary INT/TERM (not just SIGKILL, D3's only disclosed residual
+# case); a signal landing between release_lock's own flag reset and its
+# `rmdir` used to re-enter release_lock with the flag already fooled into
+# looking "not held" or (in the pre-fix ordering) still "held", and could
+# `rmdir` whatever a SUCCESSOR process has since created at the same path —
+# a direct violation of the never-steal guarantee. Both transitions are now
+# bracketed with `trap '' INT TERM`: a signal delivered while a signal's
+# disposition is SIG_IGN is discarded by the kernel outright, never queued
+# for later delivery, so nothing can fire mid-transition. Traps are
+# re-armed immediately after each bracket, so the bounded wait below and
+# the rest of the script remain interruptible exactly as before — only the
+# few bracketed statements themselves are ever momentarily signal-deaf.
+# release_lock ALSO flips LOCK_ACQUIRED to 0 BEFORE calling `rmdir` (not
+# after, as a first pass at this fix had it): with the trap already masked
+# for the whole bracket this ordering isn't needed for correctness by
+# itself, but it means a stray re-entry from anywhere outside that bracket
+# (there should be none) fails safe (skips the rmdir) rather than fails
+# open (attempts a second rmdir).
 LOCK_ACQUIRED=0
 release_lock() {
+  trap '' INT TERM
   if [ "$LOCK_ACQUIRED" = "1" ]; then
-    rmdir "$LOCK_DIR" 2>/dev/null || true
     LOCK_ACQUIRED=0
+    rmdir "$LOCK_DIR" 2>/dev/null || true
   fi
+  trap 'on_lock_signal INT 130' INT
+  trap 'on_lock_signal TERM 143' TERM
 }
 trap release_lock EXIT
 # INT/TERM need their OWN handler that calls `exit` explicitly — trapping a
@@ -546,7 +589,19 @@ trap 'on_lock_signal INT 130' INT
 trap 'on_lock_signal TERM 143' TERM
 
 lock_start="$(date +%s)"
-until mkdir "$LOCK_DIR" 2>/dev/null; do
+while :; do
+  # The mkdir-attempt-then-flag-set pair below is the acquire-side half of
+  # the signal-safety fix described above: masked start to finish, so a
+  # signal landing anywhere between `mkdir` returning and `LOCK_ACQUIRED=1`
+  # executing is simply dropped rather than observed with a half-updated
+  # flag.
+  trap '' INT TERM
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    LOCK_ACQUIRED=1
+  fi
+  trap 'on_lock_signal INT 130' INT
+  trap 'on_lock_signal TERM 143' TERM
+  [ "$LOCK_ACQUIRED" = "1" ] && break
   lock_now="$(date +%s)"
   if [ "$(( 10#$lock_now - 10#$lock_start ))" -ge "$((10#$LOCK_TIMEOUT))" ]; then
     printf 'log-run: could not acquire append lock %s within %ss (existing lock mtime: %s) — refusing to write, exiting 3. If the process that created it was killed, remove it by hand: rmdir %s\n' \
@@ -558,7 +613,6 @@ until mkdir "$LOCK_DIR" 2>/dev/null; do
   # extension this repository has not verified on every host's /bin/sh.
   sleep 1
 done
-LOCK_ACQUIRED=1
 
 # --- critical section: --seq auto derivation (D4) + the append itself ------
 if [ "$SEQ_AUTO" = "1" ]; then
