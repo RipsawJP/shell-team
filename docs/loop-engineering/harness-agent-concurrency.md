@@ -447,14 +447,84 @@ current baseline and now reports a clean flip, on the same plain-directory-copy 
 blanket "Not applicable" sentence, even though the note and `.shell-team/test-recipe.md`'s
 own T-1073 entry quote and require running many ad hoc commands — the identical
 compressed-summary shape QA already made this task fix twice (AC16(f)/(g), round 4).
-Rebuilt below as a genuine per-command matrix: every `- reproduce:` line in this note
-(**18**, `grep -cE '^\s*-\s*reproduce' docs/loop-engineering/harness-agent-concurrency.md`
-→ `18`), every `- command:` line outside the byte-locked evidence section (**2**, at
-`## Probe protocol`), every `- command:` line inside the byte-locked evidence section,
-quoted as runnable (**4**), and the recipe's own three named verification commands — **27**
-commands total, each executed this round (not reasoned about), one row per command, grouped
-by category only for readability; every row still reports its own individually-executed
-result. **Scope note**: the four `bash bin/*.sh` invocations `## AC16(c)` already reports
+Rebuilt below as a genuine per-command matrix, grouped into six categories (A–F) by real
+dependency shape, one table row per command.
+
+**Round 6 rework (operator-authorized surgical round, past the loop-guard cap; the
+override is recorded on this task's board entry, `operator ruling` sub-bullet).** Codex
+round 2 found two further defects, both fixed below and nowhere else in this section:
+**(1)** Categories E and F had reverted to one category-level blanket "not applicable"
+sentence instead of a per-row `Context (ii)` cell — the identical compressed-summary shape
+this whole section exists to close, now closed per-row for all seven of those rows (four
+in E, three in F), including the `check-acs.sh` row's own tool-vs-argument split (a real
+shipped, portable `bin/` tool, tested bare-name against an adopter-shaped fixture spec,
+exactly the same distinction Category D already draws for `derive-populations.sh`).
+**(2)** Category D's second row's own `Context (ii)` cell read "same disposition as the row
+above" — reasoned by analogy, not independently executed; it is now run for real, with its
+own distinct result.
+
+**The population count, corrected and re-derived by the tool per this sprint's own norm.**
+This section previously stated "**27**" commands (18 `- reproduce:` lines + 2 engineer
+`- command:` lines + 4 evidence `- command:` lines + 3 recipe commands) — an undercount by
+one, found independently by Codex and confirmed here: the true population is **28** table
+rows (A=11, B=5, C=3, D=2, E=4, F=3), and the earlier count missed Category C's own third
+row (the "Round 3 addendum" ancestor check, `git merge-base --is-ancestor 88a5e0e...
+954e2ee...`) because that row's source is free prose inside `## Probe protocol`'s "Round 3
+addendum" paragraph, not a line matching the `- command:`/`- reproduce:` grammar the
+original counting methodology scanned for — a genuine blind spot in the counting method
+itself (every row was always present and individually executed; only the roll-up
+arithmetic label was wrong). Re-derived directly (`grep`/`awk` per-category row counts) and
+via `bin/derive-populations.sh`, per the norm this sprint's own T-1071 shipped for exactly
+this defect class:
+- reproduce: `bin/derive-populations.sh --label t1073-r6-matrix-rows --set "cat-a=awk '/^\*\*Category A /{f=1;next} f&&/^\*\*Category B /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Reproduce/' docs/loop-engineering/harness-agent-concurrency.md" --set "cat-b=awk '/^\*\*Category B /{f=1;next} f&&/^\*\*Category C /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Reproduce/' docs/loop-engineering/harness-agent-concurrency.md" --set "cat-c=awk '/^\*\*Category C /{f=1;next} f&&/^\*\*Category D /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Command/' docs/loop-engineering/harness-agent-concurrency.md" --set "cat-d=awk '/^\*\*Category D /{f=1;next} f&&/^\*\*Category E /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Command/' docs/loop-engineering/harness-agent-concurrency.md" --set "cat-e=awk '/^\*\*Category E /{f=1;next} f&&/^\*\*Category F /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Evidence/' docs/loop-engineering/harness-agent-concurrency.md" --set "cat-f=awk '/^\*\*Category F /{f=1;next} f&&/^### \(c\)/{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Command/' docs/loop-engineering/harness-agent-concurrency.md"` — full output embedded below; `union: items: 28` confirms the corrected total.
+
+<!-- BEGIN derivation: t1073-r6-matrix-rows -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: cat-a — status: 0 — lines: 11 — items: 11 — command: awk '/^\*\*Category A /{f=1;next} f&&/^\*\*Category B /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Reproduce/' docs/loop-engineering/harness-agent-concurrency.md
+- set: cat-b — status: 0 — lines: 5 — items: 5 — command: awk '/^\*\*Category B /{f=1;next} f&&/^\*\*Category C /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Reproduce/' docs/loop-engineering/harness-agent-concurrency.md
+- set: cat-c — status: 0 — lines: 3 — items: 3 — command: awk '/^\*\*Category C /{f=1;next} f&&/^\*\*Category D /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Command/' docs/loop-engineering/harness-agent-concurrency.md
+- set: cat-d — status: 0 — lines: 2 — items: 2 — command: awk '/^\*\*Category D /{f=1;next} f&&/^\*\*Category E /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Command/' docs/loop-engineering/harness-agent-concurrency.md
+- set: cat-e — status: 0 — lines: 4 — items: 4 — command: awk '/^\*\*Category E /{f=1;next} f&&/^\*\*Category F /{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Evidence/' docs/loop-engineering/harness-agent-concurrency.md
+- set: cat-f — status: 0 — lines: 3 — items: 3 — command: awk '/^\*\*Category F /{f=1;next} f&&/^### \(c\)/{exit} f&&/^\|.*\|.*\|$/&&!/^\|---/&&!/^\| Command/' docs/loop-engineering/harness-agent-concurrency.md
+- union: items: 28
+- bucket: cat-a — items: 11
+  - | `a=...; b=...; d=...; avg=...; echo "diff_ns=$d avg_ns=$avg"` (repetition variance) | ran: `diff_ns=6586648000 avg_ns=175307530000` (matches) | ran identically: same output |
+  - | `echo $(( ...batch...)); echo $(( ...sum... ))` (rep1 batch-vs-sum) | ran: `182641255000` / `369486203000` (matches) | ran identically: same output |
+  - | `echo $(( ...batch...)); echo $(( ...sum... ))` (rep2 batch-vs-sum) | ran: `175066091000` / `354862623000` (matches) | ran identically: same output |
+  - | `echo $(( ...batch...)); echo $(( ...sum... ))` (width-n4 batch-vs-sum) | ran: `283650028000` / `1147796467000` (matches) | ran identically: same output |
+  - | `echo $(( 1786789355493665000 - 1786789176892811000 ))` (Overlap analysis, rep1 margin) | ran: `178600854000` (matches note) | ran identically: `178600854000` — no repo dependency, same result anywhere |
+  - | `echo $(( 1786789575098697000 - 1786789403084491000 ))` (rep2 margin) | ran: `172014206000` (matches) | ran identically: `172014206000` |
+  - | `echo $(( 1786789633945452000 - 1786789601143196000 ))` (max launch latency) | ran: `32802256000` (matches) | ran identically: `32802256000` |
+  - | `echo $(( 1786789904004940000 - 1786789633945452000 ))` (width-n4 margin) | ran: `270059488000` (matches) | ran identically: `270059488000` |
+  - | `lo=...; hi=...; for v in ...; do echo "$v inside=..."; done` (heartbeat-in-window) | ran: both `inside=1` (matches) | ran identically: same output |
+  - | `mtime=...; start_ns=...; end_ns=...; echo "end_s=... mtime_before_end=... mtime_after_start=..."` (alert in-window-by-write-time) | ran: `end_s=1786790327 mtime_before_end=1 mtime_after_start=1` (matches) | ran identically: same output |
+  - | `ud=...; ll=...; ...; echo "st_gt_ud=... cs_gt_st=... ud_ge_mf_x_ll=..."` (ordering invariant) | ran: `st_gt_ud=1 cs_gt_st=1 ud_ge_mf_x_ll=1` (matches) | ran identically: same output |
+- bucket: cat-b — items: 5
+  - | `awk '/^## Assumptions$/{...}' .shell-team/specs/T-1073-harness-agent-concurrency.md \| grep -c '^-'` | ran: `7` (matches the corrected claim) | not applicable — this task's own spec file does not exist in an adopter's repo |
+  - | `awk '/^## Summarized sources$/{...}' .shell-team/specs/T-1073-harness-agent-concurrency.md \| grep -c '^-'` | ran: `10` (matches the corrected claim) | not applicable — same reason |
+  - | `grep -c "\"run_id\":\"20260815T082259Z-t1073\".*\"iteration\":1" .shell-team/runs/shell-team.jsonl` | **ran: `12`, not the ten implied by the surrounding prose** — genuine live finding, disclosed below | not applicable — this repository's own machine-local telemetry file does not exist in an adopter's repo |
+  - | `grep -c '^- agent-timestamp: ' docs/loop-engineering/harness-agent-concurrency.md` | ran: `9` (matches the corrected claim) | not applicable — this exact note file and its `agent-timestamp` lines are this task's own deliverable, absent from any adopter repo |
+  - | `grep -cE '^\s*- name:' .github/workflows/check-handoff.yml` | ran: `73` (matches) | not applicable — an adopter's own CI workflow (if any) is a different file with a different step count |
+- bucket: cat-c — items: 3
+  - | `bash bin/check-intent.sh --print-hash <spec extracted from commit c000121>` (`## Probe protocol`) | ran: `bd2fc01a179a0fd382980c8394a0695ed8576411` (matches the board's recorded hash) | not applicable — `c000121` only resolves in this repository |
+  - | `git merge-base --is-ancestor 88a5e0e... 954e2ee...` (`## Probe protocol`, "Round 3 addendum") | ran: `rc=0` (matches) | not applicable — same reason |
+  - | `git merge-base --is-ancestor c000121... 88a5e0e...; echo "rc=$?"` (`## Probe protocol`) | ran: `rc=0` (matches) | not applicable — both commits are this repository's own |
+- bucket: cat-d — items: 2
+  - | `bin/derive-populations.sh --label t1073-r4-repo-facts --set "agents=..." --set "ci-steps=..."` | ran: exit `0`, well-formed block (embedded in AC16(c) above) | **executed**: bare-name `derive-populations.sh --label matrix-test --set "a=echo x" --set "b=echo y"` in a scratch dir with `bin/` on `PATH` (no plugin structure otherwise) → exit `0`, well-formed block — matches T-1071's own precedent exactly. The *literal* `--set` values in this note's own invocation (`git ls-files -- agents/*.md`, the workflow-file grep) were also tried verbatim in that same scratch dir: `derive-populations: set 'agents' exited with unaccepted status 128 ... : git ls-files -- agents/*.md` → exit `1` — a real, executed refusal (the scratch dir is not a git repository), not a guessed one. So: the **tool** is confirmed portable and bare-name-reachable; **this note's own specific arguments** are repository-local for the same reason as Category B. |
+  - | `bin/derive-populations.sh --label t1073-r4-spec-populations --set "assumptions=..." --set "sources=..."` | ran: exit `0`, well-formed block (embedded above) | **independently executed this round** (round 6 — Codex round 2 correctly flagged the prior "same disposition as the row above" as reasoned-by-analogy, not run): this row's own literal invocation, verbatim, in the same scratch dir with `bin/` on `PATH` → `derive-populations: set 'assumptions' exited with unaccepted status 1 (declare it with --accept-status assumptions=1 if this is a legitimate outcome, e.g. git grep's exit 1 for no match): awk '/^## Assumptions$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md \| grep '^-'`, exit `1` — a distinct failure shape from the row above (this one fails because `awk` finds no matching heading in a nonexistent file, so `grep '^-'` sees empty input and exits 1, tripping the tool's own pipefail refusal; the row above failed because `git ls-files` itself returns 128 outside a git repository). Confirms the same conclusion as the row above (tool portable, this invocation's own arguments repository-local) by independent execution, not inference. |
+- bucket: cat-e — items: 4
+  - | `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 5 15 5` | same disposition as the row above (identical script, different declared arguments) | not applicable — same operator/session-local reason as the row above |
+  - | `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <that-agent's-transcript.output> "" 5 20 5` | attempted against a deliberately nonexistent transcript path (the real per-agent transcript paths are session-specific and no longer resolvable): the script itself ran and reported `WATCHDOG: transcript gone (agent likely finished)`, exit `0` — the script exists and is invocable from this role's own shell, but its *substantive* per-instance behavior (polling a live transcript) cannot be faithfully reconstructed outside a real probe session, exactly as `## Assumptions` item 3 already discloses | not applicable — **operator/session-local**, not repository-local: `agent-watchdog.sh` lives under the operator's own home dotfiles (`~/.claude-dotfiles/...`), is not shipped by this repository or its plugin, and is not part of any adopter's own repo surface at all — an adopter's repo carries no equivalent path regardless of shape |
+  - | `cd "$TMPDIR/t1073-probe-clone" && CHECK_ACS_TIMEOUT=280 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md > /dev/null 2>&1; echo "unit_rc=$?"` | ran inside that same reconstructed clone (took ≈160 s wall-clock, matching the evidence's own ≈148–160 s range): `unit_rc=1`, matching the evidence's own recorded value exactly | **tool-vs-argument split, tested**: bare-name `check-acs.sh <adopter-fixture-spec>.md` was executed in a scratch dir with `bin/` on `PATH` (a one-`AC1`-criterion fixture spec built there) → exit `0`, `AC1: PASS`, `1 passed, 0 failed` — the *tool* is portable and bare-name-reachable, matching Category D's own precedent for `derive-populations.sh`. The literal argument in this row (`.shell-team/specs/T-1044-test-infra-bundle.md`) was also tried verbatim in that same scratch dir: `ERROR: cannot read spec file: .shell-team/specs/T-1044-test-infra-bundle.md`, exit `2` — a real, executed refusal (this task's own population-fixation spec does not exist in an adopter's repo), not a guessed one |
+  - | `git clone --no-hardlinks <this-checkout-root> "$TMPDIR/t1073-probe-clone" && git -C "$TMPDIR/t1073-probe-clone" checkout f8371eb...` | ran (substituting `<this-checkout-root>` with this real checkout's own path, into a fresh scratch clone): exit `0`; `git rev-parse HEAD` in the clone → `f8371eb6a26b395c020ee7811087150059d33c15`, correctly pinned | not applicable — repository/history-local: this command clones and pins a commit of *this specific repository*'s own git history; an adopter's repo is a different repository with a different commit graph entirely |
+- bucket: cat-f — items: 3
+  - | `cmp -s` between the two slices | ran: exit `0` — byte-identical, confirming **AC2** live once more this round | **executed**: a genuinely portable POSIX utility, tested on two arbitrary files in a fresh scratch directory unrelated to this repository — identical files → exit `0`; differing files → exit `1`; both results match `cmp`'s own documented contract exactly, confirming the tool itself needs no adopter-shaped cell distinct from checkout root (only its *inputs* — this note's own extracted evidence slices — are repository-local) |
+  - | `git show <probe-evidence-sha>:docs/loop-engineering/harness-agent-concurrency.md` (extracted to a scratch file) | ran with the sha currently on the board (`954e2ee...`): exit `0`, non-empty output | not applicable — repository-local: the specific probe-evidence sha and note path resolve only in this repository's own git history |
+  - | the `awk` boundary (`/^## Probe evidence \(raw, orchestrator-produced\)$/{f=1;next} f&&/^## /{exit} f`), run on both the extracted file and the working tree | ran: both slices non-empty | not applicable — repository-local in substance, though the tool (`awk`) is generic: **tested for real** against a scratch file lacking the specific heading (`printf '# Some other doc\n\nNo matching heading here.\n' > other.md`) → the command itself exits `0` (no error), but produces empty output (`0` lines, `test -s` fails) — a vacuous, not erroring, result, since the heading string this awk program searches for is unique to this note |
+<!-- END derivation: t1073-r6-matrix-rows -->
+
+**Scope note**: the four `bash bin/*.sh` invocations `## AC16(c)` already reports
 per-command with their own PASS/FAIL results (`team-paths.sh --get todo`+`check-handoff.sh`,
 `check-pii-shapes.sh`, `check-commit-identity.sh`) are that sub-item's own dedicated report
 and are not repeated here as a third copy.
@@ -517,32 +587,43 @@ below rather than assumed):
 | Command (source) | Context (i): checkout root | Context (ii): adopter-shaped repo, plugin loaded, bare name |
 |---|---|---|
 | `bin/derive-populations.sh --label t1073-r4-repo-facts --set "agents=..." --set "ci-steps=..."` | ran: exit `0`, well-formed block (embedded in AC16(c) above) | **executed**: bare-name `derive-populations.sh --label matrix-test --set "a=echo x" --set "b=echo y"` in a scratch dir with `bin/` on `PATH` (no plugin structure otherwise) → exit `0`, well-formed block — matches T-1071's own precedent exactly. The *literal* `--set` values in this note's own invocation (`git ls-files -- agents/*.md`, the workflow-file grep) were also tried verbatim in that same scratch dir: `derive-populations: set 'agents' exited with unaccepted status 128 ... : git ls-files -- agents/*.md` → exit `1` — a real, executed refusal (the scratch dir is not a git repository), not a guessed one. So: the **tool** is confirmed portable and bare-name-reachable; **this note's own specific arguments** are repository-local for the same reason as Category B. |
-| `bin/derive-populations.sh --label t1073-r4-spec-populations --set "assumptions=..." --set "sources=..."` | ran: exit `0`, well-formed block (embedded above) | same disposition as the row above — the tool is portable, this invocation's own arguments name this task's own spec file, absent from an adopter's repo |
+| `bin/derive-populations.sh --label t1073-r4-spec-populations --set "assumptions=..." --set "sources=..."` | ran: exit `0`, well-formed block (embedded above) | **independently executed this round** (round 6 — Codex round 2 correctly flagged the prior "same disposition as the row above" as reasoned-by-analogy, not run): this row's own literal invocation, verbatim, in the same scratch dir with `bin/` on `PATH` → `derive-populations: set 'assumptions' exited with unaccepted status 1 (declare it with --accept-status assumptions=1 if this is a legitimate outcome, e.g. git grep's exit 1 for no match): awk '/^## Assumptions$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md \| grep '^-'`, exit `1` — a distinct failure shape from the row above (this one fails because `awk` finds no matching heading in a nonexistent file, so `grep '^-'` sees empty input and exits 1, tripping the tool's own pipefail refusal; the row above failed because `git ls-files` itself returns 128 outside a git repository). Confirms the same conclusion as the row above (tool portable, this invocation's own arguments repository-local) by independent execution, not inference. |
 
 **Category E — the byte-locked evidence section's own `- command:` lines** (historical
 record of what the probe actually ran, quoted verbatim; context (i): a faithful
-reconstruction was executed this round on the real repository; context (ii): **not
-applicable — these are a record of one specific past probe session's own execution, tied
-to this repository's commit history and to transcript paths from that session, never a
-documented procedure a reader is told to run**):
+reconstruction, executed this round on the real repository). **Round 6 correction**: this
+category previously collapsed all four rows' `Context (ii)` into one category-level
+blanket sentence — the identical compressed-summary shape this whole section exists to
+close. Restored below as a genuine per-row cell: these four rows do **not** share one
+reason. The `git clone` row is repository/history-local (it clones and pins a commit of
+*this* repository specifically); the `check-acs.sh` row combines a genuinely portable,
+shipped `bin/` tool with a repository-local argument — the identical tool-vs-argument
+split Category D already draws for `derive-populations.sh`, tested the same way; the two
+watchdog rows are **operator/session-local**, a different non-applicability class than
+"repository-local" — `agent-watchdog.sh` is the operator's own personal home-dotfiles
+script, outside this repository (and outside any adopter's own shipped surface) entirely:
 
-| Evidence `- command:` line | Context (i): faithful reconstruction, executed this round |
-|---|---|
-| `git clone --no-hardlinks <this-checkout-root> "$TMPDIR/t1073-probe-clone" && git -C "$TMPDIR/t1073-probe-clone" checkout f8371eb...` | ran (substituting `<this-checkout-root>` with this real checkout's own path, into a fresh scratch clone): exit `0`; `git rev-parse HEAD` in the clone → `f8371eb6a26b395c020ee7811087150059d33c15`, correctly pinned |
-| `cd "$TMPDIR/t1073-probe-clone" && CHECK_ACS_TIMEOUT=280 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md > /dev/null 2>&1; echo "unit_rc=$?"` | ran inside that same reconstructed clone (took ≈160 s wall-clock, matching the evidence's own ≈148–160 s range): `unit_rc=1`, matching the evidence's own recorded value exactly |
-| `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <that-agent's-transcript.output> "" 5 20 5` | attempted against a deliberately nonexistent transcript path (the real per-agent transcript paths are session-specific and no longer resolvable): the script itself ran and reported `WATCHDOG: transcript gone (agent likely finished)`, exit `0` — the script exists and is invocable from this role's own shell, but its *substantive* per-instance behavior (polling a live transcript) cannot be faithfully reconstructed outside a real probe session, exactly as `## Assumptions` item 3 already discloses |
-| `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 5 15 5` | same disposition as the row above (identical script, different declared arguments) |
+| Evidence `- command:` line | Context (i): faithful reconstruction, executed this round | Context (ii): adopter-shaped repo, plugin loaded |
+|---|---|---|
+| `git clone --no-hardlinks <this-checkout-root> "$TMPDIR/t1073-probe-clone" && git -C "$TMPDIR/t1073-probe-clone" checkout f8371eb...` | ran (substituting `<this-checkout-root>` with this real checkout's own path, into a fresh scratch clone): exit `0`; `git rev-parse HEAD` in the clone → `f8371eb6a26b395c020ee7811087150059d33c15`, correctly pinned | not applicable — repository/history-local: this command clones and pins a commit of *this specific repository*'s own git history; an adopter's repo is a different repository with a different commit graph entirely |
+| `cd "$TMPDIR/t1073-probe-clone" && CHECK_ACS_TIMEOUT=280 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md > /dev/null 2>&1; echo "unit_rc=$?"` | ran inside that same reconstructed clone (took ≈160 s wall-clock, matching the evidence's own ≈148–160 s range): `unit_rc=1`, matching the evidence's own recorded value exactly | **tool-vs-argument split, tested**: bare-name `check-acs.sh <adopter-fixture-spec>.md` was executed in a scratch dir with `bin/` on `PATH` (a one-`AC1`-criterion fixture spec built there) → exit `0`, `AC1: PASS`, `1 passed, 0 failed` — the *tool* is portable and bare-name-reachable, matching Category D's own precedent for `derive-populations.sh`. The literal argument in this row (`.shell-team/specs/T-1044-test-infra-bundle.md`) was also tried verbatim in that same scratch dir: `ERROR: cannot read spec file: .shell-team/specs/T-1044-test-infra-bundle.md`, exit `2` — a real, executed refusal (this task's own population-fixation spec does not exist in an adopter's repo), not a guessed one |
+| `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <that-agent's-transcript.output> "" 5 20 5` | attempted against a deliberately nonexistent transcript path (the real per-agent transcript paths are session-specific and no longer resolvable): the script itself ran and reported `WATCHDOG: transcript gone (agent likely finished)`, exit `0` — the script exists and is invocable from this role's own shell, but its *substantive* per-instance behavior (polling a live transcript) cannot be faithfully reconstructed outside a real probe session, exactly as `## Assumptions` item 3 already discloses | not applicable — **operator/session-local**, not repository-local: `agent-watchdog.sh` lives under the operator's own home dotfiles (`~/.claude-dotfiles/...`), is not shipped by this repository or its plugin, and is not part of any adopter's own repo surface at all — an adopter's repo carries no equivalent path regardless of shape |
+| `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 5 15 5` | same disposition as the row above (identical script, different declared arguments) | not applicable — same operator/session-local reason as the row above |
 
 **Category F — `.shell-team/test-recipe.md`'s own T-1073 entry, the three named
-verification commands** (context (i): checkout root; context (ii): **not applicable — the
-probe-evidence sha and this note's own path are specific to this repository's own T-1073
-task**):
+verification commands** (unambiguously in scope: the recipe directs QA to run them).
+**Round 6 correction**: this category previously collapsed all three rows' `Context (ii)`
+into one category-level blanket sentence — the same defect closed for Category E above.
+Restored below per row; the three rows do not share one reason either — two are
+repository-local (the sha and the note's own heading text are specific to this task), the
+third (`cmp -s`) is a genuinely portable POSIX utility, tested for real rather than
+assumed:
 
-| Command (source: test-recipe.md's T-1073 entry) | Context (i) result |
-|---|---|
-| `git show <probe-evidence-sha>:docs/loop-engineering/harness-agent-concurrency.md` (extracted to a scratch file) | ran with the sha currently on the board (`954e2ee...`): exit `0`, non-empty output |
-| the `awk` boundary (`/^## Probe evidence \(raw, orchestrator-produced\)$/{f=1;next} f&&/^## /{exit} f`), run on both the extracted file and the working tree | ran: both slices non-empty |
-| `cmp -s` between the two slices | ran: exit `0` — byte-identical, confirming **AC2** live once more this round |
+| Command (source: test-recipe.md's T-1073 entry) | Context (i) result | Context (ii): adopter-shaped repo, plugin loaded |
+|---|---|---|
+| `git show <probe-evidence-sha>:docs/loop-engineering/harness-agent-concurrency.md` (extracted to a scratch file) | ran with the sha currently on the board (`954e2ee...`): exit `0`, non-empty output | not applicable — repository-local: the specific probe-evidence sha and note path resolve only in this repository's own git history |
+| the `awk` boundary (`/^## Probe evidence \(raw, orchestrator-produced\)$/{f=1;next} f&&/^## /{exit} f`), run on both the extracted file and the working tree | ran: both slices non-empty | not applicable — repository-local in substance, though the tool (`awk`) is generic: **tested for real** against a scratch file lacking the specific heading (`printf '# Some other doc\n\nNo matching heading here.\n' > other.md`) → the command itself exits `0` (no error), but produces empty output (`0` lines, `test -s` fails) — a vacuous, not erroring, result, since the heading string this awk program searches for is unique to this note |
+| `cmp -s` between the two slices | ran: exit `0` — byte-identical, confirming **AC2** live once more this round | **executed**: a genuinely portable POSIX utility, tested on two arbitrary files in a fresh scratch directory unrelated to this repository — identical files → exit `0`; differing files → exit `1`; both results match `cmp`'s own documented contract exactly, confirming the tool itself needs no adopter-shaped cell distinct from checkout root (only its *inputs* — this note's own extracted evidence slices — are repository-local) |
 
 ### (c) CI-equivalence, reachability-scoped
 
