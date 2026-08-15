@@ -976,3 +976,94 @@ that file's order.
   correct regardless of content size, and the technique to reach for
   first the next time a test needs to patch a specific span inside an
   existing `bin/` script rather than a single line.
+- T-1076 round 3 (bounded rework, Codex review round 2 — Blocker + Major +
+  Minor, all in test/diagnostic code): three fixes.
+  1. **`signal-race-release-side` (Blocker) — the fixture's own kill was
+     scheduling-dependent.** Round 2's choreography sent `kill -TERM` to P1
+     the instant P1's own post-rmdir marker appeared, then polled (up to
+     5x1s) for the successor P2 to have reacquired the freed lock —
+     AFTER the kill, so it could not retroactively fix the ordering.
+     Fixed by building a DEDICATED P2 mutant that writes its own
+     `.p2-acquired-marker` the instant its own `mkdir` succeeds, and
+     moving the wait for THAT marker to BEFORE the kill. This required
+     widening both mutants' injected vulnerability window (`sleep 3` →
+     `sleep 8` in the two P1 mutants) so the added pre-kill poll fits
+     inside it, and widening P2's own post-acquire hold (`sleep 5` →
+     `sleep 12`, in the new dedicated P2 mutant only) so the FIXED-shape
+     arm's "successor's lock must still be there" check is never read
+     against a P2 that already finished its own lifecycle for an
+     unrelated, benign reason (P1's fixed-shape arm does not return until
+     it has run its own full masked window to completion). Verified with
+     a standalone extraction driver (replays this file's own
+     `replace_range`/`ACQ_START`/`ACQ_END`/release-side block, keyed on
+     unique anchor lines, in a loop — the same technique round 2 recorded
+     above, reused rather than reinvented) run 5 consecutive times:
+     `grep -c '^PASS: T-1076 signal-race-release-side' <log>` = **5**,
+     `grep -c '^=== iteration' <log>` = **5**, no flake. Each iteration now
+     takes noticeably longer (~30-35s, up from round 2's much shorter
+     per-arm time) because of the widened windows and P2's longer hold —
+     wall-clock cost this round's engineer paid deliberately for
+     determinism, not a regression to chase.
+  2. **AC10 negative control (Major) — disclosed rather than
+     barrier-forced.** No explicit synchronization barrier was added
+     (would require pausing the lock-disabled mutant's own
+     compute-then-append critical section on a shared rendezvous —
+     restructuring the very TOCTOU mechanism this arm exists to observe,
+     out of this bounded rework's scope). Instead, the arm's actual
+     (empirical, not structurally forced) guarantee is disclosed in a
+     test comment: with CONT_N (>=8) writers each performing CONT_M
+     (>=20) fully-unserialized cycles against one shared file (>=160
+     total appends, zero serialization in the mutant), at least one
+     collision is empirically near-certain, not certain by construction.
+     Verified with the same standalone-driver technique, run 5
+     consecutive times: `grep -c '^PASS: T-1076 negative-control —
+     detected' <log>` = **5**, `grep -c '^=== iteration' <log>` = **5**,
+     every run `detected — seq-set-mismatch`, no `not-detected` observed.
+     Each iteration of JUST this arm alone (isolated from the rest of the
+     suite, no parallelism benefit from the other ~40 earlier test cases
+     that would otherwise share the host's idle time) took on the order
+     of several minutes on this shared, contended sandbox host — the
+     dominant cost is still `compute_auto_seq`'s O(file) bash-native
+     `while read` scan re-run on every one of the 160 total appends
+     against a file that grows to ~2.5MB (160 rows x ~16KB `--error`
+     payload each), unchanged from round 2. Budget accordingly: running
+     this arm's 5x tally in isolation is markedly slower per-iteration
+     than its share of the full suite's own ~189s total (where it runs
+     once, and other tests' CPU-idle windows do not compound the way five
+     back-to-back isolated runs do on a busy shared host).
+  3. **`lock_mtime` (Minor) — the BSD-form probe silently "succeeded" with
+     garbage on GNU/Linux.** Fixed by probing the dialect itself
+     (`stat --version` succeeds on GNU coreutils, fails on BSD/macOS
+     `stat`) and running ONLY that dialect's own format string, instead of
+     trying the BSD form first and falling through to the GNU form on a
+     non-zero exit (GNU's `-f '%Sm'` is a syntactically valid, if
+     nonsensical, format string on GNU `stat`, so the old fallthrough
+     never triggered there). Verified on this host: `stat --version`
+     exits 1 with `illegal option -- -` (confirming the BSD branch is the
+     one actually selected here), and a manual invocation against a real
+     lock directory produced a legible timestamp, not `unknown` or
+     garbage. Honest bound, unchanged from the review finding itself:
+     only the BSD branch is exercised from this repo's own dev host — the
+     GNU branch is written from GNU `stat`'s documented behaviour and is
+     NOT independently verified against a live GNU/Linux host from here.
+     **Mutation self-check finding on the new `lock-mtime-legible` test
+     itself, worth remembering for anyone else writing a "does this look
+     like a real timestamp" guard**: a first draft asserted only
+     `grep -qE '[0-9]{4}'` (a bare four-digit check). Feeding it the exact
+     garbled value this round's own finding named (`4096m`) — the mutant a
+     real GNU-dialect bug would actually produce — WRONGLY PASSED, because
+     `4096` alone is four digits. A digit-count check does not verify
+     "looks like a timestamp"; it verifies "contains some four-digit
+     number," which a filesystem block size satisfies just as well.
+     Strengthened to require the recognizable SHAPE (a three-letter month
+     abbreviation, an `HH:MM:SS` time, a trailing plausible year), which
+     both `4096m` and a plain `unknown` correctly fail.
+  A reusable technique recorded for the next task that needs to
+  iterate quickly on one expensive arm of an already-slow suite:
+  extract just that arm's own code (plus whatever earlier variable/
+  function definitions it depends on) out of the suite file with
+  `sed -n '/START-ANCHOR/,/END-ANCHOR/p'` into a small driver script that
+  `eval`s it in a loop with a fresh scratch root each iteration — far
+  faster to iterate on than re-running the whole ~189s suite for every
+  probe, and the anchors stay in sync with the real file since they are
+  read from it live rather than copied.

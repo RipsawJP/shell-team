@@ -521,11 +521,43 @@ esac
 # message. BSD `stat` (macOS, this repo's own dev host) and GNU `stat` spell
 # the flag differently and neither is guaranteed present, so every arm
 # degrades to "unknown" rather than failing the refusal path itself.
+#
+# T-1076 rework round 3 (Codex round-2 Minor): the previous shape tried the
+# BSD form (`stat -f '%Sm'`) first and fell through to the GNU form only on
+# a non-zero exit. That fallthrough never triggers on GNU/Linux: GNU `stat`
+# parses `-f '%Sm'` as a VALID format string (`%S` is "print the next
+# directive literally if unsupported, else its safe/quoted form" — legal in
+# `-f` mode; the trailing `m` is consumed as a literal character), so the
+# command SUCCEEDS with a nonsensical value (e.g. `4096m`, the filesystem
+# block size followed by a stray `m`) instead of failing over to the
+# correct GNU-form `stat -c '%y'` line below it. Exit status alone cannot
+# discriminate the two dialects here because the wrong-dialect call does
+# not fail. Discriminate on the dialect itself instead, using the
+# `--version` flag as the probe: GNU coreutils' `stat` supports it and
+# exits 0; BSD/macOS `stat` treats it as an unrecognized option and exits
+# non-zero (measured on this repo's own dev host, this session: `stat
+# --version` exits 1 with "illegal option -- -"). Each branch then runs
+# only the format string that dialect actually accepts, so a
+# wrong-dialect call is never attempted and the old silent-garbage path
+# cannot recur.
+#
+# Verified bound, stated honestly: this host is macOS (BSD `stat`), so only
+# the BSD branch below is exercised by this session's own tests. The GNU
+# branch is written from GNU `stat`'s documented `-c`/`--version` behaviour
+# and is NOT independently verified against a live GNU/Linux host here.
 lock_mtime() {
   local d="$1"
-  if command -v stat >/dev/null 2>&1; then
-    stat -f '%Sm' "$d" 2>/dev/null && return 0
+  if ! command -v stat >/dev/null 2>&1; then
+    printf 'unknown'
+    return 0
+  fi
+  if stat --version >/dev/null 2>&1; then
+    # GNU coreutils stat: --version is recognized.
     stat -c '%y' "$d" 2>/dev/null && return 0
+  else
+    # BSD/macOS stat: --version is an unrecognized option, not a real probe
+    # of the file, so this branch never mistakes it for a stat target.
+    stat -f '%Sm' "$d" 2>/dev/null && return 0
   fi
   printf 'unknown'
 }
