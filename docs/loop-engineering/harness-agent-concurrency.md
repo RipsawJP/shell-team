@@ -24,7 +24,7 @@ sandbox). Re-probe date: 2026-08-15.
 
 ### Commands (verbatim, the executable core of the protocol as run)
 
-- command: git clone --no-hardlinks /Users/sawamatsu/workspace/_my-repos/shell-team "$TMPDIR/t1073-probe-clone" && git -C "$TMPDIR/t1073-probe-clone" checkout f8371eb6a26b395c020ee7811087150059d33c15
+- command: git clone --no-hardlinks <this-checkout-root> "$TMPDIR/t1073-probe-clone" && git -C "$TMPDIR/t1073-probe-clone" checkout f8371eb6a26b395c020ee7811087150059d33c15
 - command: cd "$TMPDIR/t1073-probe-clone" && CHECK_ACS_TIMEOUT=280 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md > /dev/null 2>&1; echo "unit_rc=$?"
 - command: bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <that-agent's-transcript.output> "" 5 20 5
 - command: bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 5 15 5
