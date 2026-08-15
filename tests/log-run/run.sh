@@ -318,4 +318,199 @@ set -e
 [ ! -e "$INST_DIR/ev" ] || fail "log-run --instance in event mode created a runs dir"
 pass "log-run rejects --instance in event mode (exit 2, nothing written)"
 
+# =====================================================================
+# T-1076: append-lock contention suite (AC9) plus the lock-disabled
+# negative control (AC10). Floors read back by AC9's own check: N
+# (writers) >= 8, M (rows per writer) >= 20, payload_bytes (the
+# negative control's --error payload size) >= 16384.
+#
+# Design note (why the POSITIVE arm below carries no --error payload,
+# while the NEGATIVE CONTROL alone carries the 16384+-byte floor): D6's
+# own text scopes the multi-kilobyte payload requirement to the negative
+# control's sentence specifically ("run at the same or higher
+# concurrency with multi-kilobyte --error payloads"), not to the main
+# 8x20 case. That distinction is load-bearing here: bin/check-run.sh's
+# own unbalanced-quote detection (its `unq="${line//\\\\/}"; unq=
+# "${unq//\\\"/}"; quotes="${unq//[!\"]/}"` chain) is measured (this
+# session, this repo's own stock bash 3.2.57 dev host — see
+# .shell-team/test-recipe.md's T-1076 entry) to take upward of two
+# minutes for a SINGLE line once a JSON string field passes a few
+# kilobytes — a pre-existing property of a script this task's Non-goals
+# forbid touching, not something introduced here. Running it against a
+# 16KB+-payload row is therefore not a practical per-write cost, so the
+# positive arm here stays small/fast (feasible to lint for
+# contention-check-run-clean below) and the negative control's own
+# corruption detection never invokes check-run.sh at all.
+# =====================================================================
+
+CONT_N=8
+CONT_M=20
+NEG_PAYLOAD_BYTES=16384
+
+# run_contention_writer <writer-path> <runs-dir> <loop-id> <run-id> <n> <m> [<error-payload>]
+# — launches <n> background writer processes, each appending <m> rows
+# with --seq auto and its own --instance tag, then waits for all of
+# them. Never asserts anything itself: the caller judges the result,
+# since the positive and negative arms below judge the SAME shape
+# differently.
+run_contention_writer() {
+  local writer="$1" runsdir="$2" loop="$3" runid="$4" n="$5" m="$6" errpayload="${7:-}"
+  mkdir -p "$runsdir"
+  local i j
+  for i in $(seq 1 "$n"); do
+    (
+      # shellcheck disable=SC2034  # j is the loop counter only, never read
+      for j in $(seq 1 "$m"); do
+        if [ -n "$errpayload" ]; then
+          TEAM_RUNS_DIR="$runsdir" TEAM_LOG_LOCK_TIMEOUT=30 bash "$writer" "$loop" \
+            --run-id "$runid" --seq auto --span s --phase p --iteration 0 --attempt 1 \
+            --status success --instance "w$i" --error "$errpayload" >/dev/null 2>&1
+        else
+          TEAM_RUNS_DIR="$runsdir" TEAM_LOG_LOCK_TIMEOUT=30 bash "$writer" "$loop" \
+            --run-id "$runid" --seq auto --span s --phase p --iteration 0 --attempt 1 \
+            --status success --instance "w$i" >/dev/null 2>&1
+        fi
+      done
+    ) &
+  done
+  wait
+}
+
+# --- the positive contention arm: real writer, real lock, no payload --------
+POS_DIR="$TMP/contention-pos"
+run_contention_writer "$LOGRUN" "$POS_DIR" contloop SHARED "$CONT_N" "$CONT_M"
+POS_FILE="$POS_DIR/contloop.jsonl"
+
+pass "T-1076 contention-parameters — N=$CONT_N — M=$CONT_M — payload_bytes=$NEG_PAYLOAD_BYTES"
+
+pos_total="$(grep -c . "$POS_FILE" || true)"
+[ "$pos_total" -eq "$((CONT_N * CONT_M))" ] || fail "T-1076 contention-total-lines: got $pos_total lines, expected $((CONT_N * CONT_M))"
+pass "T-1076 contention-total-lines"
+
+bash "$REPO_ROOT/bin/check-run.sh" "$POS_FILE" >/dev/null 2>&1 \
+  || fail "T-1076 contention-check-run-clean: bin/check-run.sh reported the contention file dirty"
+pass "T-1076 contention-check-run-clean"
+
+for i in $(seq 1 "$CONT_N"); do
+  wcnt="$(grep -c "\"instance\":\"w$i\"" "$POS_FILE" || true)"
+  [ "$wcnt" -eq "$CONT_M" ] || fail "T-1076 contention-per-writer-counts: writer w$i wrote $wcnt rows, expected $CONT_M"
+done
+pass "T-1076 contention-per-writer-counts"
+
+POS_SEQS="$TMP/pos-seqs.txt"
+grep -oE '"run_id":"SHARED","seq":[0-9]+' "$POS_FILE" | grep -oE '[0-9]+$' | LC_ALL=C sort -n > "$POS_SEQS"
+POS_EXP="$TMP/pos-exp.txt"
+seq 1 "$((CONT_N * CONT_M))" > "$POS_EXP"
+cmp -s "$POS_SEQS" "$POS_EXP" \
+  || fail "T-1076 contention-auto-seq-set: derived seq set for run_id SHARED does not exactly match 1..$((CONT_N * CONT_M)) (duplicate or gap)"
+pass "T-1076 contention-auto-seq-set"
+
+# --- the D2 refusal case: a pre-held lock => nothing written, exit 3 -------
+LT_DIR="$TMP/contention-locktimeout"
+mkdir -p "$LT_DIR"
+mkdir "$LT_DIR/.locktest.jsonl.lock"
+set +e
+TEAM_LOG_LOCK_TIMEOUT=1 TEAM_RUNS_DIR="$LT_DIR" bash "$LOGRUN" locktest --run-id X --seq 1 --span s --phase p \
+  --iteration 0 --attempt 1 --status success >/dev/null 2>"$TMP/lt-err"
+lt_rc=$?
+set -e
+[ "$lt_rc" -eq 3 ] || fail "T-1076 lock-timeout-refusal: expected exit 3, got $lt_rc"
+[ ! -e "$LT_DIR/locktest.jsonl" ] || fail "T-1076 lock-timeout-refusal: the writer should not have appended anything"
+grep -qF -- '.locktest.jsonl.lock' "$TMP/lt-err" || fail "T-1076 lock-timeout-refusal: stderr did not name the lock path"
+rmdir "$LT_DIR/.locktest.jsonl.lock"
+pass "T-1076 lock-timeout-refusal"
+
+# --- a writer killed while holding the lock releases it (D3) ---------------
+# A scratch copy of the real writer with one line patched (a `sleep 5`
+# injected right after LOCK_ACQUIRED=1) so there is a window to signal it
+# mid-hold; the EXIT/INT/TERM trap this task adds must still fire.
+SIG_BIN_DIR="$TMP/lockrelease-bin"
+mkdir -p "$SIG_BIN_DIR"
+sed 's/^LOCK_ACQUIRED=1$/LOCK_ACQUIRED=1\nsleep 5/' "$LOGRUN" > "$SIG_BIN_DIR/log-run.sh"
+grep -q '^sleep 5$' "$SIG_BIN_DIR/log-run.sh" || fail "T-1076 lock-released-on-signal setup: the sleep injection did not apply to the scratch copy"
+
+SIG_DIR="$TMP/lockrelease-runs"
+mkdir -p "$SIG_DIR"
+TEAM_RUNS_DIR="$SIG_DIR" bash "$SIG_BIN_DIR/log-run.sh" sigloop --run-id S --seq 1 --span s --phase p \
+  --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+sig_pid=$!
+
+sig_waited=0
+while [ ! -d "$SIG_DIR/.sigloop.jsonl.lock" ] && [ "$sig_waited" -lt 15 ]; do
+  sleep 1
+  sig_waited=$((sig_waited + 1))
+done
+[ -d "$SIG_DIR/.sigloop.jsonl.lock" ] || fail "T-1076 lock-released-on-signal setup: the lock directory never appeared"
+
+kill -TERM "$sig_pid" 2>/dev/null || true
+wait "$sig_pid" 2>/dev/null || true
+
+[ ! -d "$SIG_DIR/.sigloop.jsonl.lock" ] || fail "T-1076 lock-released-on-signal: the lock directory survived a killed holder"
+[ ! -e "$SIG_DIR/sigloop.jsonl" ] || fail "T-1076 lock-released-on-signal: the killed holder should not have appended a row"
+
+TEAM_RUNS_DIR="$SIG_DIR" bash "$LOGRUN" sigloop --run-id S --seq 1 --span s --phase p --iteration 0 --attempt 1 \
+  --status success >/dev/null 2>&1
+sig_followup_rc=$?
+[ "$sig_followup_rc" -eq 0 ] || fail "T-1076 lock-released-on-signal: the lock was unusable after the killed holder released it"
+pass "T-1076 lock-released-on-signal"
+
+# =====================================================================
+# T-1076 AC10: the negative control. A lock-disabled mutant, built
+# under $TMP (never the working tree), run at the SAME writer/row
+# floors as the positive arm above, but with the large --error payload
+# (see the design note at the top of this section for why the split).
+# It must measurably fail; the outcome is recorded either way, on a
+# fixed-grammar PASS line — never silently, and never answered by
+# weakening a positive assertion above.
+# =====================================================================
+NEG_BIN_DIR="$TMP/negctrl-bin"
+mkdir -p "$NEG_BIN_DIR"
+# shellcheck disable=SC2016  # single-quoted sed program: the literal text
+# `$LOCK_DIR` is the pattern being matched in the SOURCE file, not an
+# expansion in THIS script.
+sed 's/^until mkdir "\$LOCK_DIR" 2>\/dev\/null; do$/until true; do/' "$LOGRUN" > "$NEG_BIN_DIR/log-run.sh"
+grep -q '^until true; do$' "$NEG_BIN_DIR/log-run.sh" \
+  || fail "T-1076 negative-control setup: the lock-disabling patch did not apply to the scratch copy"
+if cmp -s "$LOGRUN" "$NEG_BIN_DIR/log-run.sh"; then
+  fail "T-1076 negative-control setup: the mutant is byte-identical to the real writer (patch had no effect)"
+fi
+# Deliberately no sibling check-run.sh in this scratch dir: the writer's own
+# post-write self-check skips silently when check-run.sh is absent (T-042,
+# documented in the header), which this arm needs for the reason the design
+# note above states.
+
+NEG_ERR="$(head -c "$NEG_PAYLOAD_BYTES" /dev/zero | tr '\0' 'x')"
+[ "${#NEG_ERR}" -eq "$NEG_PAYLOAD_BYTES" ] \
+  || fail "T-1076 negative-control setup: payload generation produced ${#NEG_ERR} bytes, expected $NEG_PAYLOAD_BYTES"
+
+NEG_DIR="$TMP/contention-neg"
+run_contention_writer "$NEG_BIN_DIR/log-run.sh" "$NEG_DIR" contloop SHARED "$CONT_N" "$CONT_M" "$NEG_ERR"
+NEG_FILE="$NEG_DIR/contloop.jsonl"
+
+neg_findings=""
+if [ ! -s "$NEG_FILE" ]; then
+  neg_findings="empty-output"
+else
+  neg_total="$(grep -c . "$NEG_FILE" || true)"
+  if [ "$neg_total" -ne "$((CONT_N * CONT_M))" ]; then
+    neg_findings="${neg_findings}${neg_findings:+, }line-count=$neg_total (expected $((CONT_N * CONT_M)))"
+  fi
+  NEG_SEQS="$TMP/neg-seqs.txt"
+  grep -oE '"run_id":"SHARED","seq":[0-9]+' "$NEG_FILE" | grep -oE '[0-9]+$' | LC_ALL=C sort -n > "$NEG_SEQS"
+  NEG_EXP="$TMP/neg-exp.txt"
+  seq 1 "$((CONT_N * CONT_M))" > "$NEG_EXP"
+  if ! cmp -s "$NEG_SEQS" "$NEG_EXP"; then
+    neg_findings="${neg_findings}${neg_findings:+, }seq-set-mismatch (duplicate or gap in the derived seq set for run_id SHARED)"
+  fi
+fi
+
+if [ -n "$neg_findings" ]; then
+  NEG_TOKEN="detected"
+  NEG_TEXT="mutant deviated from the positive-arm invariants: $neg_findings"
+else
+  NEG_TOKEN="not-detected"
+  NEG_TEXT="mutant reproduced every positive-arm invariant despite the lock being disabled"
+fi
+pass "T-1076 negative-control — $NEG_TOKEN — $NEG_TEXT"
+
 printf '\nAll log-run resolution assertions passed.\n'
