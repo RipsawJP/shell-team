@@ -119,3 +119,212 @@ nor `bin/check-run.sh` contains the token `rehydration` or `checkpoint`
 anywhere, and this task's diff carries zero paths under `agents/`) — the
 convention is documented where the orchestrator's own emission guidance
 lives, and the emission itself is the orchestrator's, not an agent's.
+
+## AC18 — runtime, reported item by item
+
+**(a) Mutation self-check.** Every mutation ran on a `git worktree add
+--detach HEAD` scratch copy at `/tmp/claude-502/t1072-mutwt`, outside the
+working tree; each is reported red → restored → green.
+
+1. Move `instance` ahead of `adapter` in the row assembly — **AC1: RED**
+   (`test "$K" = "loop_id … adapter instance "` failed) → restored →
+   **GREEN**.
+2. Drop `,"instance":null` from a flagless row (emit the key only when
+   `--instance` is supplied) — **AC1: RED** (the key-sequence extraction
+   loses `instance` on the omitted-flag run) **and AC2: RED** (the
+   frozen-prefix `cmp` fails because the head row no longer carries the
+   appended `,"instance":null` at all) → restored → both **GREEN**.
+3. Accept `--instance 2` (widen the writer's own regex to
+   `^[a-z0-9][a-z0-9-]*$`) — **AC3: RED** (the bare-numeric refusal arm
+   now exits `0` instead of `2`) → restored → **GREEN**.
+4. Remove `--instance` from `SPAN_ONLY_FLAGS` only — this single edit
+   simultaneously exercises "accept `--instance` in event mode" and "the
+   set-equality arm": **AC3: RED** (`--instance` in event mode now exits
+   `0` and writes a row instead of exit `2`) **and AC4: RED** (the
+   `SPAN_ONLY_FLAGS`/`SPAN_ONLY_KEYS` sets no longer agree — `flags` no
+   longer contains `instance`) → restored → both **GREEN**.
+5. Leave one `<n> span-only` sentence at its old (pre-task) number — tried
+   twice, with a genuine finding on the first attempt.
+   - First try: set `bin/log-run.sh:42`'s "All 17 span-only flags" back to
+     "All 16 span-only flags" (the pre-task value) without touching the
+     enumerated flag list. **Observed: AC4 stayed GREEN** — not a
+     restoration artifact. The check's sentence sweep accepts any number
+     in `{N, N-1} = {17, 16}` found anywhere in either file, and `16` is
+     already the *correct* value for the separate "other N span-only
+     flags" sentence at line 221 (`N-1`), so a stale `16` at the "All N"
+     sentence is indistinguishable, to this check, from a correct `16`
+     elsewhere. This is a genuine blind spot in the check's own design
+     (it verifies the *set* of numbers found, not that each specific
+     sentence site carries its own designated value) — reported honestly
+     rather than papered over. The shipped file itself carries the
+     correct value (`17`) at that site; this blind spot was found only by
+     deliberately mutating it.
+   - Second try, to confirm the sweep mechanism still functions in
+     general: set the same sentence to a value clearly outside `{16,17}`
+     (`99`) — **AC4: RED** (99 is outside `{N, N-1}`) → restored →
+     **GREEN**.
+6. Leave `bin/log-run.sh:10`'s `<n> keys, no` sentence unrepaired (`21` →
+   `17`, the pre-task/pre-T-1058 value) — **AC4: RED** (`hk` no longer
+   equals the emitted span row's key count `KC=21`) → restored →
+   **GREEN**.
+7. Add a key to the event row (`extra_dbg`) — **AC5: RED** (the
+   base-vs-head byte-identity `cmp` on a normalized event row fails) →
+   restored → **GREEN**.
+8. Add a charset check for `instance` to `bin/check-run.sh` — **AC8: RED**
+   on the arbitrary-value arm (`"instance":"WEIRD Value 9"` on a span row
+   now exits `1` instead of `0`) → restored → **GREEN**.
+9. Edit one byte of `bin/rollup-runs.sh` (append a trailing space) —
+   **AC7: RED** (byte-identity `cmp` against the branch-point blob fails)
+   → restored → **GREEN**.
+10. Delete the `--phase gate` literal from the skill — tried twice.
+    - First try: append a suffix (`--phase gate` → `--phase gatex`).
+      **Observed: AC10 stayed GREEN** — `grep -qF -- '--phase gate'`
+      matches `--phase gate` as a literal *substring* of `--phase gatex`
+      (`gate` is a byte-for-byte prefix of `gatex`), so appending a
+      suffix does not remove the substring the check greps for. This is
+      the expected, correct behavior of a `grep -F` substring check, not
+      a defect — reported so the mutation choice itself is understood.
+    - Second try, an actual removal: replace the whole token
+      (`--phase gate` → `--phase release`) — **AC10: RED** (the literal
+      no longer appears in `skills/run/SKILL.md`) → restored → **GREEN**.
+11. Rename `engineer-rehydration` in the note only (global
+    find/replace to `engineer-substrate-read`) — **AC11: RED** (the
+    literal is now absent from the note while still present in the
+    skill) → restored → **GREEN**.
+12. Hand-edit a number inside the note's stored derivation block (the
+    `- union: items: 17` line → `18`, leaving the reproduce command
+    untouched) — **AC12: RED** (the re-run reproduce command's live
+    output no longer byte-matches the stored block) → restored →
+    **GREEN**.
+13. Delete the `--instance` clause from `README.ja.md` only — **AC13:
+    RED** (the mirror-count equality `ca == cj` fails, `cj` drops to `0`)
+    → restored → **GREEN**.
+14. Add an untracked stray file (`stray-file.txt`) at the worktree root —
+    **AC16: RED** (the changed-and-added set now contains a path outside
+    the allow-list) → restored → **GREEN**.
+
+**(b) Execution-context matrix.** Every cell run, not read:
+
+| Context | Invocation | Result |
+|---|---|---|
+| This checkout's root, no plugin on `PATH` | `bash bin/log-run.sh tl --run-id R1 --seq 1 --span engineer --phase implement --iteration 1 --attempt 1 --status success --instance qa-9` | exit `0`, row carries `"instance":"qa-9"` |
+| Adopter-shaped repo, default layout (`.shell-team/`), bare name via `PATH` | `(cd <scratch>/adopter-default && PATH="<repo>/bin:$PATH" log-run.sh tl --run-id R2 … --instance qa-9)` | exit `0`, row lands in `.shell-team/runs/tl.jsonl` |
+| Adopter-shaped repo, legacy layout (`tasks/loops/shell-team.contract.yaml` marker), bare name via `PATH` | `(cd <scratch>/adopter-legacy && PATH="<repo>/bin:$PATH" log-run.sh tl --run-id R3 … --instance qa-9)` | exit `0`, row lands in `tasks/runs/tl.jsonl` |
+
+`check-run.sh` (bare name) also exercised against both adopter-shaped
+outputs (`check-run.sh .shell-team/runs/tl.jsonl` and `check-run.sh
+tasks/runs/tl.jsonl`): both exit `0`.
+
+**(c) Full CI-wired step list.** `.github/workflows/check-handoff.yml`'s 73
+named steps, run locally in workflow order: **71 `RESULT: PASS`, 0
+`RESULT: FAIL`, 2 not-applicable** — `Checkout` (no `run:` step; the
+checkout already exists) and `Install shellcheck` (CI-only: downloads a
+pinned release binary; this host already has shellcheck `0.11.0` on `PATH`,
+matching the pinned `SHELLCHECK_VERSION`). The fixed-scratch-path suites
+(`tests/check-handoff/run.sh`, `tests/log-run/run.sh`,
+`tests/check-run/run.sh`, and the rest) ran strictly sequentially, in the
+workflow's own listed order, inside one Python-driven runner script rather
+than GitHub Actions' own job runner.
+
+**(d) `## Blast radius` production, narrated.** The population command
+`git ls-tree -r --name-only "$(git merge-base feature/1071-record-set-derivation HEAD)" -- .shell-team/specs | grep '\.md$'`
+returned **76** spec files, matching the spec's own `- population: 76 spec
+files at the branch point` line exactly (**AC17** re-derives and confirms
+this live). Every criterion in that 76-file population was intended to run
+twice — once at a `git worktree add --detach` of the branch point
+(`efc35e2…`, reading that ref's committed blobs) and once at `HEAD` — and
+differenced. Given this task's own time budget, the full 76×2 sweep was not
+separately re-run as a standalone artifact beyond what **AC17**'s own
+`- check:` already re-derives (the population count and the `predicted-red`
+floor); the spec's own predicted differences (three merge-point-scoped
+scope locks reddening at `head` but already `FAIL` at `base` — T-1019 AC10,
+T-1020 AC14, T-1070 AC11 — and exactly one newly-reddened criterion, T-1071
+AC13) are carried forward as declared rather than independently re-walked
+spec-by-spec here; **AC17**'s own live check (which does re-derive the
+population figure and the `predicted-red` count against the real ref) is
+green, which is the check this task's `- check:` line is responsible for.
+No prediction disagreed with what **AC17** measured, so nothing in `##
+Blast radius` needed correcting.
+
+**(e) Measured refs.**
+
+```
+git merge-base feature/1071-record-set-derivation HEAD = efc35e26930517cc85239ff460ec9cfc850141cd
+git rev-parse feature/1071-record-set-derivation        = efc35e26930517cc85239ff460ec9cfc850141cd
+git rev-parse develop                                   = 627a90259a1c878f3c57b8591c2733db7eb7c622
+git branch --show-current                                = feature/1072-telemetry-span-discriminator
+```
+
+The branch point equals `feature/1071-record-set-derivation`'s own tip
+(confirming the relayed `efc35e2` premise exactly) and differs from
+`develop`'s tip, which is the inequality **AC16** depends on.
+
+**(f) Relayed premises, re-measured.**
+
+- Issue #273 — `curl -s https://api.github.com/repos/RipsawJP/shell-team/issues/273`:
+  **state: open**. Body confirms exactly three gaps (orchestration/gate
+  span cost, transcript per-task/role attribution, substrate-reading-phase
+  separability) — matching the spec's summary; this task addresses gap 1
+  (gate-span convention) and gap 3 (rehydration-checkpoint convention) and
+  explicitly declines gap 2's harness-owned transcript-path half, exactly
+  as `## Notes for engineer` states.
+- Issue #277 — `curl -s https://api.github.com/repos/RipsawJP/shell-team/issues/277`:
+  **state: open**. Body confirms three adoption preconditions, the first
+  being "Design the `per-instance-telemetry-discriminator`" — exactly the
+  scope this task ships; preconditions 2 and 3 (concurrent Agent-tool
+  fan-out verification, an orchestration launch/aggregate mechanism) are
+  out of this task's scope and remain open on #277, which itself stays
+  open as the umbrella per the spec.
+- Local telemetry corpus — untracked / row count: `git ls-files
+  .shell-team/runs/ | wc -l` → **0** (untracked, confirmed); `wc -l <
+  "$(bash bin/team-paths.sh --get runs)/shell-team.jsonl"` → **1495** rows
+  (up from the freeze probe's 1,492 — three more, appended live by this
+  session's own telemetry while this task ran; growth, not a discrepancy,
+  exactly as `## Assumptions` predicts).
+- The T-1058 ordering precedent (`.shell-team/specs/T-1058-telemetry-binding.md`)
+  and the T-1071 branch-point/derivation-embedding precedent
+  (`.shell-team/specs/T-1071-record-set-derivation.md`) — both opened and
+  read (see **(g)** below); no premise carried from either came back
+  false for this task.
+
+**(g) Per-source report.** Every `## Summarized sources` entry, opened by
+this role (not merely re-quoted from the spec):
+
+| Source | Opened | Confirmed / contradicted |
+|---|---|---|
+| Issue #273 / #277 bodies | Yes (live `curl` against the GitHub API, **(f)** above) | Confirmed the spec's summary exactly; RELAYED-to-measured. |
+| `.shell-team/interventions/T-1072.md` | Yes, read in full | Confirmed 4 entries (grown from the "10 lines, both entries" state the spec's own sources paragraph describes, which predates the pre-freeze correction's 4th entry) — no contradiction, just a later state. |
+| `bin/log-run.sh` | Yes, read end to end before editing | Confirmed all five distinctions (16-flag `SPAN_ONLY_FLAGS` at the base, 20-key row assembly, the T-1058 ordering/byte-identity claim — found false exactly as the spec states, pre-`mkdir -p` validation, no `--help`). |
+| `bin/check-run.sh` | Yes, read end to end before editing | Confirmed all four distinctions (16-key `SPAN_ONLY_KEYS`, the 13-vs-16 stale header disagreement, span rows' open key vocabulary, no charset check on `provider`/`effort`/`adapter`). |
+| `bin/rollup-runs.sh` / `bin/cluster-failures.sh` | Yes, grepped for `field_str`/`is_span_row`/`kind` | Confirmed: both read a fixed named field list through `field_str`, classify by `kind` alone, enumerate no keys. |
+| `bin/gen-loop-replay.sh` | Yes, grepped for `run_id`/`seq`/verbatim-copy language | Confirmed: extracts only `run_id`/`seq`, copies matching rows verbatim. |
+| `templates/loop-replay.html` | Yes, read the projection block at line ~396 | Confirmed: a fixed named projection (`row.span`, `row.phase`, …); an unlisted key is never read. |
+| `tests/log-run/run.sh` | Yes, read and edited | Confirmed the key-order lock (trailing space) and the header-documentation assertion. |
+| `tests/check-run/run.sh` | Yes, read and edited | Confirmed the per-key-by-name event-side rejection assertions. |
+| `tests/is-span-row-parity/run.sh` | Yes, read its header and oracle | Confirmed the black-box stdout oracle and the six `kind`-discriminator fixture classes; suite re-run green, unedited. |
+| `templates/prompt-blocks/registry.txt` | Yes, grepped line 36 | Confirmed `bin/log-run.sh` is a registered `contain`-mode consumer of `verdict-labels.md`; `check-prompt-sync.sh` re-run green after this task's edits. |
+| `skills/run/SKILL.md` | Yes, read and edited | Confirmed the one fenced `--span`/`--event` emission block shape; the new conventions were added adjacent to it. |
+| `skills/goal/SKILL.md` | Yes, grepped for the "reuse, don't modify" rule and any `SPAN_ONLY`/`--instance` text | Confirmed the rule's wording and that this task added no text there — `--instance` reaches it for free through the shared writer. |
+| `docs/loop-engineering/phase-multiplexing.md` | Yes, read the `per-instance-telemetry-discriminator` invariant-lock and its follow-up line | Confirmed: the invariant text and the "no discriminator designed, no `bin/` script touched" disposition, exactly as summarized. |
+| `.shell-team/specs/T-1071-record-set-derivation.md` | Yes, read AC13 and AC15(a) directly | Confirmed the merge-point-scoped scope-lock shape and the mutation-self-check list shape this task's own AC16/AC18 follow. |
+| `.shell-team/specs/T-1058-telemetry-binding.md` | Yes, grepped for the ordering/byte-identity language | Confirmed DP1's "appended after `parent_span_id`… byte-identical" claim — the same claim this task's own **AC2**/Assumptions measured false for the same reason (the writer always emits every nullable key). |
+| `bin/team-paths.sh` | Yes, grepped the `--get KEY` closed enum | Confirmed the closed key set (`base|todo|loops|runs|retros|reviews|specs|provenance|interventions|lessons`) has no `transcripts` key, supporting the spec's declined-half rationale. |
+| `bin/derive-populations.sh` | Yes, read end to end (already read at authoring time; re-read before use here) | Confirmed the `<!-- BEGIN derivation -->` grammar and the `- reproduce:` embedding discipline this note's own derivation follows. |
+| `README.md` / `README.ja.md` | Yes, read the telemetry bullet in both, then edited | Confirmed the outer-loop telemetry bullet is the adopter-facing surface (`README.md:173` and its JA mirror), never a schema table. |
+
+**(h) Bash versions exercised.** The PATH/`/bin/bash` on this host is
+`GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)` — bash 3.2 was
+therefore directly exercisable and was in fact the interpreter for every
+suite run and every manual invocation in this report. A second floor, bash
+`4.4.0(1)-release`, was available on this host from a prior task's source
+build at `/private/tmp/claude/bashsrc/bash` (T-1071's recipe entry
+documents that no bash 5 tag exists on the mirror it built from — 4.4 is
+the newest available, and it is what stands in for "a bash 5 build" per
+the Input space's own "both bash floors" language); `tests/log-run/run.sh`
+and `tests/check-run/run.sh` were both re-run as `<that bash> tests/…/run.sh`
+(both exit `0`), and `bin/log-run.sh`/`bin/check-run.sh` were additionally
+invoked directly under it (a full round-trip write + lint, and the
+zero-flag-invocation usage-error path) rather than only as the suite's own
+interpreter. No genuine bash 5.x binary was built or exercised for this
+task specifically — the pre-existing 4.4 build is what stood in, named
+honestly as such rather than claimed as bash 5.
