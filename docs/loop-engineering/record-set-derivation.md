@@ -164,6 +164,53 @@ exactly; the single `at-now`-only item is this task's own spec, which the
 branch point necessarily could not have carried. There is no
 `at-branch-point`-only item — this task removed no spec.
 
+## The identifier grammar, illustrated as a set delta
+
+Added at Codex round 1 rework (2026-08-15): a third derivation, illustrating
+that the identifier grammar `valid_ident()` now enforces (`^[A-Za-z0-9]
+[A-Za-z0-9_-]*$`) cleanly separates every identifier this task's own shipped
+usage relies on from every adversarial shape the review's findings named —
+zero overlap between the two populations. This is illustrative (the two
+sets below are plain text populations, not a direct invocation of the
+grammar function itself — the fixture suite's `label-grammar`,
+`set-name-grammar` and `accept-status-name-grammar` cases are what actually
+exercise the real validation code path against these same shapes), included
+here because the spec's own dogfooding discipline extends naturally to
+this task's rework and not only its first pass.
+
+- reproduce: bin/derive-populations.sh --label identifier-grammar --set "legitimate=printf '%s\n' A B registered all-agents single-set ac2 three-sets ci-dogfood consumers spec-population" --set "adversarial=printf '%s\n' 'A+B' 'with-TAB-byte' 'with-CR-byte' 'with-NL-byte'"
+
+<!-- BEGIN derivation: identifier-grammar -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: legitimate — status: 0 — lines: 10 — items: 10 — command: printf '%s\n' A B registered all-agents single-set ac2 three-sets ci-dogfood consumers spec-population
+- set: adversarial — status: 0 — lines: 4 — items: 4 — command: printf '%s\n' 'A+B' 'with-TAB-byte' 'with-CR-byte' 'with-NL-byte'
+- union: items: 14
+- bucket: adversarial — items: 4
+  - A+B
+  - with-CR-byte
+  - with-NL-byte
+  - with-TAB-byte
+- bucket: legitimate — items: 10
+  - A
+  - B
+  - ac2
+  - all-agents
+  - ci-dogfood
+  - consumers
+  - registered
+  - single-set
+  - spec-population
+  - three-sets
+<!-- END derivation: identifier-grammar -->
+
+There is no `legitimate+adversarial` bucket — every identifier this task's
+own shipped invocations actually use is disjoint from every adversarial
+shape the review named (`A+B`, and printable stand-ins for a TAB/CR/LF-
+carrying name; the real bytes are exercised directly by the fixture suite's
+`*-grammar` cases instead of being embedded as literal control bytes in
+this note's own committed text).
+
 ## Regenerating this note
 
 Run each `- reproduce:` line above from the repository root (`bash <that

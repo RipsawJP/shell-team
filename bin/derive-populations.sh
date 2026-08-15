@@ -55,9 +55,26 @@
 #      item contains a carriage return or any other control character
 #      (never reported as an empty set, and stdout is empty in both cases)
 #   2  usage error — a bad invocation: an unknown flag, a missing --label,
-#      fewer than two or more than eight --set values, two --set values
-#      sharing a name, or a --set command whose text contains a newline
-#      (stdout is empty)
+#      an identifier (--label / a --set NAME / an --accept-status NAME)
+#      outside the closed grammar below, fewer than two or more than eight
+#      --set values, two --set values sharing a name, or a --set command
+#      whose text contains a control character (stdout is empty)
+#
+# Codex review round 1 (2026-08-15) fixed two defect classes here, both
+# still documented at their own sites below rather than only here:
+#   - swallowed-exit-status: the --set child shell now runs under its own
+#     `set -o pipefail`, so a caller's pipelined command reports its LAST
+#     FAILING stage's status, not just its last stage's (a fresh `bash -c`
+#     never inherits this script's own shell options).
+#   - identifier-grammar-validation: --label, every --set NAME and every
+#     --accept-status NAME are validated against a closed grammar
+#     (`valid_ident()`, below) rather than checked only for non-emptiness —
+#     closing three related gaps at once: a `+` or TAB in a --set NAME
+#     corrupting the emitted signature grammar (AC4), and a newline in
+#     --label forging a spurious BEGIN/END marker pair. The --set COMMAND
+#     text (not identifier-shaped — it is data, not a structural token)
+#     keeps its own, looser rule: any control character is still refused,
+#     generalized from a newline-only check to match the item-side rule.
 #
 # Zero-dependency floor this task inherits from bin/team-paths.sh: bash 3.2
 # (no mapfile/readarray/declare -A/coproc/;;&/[[ -v ]]/case-modification
@@ -107,6 +124,34 @@ die_refuse() {
   exit 1
 }
 
+# valid_ident <value> — true iff <value> matches the closed identifier
+# grammar every structural identifier this helper accepts must satisfy:
+# ^[A-Za-z0-9][A-Za-z0-9_-]*$ (Codex round-1 review, Major finding class
+# "identifier-grammar-validation"). Applied uniformly to --label, every
+# --set NAME and every --accept-status NAME — the three invocation-surface
+# identifiers this block's own grammar is built from. Closed by construction
+# rather than by an enumerated blacklist: no control character (LF, CR, TAB
+# or any other — these sort outside [A-Za-z0-9_-] entirely), no `+` (the
+# byte the emitted signature itself joins set names with — an unvalidated
+# `+` in a name is indistinguishable from a real multi-set membership), no
+# space and no em dash (so the ` — ` field separator can never appear
+# inside an identifier), non-empty, and no leading hyphen/underscore (the
+# grammar's own first-character anchor). A pure-bash glob check (no awk, no
+# grep, no regex engine) so it costs nothing to apply to every identifier
+# this script ever receives.
+valid_ident() {
+  local v="$1"
+  [ -n "$v" ] || return 1
+  case "$v" in
+    [A-Za-z0-9]*) : ;;
+    *) return 1 ;;
+  esac
+  case "$v" in
+    *[!A-Za-z0-9_-]*) return 1 ;;
+  esac
+  return 0
+}
+
 print_help() {
   cat <<'EOF'
 Usage:
@@ -134,15 +179,34 @@ Flags:
                                 for no match" case this flag exists for)
   --help, -h                   show this help and exit 0
 
+Identifier grammar: --label, every --set NAME and every --accept-status
+NAME must match ^[A-Za-z0-9][A-Za-z0-9_-]*$ — no control character (LF, CR,
+TAB or any other), no `+` (the byte the emitted signature joins set names
+with), no space, no em dash, non-empty. A value outside this grammar is a
+usage error (exit 2). The COMMAND half of a --set value may contain
+anything except a control character (still a usage error, exit 2) — it is
+always the last field on its own line, so it cannot forge a field or a
+marker line.
+
+Pipefail semantics: every --set command runs under `set -o pipefail`, so a
+command that is itself a pipeline reports the exit status of its LAST
+FAILING stage, not merely its last stage — a legitimate mid-pipeline
+non-match (e.g. `git grep pattern | sort` when `git grep` finds nothing,
+exit 1) makes the WHOLE pipeline's reported status 1, exactly the case
+--accept-status <name>=1 exists to declare acceptable.
+
 Exit codes:
   0  the derivation block was written to stdout
-  1  refusal about the input's CONTENT — an unaccepted set exit status, or
-     an item containing a carriage return or any other control character
-     (stdout is empty; nothing is ever printed as a false empty set)
+  1  refusal about the input's CONTENT — an unaccepted set exit status
+     (under pipefail; pair a legitimate mid-pipeline non-zero exit, such as
+     git grep's, with --accept-status), or an item containing a carriage
+     return or any other control character (stdout is empty; nothing is
+     ever printed as a false empty set)
   2  usage error about the INVOCATION — an unknown flag, a missing --label,
-     fewer than two or more than eight --set values, two --set values
-     sharing a name, or a --set command whose text contains a newline
-     (stdout is empty)
+     an identifier (--label, a --set NAME, or an --accept-status NAME)
+     outside the closed grammar above, fewer than two or more than eight
+     --set values, two --set values sharing a name, or a --set command
+     whose text contains a control character (stdout is empty)
 
 The collation is pinned to LC_ALL=C for this whole run, overriding whatever
 locale the caller's own shell had set, and the emitted block records this
@@ -173,8 +237,8 @@ while [ "$#" -gt 0 ]; do
       shift
       val="$1"
       case "$val" in
-        *$'\n'*)
-          die_usage "a --set command must not contain a newline (the emitted block is line-oriented): $val"
+        *[[:cntrl:]]*)
+          die_usage "a --set value must not contain a control character (a newline, carriage return, tab or similar) — the emitted block is line-oriented and the command is a verbatim field on it: $val"
           ;;
       esac
       case "$val" in
@@ -183,7 +247,7 @@ while [ "$#" -gt 0 ]; do
       esac
       name="${val%%=*}"
       cmd="${val#*=}"
-      [ -n "$name" ] || die_usage "--set name must not be empty: $val"
+      valid_ident "$name" || die_usage "--set name must match ^[A-Za-z0-9][A-Za-z0-9_-]*\$ (no '+', no whitespace, no control character): $name"
       SET_NAMES+=("$name")
       SET_CMDS+=("$cmd")
       shift
@@ -196,7 +260,9 @@ while [ "$#" -gt 0 ]; do
         *=*) ;;
         *) die_usage "--accept-status value must be NAME=CSV: $aval" ;;
       esac
-      ACCEPT_NAMES+=("${aval%%=*}")
+      aname="${aval%%=*}"
+      valid_ident "$aname" || die_usage "--accept-status name must match ^[A-Za-z0-9][A-Za-z0-9_-]*\$: $aname"
+      ACCEPT_NAMES+=("$aname")
       ACCEPT_CSVS+=("${aval#*=}")
       shift
       ;;
@@ -210,6 +276,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$LABEL" ] || die_usage "missing required --label"
+valid_ident "$LABEL" || die_usage "--label must match ^[A-Za-z0-9][A-Za-z0-9_-]*\$ (no '+', no whitespace, no control character — the value is interpolated verbatim into the BEGIN/END marker lines, which must never be forgeable): $LABEL"
 
 n=${#SET_NAMES[@]}
 [ "$n" -ge 2 ] || die_usage "at least two --set values are required (got $n)"
@@ -269,7 +336,19 @@ while [ "$idx" -lt "$n" ]; do
   cmd="${SET_CMDS[$idx]}"
   rawfile="$WORKDIR/raw.$idx"
 
-  if bash -c "$cmd" >"$rawfile" 2>"$WORKDIR/stderr.$idx"; then
+  # `set -o pipefail;` is prepended so a caller's own pipelined command
+  # (this script's own Input space names "a pipeline of those through sort,
+  # sed or cut" as a reachable shape) reports the exit status of its LAST
+  # FAILING stage, never just its last stage — the child `bash -c` shell
+  # this spawns does NOT inherit the parent script's own `set -euo
+  # pipefail` (a fresh bash -c always starts with default shell options),
+  # so without this, `git ls-tree bad-ref | sort` would read as an empty
+  # set with exit 0 (Codex round-1 review Blocker; confirmed live: the
+  # exact "a failed command read as an empty set" shape the Goal states is
+  # closed by construction). A legitimate mid-pipeline non-zero exit (e.g.
+  # `git grep pattern | sort` when grep finds nothing) is exactly the case
+  # --accept-status <name>=1 exists to declare acceptable.
+  if bash -c "set -o pipefail; $cmd" >"$rawfile" 2>"$WORKDIR/stderr.$idx"; then
     status=0
   else
     status=$?
@@ -377,6 +456,11 @@ done
 
 printf -- '- union: items: %s\n' "$union_count"
 
+# This pipeline runs at the TOP LEVEL of this script, not inside a fresh
+# child shell, so it already inherits the `set -euo pipefail` set at the
+# top of this file (verified: a failing upstream stage here does propagate)
+# — it is not the swallowed-exit-status shape the child `bash -c` above
+# needed fixing for.
 cut -f1 "$WORKDIR/sig-item.sorted" | uniq >"$WORKDIR/distinct-sigs"
 while IFS= read -r sig; do
   [ -n "$sig" ] || continue

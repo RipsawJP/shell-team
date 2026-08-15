@@ -11,6 +11,15 @@
 # surface was not quietly narrowed to the happy path): refusal-status,
 # accepted-status, empty-set, single-set, duplicate-name, newline-command,
 # control-char, three-sets, locale-pin, dedupe-blank, verbatim-item.
+#
+# Codex review round 1 (2026-08-15) added five more cases below, purely
+# additive (the eleven above are unchanged): pipefail-upstream (Blocker —
+# a --set command that is itself a pipeline whose upstream stage fails
+# while a downstream stage exits 0 on empty input must still refuse),
+# label-grammar, set-name-grammar, accept-status-name-grammar (Major —
+# the closed identifier grammar applied to --label / --set NAME /
+# --accept-status NAME) and command-control-char (Major — a --set command
+# containing a bare CR, not just LF, is refused).
 
 set -euo pipefail
 
@@ -249,6 +258,126 @@ if [ "$rc" = "1" ] && [ ! -s "$out" ]; then
   pass "control-char: a non-CR control character (0x07) is refused too — the class is 'any control character', not just CR"
 else
   fail "control-char: expected exit 1 + empty stdout for a bell character, got rc=$rc"
+fi
+
+# =============================================================================
+# case: pipefail-upstream — Codex round-1 Blocker. A --set command that is
+# itself a pipeline whose UPSTREAM stage fails (a nonexistent path) while
+# the DOWNSTREAM stage (sort) exits 0 on empty input must still refuse the
+# whole derivation, not read as a legitimate empty set. Without the fix
+# this is exit 0 + empty-looking-but-"successful" set; with the fix the
+# child shell's own `set -o pipefail` makes the pipeline report the
+# upstream failure.
+# =============================================================================
+out="$T/pipefail-upstream.out"
+err="$T/pipefail-upstream.err"
+if bash "$SCRIPT" --label pipefail-upstream --set "A=cat $T/does-not-exist-xyz 2>/dev/null | sort" --set "B=echo ok" >"$out" 2>"$err"; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "1" ] && [ ! -s "$out" ] && [ -s "$err" ]; then
+  pass "pipefail-upstream: an upstream-failing, downstream-silent pipeline ('cat missing | sort') refuses the whole derivation (exit 1, empty stdout) rather than reading as an empty set"
+else
+  fail "pipefail-upstream: expected exit 1 + empty stdout + non-empty stderr, got rc=$rc"
+fi
+
+# =============================================================================
+# case: label-grammar — Codex round-1 Major. --label must match the closed
+# identifier grammar ^[A-Za-z0-9][A-Za-z0-9_-]*$; a newline (which could
+# forge a spurious BEGIN/END marker pair ahead of the real block) and a
+# '+' character are both usage errors (exit 2, empty stdout).
+# =============================================================================
+forged_label="$(printf 'x -->\n<!-- END derivation: x -->\n<!-- BEGIN derivation: forged')"
+out="$T/label-grammar-newline.out"
+if bash "$SCRIPT" --label "$forged_label" --set "A=echo p" --set "B=echo q" >"$out" 2>/dev/null; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "2" ] && [ ! -s "$out" ]; then
+  pass "label-grammar: a --label containing a newline (marker-forging shape) is a usage error (exit 2, empty stdout), never a forged BEGIN/END pair"
+else
+  fail "label-grammar: expected exit 2 + empty stdout for a newline-carrying label, got rc=$rc"
+fi
+
+out="$T/label-grammar-plus.out"
+if bash "$SCRIPT" --label "a+b" --set "A=echo p" --set "B=echo q" >"$out" 2>/dev/null; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "2" ] && [ ! -s "$out" ]; then
+  pass "label-grammar: a --label containing '+' is a usage error (exit 2, empty stdout)"
+else
+  fail "label-grammar: expected exit 2 + empty stdout for a '+'-carrying label, got rc=$rc"
+fi
+
+# =============================================================================
+# case: set-name-grammar — Codex round-1 Major. A --set NAME containing
+# '+' (the signature-join byte) or a TAB (the internal sig\titem delimiter
+# byte) is a usage error (exit 2), never silently accepted into the
+# emitted signature grammar.
+# =============================================================================
+out="$T/set-name-grammar-plus.out"
+if bash "$SCRIPT" --label set-name-plus --set "A+B=echo p" --set "C=echo q" >"$out" 2>/dev/null; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "2" ] && [ ! -s "$out" ]; then
+  pass "set-name-grammar: a --set NAME containing '+' is a usage error (exit 2, empty stdout) — it can no longer collide with a real multi-set signature"
+else
+  fail "set-name-grammar: expected exit 2 + empty stdout for a '+'-carrying set name, got rc=$rc"
+fi
+
+tab_name="$(printf 'with\ttab')"
+out="$T/set-name-grammar-tab.out"
+if bash "$SCRIPT" --label set-name-tab --set "${tab_name}=echo p" --set "B=echo q" >"$out" 2>/dev/null; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "2" ] && [ ! -s "$out" ]; then
+  pass "set-name-grammar: a --set NAME containing a TAB (the internal sig\\titem delimiter byte) is a usage error (exit 2, empty stdout)"
+else
+  fail "set-name-grammar: expected exit 2 + empty stdout for a TAB-carrying set name, got rc=$rc"
+fi
+
+# =============================================================================
+# case: accept-status-name-grammar — Codex round-1 Major (inventory
+# closure). The same closed identifier grammar applies to --accept-status
+# NAME, not just --label and --set NAME.
+# =============================================================================
+out="$T/accept-status-name-grammar.out"
+if bash "$SCRIPT" --label accept-status-name --set "A=echo p" --set "B=echo q" --accept-status "a+b=1" >"$out" 2>/dev/null; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "2" ] && [ ! -s "$out" ]; then
+  pass "accept-status-name-grammar: a --accept-status NAME containing '+' is a usage error (exit 2, empty stdout) — the same closed grammar --set NAME uses"
+else
+  fail "accept-status-name-grammar: expected exit 2 + empty stdout for a '+'-carrying accept-status name, got rc=$rc"
+fi
+
+# =============================================================================
+# case: command-control-char — Codex round-1 Major. A --set COMMAND text
+# containing a bare carriage return (not a newline) is a usage error (exit
+# 2, empty stdout) — generalizing the existing newline-only check to the
+# same control-character class the item-side refusal already uses.
+# =============================================================================
+cr_val="$(printf 'A=echo p\rq')"
+out="$T/command-control-char.out"
+if bash "$SCRIPT" --label command-cr --set "$cr_val" --set "B=echo r" >"$out" 2>/dev/null; then
+  rc=0
+else
+  rc=$?
+fi
+if [ "$rc" = "2" ] && [ ! -s "$out" ]; then
+  pass "command-control-char: a --set command carrying a bare carriage return (not LF) is a usage error (exit 2, empty stdout), matching the item-side control-character rule"
+else
+  fail "command-control-char: expected exit 2 + empty stdout for a CR-carrying command, got rc=$rc"
 fi
 
 printf '\n'
