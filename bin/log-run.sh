@@ -7,7 +7,7 @@
 # layout). Two row shapes share the file (T-1011):
 #
 #   SPAN row (T-014/T-015, the original shape) — one call into a sub-agent.
-#     17 keys, no `kind` key at all. Unchanged by this task, byte-for-byte.
+#     21 keys, no `kind` key at all. Unchanged by this task, byte-for-byte.
 #   EVENT row (T-1011) — a transition the loop made *between* spans: a
 #     hand-off, a route-back, a gate verdict, a human stop/GO, a release.
 #     9 keys, discriminated by `"kind":"event"`.
@@ -17,12 +17,13 @@
 # NOTHING and exits 2, so the log never gains a corrupt line. Pure bash, no
 # JSON library, so it runs anywhere the other bin/ scripts do.
 #
-# Usage (span mode, unchanged plus the three T-1058 binding flags):
+# Usage (span mode, unchanged plus the three T-1058 binding flags and the
+# T-1072 --instance discriminator):
 #   log-run.sh <loop_id> --run-id R --seq K --span S --phase P \
 #              --iteration N --attempt A --status STATUS \
 #              [--model M] [--tokens T] [--tool-uses U] [--duration-ms D] \
 #              [--verdict V] [--usd X] [--error E] [--parent-span-id PS] \
-#              [--provider P] [--effort E] [--adapter A]
+#              [--provider P] [--effort E] [--adapter A] [--instance I]
 #
 # Usage (event mode, T-1011):
 #   log-run.sh <loop_id> --run-id R --seq K --event ID \
@@ -38,17 +39,18 @@
 #     gate     --from required, --label required
 #     human    --label required
 #     release  none required
-#   All 16 span-only flags (--span --phase --iteration --attempt --status
+#   All 17 span-only flags (--span --phase --iteration --attempt --status
 #   --model --tokens --tool-uses --duration-ms --verdict --usd --error
-#   --parent-span-id --provider --effort --adapter) are forbidden in event
-#   mode (exit 2, nothing written); `--from`/`--to`/`--label` are forbidden
-#   in span mode (same). `--event` together with `--span` is rejected by name.
+#   --parent-span-id --provider --effort --adapter --instance) are forbidden
+#   in event mode (exit 2, nothing written); `--from`/`--to`/`--label` are
+#   forbidden in span mode (same). `--event` together with `--span` is
+#   rejected by name.
 #
 # Required (span mode): loop_id (positional), --run-id, --seq, --span,
 #           --phase, --iteration, --attempt, --status.
 # Nullable (span mode, omit => null in the row): --model --tokens
 #           --tool-uses --duration-ms --verdict --usd --error
-#           --parent-span-id --provider --effort --adapter.
+#           --parent-span-id --provider --effort --adapter --instance.
 #
 # status  ∈ success | error | timeout | skipped | stopped
 # verdict ∈ PASS | FAIL | APPROVE | REQUEST_CHANGES   (or omit => null)
@@ -65,8 +67,34 @@
 #     --effort value is a validation error exactly like --provider/--adapter.
 #   All three are nullable (omitted => null) and are appended AFTER
 #   `parent_span_id` in the emitted row, so the frozen seventeen keep their
-#   order and their offsets and a row written without them is byte-identical
-#   to one written before this task.
+#   order and their offsets, and a row written without them keeps every key
+#   AHEAD of them at the same name, order and byte offset as one written
+#   before this task — frozen-PREFIX preservation, not whole-row byte
+#   identity: the writer always emits every nullable key, so a row written
+#   without --provider/--effort/--adapter still carries
+#   "provider":null,"effort":null,"adapter":null where a pre-T-1058 row
+#   carried no such keys at all.
+#
+# T-1072 — the per-instance discriminator, appended AFTER `adapter` so the
+# T-1058 fields (and everything ahead of them) keep their order and offsets
+# too:
+#   --instance ∈ the SAME character class as --provider/--adapter
+#     (BINDING_TOKEN_RE, ^[a-z][a-z0-9-]*$), reused rather than widened — one
+#     identifier grammar, not two. Nullable: omitted or an explicit empty
+#     value both record "instance":null. A bare numeric id (`--instance 2`)
+#     is refused by that same character class (it requires a leading
+#     lower-case letter): the field NAMES the instance a merged hand-off
+#     record stays attributable to, and a name that is only a count carries
+#     nothing to attribute by — spell instance ids role-qualified (`qa-1`,
+#     `qa-2`, `engineer-a`), which is legal under the existing class. The
+#     bare `-` is ALSO refused here (it fails the same leading-letter
+#     requirement), unlike --effort: `-` is the binding grammar's own "no
+#     value" spelling for `--effort` only, and --instance has no such
+#     spelling of its own — admitting a second spelling of "no instance"
+#     beside plain omission is exactly the ambiguity that exemption exists
+#     to prevent. Declared, never observed, exactly like
+#     provider/effort/adapter; validated by the writer only — bin/check-run.sh
+#     does not charset-check it.
 #
 # Telemetry is observability-only: callers should treat a non-zero exit as
 # "telemetry not recorded" and carry on — it must never break the loop.
@@ -121,7 +149,7 @@ shift
 
 RUN_ID="" SEQ="" SPAN="" PHASE="" ITERATION="" ATTEMPT="" STATUS=""
 MODEL="" TOKENS="" TOOL_USES="" DURATION_MS="" VERDICT="" USD="" ERROR="" PARENT=""
-PROVIDER="" EFFORT="" ADAPTER=""
+PROVIDER="" EFFORT="" ADAPTER="" INSTANCE=""
 EVENT="" FROM="" TO="" LABEL=""
 
 # Every flag actually passed on the command line, verbatim, in encounter
@@ -145,7 +173,7 @@ seen() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--provider|--effort|--adapter|--event|--from|--to|--label)
+    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--provider|--effort|--adapter|--instance|--event|--from|--to|--label)
       [[ $# -ge 2 ]] || die "missing value for $1"
       SEEN+=("$1")
       case "$1" in
@@ -167,6 +195,7 @@ while [[ $# -gt 0 ]]; do
         --provider)       PROVIDER="$2" ;;
         --effort)         EFFORT="$2" ;;
         --adapter)        ADAPTER="$2" ;;
+        --instance)       INSTANCE="$2" ;;
         --event)          EVENT="$2" ;;
         --from)           FROM="$2" ;;
         --to)             TO="$2" ;;
@@ -184,15 +213,16 @@ if seen --event; then MODE="event"; else MODE="span"; fi
 [[ -n "$RUN_ID" ]] || die "missing required --run-id"
 [[ "$SEQ" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --seq (non-negative int): '${SEQ}'"
 
-SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id --provider --effort --adapter)
+SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id --provider --effort --adapter --instance)
 EVENT_ONLY_FLAGS=(--from --to --label)
 
 if [[ "$MODE" == "event" ]]; then
   # D5: --event and --span are named explicitly with a frozen message; the
-  # other 15 span-only flags (T-1058 adds --provider/--effort/--adapter to
-  # the array above) are rejected the same way (exit 2, nothing written)
-  # without a frozen message of their own — this mirrors D2's shape-mixing
-  # rule 1:1 rather than deferring the rejection to lint time.
+  # other 16 span-only flags (T-1058 adds --provider/--effort/--adapter and
+  # T-1072 adds --instance to the array above) are rejected the same way
+  # (exit 2, nothing written) without a frozen message of their own — this
+  # mirrors D2's shape-mixing rule 1:1 rather than deferring the rejection
+  # to lint time.
   seen --span && die "--event and --span are mutually exclusive"
   for f in "${SPAN_ONLY_FLAGS[@]}"; do
     [[ "$f" == "--span" ]] && continue
@@ -265,6 +295,15 @@ else
   elif [[ "$EFFORT" == "-" ]]; then
     EFFORT_OUT=""   # the binding grammar's "-" spelling maps to JSON null
   fi
+
+  # --- T-1072: the per-instance discriminator (nullable) ---
+  # Reuses BINDING_TOKEN_RE verbatim rather than declaring a second
+  # constant — one identifier grammar for --provider/--adapter/--instance,
+  # not two. Unlike --effort, --instance has no "no value" spelling of its
+  # own: the bare '-' fails this same regex (its required leading character
+  # is [a-z]), so it is refused here exactly like any other malformed value
+  # — deliberately, per the header paragraph above.
+  [[ -z "$INSTANCE" || "$INSTANCE" =~ $BINDING_TOKEN_RE ]] || die "invalid --instance '${INSTANCE}' (lower-case token: ^[a-z][a-z0-9-]*\$)"
 fi
 
 # Escape a string for embedding in a JSON value, PRESERVING content: backslash
@@ -317,7 +356,8 @@ else
   ROW+="$(jstr parent_span_id "$PARENT"),"
   ROW+="$(jstr provider "$PROVIDER"),"
   ROW+="$(jstr effort "$EFFORT_OUT"),"
-  ROW+="$(jstr adapter "$ADAPTER")"
+  ROW+="$(jstr adapter "$ADAPTER"),"
+  ROW+="$(jstr instance "$INSTANCE")"
   ROW+="}"
 fi
 

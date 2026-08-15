@@ -125,6 +125,22 @@ Emit one at each of these points, mapped 1:1 to the phase steps above:
   - The same derivation reaches this row: a bare `READY_FOR_*` rail token in a `human` row label — an operator settling the flag directly at the gate — derives the same rail stop, because the replay page derives the flag from the label alone for every event kind, with no per-event-id branch. The byte-exact whole-label rule above is the whole of the match here too. The label itself is **not** optional on this row (`log-run.sh` refuses a `human` event whose `--label` is empty or omitted); what stays optional and best-effort, in exactly the same way as above, is choosing a rail token as that required label value — a non-rail label such as `human-interrupt` or `GO` is the ordinary case, and it costs the rail one stop, never the run.
 - `--event release` at close-out (step 7), once `READY_FOR_MERGE` is confirmed and the summary is handed to the user — no payload flags are required.
 
+**Gate and orchestration cost as a span, not a relaxed event row (T-1072).** Gate and orchestration work this orchestrator performs itself — a fail-closed seam gate, a phase's own housekeeping between sub-agent calls — has a duration but no sub-agent call to hang it on. Record that cost as its **own span row** rather than adding a cost flag to the event row that already records the transition: the event row records **that** the transition happened, the paired span row records **what it cost**.
+
+```
+log-run.sh shell-team --run-id <run_id> --seq <seq> --span orchestrator --phase gate \
+  --iteration <n> --attempt <a> --status <status> --duration-ms <d> || true
+```
+
+Emit this alongside — never instead of — the `--event gate`/`--event human` row above, sharing the same `run_id` and the same shared monotonic `seq` counter (each row still increments it once). `--duration-ms` stays illegal together with `--event` (unchanged, T-1011/D2): this convention never relaxes the event-row grammar, it only gives gate/orchestration cost somewhere honest to live.
+
+**Substrate-reading checkpoint (T-1072).** A point where this orchestrator re-reads its own substrate mid-phase (a rehydration checkpoint) is a **child span** of the span it belongs to, named `engineer-rehydration`, using the `parent_span_id` field the row has carried since T-014 — no new schema key, no new flag, and no agent prompt block is edited for it (the emission is the orchestrator's own, not an agent's):
+
+```
+log-run.sh shell-team --run-id <run_id> --seq <seq> --span engineer-rehydration --phase <phase> \
+  --iteration <n> --attempt <a> --status <status> --parent-span-id <the span it belongs to> || true
+```
+
 Between phases, give the user a one-line status update so they can interrupt if needed.
 
 **Human-gate declaration (T-1056).** At every point where a skill hands control to a human and waits, write a human-gate declaration to `<runs>/gate-<task-id>.decl` (with `<runs>` resolved via `bin/team-paths.sh --get runs`) before you wait, and remove that declaration the moment you act on the human's answer — the same choke point performs both duties, at each such point, never only one of them. The declaration carries a `gate-declaration 1` version line first, one each of `task`, `reason`, `run-epoch` and `declared-epoch`, and a `gate-declaration-end` terminator. Select `reason` from the shipped closed registry (`templates/liveness-reasons.txt`) — never a guessed token — using `merge-go` for the human GO before a merge, `push-go` for the human GO before a push, `fast-follow-approval` for a fast-follow issue awaiting user approval before filing, `intent-ratification` for a frozen intent block awaiting a human-ratified re-freeze or a class-M grant suspended pending human review, `gate-escalation` for a fail-closed seam gate handed to the human, `stop-escalation` for a loop-guard `STOP:<reason>` handed to the human with the rework digest, `same-class-2` for the pre-STOP early escalation the second occurrence of one root-cause class triggers, and `advisory-escalation` for a non-aligned drift-evaluator verdict surfaced before the merge pledge. This duty applies at every write site a skill's own gates enumerate, never only at one of them. See `## Declaration write-site inventory` in `.shell-team/specs/T-1056-loop-liveness.md` for where this orchestrator reaches such a point in the phases above.

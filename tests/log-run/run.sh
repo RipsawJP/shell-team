@@ -184,11 +184,14 @@ grep -qF -- '"effort":"high"' "$BIND_DIR/bindloop.jsonl" || fail "log-run did no
 grep -qF -- '"adapter":"claude-cli"' "$BIND_DIR/bindloop.jsonl" || fail "log-run did not record --adapter claude-cli"
 pass "log-run --provider/--effort/--adapter records all three values"
 
-# --- writer: appended AFTER parent_span_id, frozen 17 keys unmoved ---
+# --- writer: appended AFTER parent_span_id, frozen 17 keys unmoved (T-1072
+#     extends this exact lock string rather than rewriting it — the string
+#     ends in a TRAILING SPACE, so an appended key must land before that
+#     space is re-added, not after it) ---
 bind_keys="$(grep -oE '"[a-z_]+":' "$BIND_DIR/bindloop.jsonl" | tr -d '":' | tr '\n' ' ')"
-[ "$bind_keys" == "loop_id run_id seq ts span phase iteration attempt status model tokens tool_uses duration_ms verdict usd error parent_span_id provider effort adapter " ] \
+[ "$bind_keys" == "loop_id run_id seq ts span phase iteration attempt status model tokens tool_uses duration_ms verdict usd error parent_span_id provider effort adapter instance " ] \
   || fail "log-run binding row key order unexpected: $bind_keys"
-pass "log-run appends provider/effort/adapter after parent_span_id, frozen 17 keys unmoved"
+pass "log-run appends provider/effort/adapter/instance after parent_span_id, frozen key order unmoved"
 
 # --- writer: --effort - records null, never the two-character string "-" ---
 set +e
@@ -243,12 +246,76 @@ done
 [ ! -e "$BIND_DIR/ev" ] || fail "log-run binding flag in event mode created a runs dir"
 pass "log-run rejects --provider/--effort/--adapter in event mode (exit 2, nothing written)"
 
-# --- writer's own header documents all three flags ---
+# --- writer's own header documents all three T-1058 flags plus --instance ---
 HDR_TMP="$TMP/log-run-header.txt"
 awk 'NR>1 && /^#/{print} NR>1 && !/^#/{exit}' "$LOGRUN" > "$HDR_TMP"
-for f in provider effort adapter; do
+for f in provider effort adapter instance; do
   grep -qF -- "--$f" "$HDR_TMP" || fail "log-run header does not document --$f"
 done
-pass "log-run's own header comment documents --provider/--effort/--adapter"
+pass "log-run's own header comment documents --provider/--effort/--adapter/--instance"
+
+# =====================================================================
+# T-1072: the per-instance discriminator (--instance) — span-only,
+# nullable, appended AFTER --adapter, validated by the writer only, and
+# refused in event mode by presence (same SPAN_ONLY_FLAGS mechanism as the
+# T-1058 binding flags above).
+# =====================================================================
+
+INST_DIR="$TMP/instance"
+mkdir -p "$INST_DIR"
+
+# --- writer: --instance records the value verbatim, appended after adapter ---
+set +e
+RUNS_DIR="$INST_DIR" bash "$LOGRUN" instloop --run-id R1 --seq 1 --span qa-verifier --phase verify \
+  --iteration 1 --attempt 1 --status success --adapter claude-cli --instance qa-2 >/dev/null 2>&1
+inst_rc=$?
+set -e
+[ "$inst_rc" -eq 0 ] || fail "log-run --instance qa-2 expected exit 0, got $inst_rc"
+grep -qF -- '"adapter":"claude-cli","instance":"qa-2"}' "$INST_DIR/instloop.jsonl" \
+  || fail "log-run did not record --instance immediately after --adapter"
+pass "log-run --instance records the value verbatim, appended after adapter"
+
+# --- writer: omitted --instance renders null; explicitly empty also renders null ---
+set +e
+RUNS_DIR="$INST_DIR" bash "$LOGRUN" instloop --run-id R1 --seq 2 --span engineer --phase implement \
+  --iteration 1 --attempt 1 --status success >/dev/null 2>&1
+inst_omit_rc=$?
+RUNS_DIR="$INST_DIR" bash "$LOGRUN" instloop --run-id R1 --seq 3 --span engineer --phase implement \
+  --iteration 1 --attempt 1 --status success --instance "" >/dev/null 2>&1
+inst_empty_rc=$?
+set -e
+[ "$inst_omit_rc" -eq 0 ] || fail "log-run with --instance omitted expected exit 0, got $inst_omit_rc"
+[ "$inst_empty_rc" -eq 0 ] || fail "log-run --instance '' expected exit 0, got $inst_empty_rc"
+[ "$(grep -cF -- '"instance":null}' "$INST_DIR/instloop.jsonl" || true)" -eq 2 ] \
+  || fail "log-run omitted/empty --instance did not both render null"
+pass "log-run omitted or explicitly-empty --instance both render null"
+
+# --- writer: malformed --instance values are validation errors, nothing written
+#     (a bare numeric id and the bare '-' are both deliberately refused: see
+#     the T-1072 header paragraph) ---
+before_inst="$(wc -l < "$INST_DIR/instloop.jsonl")"
+i=0
+for bad in QA 2 a_b x/y -inst -; do
+  i=$((i + 1))
+  set +e
+  RUNS_DIR="$INST_DIR/bad$i" bash "$LOGRUN" instloop --run-id R1 --seq 9 --span engineer --phase implement \
+    --iteration 1 --attempt 1 --status success --instance "$bad" >/dev/null 2>&1
+  bad_inst_rc=$?
+  set -e
+  [ "$bad_inst_rc" -eq 2 ] || fail "log-run --instance '$bad' expected exit 2, got $bad_inst_rc"
+  [ ! -e "$INST_DIR/bad$i" ] || fail "log-run --instance '$bad' created a runs dir despite validation failure"
+done
+after_inst="$(wc -l < "$INST_DIR/instloop.jsonl")"
+[ "$before_inst" -eq "$after_inst" ] || fail "log-run wrote a row despite a malformed --instance value"
+pass "log-run rejects malformed --instance values, including a bare numeric id and the bare '-' (exit 2, nothing written)"
+
+# --- writer: --instance is forbidden in event mode (exit 2, nothing written) ---
+set +e
+RUNS_DIR="$INST_DIR/ev" bash "$LOGRUN" instloop --run-id R1 --seq 9 --event handoff --from a --to b --instance qa-1 >/dev/null 2>&1
+inst_ev_rc=$?
+set -e
+[ "$inst_ev_rc" -eq 2 ] || fail "log-run --instance in event mode expected exit 2, got $inst_ev_rc"
+[ ! -e "$INST_DIR/ev" ] || fail "log-run --instance in event mode created a runs dir"
+pass "log-run rejects --instance in event mode (exit 2, nothing written)"
 
 printf '\nAll log-run resolution assertions passed.\n'
