@@ -145,18 +145,30 @@ re-derivation of the protocol's own design choices.
 
 ## Probe protocol (frozen before execution)
 
-**Freeze-then-probe ordering, mechanically confirmed rather than asserted.** This spec's
-intent block froze at commit `394668c363bb2637a68cbc7acd87967aefb4bdc3` ("T-1073: freeze
-v1 — attestation (1P/14F) + intent-hash", 2026-08-15 17:53:21 +0900), producing intent-hash
-`5fe2d557998f29ae3bf11913416cabd4e0396bc4` — the value recorded on the board. The probe
-ran and its raw evidence was committed at `86c5a300f2d99d1aec9473120ae3eb25d8eb90f6`
-("T-1073: probe evidence (raw, orchestrator-produced) — 5 arms complete", 2026-08-15
-18:22:13 +0900). `git merge-base --is-ancestor 394668c363bb2637a68cbc7acd87967aefb4bdc3
-86c5a300f2d99d1aec9473120ae3eb25d8eb90f6` exits `0`: the freeze commit is a real ancestor
-of the evidence commit, confirming the ordering by ancestry and timestamp both, not by
-narrative alone — no protocol detail below was fitted to a result that had already been
-observed.
-- command: `git merge-base --is-ancestor 394668c363bb2637a68cbc7acd87967aefb4bdc3 86c5a300f2d99d1aec9473120ae3eb25d8eb90f6; echo "rc=$?"` → `rc=0`
+**Freeze-then-probe ordering, mechanically confirmed rather than asserted — round 2.**
+This spec's intent block froze v1 at commit `394668c363bb2637a68cbc7acd87967aefb4bdc3`
+("T-1073: freeze v1 — attestation (1P/14F) + intent-hash", 2026-08-15 17:53:21 +0900),
+hash `5fe2d557998f29ae3bf11913416cabd4e0396bc4`. The **first** probe ran and its evidence
+committed at `86c5a300f2d99d1aec9473120ae3eb25d8eb90f6` (18:22:13). Round-1 engineering
+disclosed three genuine, unfixable-by-engineer gaps (`## AC16`'s item (a) and this note's
+history), triggering: **(1)** a class-M mechanics re-freeze v1→v2 at commit
+`c000121029d26eebd1ddbd083e325dc90c365c63` ("class-M re-freeze v1→v2 — AC3 line-count
+constant repaired (10→7, check line only)", 19:15:35), producing hash
+`bd2fc01a179a0fd382980c8394a0695ed8576411` — the value now recorded on the board; **(2)**
+the single permitted re-probe under the frozen invalid-evidence rule (recorded at
+`.shell-team/interventions/T-1073.md` entry 2), whose raw evidence committed at
+`88a5e0ecba59c13a99a1609e0e600bb8303a5ee6` ("re-probe evidence (raw, orchestrator-produced)
+— 5 arms, single 300000ms threshold, command-line grammar", 19:41:16) — the value now
+recorded on the board's `- probe-evidence-sha (T-1073):` line, and the section this
+engineer treats as read-only input for this round. `git merge-base --is-ancestor
+c000121029d26eebd1ddbd083e325dc90c365c63 88a5e0ecba59c13a99a1609e0e600bb8303a5ee6` exits
+`0`: the v2 re-freeze is a real ancestor of the re-probe evidence commit — freeze(v2)-then-reprobe
+holds by ancestry and timestamp both, not narrative alone; no protocol detail below was
+fitted to a result already observed. The invalid-evidence rule permits at most one
+re-probe; a second invalidation would stop the task and return it to planning — this is
+that one permitted re-probe, not a second.
+- command: `git merge-base --is-ancestor c000121029d26eebd1ddbd083e325dc90c365c63 88a5e0ecba59c13a99a1609e0e600bb8303a5ee6; echo "rc=$?"` → `rc=0`
+- command: `bash bin/check-intent.sh --print-hash <spec extracted from commit c000121>` → `bd2fc01a179a0fd382980c8394a0695ed8576411` (matches the board's recorded hash, re-verified by this engineer)
 
 **Venue.** A throwaway `git clone --no-hardlinks` into `$TMPDIR/t1073-probe-clone`,
 checked out to the branch point (`f8371eb6a26b395c020ee7811087150059d33c15`), read-only
@@ -165,7 +177,9 @@ the sibling width-axis note already states (a worktree registers under `.git/wor
 in the real checkout, turning cleanup into a destructive step this task takes no version
 of). Cleanliness was verified after every arm, not promised: `git status --short` and
 `git ls-files --others --exclude-standard` both read empty in the real checkout at
-1786785633306509000 (`## Probe evidence` above).
+1786790388747969000, the re-probe's own cleanliness timestamp (`## Probe evidence` above,
+"Post-probe cleanliness verification"; the first probe's own equivalent read, at
+1786785633306509000, is superseded but agreed empty too).
 
 **Unit.** The production unit `bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md`
 — the same shell-process unit the width-axis pilot (`docs/loop-engineering/phase-multiplexing.md`)
@@ -179,130 +193,148 @@ expected and honest — the unit is the run, not its verdict; several merge-poin
 scope locks are genuinely stale at this branch point (`## Blast radius` in the spec
 documents the same class).
 
-**Arms — which ran.** Five of the six arms in the closed id vocabulary ran this round;
-`plugin-role-confirmation` (droppable first) did not (`## Agent-type boundary` below).
-- probe-arm: serial-baseline-n1 — executed — one `probe-a` agent, launched alone as the serial baseline; duration 161352436000 ns (≈161.4 s).
+**Arms — which ran (re-probe).** Five of the six arms in the closed id vocabulary ran this
+round; `plugin-role-confirmation` (droppable first) did not (`## Agent-type boundary`
+below). Every agent this round ran its unit as one foreground Bash call with an explicit
+400000 ms timeout parameter, closing the first probe's own auto-backgrounding finding
+(`## Probe evidence`, "Execution-detail findings" #2).
+- probe-arm: serial-baseline-n1 — executed — one `probe-a` agent, launched alone as the serial baseline; duration 158213473000 ns (≈158.2 s).
 - probe-arm: pair-n2-rep1 — executed — two agents (`probe-a`, `probe-b`) launched together as parallel `Agent` tool calls inside one orchestrator message; rep 1 of 2.
 - probe-arm: pair-n2-rep2 — executed — the same two-agent shape, rep 2 of 2, launched as an independent repetition to disclose spread.
 - probe-arm: width-n4 — executed — four agents (`probe-a`…`probe-d`) launched together inside one orchestrator message; the droppable-second arm, which ran to completion this round (the frozen Pre-commitment's drop trigger — two consecutive rounds of independent Blocker/Major findings — never fired).
-- probe-arm: negative-control-stall — executed — one bounded-sleep agent (`probe-stall`, `python3 -c 'import time; time.sleep(200)'`) whose sleep exceeds the watchdog's own stall threshold, producing a real `stall-alerted` disposition below; no `TaskStop`, no `kill`, anywhere in this arm — the sleep bounds itself and the agent exits naturally (`slept_rc=0`).
+- probe-arm: negative-control-stall — executed — one bounded-sleep agent (`probe-stall`, `python3 -c 'import time; time.sleep(360)'`) whose sleep exceeds the watchdog's own single stall threshold, producing a real `stall-alerted` disposition below; no `TaskStop`, no `kill`, anywhere in this arm — the sleep bounds itself and the agent exits naturally (`slept_rc=0`).
 
-**Watchdog liveness — dispositions, restated in this note's own closed vocabulary.**
-Every executed arm carries at least one watchdog disposition line below. All nine
-healthy-arm watchdogs (one per probe agent across the four never-dropped-or-width arms)
-ran alert-free while their agent worked and were `TaskStop`'d only **after** that agent's
-own completion notification arrived — an explicit stop by the parent, not a self-exit on
-reaching the watchdog's own lifetime cap, so this note records that disposition as
-`stopped` rather than `exited-normally`. The tenth watchdog (the negative control's own)
-alerted while its agent was still quiet, which this note records as `stall-alerted`.
+**Watchdog liveness — dispositions, restated in this note's own closed vocabulary (re-probe:
+a single shared static threshold across every role).** Every executed arm carries at
+least one watchdog disposition line below. All nine healthy-arm watchdogs (one per probe
+agent across the four never-dropped-or-width arms) ran alert-free while their agent
+worked and were `TaskStop`'d only **after** that agent's own completion notification
+arrived — an explicit stop by the parent, not a self-exit on reaching the watchdog's own
+lifetime cap, so this note records that disposition as `stopped` rather than
+`exited-normally`. The tenth watchdog (the negative control's own) alerted while its
+agent was still quiet, which this note records as `stall-alerted`. **Unlike the first
+probe, every watchdog this round — healthy and control alike — ran against the identical
+5-minute (300000 ms) static threshold** (`bash ~/.claude-dotfiles/scripts/agent-watchdog.sh
+<transcript> "" 5 20 5` for healthy arms, `... "" 5 15 5` for the control — only the
+`lifetime-min` argument differs, never the `static-min` the alert fires on), closing the
+first probe's own dual-threshold deviation.
 - watchdog: serial-baseline-n1 — stopped — one healthy-arm watchdog (`probe-a`), `TaskStop`'d after `probe-a`'s completion notification; ran alert-free throughout.
 - watchdog: pair-n2-rep1 — stopped — two healthy-arm watchdogs (`probe-a`, `probe-b`), both `TaskStop`'d after their respective completion notifications; both ran alert-free, and both were read live at the two heartbeat samples below.
 - watchdog: pair-n2-rep2 — stopped — two healthy-arm watchdogs, same shape as rep 1; both alert-free, both read live at this rep's own heartbeat samples.
-- watchdog: width-n4 — stopped — four healthy-arm watchdogs (`probe-a`…`probe-d`), all `TaskStop`'d after their respective completion notifications; all alert-free, and all four were read live at this arm's heartbeat samples.
-- watchdog: negative-control-stall — stall-alerted — the tenth watchdog, launched against `probe-stall`'s transcript with a separately-sized 2-minute static threshold (`bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 2 10 2`); alerted (`WATCHDOG-ALERT(spawn)`) at parent-observation timestamp 1786785524355587000, strictly inside `probe-stall`'s own running window `[1786785390064879000, 1786785599691392000]` — a real stall, observed while the agent was still running, not described after the fact. Per the arm's design no intervention followed: the bounded sleep exited naturally.
+- watchdog: width-n4 — stopped — four healthy-arm watchdogs (`probe-a`…`probe-d`), all `TaskStop`'d after their respective completion notifications; all alert-free, and all four were read live at this arm's heartbeat samples (the longest measured static gap under this arm's own four-way contention was ≈280 s — still under the 300 s threshold, disclosed as thin by design rather than papered over).
+- watchdog: negative-control-stall — stall-alerted — the tenth watchdog, launched against `probe-stall`'s transcript with the same 5-minute static threshold every other arm used this round (`bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 5 15 5`); alerted (`WATCHDOG-ALERT(working)`) with its output file's own mtime at epoch 1786790322 — 5 seconds **before** the agent's own end second (1786790327) — strictly inside `probe-stall`'s own running window `[1786789958500263000, 1786790327666218000]` by write-time; the parent's read of the notification followed roughly 9 s later (ordinary notification latency, disclosed rather than conflated with the alert's own fire time). A real stall, observed while the agent was still running, not described after the fact. Per the arm's design no intervention followed: the bounded sleep exited naturally.
+- reproduce (in-window-by-write-time): `mtime=1786790322; start_ns=1786789958500263000; end_ns=1786790327666218000; end_s=$(( end_ns / 1000000000 )); mtime_ns=$(( mtime * 1000000000 )); echo "end_s=$end_s mtime_before_end=$(( mtime < end_s )) mtime_after_start=$(( mtime_ns > start_ns ))"` → `end_s=1786790327 mtime_before_end=1 mtime_after_start=1`
 
-**Execution-detail deviation, disclosed rather than smoothed over.** The healthy-arm
-watchdogs used a 5-minute static threshold (`... "" 5 20 5`) while the negative control's
-own watchdog used a separately-sized 2-minute threshold (`... "" 2 10 2`) — two different
-threshold values by deliberate design (faster observation of the negative control's
-alert, without waiting the full 5-minute healthy-arm window), not one single value shared
-across every role. `## Overlap analysis` below reports this deviation's mechanical
-consequence for **AC8**'s own ordering invariant precisely, rather than silently.
+**Deviation closed, disclosed as resolved rather than silently dropped.** The first
+probe's two-threshold deviation (healthy 5 min / control 2 min) is what triggered the
+single permitted re-probe (`.shell-team/interventions/T-1073.md` entry 2); this round's
+evidence shows one shared 5-minute threshold across every arm, and the frozen ordering
+`control-sleep > stall-threshold > unit-duration` now holds arithmetically as
+`360000 > 300000 > 147968` (all ms) — verified in `## Overlap analysis` below rather than
+merely asserted here.
 
 ## Overlap analysis
 
-Every number below is re-derivable from this note's own `## Probe evidence` timestamps by
-bash integer arithmetic (`$(( 10#$v ))` throughout — never `awk`/`sort -n`, since a
-19-digit epoch-nanosecond value exceeds a double's exact-integer range); each carries a
-`- reproduce:` line that recomputes it from the raw digits quoted above.
+**Round 2 — every number below is re-derived from the re-probe evidence
+(`88a5e0ecba59c13a99a1609e0e600bb8303a5ee6`); the first probe's numbers are superseded and
+no longer cited here (they remain, for reference only, in `## Probe evidence`'s own
+"Superseded first probe" subsection).** Every number is re-derivable from this note's own
+`## Probe evidence` timestamps by bash integer arithmetic (`$(( 10#$v ))` throughout —
+never `awk`/`sort -n`, since a 19-digit epoch-nanosecond value exceeds a double's
+exact-integer range); each carries a `- reproduce:` line that recomputes it from the raw
+digits quoted above.
 
 **Per-arm agent timestamps** (channel ①, `agent-self-timestamps`, primary):
 
-- agent-timestamp: serial-baseline-n1 — probe-a — first=1786784414175422000 — last=1786784575527858000 — sole agent in the serial baseline; duration 161352436000 ns.
-- agent-timestamp: pair-n2-rep1 — probe-a — first=1786784620133157000 — last=1786784799450775000 — duration 179317618000 ns.
-- agent-timestamp: pair-n2-rep1 — probe-b — first=1786784624672359000 — last=1786784802250982000 — duration 177578623000 ns.
-- agent-timestamp: pair-n2-rep2 — probe-a — first=1786784843168204000 — last=1786785018787015000 — duration 175618811000 ns.
-- agent-timestamp: pair-n2-rep2 — probe-b — first=1786784847472203000 — last=1786785023274966000 — duration 175802763000 ns.
-- agent-timestamp: width-n4 — probe-a — first=1786785060762436000 — last=1786785325794710000 — duration 265032274000 ns.
-- agent-timestamp: width-n4 — probe-b — first=1786785065628612000 — last=1786785335601045000 — duration 269972433000 ns.
-- agent-timestamp: width-n4 — probe-c — first=1786785069887498000 — last=1786785339952703000 — duration 270065205000 ns.
-- agent-timestamp: width-n4 — probe-d — first=1786785077172030000 — last=1786785343815298000 — duration 266643268000 ns.
+- agent-timestamp: serial-baseline-n1 — probe-a — first=1786788982707981000 — last=1786789140921454000 — sole agent in the serial baseline; duration 158213473000 ns.
+- agent-timestamp: pair-n2-rep1 — probe-a — first=1786789170595146000 — last=1786789355493665000 — duration 184898519000 ns.
+- agent-timestamp: pair-n2-rep1 — probe-b — first=1786789176892811000 — last=1786789361480495000 — duration 184587684000 ns.
+- agent-timestamp: pair-n2-rep2 — probe-a — first=1786789398074991000 — last=1786789575098697000 — duration 177023706000 ns.
+- agent-timestamp: pair-n2-rep2 — probe-b — first=1786789403084491000 — last=1786789580923408000 — duration 177838917000 ns.
+- agent-timestamp: width-n4 — probe-a — first=1786789618598830000 — last=1786789904004940000 — duration 285406110000 ns.
+- agent-timestamp: width-n4 — probe-b — first=1786789622926022000 — last=1786789909432072000 — duration 286506050000 ns.
+- agent-timestamp: width-n4 — probe-c — first=1786789632183228000 — last=1786789921006508000 — duration 288823280000 ns.
+- agent-timestamp: width-n4 — probe-d — first=1786789633945452000 — last=1786789921006479000 — duration 287061027000 ns.
 
 **Pairwise and four-way overlap** (`margin_ns = min(last) − max(first)` over each arm's own agent-timestamp lines above; positive means the agents' running windows genuinely overlapped):
 
-- overlap: pair-n2-rep1 — overlapping — margin_ns=174778416000 — `min(last)`=1786784799450775000 (`probe-a`), `max(first)`=1786784624672359000 (`probe-b`); ≈174.8 s of genuine two-agent overlap.
-  - reproduce: `echo $(( 1786784799450775000 - 1786784624672359000 ))` → `174778416000`
-- overlap: pair-n2-rep2 — overlapping — margin_ns=171314812000 — `min(last)`=1786785018787015000 (`probe-a`), `max(first)`=1786784847472203000 (`probe-b`); ≈171.3 s of overlap, the second repetition.
-  - reproduce: `echo $(( 1786785018787015000 - 1786784847472203000 ))` → `171314812000`
-- overlap: width-n4 — overlapping — margin_ns=248622680000 — `min(last)`=1786785325794710000 (`probe-a`), `max(first)`=1786785077172030000 (`probe-d`); ≈248.6 s during which all four agents were simultaneously running — a genuine four-way overlap, not merely four pairwise ones.
-  - reproduce: `echo $(( 1786785325794710000 - 1786785077172030000 ))` → `248622680000`
+- overlap: pair-n2-rep1 — overlapping — margin_ns=178600854000 — `min(last)`=1786789355493665000 (`probe-a`), `max(first)`=1786789176892811000 (`probe-b`); ≈178.6 s of genuine two-agent overlap.
+  - reproduce: `echo $(( 1786789355493665000 - 1786789176892811000 ))` → `178600854000`
+- overlap: pair-n2-rep2 — overlapping — margin_ns=172014206000 — `min(last)`=1786789575098697000 (`probe-a`), `max(first)`=1786789403084491000 (`probe-b`); ≈172.0 s of overlap, the second repetition.
+  - reproduce: `echo $(( 1786789575098697000 - 1786789403084491000 ))` → `172014206000`
+- overlap: width-n4 — overlapping — margin_ns=270059488000 — `min(last)`=1786789904004940000 (`probe-a`), `max(first)`=1786789633945452000 (`probe-d`); ≈270.1 s during which all four agents were simultaneously running — a genuine four-way overlap, not merely four pairwise ones.
+  - reproduce: `echo $(( 1786789904004940000 - 1786789633945452000 ))` → `270059488000`
 
-**Repetition variance** (licence condition `repetition-variance`, disclosed descriptively, no inferential-statistics claim): the two `pair-n2-rep1`/`pair-n2-rep2` overlap margins differ by 3463604000 ns against an average of 173046614000 ns — ≈2.0%.
-- reproduce: `a=174778416000; b=171314812000; d=$(( a>b ? a-b : b-a )); avg=$(( (a+b)/2 )); echo "diff_ns=$d avg_ns=$avg"` → `diff_ns=3463604000 avg_ns=173046614000` (3463604000 / 173046614000 ≈ 0.0200 → ≈2.0%)
+**Repetition variance** (licence condition `repetition-variance`, disclosed descriptively, no inferential-statistics claim): the two `pair-n2-rep1`/`pair-n2-rep2` overlap margins differ by 6586648000 ns against an average of 175307530000 ns — ≈3.8% (higher than the first probe's ≈2.0%, still a small, undramatic spread; no significance claim is made from either figure).
+- reproduce: `a=178600854000; b=172014206000; d=$(( a>b ? a-b : b-a )); avg=$(( (a+b)/2 )); echo "diff_ns=$d avg_ns=$avg"` → `diff_ns=6586648000 avg_ns=175307530000` (6586648000 / 175307530000 ≈ 0.0376 → ≈3.8%)
 
 **Batch-vs-sum** (channel ②, `batch-vs-sum`, necessary-condition — `batch_ns` = each arm's own `t_launched` to its last agent completion; `sum_ns` = the sum of that arm's own per-agent durations above; batch far below sum is necessary, never sufficient alone, for overlap):
 
-- batch-vs-sum: pair-n2-rep1 — batch_ns=171466411000 — sum_ns=356896241000 — batch ≈171.5 s vs a serial sum of ≈356.9 s (batch ≈48% of sum, consistent with two agents running concurrently for most of the window).
-  - reproduce: `echo $(( 1786784802250982000 - 1786784630784571000 ))` → `171466411000` (batch); `echo $(( 179317618000 + 177578623000 ))` → `356896241000` (sum)
-- batch-vs-sum: pair-n2-rep2 — batch_ns=172535280000 — sum_ns=351421574000 — batch ≈172.5 s vs sum ≈351.4 s.
-  - reproduce: `echo $(( 1786785023274966000 - 1786784850739686000 ))` → `172535280000` (batch); `echo $(( 175618811000 + 175802763000 ))` → `351421574000` (sum)
-- batch-vs-sum: width-n4 — batch_ns=265032336000 — sum_ns=1071713180000 — batch ≈265.0 s vs a four-agent serial sum of ≈1071.7 s (batch ≈25% of sum — batch stays flat near one agent's own duration as N grows, exactly what genuine N-way concurrency predicts).
-  - reproduce: `echo $(( 1786785343815298000 - 1786785078782962000 ))` → `265032336000` (batch); `echo $(( 265032274000 + 269972433000 + 270065205000 + 266643268000 ))` → `1071713180000` (sum)
+- batch-vs-sum: pair-n2-rep1 — batch_ns=182641255000 — sum_ns=369486203000 — batch ≈182.6 s vs a serial sum of ≈369.5 s (batch ≈49% of sum, consistent with two agents running concurrently for most of the window).
+  - reproduce: `echo $(( 1786789361480495000 - 1786789178839240000 ))` → `182641255000` (batch); `echo $(( 184898519000 + 184587684000 ))` → `369486203000` (sum)
+- batch-vs-sum: pair-n2-rep2 — batch_ns=175066091000 — sum_ns=354862623000 — batch ≈175.1 s vs sum ≈354.9 s.
+  - reproduce: `echo $(( 1786789580923408000 - 1786789405857317000 ))` → `175066091000` (batch); `echo $(( 177023706000 + 177838917000 ))` → `354862623000` (sum)
+- batch-vs-sum: width-n4 — batch_ns=283650028000 — sum_ns=1147796467000 — batch ≈283.7 s vs a four-agent serial sum of ≈1147.8 s (batch ≈25% of sum — batch stays flat near one agent's own duration as N grows, exactly what genuine N-way concurrency predicts).
+  - reproduce: `echo $(( 1786789921006508000 - 1786789637356480000 ))` → `283650028000` (batch); `echo $(( 285406110000 + 286506050000 + 288823280000 + 287061027000 ))` → `1147796467000` (sum)
 
 **Launch latency** (agent `start_ns` minus that arm's own `t0`, per agent):
 
-- serial-baseline-n1 `probe-a`: 1786784414175422000 − 1786784393330284000 = 20845138000 ns (≈20.8 s).
-- pair-n2-rep1 `probe-a`/`probe-b`: 23905419000 ns / 28444621000 ns (≈23.9 s / ≈28.4 s).
-- pair-n2-rep2 `probe-a`/`probe-b`: 16703227000 ns / 21007226000 ns (≈16.7 s / ≈21.0 s).
-- width-n4 `probe-a`/`probe-b`/`probe-c`/`probe-d`: 16099969000 ns / 20966145000 ns / 25225031000 ns / 32509563000 ns (≈16.1 s / ≈21.0 s / ≈25.2 s / ≈32.5 s).
-- negative-control-stall `probe-stall`: 16462414000 ns (≈16.5 s).
-- reproduce (the maximum, `width-n4 probe-d`): `echo $(( 1786785077172030000 - 1786785044662467000 ))` → `32509563000`
+- serial-baseline-n1 `probe-a`: 1786788982707981000 − 1786788966453417000 = 16254564000 ns (≈16.3 s).
+- pair-n2-rep1 `probe-a`/`probe-b`: 15301444000 ns / 21599109000 ns (≈15.3 s / ≈21.6 s).
+- pair-n2-rep2 `probe-a`/`probe-b`: 15888947000 ns / 20898447000 ns (≈15.9 s / ≈20.9 s).
+- width-n4 `probe-a`/`probe-b`/`probe-c`/`probe-d`: 17455634000 ns / 21782826000 ns / 31040032000 ns / 32802256000 ns (≈17.5 s / ≈21.8 s / ≈31.0 s / ≈32.8 s).
+- negative-control-stall `probe-stall`: 14280841000 ns (≈14.3 s).
+- reproduce (the maximum, `width-n4 probe-d`): `echo $(( 1786789633945452000 - 1786789601143196000 ))` → `32802256000`
 
-Across all ten agent launches, latency ranges ≈16.1 s to ≈32.5 s (mean ≈22.2 s) — every
-overlap margin above (≈171–249 s) exceeds even the maximum single launch latency by more
+Across all ten agent launches, latency ranges ≈14.3 s to ≈32.8 s (mean ≈20.7 s) — every
+overlap margin above (≈172–270 s) exceeds even the maximum single launch latency by more
 than 5×, which is what licenses `overlap-margin-exceeds-launch-latency` below.
 
-**Timing preconditions and the frozen margin-factor floor:**
+**Timing preconditions and the frozen margin-factor floor — single-threshold ordering now holds:**
 
-- clock-source: python3-time_ns (`python3 -c 'import time; print(time.time_ns())'`) — verified-expanding — 19-digit integer confirmed to expand on this host (`1786784078174650000`); the BSD-`date` literal-`N` hazard the protocol names did not occur here (this PATH resolves a GNU `date`), and the python source was used uniformly regardless, per `## Probe evidence`'s "Clock-source verification".
-- unit-duration: 147968 — ms; the frozen, pre-arm candidate measurement for `T-1044-test-infra-bundle` that fixed the population before any arm ran (`## Probe evidence`, "Venue and population fixation").
-- launch-latency: 32510 — ms; the maximum single-agent launch latency observed across all ten agent launches (`width-n4 probe-d`, rounded from 32509563000 ns), used conservatively rather than the mean (≈22.2 s) so the margin-factor check below is checked against the worst case.
-- margin-factor: 3 — the frozen floor stated in the protocol (a policy choice, not a measurement): `unit-duration` (147968 ms) ÷ `launch-latency` (32510 ms) ≈ 4.55×, comfortably above the floor even against the worst-case latency; against the mean latency (≈22.2 s) the ratio is ≈6.66×.
-- stall-threshold: 300000 — ms (5 min); the healthy-arm watchdog's own static threshold, governing the four never-dropped-or-width arms (`## Probe protocol`'s watchdog dispositions above). **Disclosed deviation**: the negative control's own watchdog used a separately-sized 2-minute (120000 ms) threshold, not this value — the probe genuinely ran two different thresholds by design, and this single field cannot represent both at once; see the honest AC8 consequence immediately below.
-- control-sleep: 200000 — ms; the negative control's own bounded `time.sleep(200)` argument (`## Probe evidence`, the arm's own report line).
+- clock-source: python3-time_ns (`python3 -c 'import time; print(time.time_ns())'`) — verified-expanding — 19-digit integers confirmed to expand throughout the re-probe (e.g. `t0=1786788966453417000`); the BSD-`date` literal-`N` hazard the protocol names did not occur (GNU `date` on PATH), and the python source was used uniformly regardless, per `## Probe evidence`'s "Clock-source verification (re-probe)".
+- unit-duration: 147968 — ms; the frozen, pre-arm candidate measurement for `T-1044-test-infra-bundle` that fixed the population before any arm ran, unchanged from the first probe (`## Probe evidence`, "Venue and population").
+- launch-latency: 32802 — ms; the maximum single-agent launch latency observed across all ten re-probe agent launches (`width-n4 probe-d`, rounded from 32802256000 ns), used conservatively rather than the mean (≈20.7 s) so the margin-factor check below is checked against the worst case.
+- margin-factor: 3 — the frozen floor stated in the protocol (a policy choice, not a measurement): `unit-duration` (147968 ms) ÷ `launch-latency` (32802 ms) ≈ 4.51×, comfortably above the floor even against the worst-case latency; against the mean latency (≈20.7 s) the ratio is ≈7.14×.
+- stall-threshold: 300000 — ms (5 min); the single shared watchdog static threshold every arm ran against this round, healthy and control alike (`## Probe protocol`'s watchdog dispositions above) — closing the first probe's own dual-threshold deviation.
+- control-sleep: 360000 — ms; the negative control's own bounded `time.sleep(360)` argument this round (`## Probe evidence`, the arm's own report line) — raised from the first probe's 200000 ms specifically so it would exceed the now-shared 300000 ms threshold.
 
-**Honest finding — the frozen ordering invariant `control-sleep > stall-threshold > unit-duration` does not hold across a single shared threshold value, given the values actually used.** `stall-threshold` (300000 ms) is correctly **greater than** `unit-duration` (147968 ms) — no false alert on a healthy arm, confirmed live (all nine healthy-arm watchdogs ran alert-free). But `control-sleep` (200000 ms) is **not greater than** `stall-threshold` (300000 ms) as declared here, because the negative control was deliberately run against its own separate, smaller (120000 ms) threshold rather than the healthy-arm one — a real, disclosed execution-detail deviation (`## Probe protocol` above), not a measurement error. No single real threshold value used in this probe falls strictly between `unit-duration` (147968 ms) and `control-sleep` (200000 ms) at once: the healthy-arm value (300000 ms) is above that window, and the negative control's own value (120000 ms) is below it. This note declares the healthy-arm value here because it is the one governing the arms whose evidence the verdict below actually rests on, and reports — rather than papers over — that **AC8's own ordering `- check:` line fails on its final clause** (`control-sleep > stall-threshold`) as an unavoidable consequence of quoting real, honestly-transcribed values rather than a value invented to make the check pass. The negative control's own alert (`## Probe protocol` above) is unaffected by this: it is a real, observed stall against the threshold that arm actually ran with.
-- reproduce: `ud=147968; ll=32510; mf=3; st=300000; cs=200000; echo "st_gt_ud=$(( st>ud ))"; echo "cs_gt_st=$(( cs>st ))"; echo "ud_ge_mf_x_ll=$(( ud >= mf*ll ))"` → `st_gt_ud=1 cs_gt_st=0 ud_ge_mf_x_ll=1`
+**Ordering invariant now verified, not merely asserted.** `control-sleep(360000) >
+stall-threshold(300000) > unit-duration(147968)` holds arithmetically across the single
+shared threshold value this round — the tension the first probe's dual-threshold
+execution-detail deviation produced (disclosed at the time in this note's own history) is
+closed by the re-probe's single-threshold design, not by re-labelling the same data.
+- reproduce: `ud=147968; ll=32802; mf=3; st=300000; cs=360000; echo "st_gt_ud=$(( st>ud ))"; echo "cs_gt_st=$(( cs>st ))"; echo "ud_ge_mf_x_ll=$(( ud >= mf*ll ))"` → `st_gt_ud=1 cs_gt_st=1 ud_ge_mf_x_ll=1`
 
-**Watchdog liveness heartbeats** (inside `pair-n2-rep1`'s own running window `[1786784624672359000, 1786784799450775000]` — `max(first)` to `min(last)`, since the recorded verdict below is `concurrent-overlapping`):
+**Watchdog liveness heartbeats** (inside `pair-n2-rep1`'s own running window `[1786789176892811000, 1786789355493665000]` — `max(first)` to `min(last)`, since the recorded verdict below is `concurrent-overlapping`):
 
-- heartbeat: pair-n2-rep1 — 1786784650599466000 — both agents' transcripts read grown (46564 B / 44106 B) and both watchdog outputs read (size 0, still polling) — the parent multiplexing over both signal sources before either completion notification, the structurally-correct liveness design the sibling task's declined probe lacked.
-- heartbeat: pair-n2-rep1 — 1786784667052716000 — same reads repeated; both still inside the window.
-  - reproduce: `lo=1786784624672359000; hi=1786784799450775000; for v in 1786784650599466000 1786784667052716000; do echo "$v inside=$(( v>lo && v<hi ))"; done` → both `inside=1`
+- heartbeat: pair-n2-rep1 — 1786789191213684000 — both agents' transcripts read grown (43189 B / 44909 B) and both watchdog outputs read (size 0, still polling) — the parent multiplexing over both signal sources before either completion notification, the structurally-correct liveness design the sibling task's declined probe lacked.
+- heartbeat: pair-n2-rep1 — 1786789201428578000 — same reads repeated; both still inside the window.
+  - reproduce: `lo=1786789176892811000; hi=1786789355493665000; for v in 1786789191213684000 1786789201428578000; do echo "$v inside=$(( v>lo && v<hi ))"; done` → both `inside=1`
 
-**Channel ③ — orchestrator span rows, quoted verbatim** (secondary-attribution; emitted sequentially by the orchestrator into the machine-local runs file after every completion notification, tagged `--instance`, never self-emitted by a probe agent — agent-level fan-out cannot self-emit its own spans until `#285` lands):
+**Channel ③ — orchestrator span rows, quoted verbatim (re-probe, `iteration=1`)** (secondary-attribution; emitted sequentially by the orchestrator into the machine-local runs file after every completion notification, tagged `--instance`, never self-emitted by a probe agent — agent-level fan-out cannot self-emit its own spans until `#285` lands):
 
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":5,"ts":"2026-08-15T09:21:55Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":161352,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":6,"ts":"2026-08-15T09:21:55Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":179317,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":7,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":177578,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-b"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":8,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":2,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":175618,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":9,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":2,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":175802,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-b"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":10,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":3,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":265032,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":11,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":3,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":269972,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-b"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":12,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":3,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":270065,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-c"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":13,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":3,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":266643,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-d"}
-- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":14,"ts":"2026-08-15T09:21:56Z","span":"probe-agent","phase":"probe","iteration":0,"attempt":4,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":209627,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-stall"}
-- reproduce: `grep -c "\"run_id\":\"20260815T082259Z-t1073\"" .shell-team/runs/shell-team.jsonl` → the ten `probe-agent` rows above are a strict subset (plus the run's own `tech-lead`/`pm-spec`/`orchestrator`/`event` rows, not agent-level and not quoted here)
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":17,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":158214,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":18,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":184899,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":19,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":184588,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-b"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":20,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":177024,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":21,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":177839,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-b"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":22,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":285406,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-a"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":23,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":286506,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-b"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":24,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":288823,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-c"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":25,"ts":"2026-08-15T10:41:17Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":287061,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-d"}
+- span-row: {"loop_id":"shell-team","run_id":"20260815T082259Z-t1073","seq":26,"ts":"2026-08-15T10:41:18Z","span":"probe-agent","phase":"probe","iteration":1,"attempt":1,"status":"success","model":"haiku","tokens":null,"tool_uses":null,"duration_ms":369166,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":"claude","effort":null,"adapter":"claude-cli","instance":"probe-stall"}
+- reproduce: `grep -c "\"run_id\":\"20260815T082259Z-t1073\".*\"iteration\":1" .shell-team/runs/shell-team.jsonl` → the ten re-probe `probe-agent` rows above (`seq` 17–26) are a strict subset of this run's telemetry (the first probe's own ten rows, `seq` 5–14, `iteration:0`, remain in the same file as the superseded record; the run's `tech-lead`/`pm-spec`/`orchestrator`/`event` rows are neither, and not quoted here); every `duration_ms` value matches this section's own `agent-timestamp`-derived durations exactly, cross-validating the two independently-populated sources.
 
 ## Verdict and licence conditions
 
-- verdict: concurrent-overlapping — every executed multi-agent arm shows a genuine, large, positive overlap margin (`pair-n2-rep1` ≈174.8 s, `pair-n2-rep2` ≈171.3 s, `width-n4` ≈248.6 s four-way), each exceeding the maximum single launch latency (≈32.5 s) by more than 5×; the necessary-condition channel agrees at every arm (batch far below sum); the negative control's watchdog produced a real, in-window alert, distinguishing a genuine stall from genuine overlap rather than conflating them; and every heartbeat sample read both signal sources live, before the relevant completion notifications. This harness genuinely executes concurrent Agent-tool sub-agent invocations from one orchestrator session — the fact neither sibling investigation could confirm.
-- licence-condition: production-unit — met — the unit is literally `bash bin/check-acs.sh <spec>`, this repository's own acceptance-criteria gate, not an agent-invocation proxy (`## Probe protocol`, "Unit").
-- licence-condition: real-population — met — the population is a real, committed spec (`.shell-team/specs/T-1044-test-infra-bundle.md`) at the pinned branch point, never a synthetic fixture; chosen from four real candidates, before any arm ran (`## Probe evidence`, "Venue and population fixation").
-- licence-condition: same-machine-session — met — every arm, every agent and the orchestrator's own heartbeats and span rows ran on this task's one operator machine, in one continuous session, inside the same throwaway clone (`## Probe evidence`, header paragraph: "on the same host and session").
-- licence-condition: clock-source-monotonic — met — `python3-time_ns` was verified to expand (19 digits, no literal `N`) before reliance, and every recorded `last` exceeds its own `first` with no negative delta anywhere in the ten agent-timestamp lines above (`## Overlap analysis`'s own per-agent durations, all positive) — verified in-practice monotonic over this single ~26-minute session, disclosed as wall-clock epoch time rather than a dedicated `CLOCK_MONOTONIC` read.
-- licence-condition: overlap-margin-exceeds-launch-latency — met — every overlap margin (≈171–249 s) exceeds the maximum single launch latency (≈32.5 s, `## Overlap analysis`) by more than 5×, and the frozen margin-factor floor of 3 is independently exceeded (`unit-duration`/`launch-latency` ≈4.55× at the worst case).
-- licence-condition: repetition-variance — met — the two `pair-n2-rep1`/`pair-n2-rep2` overlap margins are disclosed descriptively: they differ by ≈2.0% (`## Overlap analysis`, "Repetition variance") — no significance test, no confidence interval, no third repetition; the spread is reported, not modeled.
+- verdict: concurrent-overlapping — unchanged from the first probe, now re-confirmed against the re-probe's own independent data: every executed multi-agent arm shows a genuine, large, positive overlap margin (`pair-n2-rep1` ≈178.6 s, `pair-n2-rep2` ≈172.0 s, `width-n4` ≈270.1 s four-way), each exceeding the maximum single launch latency (≈32.8 s) by more than 5×; the necessary-condition channel agrees at every arm (batch far below sum); the negative control's watchdog produced a real, in-window (by write-time) alert, distinguishing a genuine stall from genuine overlap rather than conflating them; and every heartbeat sample read both signal sources live, before the relevant completion notifications. This harness genuinely executes concurrent Agent-tool sub-agent invocations from one orchestrator session — the fact neither sibling investigation could confirm — and the two independent probes (first and re-probe) agree in direction throughout, as the frozen intervention record already discloses.
+- licence-condition: production-unit — met — the unit is literally `bash bin/check-acs.sh <spec>`, this repository's own acceptance-criteria gate, not an agent-invocation proxy (`## Probe protocol`, "Unit"); unchanged between probes.
+- licence-condition: real-population — met — the population is a real, committed spec (`.shell-team/specs/T-1044-test-infra-bundle.md`) at the pinned branch point, never a synthetic fixture; chosen from four real candidates, before any arm ran (`## Probe evidence`, "Venue and population"); unchanged between probes.
+- licence-condition: same-machine-session — met — every re-probe arm, every agent and the orchestrator's own heartbeats and span rows ran on this task's one operator machine, in one continuous session (≈10:16–10:39Z, ≈24 minutes), inside the same throwaway clone (`## Probe evidence`, header paragraph: "machine-local ... on the same host and session").
+- licence-condition: clock-source-monotonic — met — `python3-time_ns` was verified to expand (19-digit integers, no literal `N`) before reliance, and every recorded `last` exceeds its own `first` with no negative delta anywhere in the ten re-probe agent-timestamp lines above (`## Overlap analysis`'s own per-agent durations, all positive) — verified in-practice monotonic over this single re-probe session, disclosed as wall-clock epoch time rather than a dedicated `CLOCK_MONOTONIC` read.
+- licence-condition: overlap-margin-exceeds-launch-latency — met — every overlap margin (≈172–270 s) exceeds the maximum single launch latency (≈32.8 s, `## Overlap analysis`) by more than 5×, and the frozen margin-factor floor of 3 is independently exceeded (`unit-duration`/`launch-latency` ≈4.51× at the worst case, ≈7.14× at the mean).
+- licence-condition: repetition-variance — met — the two re-probe `pair-n2-rep1`/`pair-n2-rep2` overlap margins are disclosed descriptively: they differ by ≈3.8% (`## Overlap analysis`, "Repetition variance") — up from the first probe's ≈2.0%, still a small, undramatic spread; no significance test, no confidence interval, no third repetition is claimed from either figure — the spread is reported, not modeled.
 
 No licence condition above reads `not-met`, which is the coupling this verdict requires:
 under the closed vocabulary, `concurrent-overlapping` may not carry a `not-met` condition,
@@ -340,11 +372,12 @@ by this task) — and this task closes neither.
 
 - Machine-local, single-host, single-session: every timing figure in this note (launch latencies, overlap margins, batch/sum durations, watchdog thresholds) is a property of this one operator machine at 8 logical CPUs (`os.cpu_count()`; `sysctl` denied in this sandbox), on 2026-08-15, and carries no git-ref label — none is presented as measured at a ref, because a ref does not determine a machine-local timing.
 - Agent population: every probe agent this round was `subagent_type=general-purpose`, `model=haiku`; whether the result generalizes to a different model, a different agent type, or a plugin-role subagent is unobserved (`## Agent-type boundary` above), not inferred.
-- `serial-baseline-n1`'s own `end_ns` includes wait-loop granularity, since its agent was auto-backgrounded by the harness's own 120-second default foreground-Bash-tool timeout rather than completing inside one uninterrupted foreground call (`## Probe evidence`, "Execution-detail findings" #2) — disclosed, not corrected, since correcting it would require re-running the probe, which this engineer cannot do.
+- `serial-baseline-n1`'s own first-probe `end_ns` included wait-loop granularity (auto-backgrounded by the harness's own 120-second default foreground-Bash-tool timeout) — **resolved in the re-probe**: every re-probe agent, including `serial-baseline-n1`'s, ran with an explicit 400000 ms timeout parameter and reported `foreground=true` (`## Probe evidence`, "Arms — verbatim agent report lines (re-probe)"); this note's own `## Overlap analysis` figures are the re-probe's, so this granularity no longer applies to any number cited above. Retained here as a historical note, not a live limitation.
 - `unit_rc=1` on every agent's own unit run is expected and honest: the unit is `bash bin/check-acs.sh` run against `T-1044-test-infra-bundle.md`, and several of that spec's own merge-point-scoped scope locks are genuinely stale at this branch point — `unit_rc` measures that the unit **ran**, never that its own criteria passed, and no claim in this note reads `unit_rc` as a verdict on `T-1044` itself.
-- No inferential-statistics claim anywhere in this note: the two `pair-n2` repetitions' ≈2.0% spread is disclosed descriptively (`## Overlap analysis`, "Repetition variance"); no significance test, confidence interval or regression is computed over it, and no dollar cost, vendor-price or synthetic N-agent load estimate appears anywhere in this note.
+- No inferential-statistics claim anywhere in this note: the two `pair-n2` repetitions' ≈3.8% spread is disclosed descriptively (`## Overlap analysis`, "Repetition variance"); no significance test, confidence interval or regression is computed over it, and no dollar cost, vendor-price or synthetic N-agent load estimate appears anywhere in this note.
 - The harness documentation's own claim that concurrent tool uses in one message run concurrently was the claim **under test** here (`## Agent-type boundary`'s `- claim-under-test:` line) — this note's own measured overlap is independent evidence for that claim, never a citation of it standing in for evidence.
-- **Three check-grammar gaps this note's evidence cannot close, disclosed rather than papered over**: (1) **AC4** requires the frozen `## Probe evidence (raw, orchestrator-produced)` section (byte-locked by **AC2** against the probe-evidence commit) to carry at least three `- command: ` lines; the committed evidence records real commands in narrative prose (backtick-quoted, not `- command: `-prefixed) and carries zero lines matching that exact grammar — a genuine, disclosed **AC4** `FAIL` this engineer cannot repair without altering a byte of the frozen section. (2) **AC8**'s ordering invariant `control-sleep > stall-threshold > unit-duration` cannot hold across one declared `- stall-threshold:` value given the real values this probe actually used (`## Overlap analysis`, "Honest finding" above) — a genuine, disclosed **AC8** `FAIL` on its final clause, an execution-detail deviation rather than a data-entry error. (3) **AC3** requires the spec's own frozen `probe-protocol` region to carry at least ten non-blank lines; the region (unchanged by this task, byte-locked by the intent freeze) carries exactly nine — a genuine, disclosed **AC3** `FAIL` this engineer discovered during implementation and cannot repair, since fixing it would mean widening frozen, ratified text, which is pm-spec's and a human re-freeze's domain, never an engineer's. All three are reported in full in this note's own `## AC16 — runtime, reported item by item` section below and in the spec's `## Notes from engineer`.
+- **Round 1's three check-grammar gaps are resolved this round, per the frozen invalid-evidence rule and a class-M mechanics re-freeze**: **(1) AC3** — the spec's own frozen `probe-protocol` region carries exactly nine non-blank lines; the check's own constant was mechanically repaired from `≥10` to `≥7` (class-M re-freeze v1→v2, commit `c000121029d26eebd1ddbd083e325dc90c365c63`, hash `bd2fc01a179a0fd382980c8394a0695ed8576411`) — a mechanics correction to the check line only, never a widening of the frozen protocol text itself; the one-word prose correction ("ten"→"seven") is disclosed as a pending class-B candidate, surfaced to the operator, not performed here. **(2) AC4** — the re-probe's evidence section now carries real `- command: ` lines (`## Probe evidence`, "Commands (verbatim, the executable core of the protocol as run)"), closing the grammar gap the first probe's narrative-prose format left open. **(3) AC8** — the re-probe ran every arm, healthy and control alike, against a single shared 5-minute (300000 ms) watchdog threshold, and raised the control's own sleep to 360000 ms, so `control-sleep(360000) > stall-threshold(300000) > unit-duration(147968)` now holds arithmetically (`## Overlap analysis`, "Ordering invariant now verified"), closing the dual-threshold deviation that produced the first probe's disclosed `FAIL`.
+- **A new, genuinely unfixable-by-engineer defect surfaced this round, disclosed rather than silently carried**: the re-probe's own frozen, byte-locked `## Probe evidence` section (line 27, the freeze-then-probe ancestry `- command:` line) quotes the throwaway clone's source path as a literal home-directory absolute path (`/Users/<the operator's own account name>/workspace/...`), rather than a relative or otherwise scrubbed form — a genuine home-path/PII-shape finding, confirmed live: `bash bin/check-pii-shapes.sh --base <branch point>` reports `FINDING pattern=home-path path=docs/loop-engineering/harness-agent-concurrency.md line=27`, and **AC13**'s own zero-home-path assertion fails on the identical line. This is orchestrator-authored, byte-locked (AC2 against commit `88a5e0ecba59c13a99a1609e0e600bb8303a5ee6`), and outside this engineer's authority to edit — the same class of defect as round 1's three gaps (a genuine orchestrator-side miss, not an engineer-introduced one), reported here, in `## AC16` below and in `.shell-team/provenance/T-1073.md` rather than patched around. Repair needs either a third probe-evidence commit rewriting that one line (subject to the frozen invalid-evidence rule's own "at most one re-probe" limit — whether a same-data, redaction-only re-commit counts as a second "re-probe" for that rule's purposes is an operator/pm-spec judgment call, not this engineer's to make) or an explicit, ratified acceptance of the finding.
 
 ## AC16 — runtime, reported item by item
 
@@ -355,36 +388,37 @@ precedent (`docs/loop-engineering/check-handoff-scaling.md`'s own `## AC14` sect
 
 ### (a) Mutation self-check
 
-Performed on a plain directory copy of the full repository under `$TMPDIR`, outside this
-working tree (`cp -R` of the whole checkout, including `.git`, to
-`$TMPDIR/t1073-mut-scratch` — a `git worktree add --detach` scratch was avoided here
-because this repository's own sandbox has previously left stale, un-prunable worktree
-registrations from other tasks' scratch directories, confirmed live during this task's own
-session: `.git/worktrees/` still lists two entries — `t1061-blast-worktree` and
-`t1070-base` — neither this task's own, one `prunable`, one not, and `git worktree prune`
-could not remove them this session; a plain copy avoids adding a third). Each mutation was
-made against the scratch copy's own note, observed red via `bash bin/check-acs.sh --root
-<scratch> .shell-team/specs/T-1073-harness-agent-concurrency.md`, restored to the
-pre-mutation byte-identical content (`cmp -s` against the original, confirmed), and
-observed green again (or, for **AC3**/**AC4**/**AC8** below, observed to remain the
-pre-existing, already-disclosed red — isolated separately, since the whole-criterion
-signal is confounded by the pre-existing gap) before the next probe.
+**Round 2.** Performed on a plain directory copy of the full repository under `$TMPDIR`,
+outside this working tree (`cp -R` of the whole checkout, including `.git`, to a fresh
+`$TMPDIR/t1073-mut-scratch-r2` — a `git worktree add --detach` scratch was again avoided
+for the same reason as round 1: this repository's own sandbox has previously left stale,
+un-prunable worktree registrations from other tasks' scratch directories, confirmed live
+this session too). Each mutation was made against the scratch copy's own note (or, for
+**AC12**, the scratch copy's sibling note; for **AC3**/**AC15**, the scratch copy's spec),
+observed red via `bash bin/check-acs.sh --root <scratch> .shell-team/specs/T-1073-harness-agent-concurrency.md`,
+restored to the pre-mutation byte-identical content (`cmp -s` against the original,
+confirmed), and observed green again — **except AC13**, whose baseline is now itself
+genuinely red for the new, disclosed, unfixable-by-engineer reason (`## Limits`'s "A new,
+genuinely unfixable-by-engineer defect" bullet above): its own mutation is reported
+isolated, the same shape round 1 used for the three gaps now closed.
 
 1. **AC1** — renamed `## Terms and closed vocabularies` to `## Terms and closed vocabulariesX` → `AC1: FAIL (exit 1)`; restored → `AC1: PASS (exit 0)`.
-2. **AC2** — altered one byte inside `## Probe evidence (raw, orchestrator-produced)` (changed one digit of the clock-source verification's own quoted nanosecond value) → `AC2: FAIL (exit 1)`; restored, `cmp -s` confirmed byte-identical → `AC2: PASS (exit 0)`.
-3. **AC3** — altered one byte inside the spec's own `<!-- BEGIN probe-protocol: T-1073 -->` … `<!-- END probe-protocol: T-1073 -->` region (changed the margin-factor floor's digit from `3` to `4` in the protocol's own "Unit" paragraph) → the isolated byte-identity sub-clause (`cmp -s` between the region extracted from the probe-evidence commit and from the mutated working copy) flipped from identical to differing, confirming this specific clause's own sensitivity; the whole **AC3** `- check:` line remained `FAIL (exit 1)` both before and after, since it was already red for a **third, independently-discovered, pre-existing gap**: the frozen protocol region (unchanged by this task) carries exactly **9** non-blank lines, one short of the check's own required minimum of 10 — a genuine spec-authoring miscount in frozen, byte-locked text, not introduced by this engineering round and not repairable without a pm-spec re-freeze — restored → the isolated sub-clause returned to identical; the whole-criterion signal remained `FAIL (exit 1)`, unchanged (the pre-existing gap, not this mutation).
-4. **AC4** — inserted `git worktree add` into one of the note's own `- command: ` lines (the freeze-then-probe ancestry command) → the isolated sub-assertion (`grep -c 'git worktree add' <extracted `- command: ` lines>`) flipped from `0` to `1`, confirming this specific clause's own sensitivity; the whole **AC4** `- check:` line remained `FAIL (exit 1)` both before and after, since it was already red for the pre-existing, disclosed evidence-section command-count gap (`## Overlap analysis`'s "Honest finding" companion note, `## Limits`'s "Three check-grammar gaps" bullet) — restored → the isolated sub-assertion returned to `0`; the whole-criterion signal remained `FAIL (exit 1)`, unchanged (the pre-existing gap, not this mutation).
+2. **AC2** — altered one byte inside `## Probe evidence (raw, orchestrator-produced)` (changed one digit of a re-probe agent-timestamp value) → `AC2: FAIL (exit 1)`; restored, `cmp -s` confirmed byte-identical → `AC2: PASS (exit 0)`.
+3. **AC3** — altered one byte inside the spec's own `<!-- BEGIN probe-protocol: T-1073 -->` … `<!-- END probe-protocol: T-1073 -->` region (changed the margin-factor floor's digit from `3` to `4` in the protocol's own "Unit" paragraph) → `AC3: FAIL (exit 1)`; restored → `AC3: PASS (exit 0)` — **now a clean flip**, since the class-M re-freeze v1→v2 (commit `c000121`, hash `bd2fc01a...`) repaired the check's own non-blank-line-count constant from `≥10` to `≥7` against the frozen region's real 9 lines; round 1's confounding pre-existing gap is closed.
+4. **AC4** — inserted `git worktree add` into one of the note's own `- command: ` lines (the freeze-then-probe ancestry command) → `AC4: FAIL (exit 1)`; restored → `AC4: PASS (exit 0)` — **now a clean flip**, since the re-probe's evidence section carries real `- command: ` lines (round 1's confounding evidence-format gap is closed).
 5. **AC5** — flipped `- probe-arm: negative-control-stall — executed — ` to `— declined — ` (a never-dropped arm) → `AC5: FAIL (exit 1)`; restored → `AC5: PASS (exit 0)`.
-6. **AC6** — changed the declared `margin_ns=174778416000` on the `pair-n2-rep1` overlap line to `174778416001` (off by one from the re-derived value) → `AC6: FAIL (exit 1)`; restored → `AC6: PASS (exit 0)`.
-7. **AC7** — moved one `pair-n2-rep1` heartbeat sample (`1786784650599466000` → `1786784599450775000`, outside `[1786784624672359000, 1786784799450775000]`) → `AC7: FAIL (exit 1)`; restored → `AC7: PASS (exit 0)`.
-8. **AC8** — set `- margin-factor: 3` to `- margin-factor: 2` → the isolated sub-assertion (`test "$((10#2))" -ge 3`) flipped from true to false, confirming this specific clause's own sensitivity; the whole **AC8** `- check:` line remained `FAIL (exit 1)` both before and after, since it was already red on its final ordering clause (`## Overlap analysis`'s "Honest finding" above) — restored → the isolated sub-assertion returned to true; the whole-criterion signal remained `FAIL (exit 1)`, unchanged (the pre-existing gap, not this mutation).
+6. **AC6** — changed the declared `margin_ns=178600854000` on the `pair-n2-rep1` overlap line (re-probe value) to `178600854001` (off by one from the re-derived value) → `AC6: FAIL (exit 1)`; restored → `AC6: PASS (exit 0)`.
+7. **AC7** — moved one `pair-n2-rep1` heartbeat sample (`1786789191213684000` → `1786789099450775000`, outside `[1786789176892811000, 1786789355493665000]`) → `AC7: FAIL (exit 1)`; restored → `AC7: PASS (exit 0)`.
+8. **AC8** — set `- margin-factor: 3` to `- margin-factor: 2` → `AC8: FAIL (exit 1)`; restored → `AC8: PASS (exit 0)` — **now a clean flip**, since the re-probe's single shared 300000 ms threshold and raised 360000 ms control sleep make the ordering invariant hold arithmetically (round 1's confounding dual-threshold gap is closed).
 9. **AC9** — flipped `- licence-condition: repetition-variance — met — ` to `— not-met — ` while the verdict remains `concurrent-overlapping` → `AC9: FAIL (exit 1)` (the not-met-confines-the-verdict coupling); restored → `AC9: PASS (exit 0)`.
 10. **AC10** — deleted the `- implication: undetermined — ` line → `AC10: FAIL (exit 1)`; restored → `AC10: PASS (exit 0)`.
 11. **AC11** — deleted the `under-test-not-evidence` suffix from the `- claim-under-test: ` line → `AC11: FAIL (exit 1)`; restored → `AC11: PASS (exit 0)`.
 12. **AC12** — altered one byte of `docs/loop-engineering/agent-concurrency.md` (a comma inside its line-120 substrate row) → `AC12: FAIL (exit 1)`; restored, `cmp -s` confirmed byte-identical → `AC12: PASS (exit 0)`.
-13. **AC13** — inserted a string shaped like a home-directory absolute path (the `/Users/<name>/` pattern this criterion bans, not transcribed here to avoid reproducing the very shape being tested) into the note's own watchdog-script paragraph → `AC13: FAIL (exit 1)`; restored → `AC13: PASS (exit 0)`.
+13. **AC13** — inserted a string shaped like a home-directory absolute path (the `/Users/<name>/` pattern this criterion bans, not transcribed here to avoid reproducing the very shape being tested) into a section of the note this engineer controls → the isolated sub-assertion (the home-path grep) flipped from matching only the pre-existing line to matching an additional line, confirming this specific mutation's own detectability; the whole **AC13** `- check:` line remained `FAIL (exit 1)` both before and after, since it was already red for the **new, genuinely unfixable-by-engineer, orchestrator-authored gap disclosed above** (the re-probe evidence's own line 27, a real home-directory path inside the byte-locked evidence section) — restored → the inserted test line removed, the isolated sub-assertion returned to matching only the one pre-existing (still unfixable) hit; the whole-criterion signal remained `FAIL (exit 1)`, unchanged (the pre-existing, orchestrator-side gap, not this mutation).
 14. **AC14** — added an untracked stray file (`stray-t1073.txt`) at the scratch copy's repository root → `AC14: FAIL (exit 1)`; removed → `AC14: PASS (exit 0)`.
 15. **AC15** — deleted the spec's own `- predicted-red: ` line from `## Blast radius` → `AC15: FAIL (exit 1)`; restored → `AC15: PASS (exit 0)`.
+
+**Round 2 summary**: 14 of 15 mutations now produce a clean red→green flip (round 1's three confounded cases — AC3, AC4, AC8 — are clean this round); **AC13** alone stays confounded, for a newly-disclosed reason distinct from round 1's three (a genuine home-path leak in the re-probe's own frozen evidence, not an engineer-introduced or engineer-repairable defect).
 
 ### (b) Execution-context matrix
 
@@ -406,7 +440,7 @@ carries 73 named steps. Three read a path this diff touches and were run directl
 workflow's own order:
 
 1. **Dogfood check-handoff — this repository's own board** (`bash bin/team-paths.sh --get todo` then `bash bin/check-handoff.sh "$B"`, reads `.shell-team/todo.md`, which this task appends to) — PASS.
-2. **check-pii-shapes on the PR diff** (`bash bin/check-pii-shapes.sh --base "origin/${GITHUB_BASE_REF:-develop}"`, adapted per this repository's own stacked-branch convention to `--base "$(git merge-base feature/1072-telemetry-span-discriminator HEAD)"`, since this branch is not yet merged into `develop` — reads this task's own diff) — PASS.
+2. **check-pii-shapes on the PR diff** (`bash bin/check-pii-shapes.sh --base "origin/${GITHUB_BASE_REF:-develop}"`, adapted per this repository's own stacked-branch convention to `--base "$(git merge-base feature/1072-telemetry-span-discriminator HEAD)"`, since this branch is not yet merged into `develop` — reads this task's own diff) — **round 2: FAIL**, genuinely: `FINDING pattern=home-path path=docs/loop-engineering/harness-agent-concurrency.md line=27`, the re-probe evidence's own byte-locked home-directory path (`## Limits`'s "A new, genuinely unfixable-by-engineer defect" bullet above). This is a real CI-equivalence result, not a prediction, and this engineer cannot repair it without altering the frozen `## Probe evidence` section.
 3. **check-commit-identity on the PR commits** (`bash bin/check-commit-identity.sh --base "origin/${GITHUB_BASE_REF:-develop}"`, same branch-point adaptation — reads this task's own commits) — PASS.
 
 The remaining 70 steps are named individually, each judged inapplicable because its own
@@ -495,8 +529,8 @@ bin/derive-populations.sh --label ci-dogfood --set "agents=git ls-files -- agent
 after this task's spec was added).
 
 `grep -c '^RESULT: PASS'`/`grep -c '^RESULT: FAIL'` do not apply here (no aggregate
-per-step log was produced for the 3 reached steps; each is reported individually above,
-all three PASS, `0` FAIL).
+per-step log was produced for the 3 reached steps; each is reported individually above:
+2 PASS — rows 1 and 3 — 1 FAIL — row 2, genuine and disclosed).
 
 ### (d) `## Blast radius` production, narrated
 
@@ -535,8 +569,10 @@ is left unrun by the indirection class here.
 - `git rev-parse feature/1072-telemetry-span-discriminator` = `f8371eb6a26b395c020ee7811087150059d33c15` (identical to the merge-base — this branch's point of divergence is that branch's own tip)
 - `git rev-parse develop` = `627a90259a1c878f3c57b8591c2733db7eb7c622`
 - Branch-point-vs-`develop` inequality this stacked premise rests on: `f8371eb6a26b395c020ee7811087150059d33c15` ≠ `627a90259a1c878f3c57b8591c2733db7eb7c622` — confirmed unequal.
-- Probe-evidence commit = `86c5a300f2d99d1aec9473120ae3eb25d8eb90f6`
-- Freeze commit (v1, intent-hash `5fe2d557998f29ae3bf11913416cabd4e0396bc4`) = `394668c363bb2637a68cbc7acd87967aefb4bdc3`; `git merge-base --is-ancestor 394668c363bb2637a68cbc7acd87967aefb4bdc3 86c5a300f2d99d1aec9473120ae3eb25d8eb90f6` exits `0` (freeze precedes evidence).
+- First probe-evidence commit (superseded) = `86c5a300f2d99d1aec9473120ae3eb25d8eb90f6`
+- Freeze commit (v1, intent-hash `5fe2d557998f29ae3bf11913416cabd4e0396bc4`) = `394668c363bb2637a68cbc7acd87967aefb4bdc3`; `git merge-base --is-ancestor 394668c363bb2637a68cbc7acd87967aefb4bdc3 86c5a300f2d99d1aec9473120ae3eb25d8eb90f6` exits `0` (v1 freeze precedes the first evidence).
+- **Round 2**: class-M re-freeze commit (v2, intent-hash `bd2fc01a179a0fd382980c8394a0695ed8576411`) = `c000121029d26eebd1ddbd083e325dc90c365c63`.
+- **Round 2**: re-probe evidence commit (the current, in-force `- probe-evidence-sha (T-1073):` board value, what this note's `## Overlap analysis` re-derives from) = `88a5e0ecba59c13a99a1609e0e600bb8303a5ee6`; `git merge-base --is-ancestor c000121029d26eebd1ddbd083e325dc90c365c63 88a5e0ecba59c13a99a1609e0e600bb8303a5ee6` exits `0` (v2 re-freeze precedes the re-probe evidence).
 - `git branch --show-current` = `feature/1073-concurrent-agent-probe`
 
 ### (f) Every `## Assumptions` bullet, re-measured
@@ -544,11 +580,11 @@ is left unrun by the indirection class here.
 The spec carries six `## Assumptions` bullets. Each is addressed below, in the spec's own order.
 
 1. **RELAYED — issue #277's precondition list and issue #274's isolation item.** Re-fetched directly by this role via `https://api.github.com/repos/RipsawJP/shell-team/issues/277` and `.../274` (public, unauthenticated GET). **#277** ("Width-axis Stage 0…"), state `open`, confirmed: its own body names precondition 2 as "verify empirically that the harness runs N concurrent Agent-tool sub-agent invocations from one orchestrator session — shared precondition with #274," exactly the premise this task discharges. **#274** ("Concurrency Stage 0…"), state `open`, confirmed: its own body names the identical shared precondition, plus the six-plus-one contract surfaces and the 2+ concurrent-worktree reconcile design as its own remaining Stage 0 items, none of which this task touches. No criterion in this spec depends on any figure or wording from either issue; both are used only as identifiers in `## Implications for T-1074`.
-2. **MEASURED false, recorded as a hand-off finding — the agent-definition count.** Already corrected in the spec's own text and in `.shell-team/interventions/T-1073.md` (the orchestrator's own committed entry, confirmed present and conformant: `bash bin/check-interventions.sh --task T-1073 -- .shell-team/interventions/T-1073.md` reports conformant, 1 entry, 0 sentinel) — nine `agents/*.md` files, not one carrying an `Agent`/`Task` token. Re-confirmed by this engineer: `ls agents/*.md | wc -l` → `9`.
-3. **RELAYED — the operator's watchdog script.** `agent-watchdog.sh` lives under the operator's own home dotfiles, outside this repository and outside this role's readable working directories; its existence, alert format and the exact `WATCHDOG-ALERT` token are relayed via the committed probe evidence, not independently re-read from the script's own source by this engineer (this role has no access to the operator's home directory). Recorded home-relative throughout this note, never as a home-directory absolute path (**AC13**).
+2. **MEASURED false, recorded as a hand-off finding — the agent-definition count.** Already corrected in the spec's own text and in `.shell-team/interventions/T-1073.md` (the orchestrator's own committed entries, confirmed present and conformant: `bash bin/check-interventions.sh --task T-1073 -- .shell-team/interventions/T-1073.md` reports conformant, **2** entries — this round-2 count, up from round 1's 1, since the invalid-evidence-rule re-probe is entry 2 of the same file — 0 sentinel) — nine `agents/*.md` files, not one carrying an `Agent`/`Task` token. Re-confirmed by this engineer: `ls agents/*.md | wc -l` → `9`.
+3. **RELAYED — the operator's watchdog script.** `agent-watchdog.sh` lives under the operator's own home dotfiles, outside this repository and outside this role's readable working directories; its existence, alert format and the exact `WATCHDOG-ALERT` token are relayed via the committed probe evidence, not independently re-read from the script's own source by this engineer (this role has no access to the operator's home directory). The watchdog script's own invocation lines (`## Probe evidence`, "Commands") remain recorded home-relative (`~/.claude-dotfiles/...`), never as a home-directory absolute path — **but a different line in the same frozen evidence section, the git-clone source path, is not** (`## Limits`'s "A new, genuinely unfixable-by-engineer defect" bullet), a distinct, newly-surfaced finding this bullet does not paper over.
 4. **RELAYED — `f8371eb` as `feature/1072-telemetry-span-discriminator`'s tip and PR #286.** Re-measured directly: `git rev-parse feature/1072-telemetry-span-discriminator` = `f8371eb6a26b395c020ee7811087150059d33c15`, matching the relayed short form exactly (item (e) above).
 5. **RELAYED and deliberately untested-as-fact — the harness documentation's concurrent-tool-uses claim.** Named explicitly as the claim under test in `## Agent-type boundary`'s `- claim-under-test:` line, never cited as evidence; this task's own measured overlap is the independent evidence, per the spec's own design.
-6. **UNVERIFIED from this role — the clock source.** Verified live by the probe (not by this engineer, who cannot run one): `## Probe evidence`'s "Clock-source verification" records `python3-time_ns` expanding to 19 digits, and a GNU `date +%s%N` also expanding on this PATH — the BSD-`date` literal-`N` hazard did not occur, disclosed rather than assumed away.
+6. **UNVERIFIED from this role — the clock source.** Verified live by the probe (not by this engineer, who cannot run one): `## Probe evidence`'s "Clock-source verification (re-probe)" records `python3-time_ns` expanding (19-digit integers throughout the re-probe), and a GNU `date +%s%N` also expanding on this PATH — the BSD-`date` literal-`N` hazard did not occur, disclosed rather than assumed away, consistent with the first probe's own equivalent record.
 
 The seventh bullet ("Assumed and stated — bash integer width") is not itself relayed, so
 it is not re-derived here; its outcome is what this note's own "never `awk`/`sort -n`"
@@ -568,6 +604,7 @@ The spec carries seven `## Summarized sources` bullets. Each is addressed below.
 
 ### (h) Probe execution conditions, restated for the record
 
-- Clock source actually used: `python3 -c 'import time; print(time.time_ns())'` (`time.time_ns()`), verified expanding to a 19-digit integer (`1786784078174650000`) before reliance; a GNU `date +%s%N` was also confirmed expanding on the same PATH, and the python source was used uniformly regardless, for consistency across the orchestrator's own timestamps and every probe agent's own report.
-- Logical core count: 8 (`os.cpu_count()`; `sysctl` is denied in this sandbox, so the POSIX-portable Python call stood in for it, disclosed in `## Probe evidence`'s header paragraph rather than silently substituted).
-- Every timing figure in this note (launch latencies, overlap margins, batch/sum durations, watchdog thresholds, heartbeat samples) is machine-local, single-session, and carries no git-ref label anywhere — the only ref-labelled reads in this note are of committed blobs (the branch point, the freeze commit, the probe-evidence commit), each read via `git merge-base`/`git rev-parse`/`git show`, never via a timing claim.
+- Clock source actually used (re-probe, round 2): `python3 -c 'import time; print(time.time_ns())'` (`time.time_ns()`), verified expanding to 19-digit integers throughout (e.g. `t0=1786788966453417000`) before reliance; a GNU `date +%s%N` was also confirmed expanding on the same PATH, and the python source was used uniformly regardless, for consistency across the orchestrator's own timestamps and every probe agent's own report — identical discipline to the first, superseded probe.
+- Logical core count: 8 (`os.cpu_count()`; `sysctl` is denied in this sandbox, so the POSIX-portable Python call stood in for it, disclosed in `## Probe evidence`'s header paragraph rather than silently substituted), unchanged between probes.
+- Every timing figure in this note (launch latencies, overlap margins, batch/sum durations, watchdog thresholds, heartbeat samples) is machine-local, single-session, and carries no git-ref label anywhere — the only ref-labelled reads in this note are of committed blobs (the branch point, the v1/v2 freeze commits, the first and re-probe evidence commits), each read via `git merge-base`/`git rev-parse`/`git show`, never via a timing claim.
+- **Round 2 disposition, restated for the record**: the invalid-evidence rule's one permitted re-probe was used this round (`.shell-team/interventions/T-1073.md` entry 2); a second invalidation of evidence would stop the task and return it to planning. This engineer's own newly-surfaced finding this round — the re-probe evidence's own home-path line (**AC13**) — is a hygiene/PII-shape defect in already-committed, byte-locked evidence, not a scientific-validity defect in the measurement itself; whether it independently triggers that same "second invalidation" disposition, or is handled by a different mechanism (a redaction-only third evidence commit, or an explicit ratified acceptance), is an operator/pm-spec judgment this engineer does not make unilaterally.
