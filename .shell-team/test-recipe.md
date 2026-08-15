@@ -899,3 +899,58 @@ that file's order.
   the 120s default for this spec's full sweep (this task used 400) because
   **AC6** lints the full local telemetry corpus under two separate linter
   blobs and **AC14** runs four test suites in the same check.
+- T-1076: **a real, measured performance ceiling in `bin/check-run.sh` that
+  the next task touching this writer, its readers, or its contention fixture
+  needs to inherit rather than re-discover.** Its unbalanced-quote detection
+  (`unq="${line//\\\\/}"; unq="${unq//\\\"/}"; quotes="${unq//[!\"]/}"`,
+  lines 205-207) is a chained bash global pattern-substitution over the
+  WHOLE line, and this repo's own stock dev-host bash (3.2.57, macOS) is
+  measured to run each stage with severe super-quadratic cost whenever the
+  substitution removes a large fraction of a long string — direct isolated
+  benchmarks of that exact chain: 500B→0.03s, 1000B→0.13s, 2000B→0.82s,
+  4000B→5.7s (third stage dominant) / 8000B→20s (second stage dominant,
+  tested separately with an all-`\"`-pair payload), 16384B→did not complete
+  within 120s. The determining factor is how much of the string actually
+  gets REMOVED at each stage, not its content otherwise — an all-quote
+  payload is fast at the third stage but slow at the second, and vice
+  versa, so no payload composition avoids the ceiling once a JSON string
+  field passes a few KB. This is why `tests/log-run/run.sh`'s T-1076
+  contention suite splits its two arms: the AC9 positive/main 8x20 case
+  carries NO `--error` payload (kept fast and lintable — its file is the
+  one `bin/check-run.sh` actually runs against for the
+  `contention-check-run-clean` assertion), while the AC10 negative control
+  alone carries the 16384-byte floor D6 requires, built as a scratch copy
+  under `$TMPDIR` with NO sibling `check-run.sh` (so the writer's own
+  post-write self-check silently skips, per its documented
+  missing-checker behavior) and judged only by cheap measurements (line
+  count, derived seq-set exactness) that never invoke `bin/check-run.sh`.
+  Whoever next touches `bin/check-run.sh` itself should re-measure this
+  ceiling before assuming it moved. Separately: `bin/log-run.sh`'s own
+  `jesc()` (backslash/quote escaping) does NOT hit this ceiling for the
+  same payload sizes, because its two substitutions have near-zero matches
+  against a payload containing neither backslash nor quote characters
+  (measured: an all-`x` 16000-byte string through the equivalent
+  substitution shape completes in ~0.006s) — the slow path is specific to
+  `bin/check-run.sh`'s quote-BALANCE check, not to string escaping in
+  general.
+- T-1076: retry granularity for the append lock's bounded wait is
+  whole-second (`sleep 1`), a deliberate choice (D2 leaves either option
+  open) rather than a portability necessity — fractional `sleep 0.2` is
+  measured to work on this session's own sandboxed bash 3.2.57, but whole
+  seconds need no per-host verification and comfortably satisfy every
+  acceptance criterion's own timing bound (AC6's `TEAM_LOG_LOCK_TIMEOUT=1`
+  case returns in ~1s, well inside its 10s ceiling).
+- T-1076: `tests/log-run/run.sh`'s full contention suite (positive arm,
+  D2-refusal case, signal-release case, AC10 negative control) measured
+  **~167s wall-clock** end to end on this host
+  (`bash tests/log-run/run.sh`, timed twice, both ~167s and both exiting
+  0) — almost entirely the negative control's 160 real `bash
+  bin/log-run.sh`-equivalent process launches with a 16KB argv payload
+  each. This is well past a sub-agent's own default 120s foreground Bash
+  tool timeout: invoke it with an explicit longer timeout (or as a
+  backgrounded command polled for completion) rather than assuming a hang
+  when nothing prints for two minutes. `CHECK_ACS_TIMEOUT=400` was used
+  for this spec's full `bin/check-acs.sh` sweep (**AC9** and **AC10** each
+  run the whole suite once, back to back, so budget at least
+  2×167s ≈ 340s for those two criteria alone before any of the spec's
+  other checks run).
