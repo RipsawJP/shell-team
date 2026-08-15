@@ -228,6 +228,22 @@ bash bin/gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-
 
 このデモでは `--out` が必須 — 省略するとページが `tests/` 配下の fixture ディレクトリにデフォルトで書き出され、untracked ファイルが残ってしまう。
 
+## 母集団の導出
+
+record の集合演算——母集団総数・差分・bucket 分割——は目視で数えず
+`derive-populations.sh` が生成する: 2〜8 個の名前付き母集団抽出コマンドを
+pin された `LC_ALL=C` collation の下で実行し、record がそのまま埋め込む
+1 つの区切りブロックを出力する。ブロックの直前には、それを再生成する
+正確なコマンドを持つ `- reproduce: <command>` 行が付く。
+
+```bash
+bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
+```
+
+（プラグインをロードしていれば `bin/` は `PATH` に載るので、`bash derive-populations.sh` はそこから解決される——実行ビットには依存しない。`bin/` 接頭辞は不要——`## run のリプレイ` が `gen-loop-replay.sh` に対して文書化している convention と同じ。）各 `--set name=command` 行はキャプチャされ、重複排除され、gap のない・重複のないメンバーシップ signature へ分割される。`--accept-status name=csv` は、既定の `0` に加えて 1 つの名前付き集合に対して追加で受理する exit status を宣言する（「`git grep` はマッチなしで exit `1`」のケース）。完全な文法は `bash derive-populations.sh --help` を参照。
+
+Exit code: `0` ブロックが stdout に書かれた。`1` 入力の*内容*に関する refusal（受理されていない集合の exit status、または制御文字を含むアイテム——stdout は空のまま、決して偽の空集合として扱わない）。`2` 呼び出しに関する usage error（`--label` 欠落、`--set` が 2 未満または 8 超、同名の重複、複数行コマンド）。このリポジトリ自身の dogfood された導出例は `docs/loop-engineering/record-set-derivation.md` を参照。
+
 ## 設計上の選択
 
 - **read-only オーケストレーター**：`tech-lead` は計画のみ。実行はメインセッションが Routing Map に従って行う。

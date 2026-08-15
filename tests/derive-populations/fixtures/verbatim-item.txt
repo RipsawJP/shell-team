@@ -1,0 +1,10 @@
+- dash item
+em — dash
+日本語の項目
+ leading-space
+quote's-item
+paren(item)
+plus+item
+bracket[item]
+dollar$item
+star*item
