@@ -101,17 +101,58 @@ row keeps recording *that* the transition happened, the span row records
 nothing written (measured, not merely asserted, by **AC5** and **AC10**):
 this convention never relaxes the event-row grammar.
 
+**Known rendering limitation (Codex round 1 Major, repaired here by
+disclosure, not by code — `templates/loop-replay.html` stays frozen
+byte-identical per AC7/Non-goals).** That template treats `orchestrator`/
+`human` as fixed structural nodes, stating in its own comment (line ~413)
+that they "emit no spans themselves"; a `--span orchestrator` row is
+exactly the case it does not expect. See `## Measured: the loop-replay.html
+rendering collision` below for the live measurement (not a prediction) of
+what actually happens, and the class-closure inventory that follows it.
+
 ## Why the rehydration checkpoint needs no schema at all
 
 A substrate-reading checkpoint — a point where the orchestrator re-reads its
 own substrate mid-phase — is a **child span** of the span it belongs to,
 named `engineer-rehydration`, using the `parent_span_id` field the row has
-carried since T-014:
+carried since T-014. **The row schema has no unique span identifier at all**
+— no `span_id` field exists on any row, ever — so `parent_span_id`'s value
+here is the **parent span's own `--span` value** (a role name, e.g.
+`engineer`), never a fabricated id:
 
 ```
 log-run.sh shell-team --run-id <run_id> --seq <seq> --span engineer-rehydration --phase <phase> \
-  --iteration <n> --attempt <a> --status <status> --parent-span-id <the span it belongs to> || true
+  --iteration <n> --attempt <a> --status <status> --parent-span-id <the parent span's own --span value, e.g. engineer> || true
 ```
+
+**Verified against the writer, not merely asserted (Codex round 1 Major,
+repaired).** `bin/log-run.sh` performs **no validation whatsoever** on
+`--parent-span-id` — it is a free-form field exactly like `--error`, only
+JSON-escaped (`jesc`), never charset-checked. The relevant lines, quoted
+verbatim:
+
+```
+        --parent-span-id) PARENT="$2" ;;
+```
+```
+  ROW+="$(jstr parent_span_id "$PARENT"),"
+```
+
+No `[[ "$PARENT" =~ ... ]]` check exists anywhere between capture and
+emission (contrast `--provider`/`--effort`/`--adapter`/`--instance`, which
+all run through `BINDING_TOKEN_RE`) — so `engineer` passes as trivially as
+any other string. But because `span` is a **repeatable** role label, not a
+unique key (two rows can share one `--span` value in the same run today,
+across retries or iterations, and squarely once the fan-out this task's own
+discriminator exists for lands), this reference is honestly a
+**name-reference within the run, not a pointer**: scope it by the shared
+`run_id` already on every row, and disambiguate a shared `--span` value
+further by the same `iteration`/`attempt` pair the parent call ran under.
+A reader correlates a rehydration child to its parent by finding the
+nearest preceding row in the same `run_id` whose `span` equals the
+referenced value and whose `iteration`/`attempt` match — best-effort,
+never a guaranteed unique edge, exactly as precise as the name it points
+at.
 
 No key is added for it, no flag is added for it, and no agent prompt block
 is edited to emit it (**AC11** measures this directly: neither `bin/log-run.sh`
@@ -119,6 +160,150 @@ nor `bin/check-run.sh` contains the token `rehydration` or `checkpoint`
 anywhere, and this task's diff carries zero paths under `agents/`) — the
 convention is documented where the orchestrator's own emission guidance
 lives, and the emission itself is the orchestrator's, not an agent's.
+
+## Measured: the loop-replay.html rendering collision
+
+Codex round 1 (`.shell-team/reviews/T-1072.md`, Major 2) predicted that a
+`--span orchestrator` row would corrupt `templates/loop-replay.html`'s ring
+layout. This section replaces that prediction with a live measurement:
+a synthetic run was written with **`bin/log-run.sh`, unedited by this
+rework** — one `tech-lead`/`pm-spec`/`engineer`/`qa-verifier`/
+`codex-reviewer` span each (the six known ring agents, minus `ui-designer`),
+one `--span orchestrator --phase gate --duration-ms 300` row (the gate-span
+convention) and one `--span engineer-rehydration --parent-span-id engineer`
+row (the rehydration convention), plus event rows for realism — then
+rendered with **`bin/gen-loop-replay.sh`, unedited by this rework**
+(`bash bin/gen-loop-replay.sh <run-id> --runs-dir <scratch> --out
+replay.html`, exit `0`). The generated page's own injected JSON payload was
+extracted and its `adaptRow`/`RING_AGENTS`/`ALL_NODE_IDS` derivation — copied
+**verbatim** from `templates/loop-replay.html` lines 371-397, 416, 431-437,
+772-774 and 1104, not paraphrased — was re-run under Node against that real
+payload (`node simulate.js payload.json`). Measured output:
+
+```
+work agents seen (in span-emission order): [
+  'tech-lead', 'pm-spec', 'engineer', 'orchestrator',
+  'engineer-rehydration', 'qa-verifier', 'codex-reviewer'
+]
+RING_AGENTS (final): [
+  'tech-lead', 'pm-spec', 'engineer', 'qa-verifier', 'codex-reviewer',
+  'ui-designer', 'orchestrator', 'engineer-rehydration'
+]
+RING_AGENTS.length: 8 (baseline KNOWN_RING_AGENTS.length = 6)
+RING_ANGLE_STEP (radians): 0.7853981633974483  vs baseline (2*PI/6) = 1.0471975511965976
+ALL_NODE_IDS: [
+  'tech-lead', 'pm-spec', 'engineer', 'qa-verifier', 'codex-reviewer',
+  'ui-designer', 'orchestrator', 'engineer-rehydration', 'orchestrator', 'human'
+]
+"orchestrator" appears in ALL_NODE_IDS 2 time(s) -- expected 1, DUPLICATE if >1
+"engineer-rehydration" is a member of RING_AGENTS: true
+```
+
+**Honest severity assessment, per the measurement rather than the
+prediction.** Codex's prediction is confirmed exactly: `"orchestrator"`
+duplicates in `ALL_NODE_IDS` (both entries resolve to the identical
+`worldPos("orchestrator")`, so they draw as two exactly-overlapping nodes
+with duplicate hit-targets), and `RING_AGENTS.length` grows from **6 to 8**
+the moment one gate-span row and one rehydration-span row are both present,
+shrinking `RING_ANGLE_STEP` from **60° to 45°** — every one of the six
+known ring agents' screen positions shifts, not just the two new ones. This
+exceeds a purely cosmetic label gap: it is a measured, deterministic
+identity collision (one node genuinely drawn twice) plus a real positional
+shift for every existing legitimate ring agent, the first time this
+convention is actually followed. It is **not**, however, a crash or an
+unusable page: no JavaScript exception was raised by this measurement, the
+underlying telemetry data is never mutated or lost, and a regenerated page
+(after any future template fix) costs nothing — replay pages are
+throwaway/regenerable artifacts, never hand-edited, per this task's own
+`## Non-goals`. Net assessment: **real and worse than "cosmetic," but not
+fatal** — reported at that severity rather than rounded up or down, so the
+next round's drop-path calculus (per the spec's pre-commitment) can weigh
+it accurately. The fix needs `templates/loop-replay.html`'s own JS touched,
+which AC7 and this task's Non-goals keep frozen this round; it is carried
+as this task's own follow-up issue rather than patched here.
+
+## Class-closure inventory — every convention element × every consuming surface
+
+Every element either convention introduces, against every surface that
+reads a span row's fields or values (not just its keys) — closing the
+question the two Majors opened: are there a third, fourth, … mismatch this
+task has not yet found? The surface population itself is derived, not
+hand-listed, so an omitted surface is a measurable gap rather than a
+possibility:
+
+**Informational population check (grounding only — not one of AC12's
+tracked `- reproduce:` derivations; AC12 tracks exactly the one
+`span-only-symmetry` block above, by design, so its bucket-signature
+invariant is not asked to hold over a population comparison whose buckets
+are legitimately not all intersections).** Command run, output pasted
+verbatim, from the repository root:
+
+```
+$ bash bin/derive-populations.sh --label t1072-consuming-surfaces --set "grep_jsonl=git grep -l 'jsonl' -- 'bin/*.sh' | LC_ALL=C sort" --set "declared=printf '%s\n' bin/rollup-runs.sh bin/cluster-failures.sh bin/gen-loop-replay.sh bin/log-run.sh bin/check-run.sh | LC_ALL=C sort"
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: grep_jsonl — status: 0 — lines: 9 — items: 9 — command: git grep -l 'jsonl' -- 'bin/*.sh' | LC_ALL=C sort
+- set: declared — status: 0 — lines: 5 — items: 5 — command: printf '%s\n' bin/rollup-runs.sh bin/cluster-failures.sh bin/gen-loop-replay.sh bin/log-run.sh bin/check-run.sh | LC_ALL=C sort
+- union: items: 9
+- bucket: grep_jsonl — items: 4
+  - bin/check-pii-shapes.sh
+  - bin/codex-capture.sh
+  - bin/retro-inputs.sh
+  - bin/rollup-track.sh
+- bucket: grep_jsonl+declared — items: 5
+  - bin/check-run.sh
+  - bin/cluster-failures.sh
+  - bin/gen-loop-replay.sh
+  - bin/log-run.sh
+  - bin/rollup-runs.sh
+```
+
+The `grep_jsonl`-only bucket (`check-pii-shapes.sh`, `codex-capture.sh`,
+`retro-inputs.sh`, `rollup-track.sh`) is exactly the spec's own `##
+Reader inventory` table's remaining `unaffected` rows for `bin/` (fixture
+paths only; a *different* jsonl entirely; directory presence only; and
+`rollup-runs.sh`'s stdout text, never a row) — confirming no sixth `bin/`
+surface exists beyond the five below.
+
+```
+$ bash bin/derive-populations.sh --label t1072-templates-skills-surfaces --set "grep_hits=git grep -l 'row\.span\|\"span\"' -- 'templates/*' 'skills/*' | LC_ALL=C sort" --set "declared=printf '%s\n' templates/loop-replay.html skills/run/SKILL.md | LC_ALL=C sort"
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: grep_hits — status: 0 — lines: 1 — items: 1 — command: git grep -l 'row\.span\|"span"' -- 'templates/*' 'skills/*' | LC_ALL=C sort
+- set: declared — status: 0 — lines: 2 — items: 2 — command: printf '%s\n' templates/loop-replay.html skills/run/SKILL.md | LC_ALL=C sort
+- union: items: 2
+- bucket: declared — items: 1
+  - skills/run/SKILL.md
+- bucket: grep_hits+declared — items: 1
+  - templates/loop-replay.html
+```
+
+Confirming `templates/loop-replay.html` is the **only** `templates/`/
+`skills/` file that structurally derives anything from a `span` value —
+`skills/run/SKILL.md` is declared separately because it documents the
+convention in prose, not because it structurally consumes the field.
+
+**Disposition key.** `VERIFIED` — the surface handles the element
+correctly, no gap. `DISCLOSED` — a real, non-blocking side effect exists
+and is now stated honestly (in this note, the skill, or an existing review
+finding already carried to a fast-follow issue) rather than left silent.
+`MISMATCH` — an unresolved contradiction between what a convention claims
+and what actually happens. The two Majors this rework repairs are the two
+`MISMATCH→DISCLOSED` cells below; every other cell was already `VERIFIED`
+or `DISCLOSED` before this rework, confirming there is no third.
+
+| Element | `bin/log-run.sh` validation | `bin/check-run.sh` rules | `bin/rollup-runs.sh` grouping | `bin/cluster-failures.sh` keys | `gen-loop-replay.sh` + `loop-replay.html` scene/ring | `skills/goal/SKILL.md` | AC4 count invariants |
+|---|---|---|---|---|---|---|---|
+| Span name `orchestrator` (gate-span) | VERIFIED — `--span` has no closed vocabulary/charset check; any string is legal. | VERIFIED — same; `span` is never enum-checked. | DISCLOSED — counted as an ordinary span (measured: `spans: 7`, `phases: … gate …`); inflates `n_spans`/marks `(partial)` when no `--tokens` — Codex review Minor #7, fast-follow filed, won't-fix this round. | VERIFIED — measured (`cluster GATE:ERROR count=1 …`): `phase`/`status` grouping handles it exactly like any other phase, reads sensibly. | **MISMATCH → DISCLOSED this rework** — Major 2, measured above: duplicate `"orchestrator"` node in `ALL_NODE_IDS`, `RING_AGENTS` 6→8, angle step 60°→45°; disclosed in the skill/note, template stays frozen, fast-follow filed. | DISCLOSED — goal loop doesn't mirror this convention (Non-goals); no interaction, since the goal loop never emits `--span orchestrator`. | VERIFIED — a span **value**, not a key; the `SPAN_ONLY_FLAGS`/`SPAN_ONLY_KEYS` set is unaffected. |
+| Span name `engineer-rehydration` | VERIFIED — same as above. | VERIFIED — same as above. | DISCLOSED — same Minor #7 pollution as the gate-span row; also not a grouping key anywhere. | VERIFIED — a rehydration failure surfaces under its own `phase` like any span; readable, just doesn't reveal it was specifically a checkpoint. | DISCLOSED — becomes an 8th, unrelated-sibling ring node (measured above) rather than a nested child; already named in this task's own Non-goals ("no replay UI for the new field") and the review's Minor #9. | DISCLOSED — not mirrored (Non-goals). | VERIFIED — value, not key. |
+| `--phase gate` | VERIFIED — `--phase` has no closed vocabulary either. | VERIFIED — same. | DISCLOSED — measured above (`phases: plan specify implement gate verify review`): "gate" reads as a literal phase name alongside real loop phases in the summary line; cosmetic overlap, same Minor #7 family. | VERIFIED — measured above: becomes the cluster key component (`GATE:ERROR`), reads sensibly. | VERIFIED — `phase` is read only for display (a text chip, `templates/loop-replay.html:556,1024`), never for ring/scene derivation; no structural interaction beyond the span-name collision already covered above. | DISCLOSED — not mirrored. | VERIFIED — value, not key. |
+| The parent reference (`--parent-span-id`, now the parent's own `--span` value) | **MISMATCH → DISCLOSED this rework** — Major 1: was unresolvable as written (no `span_id` exists); repaired to a name-reference, verified against the writer's own (non-)validation, quoted above. | VERIFIED — unaffected: `parent_span_id` was already, and remains, one of `SPAN_ONLY_KEYS` (rejected on an event row); its value's *meaning* changing in prose does not touch its schema treatment. | VERIFIED — grepped: neither script references `parent_span_id` at all; not consumed. | VERIFIED — same, not referenced. | DISCLOSED — `adaptRow` never reads `row.parent_span_id` (confirmed: absent from its returned `work`-type object); the nesting is invisible in the replay page today, already named in this task's Non-goals and the review's Minor #9. | DISCLOSED — not mirrored. | VERIFIED — value, not key. |
+| Duration semantics (`--duration-ms` on a gate-span row) | VERIFIED — reuses the existing nullable-non-negative-integer validation unchanged. | VERIFIED — unvalidated numeric shape, exactly as for every other span (unaffected). | DISCLOSED — measured above (`duration: 15300ms (partial)`): summed into the run's total duration like any span's; same Minor #7 family. | VERIFIED — grepped: `cluster-failures.sh` never reads `duration_ms`. | DISCLOSED — summed into the cumulative timeline alongside its parent's own duration (`adaptRow`'s `cum += e.duration_ms`), which can double-count once a rehydration child's own duration sits inside its parent's — review's adversarial Minor #12, already downgraded and filed as a longer-horizon fast-follow. | DISCLOSED — not mirrored. | VERIFIED — value, not key. |
+
+No third `MISMATCH` cell was found in this closure; every remaining
+non-`VERIFIED` cell is a previously-disclosed, non-blocking side effect
+already carried to a fast-follow issue by the review's own dispositions,
+not a fresh contradiction.
 
 ## AC18 — runtime, reported item by item
 
