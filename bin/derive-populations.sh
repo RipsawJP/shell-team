@@ -93,12 +93,17 @@ PROG="derive-populations"
 EM=$'\xe2\x80\x94'
 
 die_usage() {
-  printf '%s: %s\n' "$PROG" "$1" >&2
+  # The write's own failure (e.g. a caller closed stderr) is swallowed with
+  # `|| true` so this line can never steal the following `exit 2` via
+  # errexit — a caller with stderr closed must still observe exit 2, never
+  # exit 1 (the closed-write's own errexit fallback), which would silently
+  # break this script's own 0/1/2 exit-code contract.
+  printf '%s: %s\n' "$PROG" "$1" >&2 || true
   exit 2
 }
 
 die_refuse() {
-  printf '%s: %s\n' "$PROG" "$1" >&2
+  printf '%s: %s\n' "$PROG" "$1" >&2 || true
   exit 1
 }
 
