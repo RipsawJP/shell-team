@@ -397,3 +397,132 @@ bash 5 package or static binary was reachable within this session's network
 allow-list, so the 4.4.0 build (the newest available on this host, carried
 over rather than rebuilt) stands in as the "second, higher" floor, disclosed
 rather than silently treated as bash 5.
+
+### (i) Codex review round 1 (2026-08-15) — rework record
+
+`.shell-team/reviews/T-1071.md` (commit `ed64d66`) returned `REQUEST_CHANGES`:
+1 Blocker (swallowed-exit-status) + 3 Major (identifier-grammar-validation,
+same root cause, same-class-2 inventory form) + 1 Minor (won't-fix). This
+subsection is that round's own item-by-item record, appended rather than
+replacing anything above.
+
+#### Swallowed-exit-status — full site enumeration (Blocker)
+
+Every place in `bin/derive-populations.sh` where an external command's own
+exit status could be lost — a command substitution, an internal pipeline,
+or the `--set` child shell — audited in one pass, per the review's own
+instruction:
+
+| # | Site (post-fix line refs) | Shape | Swallow risk | Disposition |
+|---|---|---|---|---|
+| 1 | `bash -c "$cmd"` (the `--set` child shell) | a caller-supplied command that can itself be an arbitrary pipeline | **YES — real, live** (Blocker; `git ls-tree bad-ref \| sort` read as exit 0) | **FIXED**: `bash -c "set -o pipefail; $cmd"` |
+| 2 | `cut -f1 "$WORKDIR/sig-item.sorted" \| uniq >"$WORKDIR/distinct-sigs"` | a pipeline at this script's own top level | no — already covered | reviewed: this script's own `set -euo pipefail` (line 96) already governs any pipeline run at its top level (verified empirically: a failing upstream stage here does propagate); not the same shape as #1, which runs inside a FRESH child shell that starts with default options | no change |
+| 3 | `lines="$(awk 'END{...}' "$rawfile")"` | a direct-assignment command substitution, the WHOLE simple command | no | bash's own `errexit` fires on a failing direct assignment of this shape (verified empirically: `set -e; x="$(false)"` aborts before any later statement) | no change |
+| 4 | `accept_csv="$(accepted_statuses "$name")"` | function-call substitution | no | the function always returns 0 (its last command, a `printf`, cannot fail here) | no change |
+| 5 | `WORKDIR="$(mktemp -d ...)" \|\| die_usage ...` | direct-assignment substitution | no | explicitly guarded with `\|\|` already | no change |
+| 6 | `grep -v '^$' "$rawfile" >"$nonblank" 2>/dev/null \|\| true` | intentional accounting swallow, over a file THIS SCRIPT just captured (not a second external pipeline) | no | deliberate "0 matches is not an error" idiom, reviewed and unchanged since the original implementation | no change |
+| 7 | `items="$(grep -c . "$itemsfile" ... \|\| true)"` / `union_count=...` / `cnt=...` (three sites, same idiom) | same accounting idiom, over files this script itself wrote | no | same as #6 | no change |
+| 8 | `awk -v tag=... '{...}' "$WORKDIR/items.$idx" >>"$WORKDIR/tags"` | single command, no pipe | no | a plain command as the entirety of its loop-body statement; `errexit` applies | no change |
+| 9 | the membership-aggregation `awk -F'\t' '...' "$WORKDIR/tags" >"$WORKDIR/membership"` | single command, no pipe | no | same as #8 | no change |
+| 10 | the `while IFS=$'\t' read -r item idxlist; do ... done <"$WORKDIR/membership"` loop | no pipe, no substitution | no | plain commands only | no change |
+| 11 | `sort "$WORKDIR/sig-item" >"$WORKDIR/sig-item.sorted"` | single command | no | plain command, `errexit` applies | no change |
+| 12 | `SIG="$sig" awk -F'\t' '...' "$WORKDIR/sig-item.sorted" >"$bucket_items"` | single command | no | plain command, `errexit` applies | no change |
+| 13 | `sed 's/^/  - /' "$bucket_items"` | single command inside a `while` loop body | no | plain command, `errexit` applies | no change |
+
+**Result: 13 sites audited, 1 fix (site 1), 12 already safe** — reported
+individually rather than as a blanket "reviewed, fine" sentence, per the
+review's own instruction to enumerate every path.
+
+#### Identifier-grammar × byte-class inventory (Majors)
+
+Every invocation-surface text input, decided against every grammar-reserved
+byte class:
+
+| Identifier ↓ / byte class → | LF | CR | other control chars | TAB | `+` | ` — ` (em dash sep.) | leading/trailing whitespace | empty string | marker-shaped content |
+|---|---|---|---|---|---|---|---|---|---|
+| `--label` value | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) |
+| `--set` NAME | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) |
+| `--accept-status` NAME | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) |
+| `--set` COMMAND text | REJECT (2) | REJECT (2) | REJECT (2) | REJECT (2) | ACCEPT | ACCEPT | ACCEPT | ACCEPT | ACCEPT |
+
+Reasons, by row:
+
+- **`--label` / `--set` NAME / `--accept-status` NAME** — all nine columns
+  reject, uniformly, because the SAME closed grammar
+  (`^[A-Za-z0-9][A-Za-z0-9_-]*$`, `valid_ident()`) excludes every one of
+  these byte classes at once: it is a positive allow-list (alphanumeric,
+  `_`, `-`, first character alphanumeric), not an enumerated blacklist, so
+  there is no ninth column this table would need to add later for a byte
+  class nobody thought of yet. A `+` cannot corrupt the emitted signature
+  grammar (AC4); a TAB cannot corrupt the internal `sig\titem` delimiter;
+  a newline or CR in `--label` cannot forge a spurious BEGIN/END marker
+  pair; empty is rejected by the grammar's own first-character anchor.
+- **`--set` COMMAND text** — LF/CR/other-control/TAB reject (2): the
+  existing newline-only check is generalized to the full control-character
+  class the item-side refusal (AC5(g)) already uses, closing the CR gap
+  the review named without inventing a new rule. `+`, ` — `, leading/
+  trailing whitespace and empty string all accept, because the command is
+  DATA, not a structural identifier, and its own position in the grammar
+  — always the LAST field on its own single physical line (LF/CR already
+  refused, so it cannot span more than one line) — is what the Goal's own
+  "the free-form command field is last so a separator inside it cannot
+  forge a field" reasoning already relies on; verified live (`bash
+  bin/derive-populations.sh --label marker-cmd-test --set "A=echo
+  '<!-- BEGIN derivation: x -->'"` prints that text inline on one `- set:`
+  line, and AC8's own extraction — `awk '$0==b{...}'`, a WHOLE-LINE
+  equality test — cannot match a substring embedded inside a longer line,
+  so no forgery reaches any consumer that reads the markers the way this
+  task's own tooling does). Empty command text is a legitimate, if
+  degenerate, always-empty set (verified live: `status: 0 — lines: 0 —
+  items: 0`).
+
+#### Mutation self-check — the five new/changed code paths
+
+All five mutations below were made on a fresh `git worktree add --detach`
+scratch copy at this round's own `HEAD` (`eadb824`), outside the working
+tree, each observed red, restored to the pre-mutation byte-identical
+content (diffed to confirm), and observed green again.
+
+1. **Blocker fix** — reverted `bash -c "set -o pipefail; $cmd"` back to `bash -c "$cmd"` → the `pipefail-upstream` suite case: `FAIL: ... got rc=0` (the upstream-failing pipeline read as a false empty set again); restored → `PASS`.
+2. **`--label` grammar** — commented out `valid_ident "$LABEL" || die_usage ...` → both `label-grammar` cases: `FAIL: ... got rc=0` (the newline-forging label and the `+`-carrying label both silently accepted again); restored → both `PASS`.
+3. **`--set` NAME grammar** — reverted to the old non-emptiness-only check → `set-name-grammar` (`+`): `FAIL: ... got rc=0`. The TAB-carrying variant of this same case, interestingly, still `PASS`ed even with the name-grammar check removed — it is independently caught by the earlier whole-value `[[:cntrl:]]` scan (TAB is itself a control character), so that cell has two independent layers of protection while the `+` cell relies solely on the name grammar; restored → both `PASS`.
+4. **`--accept-status` NAME grammar** — replaced the `valid_ident "$aname" || die_usage ...` line with a no-op → `accept-status-name-grammar`: `FAIL: ... got rc=0`; restored → `PASS`.
+5. **Command-text control-char generalization** — reverted the `*[[:cntrl:]]*` scan back to the old newline-only `*$'\n'*` check → `command-control-char`: `FAIL: ... got rc=1` (not `rc=0` — the CR-carrying command now passes arg parsing, runs, and its CR ends up inside a printed item, which the pre-existing item-level control-char refusal then catches at `die_refuse`, exit 1, instead of the intended `die_usage`, exit 2 — a real defect either way: the command-text check is supposed to refuse at parse time, and a CR that never reaches a printed item, e.g. one filtered out upstream, would not be caught by this fallback at all); restored → `PASS`.
+
+(Five mutations, matching the five new/changed sites the round's own findings named; none skipped.)
+
+#### Per-cell fixture mapping
+
+| Finding / cell | Fixture case (in `tests/derive-populations/run.sh`) |
+|---|---|
+| Blocker: swallowed exit status in a `--set` pipeline | `pipefail-upstream` |
+| Major: `--label` newline (marker-forging) | `label-grammar` (case 1) |
+| Major: `--label` `+` (grammar, generalized beyond the reported shape) | `label-grammar` (case 2) |
+| Major: `--set` NAME `+` (AC4 signature collision) | `set-name-grammar` (case 1) |
+| Major: `--set` NAME TAB (internal delimiter corruption) | `set-name-grammar` (case 2) |
+| Major: `--accept-status` NAME grammar (inventory closure, not itself reported) | `accept-status-name-grammar` |
+| Major: `--set` command bare CR | `command-control-char` |
+| (existing, unchanged) `--set` command LF | `newline-command` |
+
+#### Disposition of the Minor (won't-fix)
+
+`--accept-status`'s unknown-name-typo footgun (a name matching no declared
+`--set`) is unchanged, per Codex's own won't-fix disposition — harmless
+(never grants an undeserved success) and out of scope for this round; it is
+a SEMANTIC check (does this name correspond to a real set), distinct from
+the GRAMMAR check this round adds (is this name shaped like a valid
+identifier at all), which now does apply to `--accept-status` NAME.
+
+#### Verdicts after this round
+
+All 14 acceptance criteria PASS (`bash bin/check-acs.sh`), `check-intent`
+aligned (hash unchanged, `c5dfa5b4...` — the frozen intent block was never
+touched), `shellcheck` clean on both files, `tests/derive-populations/run.sh`
+19/19 `PASS` (`grep -c '^PASS' <log>` = 19), `tests/bin-exec-bit/run.sh` /
+`tests/errexit-safe/run.sh` / `tests/check-handoff/run.sh` /
+`tests/machine-tokens/run.sh` / `bin/check-prompt-sync.sh` all green,
+`bin/check-pii-shapes.sh` clean. The full CI-wired step list re-run after
+this round's fix (same 73-named-step / 71-executed / 2-not-applicable shape
+as the first pass): `grep -c '^RESULT: PASS' <log>` = 71, `grep -c
+'^RESULT: FAIL' <log>` = 0 — clean on the first attempt this round (no
+second self-caught defect this time).
