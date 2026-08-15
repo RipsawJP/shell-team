@@ -347,7 +347,8 @@ closed by the re-probe's single-threshold design, not by re-labelling the same d
 - licence-condition: production-unit — met — the unit is literally `bash bin/check-acs.sh <spec>`, this repository's own acceptance-criteria gate, not an agent-invocation proxy (`## Probe protocol`, "Unit"); unchanged between probes.
 - licence-condition: real-population — met — the population is a real, committed spec (`.shell-team/specs/T-1044-test-infra-bundle.md`) at the pinned branch point, never a synthetic fixture; chosen from four real candidates, before any arm ran (`## Probe evidence`, "Venue and population"); unchanged between probes.
 - licence-condition: same-machine-session — met — every re-probe arm, every agent and the orchestrator's own heartbeats and span rows ran on this task's one operator machine, in one continuous session (≈10:16–10:39Z, ≈24 minutes), inside the same throwaway clone (`## Probe evidence`, header paragraph: "machine-local ... on the same host and session").
-- licence-condition: clock-source-monotonic — met — `python3-time_ns` was verified to expand (19-digit integers, no literal `N`) before reliance, and every recorded `last` exceeds its own `first` with no negative delta anywhere in the ten re-probe agent-timestamp lines above (`## Overlap analysis`'s own per-agent durations, all positive) — verified in-practice monotonic over this single re-probe session, disclosed as wall-clock epoch time rather than a dedicated `CLOCK_MONOTONIC` read.
+- licence-condition: clock-source-monotonic — met — `python3-time_ns` was verified to expand (19-digit integers, no literal `N`) before reliance, and every recorded `last` exceeds its own `first` with no negative delta anywhere in the nine re-probe `agent-timestamp` lines above (`## Overlap analysis`'s own per-agent durations, all positive; the tenth agent, `negative-control-stall`'s `probe-stall`, carries no `agent-timestamp` line under this note's own `probe-[a-d]`-scoped grammar — its own start/end pair is reported separately in `## Probe evidence` and audited by **AC7**'s heartbeat/window logic instead) — verified in-practice monotonic over this single re-probe session, disclosed as wall-clock epoch time rather than a dedicated `CLOCK_MONOTONIC` read.
+  - reproduce: `grep -c '^- agent-timestamp: ' docs/loop-engineering/harness-agent-concurrency.md` → `9` (round-4 correction: this bullet previously said "ten," miscounting the total probe-agent population — 9 `probe-[a-d]` agents plus 1 `probe-stall` — as the narrower `agent-timestamp`-line population, which excludes `probe-stall` by the grammar's own design; found during this round's full claim sweep, not by QA).
 - licence-condition: overlap-margin-exceeds-launch-latency — met — every overlap margin (≈172–270 s) exceeds the maximum single launch latency (≈32.8 s, `## Overlap analysis`) by more than 5×, and the frozen margin-factor floor of 3 is independently exceeded (`unit-duration`/`launch-latency` ≈4.51× at the worst case, ≈7.14× at the mean).
 - licence-condition: repetition-variance — met — the two re-probe `pair-n2-rep1`/`pair-n2-rep2` overlap margins are disclosed descriptively: they differ by ≈3.8% (`## Overlap analysis`, "Repetition variance") — up from the first probe's ≈2.0%, still a small, undramatic spread; no significance test, no confidence interval, no third repetition is claimed from either figure — the spread is reported, not modeled.
 
@@ -456,8 +457,104 @@ command surface.
 This task's changed-and-added file set (`## Blast radius`'s own derivation) is: this spec,
 the board, `docs/loop-engineering/harness-agent-concurrency.md`, `.shell-team/test-recipe.md`,
 and this task's three records under `.shell-team/`. `.github/workflows/check-handoff.yml`
-carries 73 named steps. Three read a path this diff touches and were run directly, in the
-workflow's own order:
+carries **73** named steps (re-derived this round, `bin/derive-populations.sh`, the
+`ci-steps` set below — matching the direct count both before and after this round's own
+edits, since this task never touches the workflow file). Three read a path this diff
+touches and were run directly, in the workflow's own order:
+- reproduce: `grep -cE '^\s*- name:' .github/workflows/check-handoff.yml` → `73`
+- reproduce: `bin/derive-populations.sh --label t1073-r4-repo-facts --set "agents=git ls-files -- agents/*.md" --set "ci-steps=grep -oE '^\s*- name: .*' .github/workflows/check-handoff.yml"` — full output embedded below (the `agents` set is item (f)/(g)'s own "all nine `agents/*.md` files" claim, re-derived in the same invocation for the same reason: the tool requires two to eight `--set` values, and both populations are read from the working tree in one pass).
+
+<!-- BEGIN derivation: t1073-r4-repo-facts -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: agents — status: 0 — lines: 9 — items: 9 — command: git ls-files -- agents/*.md
+- set: ci-steps — status: 0 — lines: 73 — items: 73 — command: grep -oE '^\s*- name: .*' .github/workflows/check-handoff.yml
+- union: items: 82
+- bucket: agents — items: 9
+  - agents/codex-reviewer.md
+  - agents/drift-evaluator.md
+  - agents/engineer.md
+  - agents/pm-spec.md
+  - agents/qa-verifier.md
+  - agents/scrum-master.md
+  - agents/tech-lead.md
+  - agents/triage-orchestrator.md
+  - agents/ui-designer.md
+- bucket: ci-steps — items: 73
+  -       - name: Checkout
+  -       - name: Dogfood check-adapter — the shipped contract and definitions validate
+  -       - name: Dogfood check-binding — the shipped binding-config specimen validates
+  -       - name: Dogfood check-durability — this repository's own T-1048 implement-phase records
+  -       - name: Dogfood check-handoff — this repository's own board
+  -       - name: Dogfood check-interventions — every committed interventions file in this repository is conformant
+  -       - name: Dogfood check-liveness — the real classifier's --help
+  -       - name: Dogfood check-playbook — the real repository corpus at the resolved lessons path is schema-valid
+  -       - name: Dogfood check-prompt-sync — this repo's prompt blocks must be in sync
+  -       - name: Dogfood check-readme-version on the repo's READMEs
+  -       - name: Dogfood check-retro — the shipped retro template passes its own contract
+  -       - name: Dogfood check-retro — this repository's own retros pass the ledger contract
+  -       - name: Dogfood derive-populations — derive a real population against this repository
+  -       - name: Dogfood gen-playbook-blocks — regenerating into a scratch copy reproduces every shipped block and consumer
+  -       - name: Dogfood resolve-executor — probe-free mode against this repository (the runner carries neither executor CLI)
+  -       - name: Dogfood retro-inputs — the cycle window resolves against this repository
+  -       - name: Dogfood team-paths — a repo with no legacy markers resolves to the default layout
+  -       - name: Install shellcheck (pinned — must match local dev version)
+  -       - name: Lint the shipped board template (hand-off linter)
+  -       - name: Lint the shipped generic loop-contract template
+  -       - name: Lint the shipped goal loop contract
+  -       - name: Lint the shipped shell-team loop contract
+  -       - name: Run bin-exec-bit lock suite
+  -       - name: Run check-acs fixture suite
+  -       - name: Run check-adapter fixture suite
+  -       - name: Run check-binding fixture suite
+  -       - name: Run check-board-headings fixture suite
+  -       - name: Run check-commit-identity fixture suite
+  -       - name: Run check-contract fixture suite
+  -       - name: Run check-design-note fixture suite
+  -       - name: Run check-durability fixture suite
+  -       - name: Run check-handoff fixture suite
+  -       - name: Run check-intent fixture suite
+  -       - name: Run check-interventions fixture suite
+  -       - name: Run check-liveness fixture suite
+  -       - name: Run check-pii-shapes fixture suite
+  -       - name: Run check-playbook fixture suite
+  -       - name: Run check-prompt-sync fixture suite
+  -       - name: Run check-provenance fixture suite
+  -       - name: Run check-readme-version fixture suite
+  -       - name: Run check-refreeze-class fixture suite
+  -       - name: Run check-retro fixture suite
+  -       - name: Run check-run fixture suite
+  -       - name: Run close-out fixture suite
+  -       - name: Run cluster-failures fixture suite
+  -       - name: Run codex-skeleton-hygiene suite
+  -       - name: Run consolidate-proposals fixture suite
+  -       - name: Run derive-populations fixture suite
+  -       - name: Run discover-work fixture suite
+  -       - name: Run errexit-safe regression suite
+  -       - name: Run gen-loop-replay fixture suite
+  -       - name: Run gen-playbook-blocks fixture suite
+  -       - name: Run gitignore-raw-dumps lock suite
+  -       - name: Run goal-state fixture suite
+  -       - name: Run install fixture suite
+  -       - name: Run interventions-reminder fixture suite
+  -       - name: Run is-span-row-parity fixture suite
+  -       - name: Run log-run resolution suite
+  -       - name: Run loop-guard fixture suite
+  -       - name: Run machine-tokens fixture suite
+  -       - name: Run playbook-promote fixture suite
+  -       - name: Run resolve-executor fixture suite
+  -       - name: Run retro-inputs bounded invariants lock
+  -       - name: Run retro-inputs fixture suite
+  -       - name: Run review-gate fixture suite
+  -       - name: Run rework-digest fixture suite
+  -       - name: Run rollup-runs fixture suite
+  -       - name: Run rollup-track fixture suite
+  -       - name: Run team-init fixture suite
+  -       - name: Run team-paths fixture suite
+  -       - name: check-commit-identity on the PR commits
+  -       - name: check-pii-shapes on the PR diff
+  -       - name: shellcheck
+<!-- END derivation: t1073-r4-repo-facts -->
 
 1. **Dogfood check-handoff — this repository's own board** (`bash bin/team-paths.sh --get todo` then `bash bin/check-handoff.sh "$B"`, reads `.shell-team/todo.md`, which this task appends to) — PASS.
 2. **check-pii-shapes on the PR diff** (`bash bin/check-pii-shapes.sh --base "origin/${GITHUB_BASE_REF:-develop}"`, adapted per this repository's own stacked-branch convention to `--base "$(git merge-base feature/1072-telemetry-span-discriminator HEAD)"`, since this branch is not yet merged into `develop` — reads this task's own diff) — **round 2: FAIL**, genuinely: `FINDING pattern=home-path path=docs/loop-engineering/harness-agent-concurrency.md line=27`, the re-probe evidence's own byte-locked home-directory path (`## Limits`'s "A home-path/PII-shape defect surfaced in round 2, resolved in round 3" bullet above). **Round 3: PASS** — the orchestrator's redaction-only evidence amendment (commit `954e2eeff0699f27d3cfb4084d9583e955210105`) replaced the one literal path with a placeholder; this engineer re-ran the identical command live and confirmed `clean`.
@@ -599,7 +696,46 @@ is left unrun by the indirection class here.
 
 ### (f) Every `## Assumptions` bullet, re-measured
 
-The spec carries six `## Assumptions` bullets. Each is addressed below, in the spec's own order.
+**Round 4 correction.** This section previously stated "six" bullets while separately
+discussing "the seventh" — a self-contradictory population claim, flagged by QA (round-1
+review) as a `whole-set-claim-under-enumeration` finding. Re-derived population, both by a
+direct command and by `bin/derive-populations.sh` (this repository's own norm for a
+set/population claim, shipped by T-1071 for exactly this defect class): the spec carries
+**seven** `## Assumptions` bullets, all seven addressed below in the spec's own order (six
+individually re-measured, one — item 7 — correctly exempted as not itself relayed, the
+same disposition this section already gave it, now correctly counted rather than narrated
+around).
+- reproduce: `awk '/^## Assumptions$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md | grep -c '^-'` → `7`
+- reproduce: `bin/derive-populations.sh --label t1073-r4-spec-populations --set "assumptions=awk '/^## Assumptions\$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md | grep '^-'" --set "sources=awk '/^## Summarized sources\$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md | grep '^-'"` (the `sources` set is `(g)`'s own population, derived in the same invocation since the tool requires two to eight `--set` values) — full output embedded below.
+
+<!-- BEGIN derivation: t1073-r4-spec-populations -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: assumptions — status: 0 — lines: 7 — items: 7 — command: awk '/^## Assumptions$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md | grep '^-'
+- set: sources — status: 0 — lines: 10 — items: 10 — command: awk '/^## Summarized sources$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md | grep '^-'
+- union: items: 17
+- bucket: assumptions — items: 7
+  - - **Assumed and stated — bash integer width.** The criteria compare 19-digit epoch-nanosecond values using bash arithmetic, which is 64-bit on every platform this repository supports; `awk` and `sort -n` are deliberately avoided for these comparisons because a double cannot hold a 19-digit integer exactly.
+  - - **Measured false, recorded as a hand-off finding — the agent-definition count.** The briefing relayed "no `Agent`/`Task` token in any of the **8** `agents/*.md` `tools:` lines". Measured first-hand: there are **9** agent definitions (`triage-orchestrator`, `ui-designer`, `drift-evaluator`, `scrum-master`, `engineer`, `tech-lead`, `qa-verifier`, `pm-spec`, `codex-reviewer`), and the substantive half of the premise holds across all nine — **not one** carries an `Agent` or `Task` token. The conclusion the task rests on is unchanged and strengthened; only the count was wrong. Exact text for the orchestrator's interventions entry, since this role does not own that file: *"Relayed premise partially false: the tech-lead's routing map states 8 `agents/*.md` `tools:` lines; the measured count is 9 (`agents/*.md` enumerated at authoring time). The load-bearing half — that none of them carries an `Agent` or `Task` token, so only the orchestrator session can launch a sub-agent — holds across all nine. No criterion changed."*
+  - - **RELAYED and deliberately untested-as-fact — the harness documentation's claim that multiple tool uses in one message run concurrently.** This is the claim **under test**; it is cited nowhere as evidence, and **AC11** makes that distinction mechanical.
+  - - **RELAYED — `f8371eb` as `feature/1072-telemetry-span-discriminator`'s tip and PR #286.** No criterion writes a 40-hex literal; every criterion resolves the branch point itself and fails closed when it does not. The freeze run reports the measured values under **AC16(e)**.
+  - - **RELAYED — issue #277's precondition list and issue #274's isolation item.** Both reached this role as the orchestrator's briefing; this role has no network path and could not open either issue. Corroborated first-hand where the repository allows it: `docs/loop-engineering/phase-multiplexing.md:45` names issue #274 item 7 as a seventh contract surface recorded only in that issue, and the board's T-1072 entry names #277 as the still-open umbrella whose precondition 1 shipped there and #285 as the append-locking successor car. **No criterion depends on any figure or wording from either issue**; the three issue anchors appear in the note only as identifiers. The freeze run and the engineer re-measure the issues' actual bodies and open/closed states and report the values beside this line.
+  - - **RELAYED — the operator's watchdog script.** `agent-watchdog.sh` lives under the operator's own home directory, outside this repository and outside this role's readable working directories; its existence, its alert format and the exact `WATCHDOG-ALERT` token are relayed and were not verified here. The probe run measures them, and **AC13** requires the note to record the launch command **home-relative** rather than as a home-directory absolute path, which is a hygiene requirement in a public repository regardless of what the script turns out to be.
+  - - **UNVERIFIED from this role — the clock source.** `date -u +%s%N` does not expand `%N` on a BSD `date`, which emits a literal `N`; whether the probe host's `date` expands it is unknown here. The protocol therefore requires the probe to verify expansion and record the source it used, and treats a non-expanding source as `unusable` rather than recording a corrupted integer.
+- bucket: sources — items: 10
+  - - `.shell-team/specs/T-1069-phase-multiplexing.md` lines 111–123 — read first-hand. Three distinctions. **(i)** Its criteria preamble fixes the **presence-and-structure** discipline for an investigation deliverable: no criterion compares a declared figure against a live re-derivation from a growing corpus, and no criterion re-derives an analysis conclusion, because under that task's own verdict-scope ruling the correctness of a computed value is the reading gates' mandate rather than a checker's. **(ii)** Its AC3 is the mechanical coupling shape reused here: exactly-one-per-id lines, a total-equals-grammar-matching-total closure so a later addition must conform, and cross-clauses that forbid a strong label when any condition reads `not-met`. **(iii)** Its AC5 bars `git worktree add` anywhere in the note's commands, the venue rule this task inherits verbatim.
+  - - `.shell-team/specs/T-1072-telemetry-span-discriminator.md` — read lines 1–164. Three distinctions. **(i)** The single-branch-point-discriminator convention and its stated rationale, reused in shape here. **(ii)** Its **AC16** is a merge-point-scoped scope-lock allow-list resolved against `git merge-base feature/1071-record-set-derivation HEAD`, which is why it is among the merged criteria this task's diff is most likely to redden newly — disclosed in `## Blast radius`, never repaired. **(iii)** Its frozen `instance` grammar: `--instance` is span-only, validated by the **writer only** against `BINDING_TOKEN_RE`, and a bare numeric id is refused — so the probe's instance labels must be role-qualified tokens, which is why this spec fixes them as `probe-a`…`probe-d`.
+  - - `.shell-team/todo.md` lines 1–45 — read first-hand. Three distinctions. **(i)** The board's strict `- [ ] **T-NNN** <title> — \`<FLAG>\` — spec: <path>` line format, with every annotation on indented sub-bullets. **(ii)** T-1072's entry records `#277` as the still-open umbrella whose **precondition 1** shipped there, and `#285` as the append-locking/seq successor car — the two issue anchors this task's implications table names. **(iii)** The house shape for a task's board sub-bullets (source, stacked, declarations, criteria pricing, prediction, freeze attestation), which this task's entry follows.
+  - - `agents/*.md` frontmatter `tools:` lines — read across **all nine** files (`triage-orchestrator`, `ui-designer`, `drift-evaluator`, `scrum-master`, `engineer`, `tech-lead`, `qa-verifier`, `pm-spec`, `codex-reviewer`). The distinction carried over, and the structural constraint this whole task's shape rests on: **not one of the nine carries an `Agent` or `Task` token**, so no sub-agent in this loop can launch another sub-agent, and the probe can only be executed by the orchestrator session itself. The relayed count was 8; the measured count is 9 (see `## Assumptions`).
+  - - `bin/check-acs.sh` — read at lines 6–41, 120, 141 and 224–234. Three distinctions. **(i)** Only the **first** indented `- check:` line following an AC bullet is executed. **(ii)** `AC_RE` recognises `**ACn**` / `**AC-N**` and nothing suffixed. **(iii)** The per-check timeout defaults to **120 s** and is raised through `CHECK_ACS_TIMEOUT`; an invalid value falls back to 120 with a warning.
+  - - `bin/check-intent.sh` — read at lines 84–107 and 293–332. Two distinctions. **(i)** `--print-hash <spec.md>` prints the 40-hex hash and one trailing LF on stdout and nothing else, sharing the whole pipeline with the verifying mode. **(ii)** Marker detection is a **whole-line equality** match against `<!-- BEGIN intent-block: T-NNN -->` scoped by the derived task id, never a substring search — which is what makes the second, differently-named marker pair this spec places inside its own Goal section (`probe-protocol`) inert to that checker rather than a structural error.
+  - - `bin/log-run.sh` — read by targeted grep at lines 21–306. Three distinctions. **(i)** `--instance` is in `SPAN_ONLY_FLAGS` (line 216) and is validated at line 306 against `BINDING_TOKEN_RE='^[a-z][a-z0-9-]*$'` (line 289), so `probe-a` is legal and `probe_1` or `2` would be refused with exit 2 and nothing written. **(ii)** `--status` is a closed five-value set (line 262: `success|error|timeout|skipped|stopped`). **(iii)** `--span` and `--phase` carry no closed vocabulary — they are free non-empty strings — so a probe span needs no schema change to be emitted.
+  - - `bin/team-paths.sh` — read at lines 37, 68 and 194. The distinction carried over: `--get KEY` resolves a closed ten-key set (`base|todo|loops|runs|retros|reviews|specs|provenance|interventions|lessons`) and dies on anything else, so this task adds **no** new operating directory and every path it touches is either one of those ten or a literal under `docs/`.
+  - - `docs/loop-engineering/agent-concurrency.md` — read end to end (166 lines). Five distinctions this spec rests on. **(i)** The `substrate: agent-tool-concurrent-launch — absent` row at line 120 is explicitly scoped: `absent` means *absent from what that task could itself confirm*, under a closed two-word vocabulary (`provided`/`absent`) in which `provided` required that task's own evidence — it is **not** a claim that the harness lacks the capability, and this spec's supersession clause must preserve that distinction rather than flattening it into "the note said it was missing". **(ii)** The pilot probe at line 131 is `declined`, by a **frozen pre-commitment firing** after two consecutive rounds of independent findings against the probe's own safety — round 1: no watchdog at all; round 2: a watchdog structurally inert because the parent called a plain `wait` on the watched job before ever reading the watchdog's verdict, so it could only ever report `exited-normally`. **(iii)** Line 154 carries that probe's four carried-forward retry requirements, and this task's protocol answers each: a liveness design the parent actually observes, a stall threshold sized to the unit's real duration, a **real Agent-tool launch rather than a Bash-job proxy**, and explicit handling of the polling loop's own boundary condition. **(iv)** Line 162's Limits entry states the harness question is **not verified** by that task, with the reason (no Agent-launching tool in that role's tool set). **(v)** Lines 119 and 121 scope `background-agent-launch — provided` and `completion-notification — provided` to **Bash-level backgrounding only** — so nothing in that note licenses an Agent-tool-level claim, and this task inherits no positive premise from it.
+  - - `docs/loop-engineering/phase-multiplexing.md` — read at lines 40–90 and 155–184. Four distinctions. **(i)** Line 54's Tier-1 saving is `measured` with `bash bin/check-acs.sh <spec>` as the unit — a **shell-process** ladder, which is why reusing that same production unit here makes agent-launch overhead separable against a known baseline rather than confounded with it. **(ii)** Lines 76–84 are the measured-label discipline: five named licence conditions, each `met`/`not-met` with evidence, and an explicit closing sentence stating that all five being `met` is what licenses the word `measured` for that saving **and for no other**. This spec adopts the same shape with six conditions, the sixth being this task's own (`overlap-margin-exceeds-launch-latency`). **(iii)** Line 170 gates staged adoption on "an orchestration step … that can actually launch N *agent* instances", naming that pilot's units as shell processes, never a real Agent-tool launch. **(iv)** Line 45 names **issue #274 item 7** as a seventh contract surface recorded only in that issue — a `codex-reviewer` record commit racing qa-verifier's HEAD-relative checks — which is the isolation item this task's #274 half is measured against.
+<!-- END derivation: t1073-r4-spec-populations -->
+
+Both counts (7 assumptions, 10 sources) match the direct `awk`/`grep -c` command above exactly — the tool and the hand command agree, as they must, since both read the identical committed spec.
 
 1. **RELAYED — issue #277's precondition list and issue #274's isolation item.** Re-fetched directly by this role via `https://api.github.com/repos/RipsawJP/shell-team/issues/277` and `.../274` (public, unauthenticated GET). **#277** ("Width-axis Stage 0…"), state `open`, confirmed: its own body names precondition 2 as "verify empirically that the harness runs N concurrent Agent-tool sub-agent invocations from one orchestrator session — shared precondition with #274," exactly the premise this task discharges. **#274** ("Concurrency Stage 0…"), state `open`, confirmed: its own body names the identical shared precondition, plus the six-plus-one contract surfaces and the 2+ concurrent-worktree reconcile design as its own remaining Stage 0 items, none of which this task touches. No criterion in this spec depends on any figure or wording from either issue; both are used only as identifiers in `## Implications for T-1074`.
 2. **MEASURED false, recorded as a hand-off finding — the agent-definition count.** Already corrected in the spec's own text and in `.shell-team/interventions/T-1073.md` (the orchestrator's own committed entries, confirmed present and conformant: `bash bin/check-interventions.sh --task T-1073 -- .shell-team/interventions/T-1073.md` reports conformant, **3** entries — round 1's assumption-contradicted entry, round 2's invalid-evidence-rule re-probe entry, and round 3's redaction-ruling entry, 0 sentinel) — nine `agents/*.md` files, not one carrying an `Agent`/`Task` token. Re-confirmed by this engineer: `ls agents/*.md | wc -l` → `9`.
@@ -607,14 +743,20 @@ The spec carries six `## Assumptions` bullets. Each is addressed below, in the s
 4. **RELAYED — `f8371eb` as `feature/1072-telemetry-span-discriminator`'s tip and PR #286.** Re-measured directly: `git rev-parse feature/1072-telemetry-span-discriminator` = `f8371eb6a26b395c020ee7811087150059d33c15`, matching the relayed short form exactly (item (e) above).
 5. **RELAYED and deliberately untested-as-fact — the harness documentation's concurrent-tool-uses claim.** Named explicitly as the claim under test in `## Agent-type boundary`'s `- claim-under-test:` line, never cited as evidence; this task's own measured overlap is the independent evidence, per the spec's own design.
 6. **UNVERIFIED from this role — the clock source.** Verified live by the probe (not by this engineer, who cannot run one): `## Probe evidence`'s "Clock-source verification (re-probe)" records `python3-time_ns` expanding (19-digit integers throughout the re-probe), and a GNU `date +%s%N` also expanding on this PATH — the BSD-`date` literal-`N` hazard did not occur, disclosed rather than assumed away, consistent with the first probe's own equivalent record.
-
-The seventh bullet ("Assumed and stated — bash integer width") is not itself relayed, so
-it is not re-derived here; its outcome is what this note's own "never `awk`/`sort -n`"
-discipline already states throughout `## Overlap analysis`, applied consistently.
+7. **ASSUMED, stated as unverified — bash integer width.** Not itself relayed, so not re-derived by fetching an external source the way items 1–6 were; its outcome is what this note's own "never `awk`/`sort -n`" discipline already states throughout `## Overlap analysis`, applied consistently — every 19-digit epoch-nanosecond arithmetic comparison in this note uses `$(( 10#$v ))` bash integer arithmetic, confirmed by inspection of every `- reproduce:` line in `## Overlap analysis`, none of which reaches for `awk` or `sort -n`.
 
 ### (g) Per-source report — every `## Summarized sources` entry
 
-The spec carries seven `## Summarized sources` bullets. Each is addressed below.
+**Round 4 correction.** This section previously stated "seven" bullets and reported seven
+numbered items, with item 7 silently merging four distinct spec bullets
+(`bin/team-paths.sh`, `bin/check-intent.sh`, `bin/check-acs.sh`, `.shell-team/todo.md`)
+into one compressed line — exactly the "compressed summary does not discharge it" shape
+this criterion's own frozen text forbids, flagged by QA (round-1 review) as the second
+`whole-set-claim-under-enumeration` finding. Re-derived population (same
+`bin/derive-populations.sh` invocation as `(f)` above, `sources` set): the spec carries
+**ten** `## Summarized sources` bullets, each now reported on its own line below — item 7's
+former four constituent sources are items 7–10.
+- reproduce: `awk '/^## Summarized sources$/{f=1;next} f&&/^## /{exit} f' .shell-team/specs/T-1073-harness-agent-concurrency.md | grep -c '^-'` → `10`
 
 1. **`docs/loop-engineering/agent-concurrency.md`** — opened and read (lines 110–170 targeted, per the spec's own five distinctions). Confirmed: the `absent`-is-scoped distinction (line 120), the `declined` pilot probe's own two-round pre-commitment firing (line 131), the four carried-forward requirements (line 154), the Limits entry's own "not verified" wording (line 162), and the Bash-level-only scoping of `background-agent-launch`/`completion-notification` (lines 119/121). Nothing contradicted; this task's own `## Supersession and follow-ups` section supersedes lines 120/162 precisely as scoped, never flattening `absent`'s own qualification into a blanket "the note said it was missing."
 2. **`docs/loop-engineering/phase-multiplexing.md`** — opened and read (lines 40–90 and 155–184 targeted). Confirmed: the shell-process unit at line 54 (`bash bin/check-acs.sh <spec>` — the identical unit reused here), the five-condition measured-label discipline (lines 76–84, this task's own six-condition licence-condition shape copies its structure), the shell-process-only scoping of the `staged-adoption` recommendation (line 170), and issue #274 item 7's own status as an issue-only contract surface (line 45). Nothing contradicted.
@@ -622,7 +764,10 @@ The spec carries seven `## Summarized sources` bullets. Each is addressed below.
 4. **`.shell-team/specs/T-1072-telemetry-span-discriminator.md` lines 1–164** — opened and read first-hand. Confirmed: the single-branch-point-discriminator convention (reused here verbatim); its own **AC16** as a merge-point-scoped scope-lock allow-list (confirmed genuinely newly reddened by this task, item (d) above); and the `--instance` grammar (`BINDING_TOKEN_RE`, writer-only validation, bare-numeric refusal) which is why this spec's own probe instance labels are `probe-a`…`probe-d` (plus `probe-stall`, also a legal token under `^[a-z][a-z0-9-]*$`). Nothing contradicted.
 5. **`bin/log-run.sh`** — read by targeted grep (lines 21–306 per the spec's own citation). Confirmed: `--instance` in `SPAN_ONLY_FLAGS`, validated against `BINDING_TOKEN_RE='^[a-z][a-z0-9-]*$'` — `probe-a` through `probe-d` and `probe-stall` all match; `--status`'s closed five-value set; `--span`/`--phase` carrying no closed vocabulary. Nothing contradicted; this is exactly the emission path the probe's own span rows (`## Overlap analysis`, channel ③) used.
 6. **`agents/*.md` frontmatter `tools:` lines, all nine** — re-confirmed by this engineer (`ls agents/*.md | wc -l` → `9`; `grep -l 'Agent\|Task' agents/*.md` inside each file's own `tools:` line returns no match across all nine, re-derived independently of the spec's own authoring-time claim). Nothing contradicted; this is the structural reason the probe had to be an orchestrator step.
-7. **`bin/team-paths.sh`**, **`bin/check-intent.sh`**, **`bin/check-acs.sh`**, **`.shell-team/todo.md`** — each read as cited by the spec (lines 37/68/194 for team-paths; 84–107/293–332 for check-intent; 6–41/120/141/224–234 for check-acs; 1–45 for the board). Confirmed: the ten-key closed set `team-paths.sh --get` resolves; `--print-hash`'s single 40-hex-plus-LF stdout contract; whole-line marker matching scoped by task id; `check-acs.sh`'s first-check-line-only execution and 120s-default/`CHECK_ACS_TIMEOUT`-override timeout; and the board's strict `- [ ] **T-NNN** …` line format, this task's `#277`/`#285` anchors, and the house shape for a task's board sub-bullets. Nothing contradicted.
+7. **`bin/team-paths.sh`** — read at lines 37, 68 and 194, per the spec's own citation. Confirmed: `--get KEY` resolves the closed ten-key set (`base|todo|loops|runs|retros|reviews|specs|provenance|interventions|lessons`) and dies on anything else, so this task adds no new operating directory. Nothing contradicted.
+8. **`bin/check-intent.sh`** — read at lines 84–107 and 293–332, per the spec's own citation. Confirmed: `--print-hash <spec.md>` prints the 40-hex hash and one trailing LF on stdout and nothing else; marker detection is whole-line equality scoped by task id, never a substring search — the reason the spec's own second, differently-named `probe-protocol` marker pair is inert to it. Nothing contradicted.
+9. **`bin/check-acs.sh`** — read at lines 6–41, 120, 141 and 224–234, per the spec's own citation. Confirmed: only the first indented `- check:` line following an AC bullet is executed; `AC_RE` recognises `**ACn**`/`**AC-N**` and nothing suffixed; the per-check timeout defaults to 120 s and is raised through `CHECK_ACS_TIMEOUT`, falling back to 120 with a warning on an invalid value. Nothing contradicted; every AC verdict in this task's own hand-off rests on this script, unedited.
+10. **`.shell-team/todo.md`** — read at lines 1–45, per the spec's own citation. Confirmed: the board's strict `- [ ] **T-NNN** <title> — \`<FLAG>\` — spec: <path>` line format, with every annotation on indented sub-bullets; this task's `#277`/`#285` anchors already present in T-1072's own entry; the house shape for a task's board sub-bullets (source, stacked, declarations, criteria pricing, prediction, freeze attestation), which this task's own entry follows. Nothing contradicted.
 
 ### (h) Probe execution conditions, restated for the record
 
