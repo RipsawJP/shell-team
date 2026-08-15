@@ -221,3 +221,228 @@ own `- check:` line.
 - portability: bash_3_2 pass — the fix uses only constructs already present in the file's bash-3.2 floor (indexed-array-free, no `mapfile`/`readarray`, no `${var^^}`/`${var,,}`); the differential oracle (AC4) and this note's `before`/`after` scaling measurements were run directly under this host's stock `/bin/bash` 3.2.57.
 - portability: posix_awk pass — the early-exit change adds one POSIX `exit` statement to the existing awk program; no `gensub`/`asort`/`systime`/`strftime`/`IGNORECASE`/`FIELDWIDTHS`/`patsplit`/`nextfile` and no `gawk`/`nawk` is introduced.
 - portability: shellcheck_0_11_0 pass — `shellcheck --version` on this host reports `0.11.0`; `shellcheck bin/check-handoff.sh tests/check-handoff/run.sh` exits 0.
+
+## AC14 — runtime, reported item by item
+
+AC14 is `SKIP` by design (no command can prove a command was run), so this
+section — not the engineer's ephemeral hand-off message — is this
+criterion's evidence. Per this task's own repo-wide discipline ("Git-tracked
+files are the only shared state"), everything AC14 asks for lives here,
+committed, rather than in any message. QA round 1 (2026-08-15) found this
+section absent; this is the durable transcription of the same content the
+engineer's hand-off message already reported, not new analysis.
+
+### (a) Mutation self-check — every probe, one line each
+
+All seventeen mutations below were made on a `git worktree add --detach`
+scratch copy at `HEAD` (`/tmp/.../t1070-mut`, outside this working tree),
+each observed red, restored to the pre-mutation byte-identical content
+(diffed to confirm), and observed green again before the next probe.
+
+1. **AC1** — renamed a `- profile: before awk_extract` stage id to `awk_extractX` in the note → `AC1: FAIL (exit 1)`; restored → `AC1: PASS (exit 0)`.
+2. **AC1** — overwrote the dominant stage's before-arm milliseconds (`- profile: before bash_loop elapsed_ms 1027`) to `100`, under half of the before-arm total (1137) → `AC1: FAIL (exit 1)` (the arithmetic clause — proving "dominant" is computed, not read); restored → `AC1: PASS (exit 0)`.
+3. **AC2** — replaced `git show`/`git ls-tree`/`git cat-file` inside the `- condition: board_identity` line with a non-matching token → `AC2: FAIL (exit 1)`; restored → `AC2: PASS (exit 0)`.
+4. **AC2** — set `- condition: trials 3` to `2` → `AC2: FAIL (exit 1)`; restored → `AC2: PASS (exit 0)`.
+5. **AC3** — flipped `- dominant-axis: active` to `done`, disagreeing with `- dominant: bash_loop` → `AC3: FAIL (exit 1)` (the cross-section agreement clause); restored → `AC3: PASS (exit 0)`.
+6. **AC3** — inflated `- scaling: after done 4x elapsed_ms 9` to `30`, past twice the 1x value (9) → `AC3: FAIL (exit 1)`; restored → `AC3: PASS (exit 0)`.
+7. **AC4** — reverted the blank-test fix in `bin/check-handoff.sh` to a non-equivalent form (`[[ -z "$content" ]]`, which is not the anchored regex) → `AC4: FAIL (exit 1)`, caught by **`tests/check-handoff/fixtures/strand-tolerant.md`** (its whitespace-only line 12 was mis-classified as a boundary line rather than blank, which falsely reset `in_entry` and stranded line 13's real continuation); restored → `AC4: PASS (exit 0)`.
+8. **AC5** — changed the reason string `"format mismatch"` to `"format mismatchX"` in `bin/check-handoff.sh` → `AC5: FAIL (exit 1)` (the byte-exact expected stream); restored → `AC5: PASS (exit 0)`.
+9. **AC5** — duplicated the `emit()` `printf '%s:%s: %s: %s\n' "$FILE" "$1" "$2" "$3" >&2` line → `AC5: FAIL (exit 1)` (the exactly-once clause, the shape `tests/errexit-safe/run.sh` counts); restored → `AC5: PASS (exit 0)`.
+10. **AC6** — altered the recorded after-arm `- realboard: after exit 0 stderr_bytes 0` to `stderr_bytes 5` → `AC6: FAIL (exit 1)`; restored → `AC6: PASS (exit 0)`.
+11. **AC7** — altered the declared `- population: files 25 occurrences 144` to `files 99 occurrences 144` → `AC7: FAIL (exit 1)`; restored → `AC7: PASS (exit 0)`.
+12. **AC8** — introduced `mapfile -t foo < /dev/null` as a non-comment line appended to `bin/check-handoff.sh` → `AC8: FAIL (exit 1)`; restored → `AC8: PASS (exit 0)`.
+13. **AC8** — separately introduced `# mapfile is not used anywhere in this file` as a full-line comment → `AC8: PASS (exit 0)` **(still green — the deliberate scan boundary, reported as such rather than as a defect)**; restored (removed) → `AC8: PASS (exit 0)`.
+14. **AC9** — deleted one new fixture's name (`no-active.md` → `no-active-XXX.md`) from `tests/check-handoff/run.sh` → `AC9: FAIL (exit 1)`; restored → `AC9: PASS (exit 0)`.
+15. **AC10** — pointed the `bin/check-handoff.sh:<start>-<end>` reference in `bin/check-board-headings.sh` at `1-2` (a range with no `in_active`) → `AC10: FAIL (exit 1)`; restored → `AC10: PASS (exit 0)`.
+16. **AC10** — separately appended an unrelated comment line to `bin/check-board-headings.sh` → `AC10: FAIL (exit 1)` (the at-most-two-differing-lines clause); restored → `AC10: PASS (exit 0)`.
+17. **AC11** — added an untracked stray file (`stray-file.txt`) at the scratch worktree root → `AC11: FAIL (exit 1)`; removed → `AC11: PASS (exit 0)`.
+
+(The spec's own AC14(a) prose enumerates these same seventeen mutations
+across eleven distinct AC labels — AC1 through AC11 excluding AC12/AC13,
+which this item's own text does not name — in this same order; none were
+skipped.)
+
+### (b) The profile's own method
+
+Two whole-input passes, timed separately by wrapping each stage's
+**unmodified** code in bash's own `time` reserved word (`TIMEFORMAT='%R'`,
+plain wall-clock seconds) — never by altering logic to measure it. Held
+constant across the before/after comparison for a given input: the input
+file's own bytes (read once per arm from the same on-disk file) and the
+locale (`LC_ALL=C` primary, `LC_ALL=en_US.UTF-8` as a stated cross-check).
+Three trials per cell; the **median** of three is what is recorded (stated
+explicitly in `## Measurement protocol`'s `- condition: trials` line). Both
+arms of every before/after pair read the identical bytes by construction:
+each synthetic board is generated once and reused unmodified for both the
+branch-point script and the working-tree script; the real board is pinned
+via `git show <branch-point>:<path> > scratch/realboard-base.md` once and
+that one file is fed to both scripts. The `bash_loop` stage is timed fed
+from the `awk_extract` stage's own captured output (`active_block`), so no
+extraction cost leaks into the loop's own number.
+
+### (c) Full CI-wired step list, run locally in workflow order
+
+`.github/workflows/check-handoff.yml` carries 71 named steps. Two are not
+applicable to a local run, named individually with their reason: **`Checkout`**
+(this is already a checkout of the repository; there is nothing to check
+out) and **`Install shellcheck (pinned — must match local dev version)`**
+(shellcheck 0.11.0 is already present on this host and version-verified —
+`shellcheck --version` reports `0.11.0`, matching the workflow's own
+`SHELLCHECK_VERSION` pin — so the install step's own effect already holds).
+The remaining 69 were run directly, strictly sequentially (no suite started
+before the previous one exited), in the workflow's own order:
+
+1. shellcheck (full list, the workflow's own single physical shellcheck line) — PASS
+2. Lint the shipped board template (hand-off linter) — PASS
+3. Dogfood check-handoff — this repository's own board — PASS
+4. Run check-handoff fixture suite — PASS
+5. Lint the shipped shell-team loop contract — PASS
+6. Lint the shipped generic loop-contract template — PASS
+7. Lint the shipped goal loop contract — PASS
+8. Run check-contract fixture suite — PASS
+9. Run loop-guard fixture suite — PASS
+10. Run check-run fixture suite — PASS
+11. Run log-run resolution suite — PASS
+12. Run team-init fixture suite — PASS
+13. Run discover-work fixture suite — PASS
+14. Run check-acs fixture suite — PASS
+15. Run check-design-note fixture suite — PASS
+16. Run goal-state fixture suite — PASS
+17. Run rework-digest fixture suite — PASS
+18. Run check-retro fixture suite — PASS
+19. Run retro-inputs fixture suite — PASS
+20. Run retro-inputs bounded invariants lock — PASS
+21. Dogfood retro-inputs — the cycle window resolves against this repository — PASS
+22. Dogfood check-retro — this repository's own retros pass the ledger contract — PASS
+23. Dogfood check-retro — the shipped retro template passes its own contract — PASS
+24. Run machine-tokens fixture suite — PASS
+25. Run gen-loop-replay fixture suite — PASS
+26. Run check-readme-version fixture suite — PASS
+27. Dogfood check-readme-version on the repo's READMEs — PASS
+28. Run rollup-runs fixture suite — PASS
+29. Run rollup-track fixture suite — PASS
+30. Run consolidate-proposals fixture suite — PASS
+31. Run cluster-failures fixture suite — PASS
+32. Run is-span-row-parity fixture suite — PASS
+33. Run review-gate fixture suite — PASS
+34. Run close-out fixture suite — PASS
+35. Run check-prompt-sync fixture suite — PASS
+36. Dogfood check-prompt-sync — this repo's prompt blocks must be in sync — PASS
+37. Run check-playbook fixture suite — PASS
+38. Run gen-playbook-blocks fixture suite — PASS
+39. Run playbook-promote fixture suite — PASS
+40. Dogfood check-playbook — the real repository corpus at the resolved lessons path is schema-valid — PASS
+41. Dogfood gen-playbook-blocks — regenerating into a scratch copy reproduces every shipped block and consumer — PASS
+42. Run team-paths fixture suite — PASS
+43. Dogfood team-paths — a repo with no legacy markers resolves to the default layout — PASS
+44. Run install fixture suite — PASS
+45. Run check-intent fixture suite — PASS
+46. Run check-provenance fixture suite — PASS
+47. Run check-interventions fixture suite — PASS
+48. Run interventions-reminder fixture suite — PASS
+49. Dogfood check-interventions — every committed interventions file in this repository is conformant — PASS
+50. Run check-board-headings fixture suite — PASS
+51. Run errexit-safe regression suite — PASS
+52. Run codex-skeleton-hygiene suite — PASS
+53. Run check-pii-shapes fixture suite — PASS
+54. check-pii-shapes on the PR diff (adapted: compared against this task's own branch point, `chore/lesson-promotion-2026-08-15`'s tip, rather than `origin/develop` — this branch is stacked and not yet merged into `develop`, so a `develop`-based diff would also pick up the earlier stacked cars' own changes; the real CI run, once this PR's base is reached, compares against `origin/develop` as written) — PASS
+55. Run check-commit-identity fixture suite — PASS
+56. Run gitignore-raw-dumps lock suite — PASS
+57. check-commit-identity on the PR commits (same branch-point adaptation as row 54) — PASS
+58. Run check-refreeze-class fixture suite — PASS
+59. Run bin-exec-bit lock suite — PASS
+60. Run check-durability fixture suite — PASS
+61. Dogfood check-durability — this repository's own T-1048 implement-phase records — PASS
+62. Run check-binding fixture suite — PASS
+63. Dogfood check-binding — the shipped binding-config specimen validates — PASS
+64. Run check-adapter fixture suite — PASS
+65. Dogfood check-adapter — the shipped contract and definitions validate — PASS
+66. Run check-liveness fixture suite — PASS
+67. Dogfood check-liveness — the real classifier's --help — PASS
+68. Run resolve-executor fixture suite — PASS
+69. Dogfood resolve-executor — probe-free mode against this repository (the runner carries neither executor CLI) — PASS
+
+`grep -c '^RESULT: PASS'` on this run's own log = 69; `grep -c '^RESULT: FAIL'` = 0.
+
+### (d) `## Blast radius` production, narrated
+
+Already committed in the spec itself (`.shell-team/specs/T-1070-check-handoff-scaling.md`'s `## Blast radius` section, outside the frozen intent block) — not duplicated here to avoid two sources of truth for the same figures. In summary: population enumerated with `git ls-tree -r --name-only "$(git merge-base chore/lesson-promotion-2026-08-15 HEAD)" -- .shell-team/specs | grep '\.md$'` = 74; every criterion of 45 of those 74 specs was run once against a `git worktree add --detach` at the branch point (reading that ref's committed blobs) and once at `HEAD`, sequentially; two genuine flips found (`T-1019-is-span-row-parity.md` AC10, `T-1020-lessons-supersede-sweep.md` AC14, both `base: PASS → head: FAIL`, both whole-`bin/`-tree preservation locks this task's own in-scope `bin/` edit necessarily breaks); the remaining 29 population specs are named individually as unmeasured in that same section, per this item's own license ("any spec not run at both refs named individually as unmeasured").
+
+### (e) Measured 40-hex values
+
+- `git merge-base chore/lesson-promotion-2026-08-15 HEAD` = `aa28e9a36f8e0ced94f0533b6e4443471283c820`
+- `git rev-parse chore/lesson-promotion-2026-08-15` = `aa28e9a36f8e0ced94f0533b6e4443471283c820` (identical to the merge-base — this branch's point of divergence is that branch's own tip)
+- `git rev-parse develop` = `627a90259a1c878f3c57b8591c2733db7eb7c622`
+- Branch-point-vs-`develop` inequality this stacked premise rests on: `aa28e9a36f8e0ced94f0533b6e4443471283c820` ≠ `627a90259a1c878f3c57b8591c2733db7eb7c622` — confirmed unequal, satisfying AC11's own premise check.
+- `git branch --show-current` = `feature/1070-check-handoff-performance`
+
+### (f) Every `## Assumptions` bullet, re-measured and reported individually
+
+The spec carries seven `## Assumptions` bullets. Each is addressed below by
+its own number, in the spec's own order.
+
+1. **RELAYED — issue #269's contents.** Re-fetched directly by this role via `https://api.github.com/repos/RipsawJP/shell-team/issues/269` (a public, unauthenticated GET — `api.github.com` is on this environment's network allow-list) rather than left relayed. Title: "check-handoff.sh runs ~122s against a 2.6MB board — approaching harness timeouts." Body (verbatim): "Fast-follow from T-1065 QA round 5 (2026-08-14); filed only, not acted on this sprint. ## Measured `bash bin/check-handoff.sh .shell-team/todo.md` took ~122 seconds against this repository's own board at 2637 lines / 2.6MB (QA round-5 record on the T-1065 board entry). The coordinating session independently hit a 120s default Bash timeout on a command chain that included the same check. Not a correctness defect — the checker returns the right verdict — but it now sits at the edge of common harness timeouts, and every loop phase (freeze, seam gates, QA, close-out) runs it at least once, so the cost multiplies per task. ## Likely shape The board grows monotonically under append-only records discipline, and this sprint's stacked train adds several long per-round record sub-bullets per task. Options for the implementing task to weigh: - Profile the checker (likely per-line subshell/grep patterns that go quadratic with board size) and make it single-pass. - And/or an archival convention: move `## Done` entries older than N sprints to a `todo-archive.md` the checker skips (needs care — several merged criteria and retro procedures read board history). Interacts with #268 (both concern record-layer scale as the board corpus grows). Evidence: `.shell-team/todo.md` T-1065 entry, QA round-5 record (\"took ~122s against the board's current 2637 lines\")." One comment on the issue (root-cause note, quoted in full under bullet 2 below since it is the source of the "confirmed" verdict this task's own `- diagnosis:` line reaches). This confirms the relayed ≈122s/2637-line/2.6MB figures exactly; no criterion in this task depends on any of them.
+2. **RELAYED — issue #256's contents and its status as a root-cause candidate.** Re-fetched via `https://api.github.com/repos/RipsawJP/shell-team/issues/256`. Title: "check-handoff.sh: per-line blank-line normalization goes quadratic on long multibyte board lines (measured 2.5 min under macOS bash 3.2)." Body (verbatim): "Found operationally during T-1062's close-out (2026-08-13); filed as a fast-follow, not touched in sprint v2.0.1. **The symptom.** `bash bin/check-handoff.sh .shell-team/todo.md` took **147 s wall / 138 s user CPU** (previously: seconds) once the board's T-1062 entry carried its full freeze ledger. Verified by `bash -x` trace: the time is spent in the per-line loop, dominated by the blank-line test `[[ -z \"${content//[[:space:]]/}\"]]` — bash's pattern substitution over a long line is superlinear, and severely so for multibyte content under macOS's `/bin/bash` 3.2.57 (arm64). The board lines that trigger it are the ones this repository's own record formats guarantee: `- refreeze-class` sub-bullets carry the superseded and replacement check lines verbatim (`old[i]:`/`new[i]:` pairs), producing single lines of 5–6 KB dense with em-dashes and arrows; T-1062's entry carries two of them plus several 2 KB sweep narratives. **Why it matters.** check-handoff runs at every hand-off gate, in CI, and inside QA/review rounds — a per-run 2.5-minute floor on the very boards that used the freeze machinery most is a tax on exactly the audit trail the loop is proudest of. (`bin/close-out.sh` is unaffected: it lints synthesized single-entry boards, measured 0.77 s for the same entry.) **Unmeasured:** the same board under CI's Ubuntu bash 5.x — likely much less severe (bash 5 improved substitution performance), but unverified; CI durations for PR #255 are the ready data point. **Fix candidates (any one is a small, behavior-preserving patch):** 1. Replace the blank test with a linear regex scan: `[[ ! \"$content\" =~ [^[:space:]] ]]` — same truth table, no substitution. 2. Reorder the loop: classify continuation lines first (`CONTINUATION_RE`, a cheap anchored regex) and only apply the blank test to what remains — the giant lines are all continuations and would skip the hot path entirely. 3. Both. Whichever lands must keep the checker fail-closed and shellcheck-clean, and `tests/` already covers the blank/continuation semantics the patch must preserve. Origin: T-1062 close-out, `time` measurement `138.67s user 0.45s system 94% cpu 2:27.42 total` against board state `1e40af9`; trace evidence in the session record." This is the specific attribution AC1's `- diagnosis: issue_256_quadratic_blank_check confirmed` line settles — confirmed exactly as this issue describes (the blank test, not the CR strip or the anchored regex matches, is the quadratic term), via this task's own isolated micro-benchmark (see `## Profile` above), independent of reading the issue's own suggested fix, which happens to match option 1 this task implemented.
+3. **RELAYED — the board's live size today.** Re-measured: `bash bin/team-paths.sh --get todo` resolves `.shell-team/todo.md`; `wc -l`/`wc -c` on it now (post this task's own board edits) report 2,809 lines / 2,897,611 bytes. The branch-point committed blob (the snapshot every criterion in this task actually reads) is 2,793 lines / 2,884,750 bytes — both distinct from issue #269's relayed 2,637 lines / 2.6MB, confirming the board has kept growing since that issue was filed, exactly as the two-axis model predicts.
+4. **MEASURED at authoring time — `## Active`'s pre-entry span.** Re-confirmed against the branch-point committed blob: `## Active` spanned lines 13–20 (8 lines) and held no task entry, only two leftover `### Local test result` blocks — matches the spec's own authored figure exactly.
+5. **MEASURED at authoring time — the consumer inventory.** Re-derived in `## Consumers` above: 25 files / 144 occurrences (`git grep -c -e check-handoff <branch-point> -- bin tests`), matching the spec's own corrected figure exactly (not the Routing Map's relayed 16-files/112-occurrences, which was the `tests/`-only half).
+6. **RELAYED — the branch point's 40-hex value and this task's stacked-train position.** Measured in item (e) above: `aa28e9a36f8e0ced94f0533b6e4443471283c820`, identical to `chore/lesson-promotion-2026-08-15`'s own tip, distinct from `develop`'s `627a90259a1c878f3c57b8591c2733db7eb7c622`.
+7. **RELAYED — the existence of the orchestrator-owned `.shell-team/interventions/T-1070.md`.** Confirmed present and conformant: `bash bin/check-interventions.sh --task T-1070 -- .shell-team/interventions/T-1070.md` → `check-interventions: conformant: .shell-team/interventions/T-1070.md (2 entries, 0 sentinel)`; file untouched by this role throughout (confirmed via `git status --short .shell-team/interventions/T-1070.md`, empty).
+
+The eighth bullet ("ASSUMED, stated as unverified — bash 5 / UTF-8 locale
+availability") is not itself relayed, so it is not re-derived here; its
+outcome is what `## Measurement protocol`'s `- condition: bash_version` and
+`- condition: locale` lines already state — a bash 5 build was not
+reachable (bash 4.4.0 was built instead, disclosed rather than
+papered over), and a UTF-8 locale (`en_US.UTF-8`) was available and used.
+
+### (g) Per-source report — every `## Summarized sources` entry
+
+The spec carries eleven `## Summarized sources` bullets (ten named
+artifacts plus one combined relayed-issues bullet). Each is addressed below.
+
+1. **`bin/check-handoff.sh`** — opened and read end to end (both before and after editing it). Confirmed: the two whole-input passes (awk extraction, bash loop) at the then-current 53–57/127–177 line ranges; the exit-2/exit-1/exit-0 contract; the three grammar constants and `ALLOWED_FLAGS`; the `!seen` single-open-only guard; the blank test / CR strip / two splits as per-line operations. Nothing contradicted.
+2. **`bin/close-out.sh` lines 337–417`** — opened and read first-hand (lines 330–419 read in this task's own session). Confirmed: the three-outcome discrimination (exit 0/1/2), the verbatim-stderr-then-reason-line order, the fail-closed `die` at line 378 (unchanged — verified present at the same line number after this task's diff, since this task never touches `bin/close-out.sh`), and the two invocations at (then) lines 357/414. Nothing contradicted.
+3. **`bin/check-board-headings.sh` lines 159–173`** — opened and read first-hand, and edited (the one permitted comment line). Confirmed: the stale `47-51` reference (verified stale — those lines were the tail of `flag_allowed()` and two comments, not the section-tracking awk) and the single occurrence of the `check-handoff\.sh:[0-9]+-[0-9]+` pattern under `bin/` (re-confirmed after the fix: `grep -rn 'check-handoff\.sh:[0-9]\+-[0-9]\+' bin/` → exactly one hit, now `65-69`). Nothing contradicted; this task's repair is exactly what the source distinction called for.
+4. **`tests/errexit-safe/run.sh` lines 329–365`** — opened and read first-hand. Confirmed: the `NOT_APPLY` registry pins the two named `printf` lines by exact content with a declared count of 1 each (re-confirmed post-fix: both lines survive byte-identical, both counts still 1, via the suite's own green run and AC5's live check). Nothing contradicted.
+5. **`tests/check-handoff/run.sh` and `tests/check-handoff/fixtures/`** — opened and read first-hand, and extended. Confirmed: 11 committed fixtures pre-task (now 17, the 6 new section-structure ones added); the corpus covered grammar shapes exhaustively and section-structure shapes not at all before this task (confirmed by inspection — no pre-existing fixture omitted `## Active`, ended inside it, repeated it, or placed it last); `valid.md`'s own line numbers (`## Active` at line 7, `## Done` at line 19) unchanged, still used as the base for AC4's generated corpora. Nothing contradicted.
+6. **`.github/workflows/check-handoff.yml`** — opened and read first-hand, and executed in full (item (c) above). Confirmed: one physical shellcheck line already naming `bin/check-handoff.sh` and `tests/check-handoff/run.sh` first; the double invocation (once on `templates/todo-template.md`, once as a dogfood step on the resolved real board); byte-identical to its branch-point blob throughout this task (`cmp -s` in AC9's own check, PASS). Nothing contradicted.
+7. **`templates/todo-template.md`** — opened and read first-hand. Confirmed: `## Active` holds only `_(none)_`; `## Format` sits after `## Done`; its fenced `- [ ] **T-XXX** …` example is outside `## Active` and untouched by any traversal change (confirmed: `bash bin/check-handoff.sh templates/todo-template.md` still exits 0 post-fix). Nothing contradicted.
+8. **`.shell-team/todo.md`** — opened and read first-hand, both at the branch-point blob and live today. Confirmed: the pre-entry `## Active` span (item (f)4 above); `###` sub-headings do not close a `## ` section (unchanged behavior, still relied on by this task's own board entries sitting inside `## Active`); the T-1068 entry's prior measurements (14.95s/2.08s, the 5,008-byte line, ≈12.3s isolation) read directly from the board rather than relayed. Nothing contradicted.
+9. **`.shell-team/lessons.md`** — opened and read first-hand. Confirmed both cited 2026-08-15 entries exist verbatim: "A checker's runtime cost is recorded only from a measurement whose locale and input size are stated" (its re-evaluation trigger names issue #269 explicitly: "Issue #269 tracks the locale/content-length root cause; re-price or retire this entry when that lands") and "A completeness claim is written only as the extraction command plus its pasted output." Finding for retro's awareness (not a criterion, not fixed here): this task's own landing is the named re-evaluation trigger for the first entry — a candidate for the next lessons-promotion round to retire or re-price, not something this engineer edits unilaterally.
+10. **`bin/check-acs.sh`** — opened and read first-hand (and relied on throughout — every AC verdict and every mutation probe in this task ran through it). Confirmed: `timeout ${CHECK_ACS_TIMEOUT:-120}` applied only when `command -v timeout` resolves (confirmed absent on this host: `command -v timeout` exits 1); `AC_RE` matches only the first `- check:` line per criterion; `--root <dir>` reruns each `check:` command from that directory (used for all seventeen mutation probes in item (a)). Nothing contradicted.
+11. **Issue #269 (primary) and issue #256 (root-cause candidate) — RELAYED** — both re-fetched directly by this role during this rework round (item (f)1–2 above quotes both in full); no longer relayed as of this record, though neither issue's figures are used by any criterion, exactly as the spec states.
+
+### (h) Execution-context matrix
+
+The one shipped, adopter-facing command this task's records point a reader
+at is `bin/check-handoff.sh <board-path>`. Verified in both contexts:
+
+| context | invocation | result |
+|---|---|---|
+| checkout root, plugin not on `PATH` | `bash bin/check-handoff.sh tests/check-handoff/fixtures/valid.md` | exit 0, empty stdout/stderr |
+| adopter-shaped repo, plugin loaded (`bin/` on `PATH`, bare name) | `check-handoff.sh tests/check-handoff/fixtures/valid.md` | exit 0, empty stdout/stderr — byte-identical to the row above |
+
+Every other command this note quotes (`git show <ref>:<path>`, `git
+ls-tree`, `wc -c`/`wc -l`, the `awk` board-splicing/generation commands, the
+Python measurement one-liners) is an ad hoc measurement or fixture-
+construction command produced for this task's own analysis, not a command
+any reader — adopter or otherwise — is told to run as a standard procedure.
+**Not applicable — these are one-off measurement scaffolding, not a shipped
+or documented procedure**, so the execution-context matrix does not apply
+to them individually; this is stated explicitly rather than the rows being
+silently omitted.
+
+### One additional disclosed deviation
+
+The profile note and the two implementation edits (the awk early-exit, the
+blank-test regex) landed in a single commit (`1697099`) rather than two
+separate commits, even though the spec's Notes for engineer phrase the
+order as "profile first, and commit the profile before writing any
+implementation change." The **work order** was followed exactly as written
+— the before-arm profile numbers in `## Profile` above were all measured
+against the unmodified branch-point script, before either implementation
+edit was made, using a separate instrumented scratch copy outside
+`bin/check-handoff.sh` itself — but the **commit** boundary was not split
+to mirror it. Disclosed here rather than left implicit; the note's own
+before-arm figures are unaffected by this transcription choice either way.
