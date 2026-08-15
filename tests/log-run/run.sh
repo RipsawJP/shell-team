@@ -417,6 +417,7 @@ POS_FILE="$POS_DIR/contloop.jsonl"
 # lock defect, and must fail loudly here rather than surface later as a
 # confusing line-count or seq-set mismatch below.
 [ "$WRITER_FAILED_COUNT" -eq 0 ] || fail "T-1076 contention-writer-exit-status: $WRITER_FAILED_COUNT of $CONT_N positive-arm writers exited non-zero (pids: ${WRITER_FAILED_PIDS[*]:-none}) — a writer/fixture failure, not lock contention"
+pass "T-1076 contention-writer-exit-status"
 
 pass "T-1076 contention-parameters — N=$CONT_N — M=$CONT_M — payload_bytes=$NEG_PAYLOAD_BYTES"
 
