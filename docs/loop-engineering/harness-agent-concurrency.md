@@ -443,14 +443,106 @@ current baseline and now reports a clean flip, on the same plain-directory-copy 
 
 ### (b) Execution-context matrix
 
-This task ships no adopter-facing command (`- user-visible: no`; the whole diff is prose).
-Every command this note quotes (`git merge-base --is-ancestor`, the `echo $(( ... ))`
-arithmetic reproductions, `grep -c`) is an ad hoc measurement or reproduction command over
-this task's own committed evidence, not a shipped or documented procedure a reader — adopter
-or otherwise — is told to run as a standard invocation. **Not applicable — no execution-context
-matrix is owed here**, stated explicitly rather than an empty table being silently omitted;
-this mirrors T-1059/T-1060's own precedent for a documentation-only task with no shipped
-command surface.
+**Round 5 rework.** Codex review round 1 found this section discharged AC16(b) with one
+blanket "Not applicable" sentence, even though the note and `.shell-team/test-recipe.md`'s
+own T-1073 entry quote and require running many ad hoc commands — the identical
+compressed-summary shape QA already made this task fix twice (AC16(f)/(g), round 4).
+Rebuilt below as a genuine per-command matrix: every `- reproduce:` line in this note
+(**18**, `grep -cE '^\s*-\s*reproduce' docs/loop-engineering/harness-agent-concurrency.md`
+→ `18`), every `- command:` line outside the byte-locked evidence section (**2**, at
+`## Probe protocol`), every `- command:` line inside the byte-locked evidence section,
+quoted as runnable (**4**), and the recipe's own three named verification commands — **27**
+commands total, each executed this round (not reasoned about), one row per command, grouped
+by category only for readability; every row still reports its own individually-executed
+result. **Scope note**: the four `bash bin/*.sh` invocations `## AC16(c)` already reports
+per-command with their own PASS/FAIL results (`team-paths.sh --get todo`+`check-handoff.sh`,
+`check-pii-shapes.sh`, `check-commit-identity.sh`) are that sub-item's own dedicated report
+and are not repeated here as a third copy.
+
+**Category A — pure bash integer arithmetic, no repository dependency at all** (runs
+byte-identically in *any* directory, adopter-shaped or not, since these read no file):
+
+| Reproduce line (source) | Context (i): checkout root, no plugin on PATH | Context (ii): adopter-shaped repo, plugin loaded |
+|---|---|---|
+| `echo $(( 1786789355493665000 - 1786789176892811000 ))` (Overlap analysis, rep1 margin) | ran: `178600854000` (matches note) | ran identically: `178600854000` — no repo dependency, same result anywhere |
+| `echo $(( 1786789575098697000 - 1786789403084491000 ))` (rep2 margin) | ran: `172014206000` (matches) | ran identically: `172014206000` |
+| `echo $(( 1786789904004940000 - 1786789633945452000 ))` (width-n4 margin) | ran: `270059488000` (matches) | ran identically: `270059488000` |
+| `a=...; b=...; d=...; avg=...; echo "diff_ns=$d avg_ns=$avg"` (repetition variance) | ran: `diff_ns=6586648000 avg_ns=175307530000` (matches) | ran identically: same output |
+| `echo $(( ...batch...)); echo $(( ...sum... ))` (rep1 batch-vs-sum) | ran: `182641255000` / `369486203000` (matches) | ran identically: same output |
+| `echo $(( ...batch...)); echo $(( ...sum... ))` (rep2 batch-vs-sum) | ran: `175066091000` / `354862623000` (matches) | ran identically: same output |
+| `echo $(( ...batch...)); echo $(( ...sum... ))` (width-n4 batch-vs-sum) | ran: `283650028000` / `1147796467000` (matches) | ran identically: same output |
+| `echo $(( 1786789633945452000 - 1786789601143196000 ))` (max launch latency) | ran: `32802256000` (matches) | ran identically: `32802256000` |
+| `ud=...; ll=...; ...; echo "st_gt_ud=... cs_gt_st=... ud_ge_mf_x_ll=..."` (ordering invariant) | ran: `st_gt_ud=1 cs_gt_st=1 ud_ge_mf_x_ll=1` (matches) | ran identically: same output |
+| `lo=...; hi=...; for v in ...; do echo "$v inside=..."; done` (heartbeat-in-window) | ran: both `inside=1` (matches) | ran identically: same output |
+| `mtime=...; start_ns=...; end_ns=...; echo "end_s=... mtime_before_end=... mtime_after_start=..."` (alert in-window-by-write-time) | ran: `end_s=1786790327 mtime_before_end=1 mtime_after_start=1` (matches) | ran identically: same output |
+
+**Category B — commands reading this repository's own specific committed files** (context
+(i): checkout root; context (ii): **not applicable — each named path or its content is
+unique to this repository's own T-1073 investigation, not present in an adopter's repo**):
+
+| Reproduce line (source) | Context (i) result | Context (ii) |
+|---|---|---|
+| `grep -c '^- agent-timestamp: ' docs/loop-engineering/harness-agent-concurrency.md` | ran: `9` (matches the corrected claim) | not applicable — this exact note file and its `agent-timestamp` lines are this task's own deliverable, absent from any adopter repo |
+| `grep -cE '^\s*- name:' .github/workflows/check-handoff.yml` | ran: `73` (matches) | not applicable — an adopter's own CI workflow (if any) is a different file with a different step count |
+| `awk '/^## Assumptions$/{...}' .shell-team/specs/T-1073-harness-agent-concurrency.md \| grep -c '^-'` | ran: `7` (matches the corrected claim) | not applicable — this task's own spec file does not exist in an adopter's repo |
+| `awk '/^## Summarized sources$/{...}' .shell-team/specs/T-1073-harness-agent-concurrency.md \| grep -c '^-'` | ran: `10` (matches the corrected claim) | not applicable — same reason |
+| `grep -c "\"run_id\":\"20260815T082259Z-t1073\".*\"iteration\":1" .shell-team/runs/shell-team.jsonl` | **ran: `12`, not the ten implied by the surrounding prose** — genuine live finding, disclosed below | not applicable — this repository's own machine-local telemetry file does not exist in an adopter's repo |
+
+**Live finding on the last row (found by executing, not reasoning):** the pattern
+`"iteration":1` is not scoped to `"span":"probe-agent"`, so as this task's own loop round
+advanced past the re-probe (QA round 1, this rework round), two more spans
+(`qa-verifier` at `seq` 32, `engineer` at `seq` 35) also carry `"iteration":1` and match the
+same grep, growing the raw count from 10 (right after the re-probe) to 12 today. The
+note's own claim survives because it was worded as a subset relation ("the ten re-probe
+`probe-agent` rows above (`seq` 17–26) are a strict subset of this run's telemetry"), which
+remains true at 12 exactly as it was at 10 — but the raw `grep -c` number itself is not
+stable over time, and a reader re-running this exact command later will see a number
+larger than 12 as the loop continues. Disclosed here rather than left for a future reader
+to discover unexplained.
+
+**Category C — `git`/`check-intent` commands naming this repository's own specific 40-hex
+commits** (context (i): checkout root; context (ii): **not applicable — the named commits
+exist only in this repository's own git history**):
+
+| Command (source) | Context (i) result | Context (ii) |
+|---|---|---|
+| `git merge-base --is-ancestor c000121... 88a5e0e...; echo "rc=$?"` (`## Probe protocol`) | ran: `rc=0` (matches) | not applicable — both commits are this repository's own |
+| `bash bin/check-intent.sh --print-hash <spec extracted from commit c000121>` (`## Probe protocol`) | ran: `bd2fc01a179a0fd382980c8394a0695ed8576411` (matches the board's recorded hash) | not applicable — `c000121` only resolves in this repository |
+| `git merge-base --is-ancestor 88a5e0e... 954e2ee...` (`## Probe protocol`, "Round 3 addendum") | ran: `rc=0` (matches) | not applicable — same reason |
+
+**Category D — `bin/derive-populations.sh` invocations** (a real shipped, portable `bin/`
+tool — unlike categories A–C, the *tool* genuinely has an adopter-shaped cell, tested
+below rather than assumed):
+
+| Command (source) | Context (i): checkout root | Context (ii): adopter-shaped repo, plugin loaded, bare name |
+|---|---|---|
+| `bin/derive-populations.sh --label t1073-r4-repo-facts --set "agents=..." --set "ci-steps=..."` | ran: exit `0`, well-formed block (embedded in AC16(c) above) | **executed**: bare-name `derive-populations.sh --label matrix-test --set "a=echo x" --set "b=echo y"` in a scratch dir with `bin/` on `PATH` (no plugin structure otherwise) → exit `0`, well-formed block — matches T-1071's own precedent exactly. The *literal* `--set` values in this note's own invocation (`git ls-files -- agents/*.md`, the workflow-file grep) were also tried verbatim in that same scratch dir: `derive-populations: set 'agents' exited with unaccepted status 128 ... : git ls-files -- agents/*.md` → exit `1` — a real, executed refusal (the scratch dir is not a git repository), not a guessed one. So: the **tool** is confirmed portable and bare-name-reachable; **this note's own specific arguments** are repository-local for the same reason as Category B. |
+| `bin/derive-populations.sh --label t1073-r4-spec-populations --set "assumptions=..." --set "sources=..."` | ran: exit `0`, well-formed block (embedded above) | same disposition as the row above — the tool is portable, this invocation's own arguments name this task's own spec file, absent from an adopter's repo |
+
+**Category E — the byte-locked evidence section's own `- command:` lines** (historical
+record of what the probe actually ran, quoted verbatim; context (i): a faithful
+reconstruction was executed this round on the real repository; context (ii): **not
+applicable — these are a record of one specific past probe session's own execution, tied
+to this repository's commit history and to transcript paths from that session, never a
+documented procedure a reader is told to run**):
+
+| Evidence `- command:` line | Context (i): faithful reconstruction, executed this round |
+|---|---|
+| `git clone --no-hardlinks <this-checkout-root> "$TMPDIR/t1073-probe-clone" && git -C "$TMPDIR/t1073-probe-clone" checkout f8371eb...` | ran (substituting `<this-checkout-root>` with this real checkout's own path, into a fresh scratch clone): exit `0`; `git rev-parse HEAD` in the clone → `f8371eb6a26b395c020ee7811087150059d33c15`, correctly pinned |
+| `cd "$TMPDIR/t1073-probe-clone" && CHECK_ACS_TIMEOUT=280 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md > /dev/null 2>&1; echo "unit_rc=$?"` | ran inside that same reconstructed clone (took ≈160 s wall-clock, matching the evidence's own ≈148–160 s range): `unit_rc=1`, matching the evidence's own recorded value exactly |
+| `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <that-agent's-transcript.output> "" 5 20 5` | attempted against a deliberately nonexistent transcript path (the real per-agent transcript paths are session-specific and no longer resolvable): the script itself ran and reported `WATCHDOG: transcript gone (agent likely finished)`, exit `0` — the script exists and is invocable from this role's own shell, but its *substantive* per-instance behavior (polling a live transcript) cannot be faithfully reconstructed outside a real probe session, exactly as `## Assumptions` item 3 already discloses |
+| `bash ~/.claude-dotfiles/scripts/agent-watchdog.sh <probe-stall-transcript.output> "" 5 15 5` | same disposition as the row above (identical script, different declared arguments) |
+
+**Category F — `.shell-team/test-recipe.md`'s own T-1073 entry, the three named
+verification commands** (context (i): checkout root; context (ii): **not applicable — the
+probe-evidence sha and this note's own path are specific to this repository's own T-1073
+task**):
+
+| Command (source: test-recipe.md's T-1073 entry) | Context (i) result |
+|---|---|
+| `git show <probe-evidence-sha>:docs/loop-engineering/harness-agent-concurrency.md` (extracted to a scratch file) | ran with the sha currently on the board (`954e2ee...`): exit `0`, non-empty output |
+| the `awk` boundary (`/^## Probe evidence \(raw, orchestrator-produced\)$/{f=1;next} f&&/^## /{exit} f`), run on both the extracted file and the working tree | ran: both slices non-empty |
+| `cmp -s` between the two slices | ran: exit `0` — byte-identical, confirming **AC2** live once more this round |
 
 ### (c) CI-equivalence, reachability-scoped
 
