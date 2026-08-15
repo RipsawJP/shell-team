@@ -225,17 +225,33 @@ One row per normative directive stated in the body prose, mapped to the criterio
 - base-side reading target: the branch point's **committed blobs**, read through `git show <branch-point>:<spec>` into a scratch tree under `$TMPDIR` (or an equivalent `git worktree add --detach` scratch); never the working tree, whose bytes at read time are not that ref's.
 - **indirection** — the class this method cannot see by construction: a criterion that reaches the board through `bin/team-paths.sh --get todo` at run time, or names the recipe only through a variable, matches no search for those literal bytes. Disposition, to be stated as measurement rather than prediction by the engineer: every merged spec carrying a `bin/team-paths.sh --get` invocation in any `- check:` line is run at both refs regardless of whether it names the board literally, and whatever remains unrun is named here explicitly rather than left implied.
 
-Predicted rows, to be **replaced by measurement** by the engineer — where a measured verdict differs from a prediction, this table is corrected to the measurement and the correction is stated; the prediction is never defended.
+**Measured by the engineer, replacing the predicted rows above** (population unchanged:
+these four merged criteria, identified by the derivation command against the branch point
+and HEAD). Base-side verdicts were read from a `git worktree add --detach` scratch tree
+checked out to the branch point's own committed blob
+(`f8371eb6a26b395c020ee7811087150059d33c15`), never the working tree. Where a measured
+verdict differs from the original prediction, it is corrected here and the correction is
+stated rather than the prediction being defended: **two of the three predicted rows
+measured `base: FAIL` already**, at this task's own branch point, before this task's diff
+touches anything — they were already broken by earlier stacked cars' own accumulated files
+overflowing those two specs' own merge-point-scoped scope-lock allow-lists (the known
+staleness class both specs' own Non-goals already name), so this task does not newly
+redden them. Only the first row is genuinely caused by this task.
 
 - population note: the read set is derived, not declared, so no population count is written here and none can go stale.
-- predicted-red: 3
+- predicted-red: 1
 
-| Merged criterion | What it reads | Predicted base | Predicted head | Why |
+| Merged criterion | What it reads | Measured base | Measured head | Why |
 |---|---|---|---|---|
-| `.shell-team/specs/T-1072-telemetry-span-discriminator.md` **AC16** | its own scope-lock allow-list, resolved against `git merge-base feature/1071-record-set-derivation HEAD` | base: PASS | head: FAIL | this task's files enter the changed set taken from that predecessor's branch point — merge-point-scoped by that criterion's own body, disclosed and not repaired |
-| `.shell-team/specs/T-1071-record-set-derivation.md` **AC13** | its own scope-lock allow-list, resolved against its predecessor's branch point | base: PASS | head: FAIL | same mechanism, one car further back in the stack |
-| `.shell-team/specs/T-1070-check-handoff-scaling.md` (scope-lock criterion) | its own scope-lock allow-list | base: PASS | head: FAIL | same mechanism; the engineer confirms the criterion's real label rather than inheriting this row's description |
-| `.shell-team/specs/T-1072-telemetry-span-discriminator.md` **AC15** | the board and `.shell-team/test-recipe.md`, base-relative survival | base: PASS | head: PASS | both edits are pure appends; every base-side line survives verbatim |
+| `.shell-team/specs/T-1072-telemetry-span-discriminator.md` **AC16** | its own scope-lock allow-list, resolved against `git merge-base feature/1071-record-set-derivation HEAD` | base: PASS | head: FAIL | genuinely caused by this task: this task's own spec, board additions, note and records enter the changed set taken from that predecessor's branch point, exceeding its allow-list — confirmed `base: PASS` at `f8371eb6a26b395c020ee7811087150059d33c15`, `head: FAIL` at current tip |
+| `.shell-team/specs/T-1071-record-set-derivation.md` **AC13** | its own scope-lock allow-list, resolved against `git merge-base feature/1070-check-handoff-performance HEAD` | base: FAIL (already, at the branch point) | head: FAIL | **corrected from the prediction of `base: PASS`** — not caused by this task: `.shell-team/specs/T-1072-telemetry-span-discriminator.md` (a later stacked car's own file) already exceeds this criterion's own allow-list before this task's diff exists; this task's own files add to an already-overflowing set rather than introducing a new defect |
+| `.shell-team/specs/T-1070-check-handoff-scaling.md` **AC11** (the spec's own real scope-lock label, confirmed rather than inherited — the original row's parenthetical description is corrected to the measured label) | its own scope-lock allow-list, resolved against `git merge-base chore/lesson-promotion-2026-08-15 HEAD` | base: FAIL (already, at the branch point) | head: FAIL | **corrected from the prediction of `base: PASS`** — same mechanism, one car further back in the stack; already broken by T-1071's and T-1072's own accumulated files before this task's diff exists |
+| `.shell-team/specs/T-1072-telemetry-span-discriminator.md` **AC15** | the board and `.shell-team/test-recipe.md`, base-relative survival | base: PASS | head: PASS | confirmed as predicted: both edits are pure appends; every base-side line survives verbatim |
+
+Full production narrative (the derivation command's own output, the scratch tree's
+resolution, and the per-row reasoning above) is repeated with the same content in
+`docs/loop-engineering/harness-agent-concurrency.md`'s own `## AC16 — runtime, reported
+item by item` section, item (d), which this table does not duplicate further.
 
 ## Assumptions
 
