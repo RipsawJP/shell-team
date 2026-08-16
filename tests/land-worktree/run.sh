@@ -187,6 +187,73 @@ assert_empty_stdout_refusal() {  # <desc> <expected_rc> <expected_class>
   REFUSAL_CLASS_COUNT=$((REFUSAL_CLASS_COUNT + 1))
 }
 
+# make_fake_git <marker-dir> <bin-dir> — writes a PATH-shadowing `git`
+# wrapper into <bin-dir> that transparently delegates EVERY invocation to
+# the real `git` (its absolute path resolved here, BEFORE PATH is ever
+# overridden for a coordinator invocation, so the wrapper can never call
+# itself), while additionally dropping a completion marker into
+# <marker-dir> for exactly two invocation shapes the TOCTOU fixtures below
+# need to detect deterministically: `git worktree list --porcelain`
+# (`onto-check-done`, the exact call `check_onto_not_checked_out` makes)
+# and `git -C <path> status --porcelain --untracked-files=normal`
+# (`worker-tree-check-done`, `check_worker_tree_clean`'s own call). Both
+# markers are written only AFTER the real git call has genuinely
+# returned, so "marker exists" means "the coordinator's own pre-lock
+# check has already read the filesystem and reached its own pass/refuse
+# decision" — a real synchronization point, never a guessed duration.
+#
+# Precedented by this repository's own T-1076 provenance record (a
+# PATH-prepended fake `stat`, used to force `bin/log-run.sh`'s
+# `lock_mtime` through its GNU branch on a host with no GNU stat) — the
+# same technique, applied to `git`, and load-bearing for the identical
+# reason: it instruments an EXTERNAL command the script under test calls,
+# so no test-only hook needs to exist inside the shipped script at all.
+make_fake_git() {
+  local marker_dir="$1" bin_dir="$2" real_git
+  real_git="$(command -v git)"
+  mkdir -p "$bin_dir"
+  cat > "$bin_dir/git" <<WRAP
+#!/usr/bin/env bash
+REAL_GIT='$real_git'
+MARKER_DIR='$marker_dir'
+case "\$*" in
+  "worktree list --porcelain")
+    "\$REAL_GIT" "\$@"; rc=\$?
+    : > "\$MARKER_DIR/onto-check-done"
+    exit "\$rc"
+    ;;
+esac
+case " \$* " in
+  *" status --porcelain --untracked-files=normal "*)
+    "\$REAL_GIT" "\$@"; rc=\$?
+    : > "\$MARKER_DIR/worker-tree-check-done"
+    exit "\$rc"
+    ;;
+esac
+exec "\$REAL_GIT" "\$@"
+WRAP
+  chmod +x "$bin_dir/git"
+}
+
+# wait_for_marker <desc> <marker-file> — bounded poll (10s) for a marker
+# file's existence. The `sleep 0.1` here paces the POLL only; the actual
+# ordering guarantee comes from the marker file's own existence (written
+# by make_fake_git's wrapper, or by bin/land-worktree.sh's own shipped
+# TEAM_LAND_WORKTREE_TESTHOOK_DIR seam elsewhere in this suite) — never
+# from how long this loop happens to run.
+wait_for_marker() {
+  local desc="$1" marker="$2" i=0
+  while [ ! -e "$marker" ]; do
+    i=$((i + 1))
+    if [ "$i" -ge 100 ]; then
+      fail "$desc: marker $marker never appeared within the bound"
+      return 1
+    fi
+    sleep 0.1 2>/dev/null || sleep 1
+  done
+  return 0
+}
+
 # =============================================================================
 # clean-landing group: three disjoint workers land sequentially onto one
 # coordinator branch.
@@ -562,13 +629,18 @@ pass "T-1077 composition-gitlink-refused-existing"
 
 # =============================================================================
 # TOCTOU re-verification group (rework: T-1077 round-1 review Finding 2,
-# Major + same-class Minor). Each case holds the lock manually (mkdir at
-# the exact computed lock path), starts the coordinator in the background
-# against an --onto/--worker-tree that is CLEAN at invocation time (so the
-# pre-lock check passes), mutates the precondition WHILE the coordinator
-# is genuinely blocked waiting for the lock, then releases the lock and
-# confirms the coordinator's OWN post-lock recheck catches the change —
-# proving the recheck is real and not merely present in the source.
+# Major + same-class Minor; readiness barrier hardened in round 2 review
+# Finding — see make_fake_git's own header comment above). Each case holds
+# the lock manually (mkdir at the exact computed lock path), starts the
+# coordinator in the background against an --onto/--worker-tree that is
+# CLEAN at invocation time (so the pre-lock check passes), waits for a
+# DETERMINISTIC marker proving the coordinator's own pre-lock check has
+# genuinely completed (never a fixed sleep count), mutates the
+# precondition, then releases the lock and confirms the coordinator's OWN
+# post-lock recheck catches the change — proving the recheck is real and
+# not merely present in the source, and proving it WITHOUT any chance the
+# pre-lock check (not the post-lock recheck this fixture exists to prove)
+# is what actually caught the mutation.
 # =============================================================================
 
 # toctou-onto-checked-out-during-wait
@@ -580,9 +652,13 @@ TO_WORKER="$(mk_commit "$TO_REPO" "$TO_BASE_SHA" worker 100644 w.txt "content")"
 WORKER_COUNT=$((WORKER_COUNT + 1))
 TO_LOCKDIR="$(lockdir_of "$TO_REPO")"
 mkdir "$TO_LOCKDIR"
+TO_MARKERS="$T/toctou-onto-markers"
+TO_FAKEBIN="$T/toctou-onto-fakebin"
+mkdir -p "$TO_MARKERS"
+make_fake_git "$TO_MARKERS" "$TO_FAKEBIN"
 (
   cd "$TO_REPO" || exit 1
-  if TEAM_LAND_LOCK_TIMEOUT=30 bash "$BIN" --base "$TO_BASE_SHA" --onto onto --worker "$TO_WORKER" \
+  if PATH="$TO_FAKEBIN:$PATH" TEAM_LAND_LOCK_TIMEOUT=30 bash "$BIN" --base "$TO_BASE_SHA" --onto onto --worker "$TO_WORKER" \
     >"$T/toctou-onto.out" 2>"$T/toctou-onto.err"; then
     to_rc=0
   else
@@ -591,22 +667,16 @@ mkdir "$TO_LOCKDIR"
   echo "$to_rc" > "$T/toctou-onto.rc"
 ) >/dev/null 2>&1 &
 TO_BG_PID=$!
-# Wait for the background coordinator to genuinely be blocked on the lock
-# (the pre-lock --onto-checked-out check has already passed by the time
-# it starts polling for the lock — this repo's `onto` was clean at launch).
-to_i=0
-while kill -0 "$TO_BG_PID" 2>/dev/null; do
-  to_i=$((to_i + 1))
-  [ "$to_i" -ge 20 ] && break
-  sleep 0.1 2>/dev/null || sleep 1
-  # Once ~0.5s has passed the coordinator has certainly reached its
-  # polling loop (mkdir attempts happen well within that window); check
-  # out `onto` in a second worktree now, while it is still blocked.
-  if [ "$to_i" -eq 5 ]; then
-    TO_WT="$T/toctou-onto-wt"
-    git -C "$TO_REPO" worktree add -q "$TO_WT" onto
-  fi
-done
+# `onto-check-done` appears only once the coordinator's OWN
+# `check_onto_not_checked_out` has genuinely invoked and completed its
+# `git worktree list --porcelain` call (via the fake-git wrapper above) —
+# a real synchronization point, not a guessed duration. By the time this
+# returns, the pre-lock onto-check has already read the (still-clean)
+# filesystem and passed; mutating now is therefore only reachable by the
+# post-lock recheck, never by the pre-lock check racing against it.
+wait_for_marker "toctou-onto-checked-out-during-wait" "$TO_MARKERS/onto-check-done"
+TO_WT="$T/toctou-onto-wt"
+git -C "$TO_REPO" worktree add -q "$TO_WT" onto
 rmdir "$TO_LOCKDIR" 2>/dev/null || true
 wait "$TO_BG_PID" 2>/dev/null || true
 TO_RC="$(cat "$T/toctou-onto.rc" 2>/dev/null || true)"
@@ -629,9 +699,13 @@ git -C "$TW_WT" commit -q -m worker
 WORKER_COUNT=$((WORKER_COUNT + 1))
 TW_LOCKDIR="$(lockdir_of "$TW_REPO")"
 mkdir "$TW_LOCKDIR"
+TW_MARKERS="$T/toctou-wt-markers"
+TW_FAKEBIN="$T/toctou-wt-fakebin"
+mkdir -p "$TW_MARKERS"
+make_fake_git "$TW_MARKERS" "$TW_FAKEBIN"
 (
   cd "$TW_REPO" || exit 1
-  if TEAM_LAND_LOCK_TIMEOUT=30 bash "$BIN" --base "$TW_BASE_SHA" --onto onto --worker twworker --worker-tree "$TW_WT" \
+  if PATH="$TW_FAKEBIN:$PATH" TEAM_LAND_LOCK_TIMEOUT=30 bash "$BIN" --base "$TW_BASE_SHA" --onto onto --worker twworker --worker-tree "$TW_WT" \
     >"$T/toctou-wt.out" 2>"$T/toctou-wt.err"; then
     tw_rc=0
   else
@@ -640,17 +714,17 @@ mkdir "$TW_LOCKDIR"
   echo "$tw_rc" > "$T/toctou-wt.rc"
 ) >/dev/null 2>&1 &
 TW_BG_PID=$!
-tw_i=0
-while kill -0 "$TW_BG_PID" 2>/dev/null; do
-  tw_i=$((tw_i + 1))
-  [ "$tw_i" -ge 20 ] && break
-  sleep 0.1 2>/dev/null || sleep 1
-  if [ "$tw_i" -eq 5 ]; then
-    # Dirty the worker's worktree while the coordinator is still blocked
-    # waiting for the lock (it was clean when the pre-lock check ran).
-    printf 'uncommitted\n' >> "$TW_WT/base.txt"
-  fi
-done
+# `worker-tree-check-done` appears only once `check_worker_tree_clean`'s
+# own `git -C <path> status --porcelain --untracked-files=normal` call has
+# genuinely completed — which, in the coordinator's own strictly
+# sequential execution, can only happen AFTER check_onto_not_checked_out
+# and the ancestry check have already run (so waiting for this one marker
+# transitively proves every earlier pre-lock check has already passed
+# too), and strictly BEFORE the lock-acquire loop is ever reached.
+wait_for_marker "toctou-worker-tree-dirty-during-wait" "$TW_MARKERS/worker-tree-check-done"
+# Dirty the worker's worktree now that the coordinator's own pre-lock
+# cleanliness check has already read it clean and moved on.
+printf 'uncommitted\n' >> "$TW_WT/base.txt"
 rmdir "$TW_LOCKDIR" 2>/dev/null || true
 wait "$TW_BG_PID" 2>/dev/null || true
 TW_RC="$(cat "$T/toctou-wt.rc" 2>/dev/null || true)"
