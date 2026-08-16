@@ -114,6 +114,21 @@ The steps of a release, written from the release this repository has actually ru
 - **Title the release with the tag name, verbatim** — `vX.Y.Z`, nothing prepended and nothing appended — never a summary suffix or a prefix the tag itself does not carry, whatever a release page's own draft field proposes by default.
 - **Publish the release against that tag.** The notes are drafted before the promotion merges and approved by the maintainer with the same go-ahead, they are written in English as both earlier releases were, and the release is confirmed published rather than left as a draft.
 - **Draft the release body from `docs/templates/release-notes-template.md`.** Copy the region between its two marker comments into the release body, fill it in per the instructions beside each section, and publish it as that region reads — this is the shipped answer to issue #223's ratified body properties, and it is forward-only: no earlier release's title or body is edited to match it.
+- **Version numbers follow a value rule, not this list.** See `## What a version number encodes` for what a version number means and how MAJOR, MINOR and PATCH are chosen; the steps above cover only the mechanics of publishing once a number is decided.
+
+## What a version number encodes
+
+A version number is a claim made to whoever receives this project, not a record of how the work was done. This section states what earns each tier.
+
+- **What the number encodes.** A version number encodes how much more useful this project became for the person who receives it, never how much work it took to build: diff size, invasiveness and volume of change carry no meaning of their own, and a large, invasive change that leaves the user's felt experience unchanged is not progress — it is wasted cost.
+- **MAJOR.** A break to the stable surface `## Cutting a release` defines — the plugin namespace and its command names — requiring an adopter to change their own setup or usage to keep working.
+- **MINOR.** A new adopter-perceivable benefit, gated jointly on the headline test and the default-reachability test below — passing only one of the two is not sufficient, and both must hold before a change earns MINOR.
+- **The headline test.** Could this change be named as the headline of the release notes — a benefit an adopter would actually recognize — rather than folded into an inventory of internal changes nobody outside the project would notice.
+- **The default-reachability test.** Does the adopter feel this benefit by running the project's own default shipped path, or does it stay latent behind an explicit opt-in that most adopters never touch — a latent, opt-in-only capability does not pass this test no matter how valuable it could become.
+- **PATCH.** Bug fixes, performance work, internal mechanisms, and capabilities that ship but stay latent behind an opt-in are PATCH regardless of diff size or how invasive the change was to make.
+- **Releases decouple from merges.** A train may merge fully unversioned; the version number is assigned only when a value-bearing release actually ships, applying `## Cutting a release`'s own "Measure the release before naming it" step to that release rather than to any earlier merge.
+- **Release notes trace to the request.** A release note names the adopter-facing request or need it answers, not merely a summary of what changed; a note that reads as an inventory of internal changes rather than a traced answer to a request signals the headline test was not actually met.
+- **Internal work needs a named benefit.** Internal work — a mechanism, a refactor, a piece of infrastructure — is justifiable only as a traced precondition to a user-felt benefit that is named at planning time, not assumed to pay off on its own later.
 
 ## What does not belong in this file
 
