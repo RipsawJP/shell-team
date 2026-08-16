@@ -342,5 +342,22 @@ for k in provider effort adapter; do
     "event row carries span-only key\\(s\\): $k"
 done
 
+# =====================================================================
+# T-1072: the per-instance discriminator — `instance` is a span-only key
+# (never required), reported by name on an event row exactly like
+# provider/effort/adapter, and NOT charset-validated on a span row (no
+# closed vocabulary — matching how provider/adapter are already treated).
+# =====================================================================
+
+INSTANCE_SPAN_LINE='{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","span":"qa-verifier","phase":"verify","iteration":1,"attempt":1,"status":"success","model":null,"tokens":null,"tool_uses":null,"duration_ms":null,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-2"}'
+assert_line "--line span row carrying instance -> 0" 0 "$INSTANCE_SPAN_LINE"
+
+INSTANCE_SPAN_WEIRD_LINE='{"loop_id":"L","run_id":"R","seq":1,"ts":"2026-08-01T00:00:01Z","span":"qa-verifier","phase":"verify","iteration":1,"attempt":1,"status":"success","model":null,"tokens":null,"tool_uses":null,"duration_ms":null,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"WEIRD Value 9"}'
+assert_line "--line span row carrying an arbitrary (non-charset-checked) instance value -> 0" 0 "$INSTANCE_SPAN_WEIRD_LINE"
+
+assert_line "--line event row carrying span-only key \"instance\" -> 1" 1 \
+  "$(printf '%s' "$EVENT_HANDOFF_LINE" | sed 's/}$/,"instance":"qa-1"}/')" \
+  'event row carries span-only key\(s\): instance'
+
 printf 'OK\n'
 exit 0
