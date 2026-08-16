@@ -138,6 +138,34 @@ Every arm's 135 rows break down identically as 76 `PASS`, 50 `FAIL`, 8 `SKIP` an
 
 No experiment was run for this tier (Non-goals); the disposition above is entirely paper-based. A judge role would need to read N candidate diffs against the frozen spec's own acceptance criteria and pick one (or, if the candidates' own changes are non-overlapping, merge disjoint pieces) before Validate — never after, since Validate and Review already gate on one committed tree per `docs/loop-engineering/agent-concurrency.md`'s own `both-gates-green` invariant. Two costs this tier carries that Tier 1 does not: the discard cost of N−1 wasted implementation attempts (full engineer-phase token and wall-clock cost each, per the `token-cost` sub-bullet above), and the judge's own scoring reliability, which this task has no data to evaluate — no judge role exists anywhere in this repository's own shipped `agents/` today, and building one to pilot would itself be a mechanism this task's own `- verification-class: no-mechanism` declaration forbids. Unlike Tier 3, this tier does not need the 2+ concurrent-worktree reconcile below, because only one candidate's own work ever lands; the other N−1 are discarded entire; that structural difference is why Tier 2 is priced `M` rather than `L`.
 
+## Tier-3 pilot: work splitting
+
+(The analysis of this section is written by the engineer phase; the raw evidence below was committed by the orchestrator at the end of the pilot's execution phase and is byte-frozen from that commit.)
+
+<!-- BEGIN pilot3-evidence: T-1078 -->
+- venue: a throwaway clone of this repository under the session temp dir; every `git worktree add` ran inside that clone, never in the real checkout; the coordinator branches were never checked out anywhere.
+- pinned-base: pilot-base = 4657de19b264cd6fd2a36d80efdb374243fe84e0 (the subject task's README, frozen interface contract, and the partition manifest, committed before any instance launched and never re-partitioned).
+- subject: `wordstats` — a two-library-plus-CLI shell tool with two standalone test suites; partition: owner-a = { lib/parse.sh, tests/parse_test.sh }, owner-b = { lib/stats.sh, bin/wordstats, tests/stats_test.sh } (disjoint by construction; the serial arm implements the union).
+- wall-clock definition applied to every arm: t0 is the orchestrator's own launch call for that arm; the arm ends at the last completion notification plus that arm's own landing spans. Orchestrator-idle gaps between a notification and the next command are excluded by this definition.
+- arm-timing: serial-n1 — rep1 334625 ms, rep2 278772 ms — mean 306699 ms.
+- arm-timing: parallel-n2 — rep1 456099 ms, rep2 515770 ms — mean 485935 ms (landings included: rep1 468+490 ms; rep2 landing-a approximated from record-file mtime because a shell error lost its timer — disclosed, sub-second, consistent with the three exact measurements — plus 475 ms).
+- arm-timing: rework-parallel-n2 (seeded cross-partition change-request) — rep1 236690 ms, rep2 293220 ms — mean 264955 ms.
+- arm-timing: rework-serial-n1 (same seeded change-request) — rep1 220822 ms, rep2 221039 ms — mean 220931 ms.
+- per-instance agent runtimes (harness usage, ms): serial 303524 / 240020; parallel workers a=177034 b=396914 (rep1), a=189918 b=470048 (rep2); rework a=132029 b=184510 serial=191091 (rep1), a=110877 b=246359 serial=147300 (rep2).
+- launch-plus-notification overhead per arm, derived (arm wall-clock minus the arm's longest instance runtime): serial rep1 31101 ms, serial rep2 38752 ms — consistent with the launch-latency range the harness note records, plus notification handling.
+- landings: 8 of 8 `mode: landed`, zero refusals, through the unmodified shipped coordinator; measured durations 468, 490, 475, 458, 459, 475, 462 ms (one further landing's timer was lost to a shell error and is mtime-approximated at under one second).
+- landed tips: primary rep1 1b201fd -> 49c220c; primary rep2 2afc858 -> cf3ca2f; rework rep1 02d1386 -> ddce642; rework rep2 1d54a85 -> 35bc040 (all clone-local refs).
+- composed-tip verification: all four compositions extracted with `git archive` and both test suites run — every suite exit 0; end-to-end CLI checks correct on the primary compositions and on both rework compositions (MINLEN filtering observed working through the real composed pipeline).
+- seeded rework observation: the seeded change-request (an interface extension spanning the partition boundary: a new optional MINLEN parameter threaded from the CLI into the parser) forced BOTH owners to rework in BOTH parallel reps (2 of 2 owners), versus exactly one instance in each serial rep.
+- partition-overhead, serialization half: the landing durations above — well under one second per landing at this repository's scale.
+- partition-overhead, authoring half: the partition manifest (7 lines) and the frozen interface contract (5 lines) were authored by the orchestrator inside the venue-setup interval, measured as 139 s between the adjacent commits that bound it (the spec-freeze commit and pilot-base) — an upper bound that also contains the clone itself and one denied-command retry; not separately instrumented below that bound.
+- telemetry: 18 span rows recorded in the real runs file under one run id, instance-tagged with `--instance` and `--seq auto`; two verbatim reconcile rows follow.
+- span-row verbatim: {"loop_id":"shell-team","run_id":"t1078-20260816T190505Z","seq":7,"ts":"2026-08-16T19:59:41Z","span":"orchestrator","phase":"reconcile","iteration":0,"attempt":1,"status":"success","model":null,"tokens":null,"tool_uses":null,"duration_ms":468,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"eng-a-r1"}
+- span-row verbatim: {"loop_id":"shell-team","run_id":"t1078-20260816T190505Z","seq":8,"ts":"2026-08-16T19:59:41Z","span":"orchestrator","phase":"reconcile","iteration":0,"attempt":2,"status":"success","model":null,"tokens":null,"tool_uses":null,"duration_ms":490,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"eng-b-r1"}
+- real-checkout cleanliness: measured after every arm — `git status --short` empty and `git ls-files --others --exclude-standard` empty, every time (five readings).
+- instances: 12 of 12 launched instances ran to completion with a liveness watchdog started at launch through a harness-tracked background launch; no stall, no partial return, no out-of-partition write (every landing's claim set matched its owner's manifest lines exactly).
+<!-- END pilot3-evidence: T-1078 -->
+
 ## Tier-3 feasibility and break-even model (paper only)
 
 No experiment was run for this tier (Non-goals); issue #253 itself asks for a written feasibility verdict only, in three parts.
