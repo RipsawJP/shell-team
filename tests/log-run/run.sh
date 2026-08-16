@@ -931,6 +931,28 @@ pass "T-1076 signal-race-release-side — the shipped code's masked release tran
 # re-arm (acquire side), mask < flag=0 < rmdir < re-arm (release side).
 # An extraction or a lookup that comes back empty is its own named
 # failure, never a silent pass (a missing statement is not "order OK").
+#
+# T-1076 rework round 7 (operator ruling, third HALT, "b GO" — re-scope,
+# not strengthen): this pin is a TRIPWIRE against accidental structural
+# damage to the masking/re-arm/exit-handler lines above — a deletion or a
+# reorder of those lines fails it, on purpose, without needing to build or
+# run a mutant. It is NOT a semantic guarantee that the critical section is
+# correct under a deliberate, count-and-order-preserving edit: Codex round
+# 6 (`.shell-team/reviews/T-1076.md`) directly executed three mutant
+# shapes that keep every count and every relative order this pin checks
+# while breaking the actual safety property — guard-hoist (moving
+# `LOCK_ACQUIRED=1` outside its `mkdir` success guard), duplicate-decoy (an
+# added, unconditional second occurrence of a guarded statement, invisible
+# to this pin's first-match extraction), and intervening-unmask (a
+# trap-disposition change spliced between the mask and the statement it is
+# supposed to bracket) — a fast-follow issue carries all three as its
+# requirement list. Closing them needs either a structural parser of the
+# real control flow or a genuine behavioral reproduction, not more
+# line-position bookkeeping of this same flat, textual kind. Behavioral
+# protection for deliberate edits to this critical section lives elsewhere
+# in this suite: the contention suite (AC9/AC10), the signal-race
+# determinism tests (`signal-race-acquire-side`, `signal-race-release-side`
+# above), `lock-released-on-signal`, and ordinary diff review.
 # =====================================================================
 SMP_MASK_COUNT="$(grep -cFx "  trap '' INT TERM" "$LOGRUN" || true)"
 [ "$SMP_MASK_COUNT" = "2" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 2 masked transitions (acquire loop + release_lock), found $SMP_MASK_COUNT"
