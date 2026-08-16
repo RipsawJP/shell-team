@@ -1195,11 +1195,12 @@ that file's order.
   immediately after the kill, by design, so its own 60-iteration backstop
   genuinely never fires in a healthy run.
 
-  **Measured consequence:** `bash tests/log-run/run.sh`, one live run this
-  session (own `date +%s` bracket): `exit=0 elapsed=164s` — down from round
-  4's own recorded `elapsed=227s`, a ~63s reduction, consistent with the
-  ~60s unconditional stall this round removes together with the retired
-  arm's own remaining setup/comparison steps. `grep -c '^PASS:' <log>` =
+  **Measured consequence:** `bash tests/log-run/run.sh`, run twice this
+  round (own `date +%s` bracket each time) — pre-commit: `exit=0
+  elapsed=164s`; post-commit, final/authoritative: `exit=0 elapsed=162s` —
+  down from round 4's own recorded `elapsed=227s`, a ~65s reduction,
+  consistent with the ~60s unconditional stall this round removes
+  together with the retired arm's own remaining setup/comparison steps. `grep -c '^PASS:' <log>` =
   **38** (37 round-4 tokens, unchanged for `signal-race-acquire-side` and
   `signal-race-release-side` — each still emits exactly ONE `PASS:` token,
   same as before the retirement, since retiring the OLD-shape arm removed
