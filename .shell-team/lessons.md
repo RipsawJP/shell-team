@@ -497,7 +497,7 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When a same-class bulk-fix inventory (an apply/not-apply table) is produced, attach the actual repository-wide grep command string and its hit count to the hand-off, not just a prose claim of "checked everywhere." QA should independently re-run the same grep to audit completeness.
 - **Why**: Even after an engineer reported "the whole scope was inventoried," a reviewer's own repository-wide grep and a cross-provider review's independent pass both caught the same two missed sites — one of which was inside a file already claimed as inventoried. A prose claim of completeness alone does not guarantee it.
 - **How to apply**: When building an inventory table (whether as the engineer or as pm-spec), write "grep run: <command> → N hits, all listed in the table" directly under the table. QA should re-run the identical grep during verification and confirm the count matches the table's row count before trusting the apply/not-apply judgment.
-- **Superseded-by**: 2026-08-03 — A completeness claim attaches its accounting: population total, selection method, and exclusion reasons (supersedes the bulk-fix inventory entry)
+- **Superseded-by**: 2026-08-15 — A completeness claim is written only as the extraction command plus its pasted output (supersedes the completeness-accounting and bulk-fix inventory entries)
 
 ## 2026-07-19 — A change to a completion gate's condition count needs an AC covering downstream consumers of the gate's result
 - **Category**: verification-discipline
@@ -882,11 +882,12 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Category**: verification-discipline
 - **Applies-to**: pm-spec, engineer, qa-verifier
 - **Scope**: loop
-- **Status**: active
+- **Status**: superseded
 - **Source**: .shell-team/reviews/T-1020.md
 - **Rule**: Any claim that a set of items is complete — "all N sites inventoried", "these candidates exhaust the space", "checked everywhere" — attaches its accounting at the claim site: the population total, the selection or search method actually used (the literal command where one exists), and the reason each excluded item is out; the verifying role re-derives the accounting independently from the raw population instead of re-checking the producer's arithmetic.
 - **Why**: The narrower form of this rule (bulk-fix inventories attach the grep command and hit count) was already in this corpus when a candidate-set completeness claim shipped with no accounting at all: a companion document asserted 24 candidates exhausted an 80-entry space with no selection method stated, QA passed it, and only two independent cross-provider review passes caught the gap. The defect class is the completeness claim itself, not the bulk-fix special case — any unaccounted "exhaustive" survives every gate that only samples it.
 - **How to apply**: pm-spec writes the accounting into the spec or companion document at the point the claim is made; the engineer keeps it current when the set changes; QA re-derives the total and the partition from the raw population (not from the producer's table) and confirms zero overlap and zero gap before treating the claim as verified.
+- **Superseded-by**: 2026-08-15 — A completeness claim is written only as the extraction command plus its pasted output (supersedes the completeness-accounting and bulk-fix inventory entries)
 
 ## 2026-08-03 — Code feeding a regex-captured digit string into bash arithmetic follows the file's existing base-10 normalization convention
 - **Category**: verification-discipline
@@ -1130,3 +1131,43 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: Any operator-facing report — a STOP escalation, a gate firing, a hand-off — that invokes a pre-decided disposition ("per the pre-decided rule", a pre-commitment's trigger firing) declares, in that same report, whose authority the disposition belongs to: AI self-discipline (self-imposed, never operator-ratified) or an operator-ratified ruling — so the operator is never framed as the author of a rule they did not make.
 - **Why**: A STOP escalation reported a pre-commitment's trigger firing as "the pre-decided rule," and the operator corrected it on the spot: "I never made such a rule — this class of misattribution is the problem." This is the mirror image of this corpus's existing T-1023-derived lesson on an unratified gate quietly becoming standing practice: there, an AI-invented gate was misread as durable operator-approved practice; here, an AI-internal self-discipline was misread as an operator ruling. Both share the same missing discipline — declaring, at the point of use, who owns a disposition — rather than letting the report's phrasing blur AI self-imposed constraint and human ratification together.
 - **How to apply**: Whenever an operator-facing report cites a pre-decided disposition (a loop-guard pre-commitment, a same-class-2 trigger, any "per the pre-decided rule" framing), state in that same report whether the disposition is AI self-discipline or an operator-ratified ruling. This is spliced as a one-sentence requirement into the STOP-escalation report sections of both `skills/run/SKILL.md` and `skills/goal/SKILL.md`.
+
+## 2026-08-15 — A completeness claim is written only as the extraction command plus its pasted output (supersedes the completeness-accounting and bulk-fix inventory entries)
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, engineer, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-15.md
+- **Rule**: Any completeness or set-comparison claim in a record, spec, or note — 'all/every/none/complete', a cardinality, a difference or intersection between sets — is written only as the population-extraction command plus its output pasted verbatim at the claim site; hand-computed set operations, manual counts, eyeball diffs, and visual enumeration are banned even when an accounting is attached, because a hand-derived accounting reintroduces the same defect the accounting was meant to close.
+- **Why**: The predecessor entry required a completeness claim to attach its accounting (population total, selection method, exclusion reasons), yet the class recurred at least nine times in one cycle across two tasks (five instances in one, four in the other), drew two operator halts, and reappeared within the same cycle as a headline rounding error (43.85% written where the measured value was 43.84%) even after three premise changes had claimed to close the class — the surviving generator was the hand-derived arithmetic itself, which an attached-but-manual accounting still permits.
+- **How to apply**: At the moment of writing an 'all/every/none/complete' claim, a count, or a set difference into any record, derive it with a command and paste both the command and its verbatim output; the verifying role re-runs the same command rather than re-checking prose arithmetic. Issue #268 tracks mechanizing command-derived set operations in records; once that checker ships, this entry is expected to shrink to a pointer at it (re-evaluation trigger).
+
+## 2026-08-15 — An analysis-note spec's verdict scope prices review depth by consumer and stakes at freeze
+- **Category**: process
+- **Applies-to**: pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-15.md
+- **Rule**: When freezing a spec for an internal analysis-note deliverable — an investigation that changes no shipped mechanism — the '### Verdict scope' block defines that artifact class's deliverable correctness as computed values plus the direction of conclusions, with prose wording explicitly non-gating (notes), so review depth is priced by the artifact's consumer and stakes once at freeze instead of being re-litigated round by round.
+- **Why**: An analysis-note task reviewed at code-change strictness drew four review rounds and two self-escalations over prose wording until the operator halted it as means-obsession and set the pricing by ruling; the three analysis-note tasks frozen after that ruling inherited the verdict-scope block by citation and converged in one to two rounds each — the cost difference was the presence of the pricing at freeze, not the artifacts' content.
+- **How to apply**: pm-spec writes the verdict-scope block into every analysis-note spec at freeze, naming the consumer and stakes and citing the artifact class's correctness definition; the orchestrator applies that frozen scope when judging same-class escalations instead of ratcheting review depth mid-task. Templating this block as the default for analysis-note specs is a candidate mechanization for a future task.
+
+## 2026-08-15 — A checker's runtime cost is recorded only from a measurement whose locale and input size are stated
+- **Category**: verification-discipline
+- **Applies-to**: engineer, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-15.md
+- **Rule**: A claim about a checker's runtime cost — 'light', 'seconds', an order-of-magnitude comparison — is recorded only from a live measurement taken under stated conditions, locale and input size (board size, section population) at minimum, because a real number measured in a non-representative environment misleads exactly as well as an unmeasured guess.
+- **Why**: A verification round concluded a board checker's documented cost was two orders of magnitude wrong based on a measurement near 2.49 seconds that was real but non-representative (C locale, a near-empty active section), and had to be corrected the following round; the same checker's cost later measured 45 to 104 seconds as the board grew, so the original number was an artifact of its conditions, not a property of the checker.
+- **How to apply**: When writing any statement about a checker's execution cost into a record or review, run it live first and state the locale and the input's size next to the number; treat an inherited cost figure with no stated conditions as unverified. Issue #269 tracks the locale/content-length root cause; re-price or retire this entry when that lands (re-evaluation trigger).
+
+## 2026-08-15 — A cross-role safety premise quotes each involved agent contract's lines at spec time
+- **Category**: process
+- **Applies-to**: pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-15.md
+- **Rule**: When a spec or analysis note states a safety premise spanning multiple agent contracts — for example that two roles read the same frozen tree — it quotes the governing lines of every involved agents/*.md file and reconciles them premise by premise, and an unverified symmetry assumption such as 'both should be read-only' is a freeze blocker, not a default.
+- **Why**: A concurrency investigation enumerated five contract surfaces for a parallel-review design and still missed a sixth — one role's test-only edit permission colliding with another role's unpinned working-tree read — which surfaced only in a late review round, because the premise that both readers see the same tree had been assumed symmetric instead of checked against each contract's actual lines; this is the assumption-time counterpart of the existing parallel-surface symmetry-table lesson, which fires when a norm is changed rather than when one is presumed.
+- **How to apply**: When pm-spec freezes a spec whose design or analysis rests on multi-role assumptions (concurrency, shared trees, parallel gates), add a premise table quoting the relevant line of each involved agents/*.md file next to each premise, and refuse to freeze while any premise row lacks its quotation.
