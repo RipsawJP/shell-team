@@ -1314,3 +1314,31 @@ that file's order.
   — the strengthened checks live inside the SAME `signal-mask-shape-pin`
   test/pass banner, no new PASS token added), `grep -c '^PASS: T-1076'
   <log>` = **16** (unchanged), `grep -c '^FAIL:' <log>` = **0**.
+- T-1075: no new `bin/` script, no new test suite, and no shellcheck
+  surface (`git diff --stat feature/1074-fanout-orchestration...HEAD --
+  bin/ tests/ .github/` empty). This task's own full-population
+  `## Blast radius` sweep (80 `.shell-team/specs/*.md` files, base ref via
+  a disposable `git worktree add --detach`, head against the working
+  tree) took long enough on this machine that six-way parallel
+  `bin/check-acs.sh` invocations per side (population split into six
+  ~12-spec chunks, each side's six workers run concurrently) were needed
+  to finish in a practical wall-clock time; a single serial pass over 80
+  specs did not complete inside two ~10-minute polling windows and was
+  abandoned mid-sweep in favour of the chunked approach — the earlier
+  T-1073 test-recipe entry's ten-plus-minutes-per-side estimate (for the
+  79-spec T-1074 sweep) understates the cost once the corpus reaches 80
+  specs and several of them run whole fixture suites inside their own
+  `- check:` lines (T-1074's own AC17, T-1076's AC9/AC14). `bin/check-acs.sh`
+  only reads the single spec path it is given and writes only to `mktemp`
+  scratch directories, so running six instances concurrently against the
+  same read-only scratch worktree (base side) or the same working tree
+  (head side) is safe — verified after the fact via a per-spec
+  verdict-line-count join across the combined output
+  (`join -j 2 -o 1.2,1.1,2.1 <(awk -F'\t' '{c[$1]++} END{for(s in c)
+  print c[s], s}' base.tsv | sort -k2) <(… head.tsv …) | awk '{if ($2 !=
+  $3) print}'`, empty — no spec's line count drifted between runs).
+  Two population entries, `design-note-T-1012.md` and
+  `T-1020-supersede-adjudication.md`, are not specs with acceptance
+  criteria at all (`bin/check-acs.sh` reports
+  `no acceptance criteria (- [ ] **ACn** / **AC-N**) found` for both,
+  identically on base and head) — expected, not a sweep defect.
