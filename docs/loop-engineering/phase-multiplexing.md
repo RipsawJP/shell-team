@@ -142,6 +142,8 @@ No experiment was run for this tier (Non-goals); the disposition above is entire
 
 (The analysis of this section is written by the engineer phase; the raw evidence below was committed by the orchestrator at the end of the pilot's execution phase and is byte-frozen from that commit.)
 
+- evidence-commit: 443ce84cb736b3b152825cb238a96a833f21807e — the orchestrator's own commit of the raw-evidence region below; the region is byte-frozen from it (AC11 compares this commit's blob against HEAD).
+
 <!-- BEGIN pilot3-evidence: T-1078 -->
 - venue: a throwaway clone of this repository under the session temp dir; every `git worktree add` ran inside that clone, never in the real checkout; the coordinator branches were never checked out anywhere.
 - pinned-base: pilot-base = 4657de19b264cd6fd2a36d80efdb374243fe84e0 (the subject task's README, frozen interface contract, and the partition manifest, committed before any instance launched and never re-partitioned).
