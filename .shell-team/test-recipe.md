@@ -601,6 +601,24 @@ that file's order.
   both instances processed before one finished, which is easy to miss
   since the corruption is partial (only the early portion of the file) and
   every individual line still looks well-formed.
+- T-1074: `bash tests/aggregate-verdicts/run.sh` is `bin/aggregate-verdicts.sh`'s
+  fixture suite (the T-1074 fail-closed fan-out aggregator). No new
+  prerequisite: pure bash + coreutils, no static `fixtures/` directory (every
+  population/part file is built inline via `printf`, the same convention
+  `tests/derive-populations/run.sh` uses). Measured: standalone run
+  `exit=0 elapsed=3s`, 18 `PASS:` lines, 0 `FAIL:` lines
+  (`grep -c '^PASS:' <log>` = 18, `grep -c '^FAIL:' <log>` = 0). The whole
+  spec's own `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh
+  .shell-team/specs/T-1074-fanout-orchestration.md` (all 19 criteria,
+  `--dry-run` first) measured `elapsed=54s` on this machine — comfortably
+  inside the spec's own instruction to raise `CHECK_ACS_TIMEOUT` to at least
+  300 for this spec (AC8/AC17 each run a whole fixture suite). AC9's
+  negative control builds its coverage-check-disabled mutant by `sed`-
+  neutering the single, literal `die 3 uncovered-unit` call in a scratch
+  copy of `bin/aggregate-verdicts.sh` under `$TMPDIR` — never the working
+  tree — and asserts the occurrence count of that literal text is exactly 1
+  before the substitution and exactly 0 after, so a future rewording of
+  that line does not let the mutation silently no-op.
 - T-1055 (round 2 / v2 rework): a doc's "canon region" delimited by a
   marker-comment pair that itself sits inside a fenced code block (e.g.
   `` ``` ``, then `<!-- BEGIN X -->`, content, `<!-- END X -->`, then
