@@ -899,3 +899,400 @@ that file's order.
   the 120s default for this spec's full sweep (this task used 400) because
   **AC6** lints the full local telemetry corpus under two separate linter
   blobs and **AC14** runs four test suites in the same check.
+- T-1076: **a real, measured performance ceiling in `bin/check-run.sh` that
+  the next task touching this writer, its readers, or its contention fixture
+  needs to inherit rather than re-discover.** Its unbalanced-quote detection
+  (`unq="${line//\\\\/}"; unq="${unq//\\\"/}"; quotes="${unq//[!\"]/}"`,
+  lines 205-207) is a chained bash global pattern-substitution over the
+  WHOLE line, and this repo's own stock dev-host bash (3.2.57, macOS) is
+  measured to run each stage with severe super-quadratic cost whenever the
+  substitution removes a large fraction of a long string — direct isolated
+  benchmarks of that exact chain: 500B→0.03s, 1000B→0.13s, 2000B→0.82s,
+  4000B→5.7s (third stage dominant) / 8000B→20s (second stage dominant,
+  tested separately with an all-`\"`-pair payload), 16384B→did not complete
+  within 120s. The determining factor is how much of the string actually
+  gets REMOVED at each stage, not its content otherwise — an all-quote
+  payload is fast at the third stage but slow at the second, and vice
+  versa, so no payload composition avoids the ceiling once a JSON string
+  field passes a few KB. This is why `tests/log-run/run.sh`'s T-1076
+  contention suite splits its two arms: the AC9 positive/main 8x20 case
+  carries NO `--error` payload (kept fast and lintable — its file is the
+  one `bin/check-run.sh` actually runs against for the
+  `contention-check-run-clean` assertion), while the AC10 negative control
+  alone carries the 16384-byte floor D6 requires, built as a scratch copy
+  under `$TMPDIR` with NO sibling `check-run.sh` (so the writer's own
+  post-write self-check silently skips, per its documented
+  missing-checker behavior) and judged only by cheap measurements (line
+  count, derived seq-set exactness) that never invoke `bin/check-run.sh`.
+  Whoever next touches `bin/check-run.sh` itself should re-measure this
+  ceiling before assuming it moved. Separately: `bin/log-run.sh`'s own
+  `jesc()` (backslash/quote escaping) does NOT hit this ceiling for the
+  same payload sizes, because its two substitutions have near-zero matches
+  against a payload containing neither backslash nor quote characters
+  (measured: an all-`x` 16000-byte string through the equivalent
+  substitution shape completes in ~0.006s) — the slow path is specific to
+  `bin/check-run.sh`'s quote-BALANCE check, not to string escaping in
+  general.
+- T-1076: retry granularity for the append lock's bounded wait is
+  whole-second (`sleep 1`), a deliberate choice (D2 leaves either option
+  open) rather than a portability necessity — fractional `sleep 0.2` is
+  measured to work on this session's own sandboxed bash 3.2.57, but whole
+  seconds need no per-host verification and comfortably satisfy every
+  acceptance criterion's own timing bound (AC6's `TEAM_LOG_LOCK_TIMEOUT=1`
+  case returns in ~1s, well inside its 10s ceiling).
+- T-1076: `tests/log-run/run.sh`'s full contention suite (positive arm,
+  D2-refusal case, signal-release case, AC10 negative control) measured
+  **~167s wall-clock** end to end on this host
+  (`bash tests/log-run/run.sh`, timed twice, both ~167s and both exiting
+  0) — almost entirely the negative control's 160 real `bash
+  bin/log-run.sh`-equivalent process launches with a 16KB argv payload
+  each. This is well past a sub-agent's own default 120s foreground Bash
+  tool timeout: invoke it with an explicit longer timeout (or as a
+  backgrounded command polled for completion) rather than assuming a hang
+  when nothing prints for two minutes. `CHECK_ACS_TIMEOUT=400` was used
+  for this spec's full `bin/check-acs.sh` sweep (**AC9** and **AC10** each
+  run the whole suite once, back to back, so budget at least
+  2×167s ≈ 340s for those two criteria alone before any of the spec's
+  other checks run).
+- T-1076 round 2 (rework, Codex review round 1): the suite grew three cases
+  (`seq-auto-escaping`, `signal-race-acquire-side`, `signal-race-release-side`
+  — the Major #1 and Blocker regression pins) and now measures
+  **~189s wall-clock** end to end on this host (`bash tests/log-run/run.sh`,
+  timed, exit 0) — up from round 1's ~167s, almost entirely the two new
+  signal-race cases' own deliberate multi-second `sleep`-widened windows
+  (each choreography holds a lock for several seconds on purpose so a real
+  `kill -TERM` can be aimed inside it deterministically). Re-budget
+  `CHECK_ACS_TIMEOUT` accordingly (this round used 400, still comfortable).
+  A bash-3.2.57-specific pitfall found and worked around while building
+  these fixtures: `${content//"$pat"/"$rep"}` — quoting BOTH the pattern
+  and the replacement — either leaks literal `"` characters into the
+  replacement text or, for a multi-line pattern spanning this script's own
+  ~600-line body, hangs outright (this repo's own super-quadratic
+  string-substitution ceiling, recorded above for `bin/check-run.sh`,
+  generalizes to bash's own glob engine here too). The working fixture
+  technique is line-range replacement via `awk` keyed on unique anchor
+  lines (`$0 == start` / `$0 == end`, both verified unique with
+  `grep -cFx` before use), not a bash pattern substitution — fast and
+  correct regardless of content size, and the technique to reach for
+  first the next time a test needs to patch a specific span inside an
+  existing `bin/` script rather than a single line.
+- T-1076 round 3 (bounded rework, Codex review round 2 — Blocker + Major +
+  Minor, all in test/diagnostic code): three fixes.
+  1. **`signal-race-release-side` (Blocker) — the fixture's own kill was
+     scheduling-dependent.** Round 2's choreography sent `kill -TERM` to P1
+     the instant P1's own post-rmdir marker appeared, then polled (up to
+     5x1s) for the successor P2 to have reacquired the freed lock —
+     AFTER the kill, so it could not retroactively fix the ordering.
+     Fixed by building a DEDICATED P2 mutant that writes its own
+     `.p2-acquired-marker` the instant its own `mkdir` succeeds, and
+     moving the wait for THAT marker to BEFORE the kill. This required
+     widening both mutants' injected vulnerability window (`sleep 3` →
+     `sleep 8` in the two P1 mutants) so the added pre-kill poll fits
+     inside it, and widening P2's own post-acquire hold (`sleep 5` →
+     `sleep 12`, in the new dedicated P2 mutant only) so the FIXED-shape
+     arm's "successor's lock must still be there" check is never read
+     against a P2 that already finished its own lifecycle for an
+     unrelated, benign reason (P1's fixed-shape arm does not return until
+     it has run its own full masked window to completion). Verified with
+     a standalone extraction driver (replays this file's own
+     `replace_range`/`ACQ_START`/`ACQ_END`/release-side block, keyed on
+     unique anchor lines, in a loop — the same technique round 2 recorded
+     above, reused rather than reinvented) run 5 consecutive times:
+     `grep -c '^PASS: T-1076 signal-race-release-side' <log>` = **5**,
+     `grep -c '^=== iteration' <log>` = **5**, no flake. Each iteration now
+     takes noticeably longer (~30-35s, up from round 2's much shorter
+     per-arm time) because of the widened windows and P2's longer hold —
+     wall-clock cost this round's engineer paid deliberately for
+     determinism, not a regression to chase.
+  2. **AC10 negative control (Major) — disclosed rather than
+     barrier-forced.** No explicit synchronization barrier was added
+     (would require pausing the lock-disabled mutant's own
+     compute-then-append critical section on a shared rendezvous —
+     restructuring the very TOCTOU mechanism this arm exists to observe,
+     out of this bounded rework's scope). Instead, the arm's actual
+     (empirical, not structurally forced) guarantee is disclosed in a
+     test comment: with CONT_N (>=8) writers each performing CONT_M
+     (>=20) fully-unserialized cycles against one shared file (>=160
+     total appends, zero serialization in the mutant), at least one
+     collision is empirically near-certain, not certain by construction.
+     Verified with the same standalone-driver technique, run 5
+     consecutive times: `grep -c '^PASS: T-1076 negative-control —
+     detected' <log>` = **5**, `grep -c '^=== iteration' <log>` = **5**,
+     every run `detected — seq-set-mismatch`, no `not-detected` observed.
+     Each iteration of JUST this arm alone (isolated from the rest of the
+     suite, no parallelism benefit from the other ~40 earlier test cases
+     that would otherwise share the host's idle time) took on the order
+     of several minutes on this shared, contended sandbox host — the
+     dominant cost is still `compute_auto_seq`'s O(file) bash-native
+     `while read` scan re-run on every one of the 160 total appends
+     against a file that grows to ~2.5MB (160 rows x ~16KB `--error`
+     payload each), unchanged from round 2. Budget accordingly: running
+     this arm's 5x tally in isolation is markedly slower per-iteration
+     than its share of the full suite's own ~189s total (where it runs
+     once, and other tests' CPU-idle windows do not compound the way five
+     back-to-back isolated runs do on a busy shared host).
+  3. **`lock_mtime` (Minor) — the BSD-form probe silently "succeeded" with
+     garbage on GNU/Linux.** Fixed by probing the dialect itself
+     (`stat --version` succeeds on GNU coreutils, fails on BSD/macOS
+     `stat`) and running ONLY that dialect's own format string, instead of
+     trying the BSD form first and falling through to the GNU form on a
+     non-zero exit (GNU's `-f '%Sm'` is a syntactically valid, if
+     nonsensical, format string on GNU `stat`, so the old fallthrough
+     never triggered there). Verified on this host: `stat --version`
+     exits 1 with `illegal option -- -` (confirming the BSD branch is the
+     one actually selected here), and a manual invocation against a real
+     lock directory produced a legible timestamp, not `unknown` or
+     garbage. Honest bound, unchanged from the review finding itself:
+     only the BSD branch is exercised from this repo's own dev host — the
+     GNU branch is written from GNU `stat`'s documented behaviour and is
+     NOT independently verified against a live GNU/Linux host from here.
+     **Mutation self-check finding on the new `lock-mtime-legible` test
+     itself, worth remembering for anyone else writing a "does this look
+     like a real timestamp" guard**: a first draft asserted only
+     `grep -qE '[0-9]{4}'` (a bare four-digit check). Feeding it the exact
+     garbled value this round's own finding named (`4096m`) — the mutant a
+     real GNU-dialect bug would actually produce — WRONGLY PASSED, because
+     `4096` alone is four digits. A digit-count check does not verify
+     "looks like a timestamp"; it verifies "contains some four-digit
+     number," which a filesystem block size satisfies just as well.
+     Strengthened to require the recognizable SHAPE (a three-letter month
+     abbreviation, an `HH:MM:SS` time, a trailing plausible year), which
+     both `4096m` and a plain `unknown` correctly fail.
+  A reusable technique recorded for the next task that needs to
+  iterate quickly on one expensive arm of an already-slow suite:
+  extract just that arm's own code (plus whatever earlier variable/
+  function definitions it depends on) out of the suite file with
+  `sed -n '/START-ANCHOR/,/END-ANCHOR/p'` into a small driver script that
+  `eval`s it in a loop with a fresh scratch root each iteration — far
+  faster to iterate on than re-running the whole ~189s suite for every
+  probe, and the anchors stay in sync with the real file since they are
+  read from it live rather than copied.
+- T-1076 round 4 (surgical rework, Codex review round 3 — Blocker + Major +
+  Minor): three fixes, all confined to `tests/log-run/run.sh` (no
+  production-code change this round — `bin/log-run.sh`'s own `lock_mtime`
+  was re-read and confirmed correct; the defect was entirely in the test's
+  own assertions).
+  1. **`lock-mtime-legible` (Blocker) — the round-3 assertions were
+     BSD-shape-only and would fail deterministically on this repo's own
+     `ubuntu-latest` CI (GNU `stat -c '%y'`).** Round 3's own "disclosed as
+     unverified" bound on the GNU branch is exactly what let this Blocker
+     through, so this round closes the gap by EXECUTING the GNU branch,
+     not by disclosing it more carefully a second time. Fixed two ways:
+     (a) rewrote the three round-3 assertions (month name, HH:MM:SS,
+     year-anchored-to-tail) into a platform-agnostic pair — an
+     HH:MM:SS-shaped time anywhere in the string, AND a plausible
+     `(19|20)[0-9]{2}` year anywhere in the string, neither anchored to
+     either end — verified to hold for both BSD's default format (`Jan 15
+     10:30:45 2024`) and GNU's documented format
+     (`2024-01-15 10:30:45.123456789 +0000`), and to still reject all four
+     garbled values this test exists to catch (`4096m`, `unknown`,
+     `4096manual`, `Aug 4096` — none has a colon-separated time, so all
+     four fail the time check alone) via a dedicated negative-literal loop
+     run before the real-host assertion. (b) built a PATH-prepended fake
+     `stat` (answers `--version` so `lock_mtime`'s own dialect probe
+     selects the GNU branch, `-c '%y'` with a realistic GNU byte string,
+     refuses `-f` outright) and ran the REAL `lock_mtime` function —
+     extracted from `bin/log-run.sh` with `sed -n
+     '/^lock_mtime() {$/,/^}$/p'`, the same unique-anchor technique this
+     file already uses elsewhere, not a reimplementation — against that
+     stub, live, on this session's own macOS host. Stub run's actual
+     output, captured this session: `2024-03-07 10:15:42.123456789
+     +0000`, printed via `PASS: T-1076 lock-mtime-legible (GNU stub) —
+     lock_mtime selects the GNU branch against a fake GNU stat and
+     returns '2024-03-07 10:15:42.123456789 +0000', which the
+     platform-agnostic check pair accepts` — an executed positive
+     control, not another round of reasoning about a documented format
+     string.
+  2. **`signal-race-release-side` (Major) — the reworked choreography's
+     ordering was already deterministic (round 3's own fix), but the
+     `sleep 8` (both P1 mutants) / `sleep 12` (the dedicated P2 mutant)
+     widths remained fixed wall-clock BUDGETS: exhausted under enough CI
+     contention, either could let a mutant complete its own lifecycle and
+     return before the driver even sent — or benefited from — the kill,
+     flipping the verdict on scheduling grounds. This is the third
+     consecutive round this exact fixture family drew a scheduling-timing
+     finding, which the review itself reads as a signal about the
+     fixed-sleep-margin PATTERN, not about any one width. Removed the
+     load-bearing widths entirely: `REL_OLD_REPL`/`REL_FIXED_REPL` now
+     wait on an explicit `${LOCK_DIR}.rel-proceed-marker` file the test
+     driver writes (gated so it is only ever written for the
+     `expect_rc=0` FIXED-shape call — OLD-shape's kill is delivered
+     essentially instantly since its traps stay unmasked, so it never
+     needs or waits on this marker), and the dedicated P2 mutant
+     (`REL_P2_BIN`) now waits on `${LOCK_DIR}.p2-proceed-marker`, written
+     by the driver only after the "successor survives" check has already
+     run. Both waits carry a `-lt 60` iteration cap as a pure anti-hang
+     backstop (a test bug that never sends the kill or writes the marker
+     should eventually fail loudly rather than hang the suite forever) —
+     it is NOT sized to budget any correctness-relevant transition, unlike
+     the widths it replaces. Verified with a standalone extraction driver
+     (the same technique round 3 recorded, reused rather than reinvented:
+     `replace_range`, `ACQ_START`/`ACQ_END`, the release-side block, all
+     replayed from the real file's own anchors) run 5 consecutive times:
+     `grep -c '^=== iteration' <log>` = **5**, `grep -c '^PASS: T-1076
+     signal-race-release-side' <log>` = **5**, `grep -c '^FAIL:' <log>` =
+     **0** — no flake, both the OLD-shape theft arm and the FIXED-shape
+     absorb arm passing on every run. Per-iteration wall time (this driver
+     also runs the unrelated `signal-race-acquire-side` case in the same
+     pass): 5 iterations totaled ~7 minutes on this shared, contended
+     sandbox host (~82s/iteration average) — measured once in isolation
+     (release-side only, no acquire-side): a single run took 69s. Neither
+     number is directly comparable to round 3's own recorded ~30-35s
+     figure (different isolation scope, different host-contention sample
+     at measurement time); recorded here as this round's own honest
+     measurement, not a claimed improvement or regression.
+  3. **AC10 disclosure comment (Minor) — wording only.** Removed
+     "guarantees" and "near-certain... on any real multi-core host" (an
+     unqualified universal claim from a sample of runs on one host);
+     restated as the measured evidence only (`detected` observed in every
+     recorded run of this arm across this task's full history, not
+     established for any other host or scheduler), and reframed the
+     omitted synchronization barrier as a scope choice for this bounded
+     rework rather than a technical necessity. No change to the test's
+     actual behavior or pass/fail outcome.
+  Full-suite re-verification this round: `bash tests/log-run/run.sh` run
+  once, live, this session — see this task's own hand-off for the exact
+  PASS/FAIL tally command and result; budget the same `CHECK_ACS_TIMEOUT`
+  window recorded above (this round did not reduce the suite's own
+  worst-case wall-clock ceiling, since AC9/AC10 each still run the whole
+  suite once).
+
+- T-1076 rework round 5 (operator-ratified design-premise change, board
+  record `d726e80`, "b GO"): retired the OLD-shape reproduction machinery
+  from `signal-race-acquire-side` and `signal-race-release-side` — the
+  mutant construction, its A/B assertions, and (release-side) the
+  re-entrant-release choreography that itself generated round 4's
+  finding — after this exact fixture family drew an independent
+  timing-adjacent Blocker or Major finding in four consecutive review
+  rounds. Kept the FIXED-shape determinism tests (the shipped code,
+  driven through the same choreography, absorbing a real `kill -TERM`
+  cleanly: lock released, exactly one row from the killed holder rather
+  than a duplicate, successor's lock left untouched, lock reusable), and
+  added a new grep-level regression test, `signal-mask-shape-pin`, as the
+  fixture family's ongoing regression protection — see
+  `.shell-team/provenance/T-1076.md`'s two round-5 decision entries for
+  the full rationale and the mutation self-check.
+
+  **Correction (round 4's own finding, this round):** round 4's own entry
+  immediately above states, of the `-lt 60` marker-wait backstop, that it
+  "is NOT sized to budget any correctness-relevant transition" and that
+  "OLD-shape's kill is delivered essentially instantly since its traps
+  stay unmasked, so it never needs or waits on this marker." Both claims
+  are FALSE for the OLD-shape arm specifically, per round 4's own review
+  (`.shell-team/reviews/T-1076.md`, appended at `17ee49f`): the OLD-shape
+  arm's re-entrant `release_lock()` call also waited on
+  `rel-proceed-marker` (a marker the driver deliberately never wrote for
+  that arm), so the killed OLD-shape holder in fact exited only once the
+  60-iteration backstop fired — an unconditional ~60s stall, and a very
+  real correctness-relevant-to-the-test-itself transition the backstop
+  was budgeting. This entry corrects both claims rather than editing the
+  round-4 prose above (this section is an append-only log; the round-4
+  entry is left standing as a historical record of what round 4 shipped
+  and believed at the time). The retirement above removes the OLD-shape
+  arm entirely, so neither claim describes any code that still exists
+  after this round; the surviving FIXED-shape arm was never subject to
+  either claim — its own `p1proceed` marker is always written
+  immediately after the kill, by design, so its own 60-iteration backstop
+  genuinely never fires in a healthy run.
+
+  **Measured consequence:** `bash tests/log-run/run.sh`, run twice this
+  round (own `date +%s` bracket each time) — pre-commit: `exit=0
+  elapsed=164s`; post-commit, final/authoritative: `exit=0 elapsed=162s` —
+  down from round 4's own recorded `elapsed=227s`, a ~65s reduction,
+  consistent with the ~60s unconditional stall this round removes
+  together with the retired arm's own remaining setup/comparison steps. `grep -c '^PASS:' <log>` =
+  **38** (37 round-4 tokens, unchanged for `signal-race-acquire-side` and
+  `signal-race-release-side` — each still emits exactly ONE `PASS:` token,
+  same as before the retirement, since retiring the OLD-shape arm removed
+  setup/comparison code but not either case's own single pass banner —
+  plus 1 new token for `signal-mask-shape-pin`), `grep -c '^PASS: T-1076'
+  <log>` = **16**, `grep -c '^FAIL:' <log>` = **0**.
+
+  The two retained signal-mask tests plus the new shape pin were also run
+  5 consecutive times each, isolated from the rest of the suite, via a
+  standalone extraction driver replaying `tests/log-run/run.sh`'s own
+  lines 644-936 (the retained/rewritten block) against a fresh harness:
+  `grep -c '^=== iteration' <driver-log>` = **5**,
+  `grep -c '^PASS: T-1076 signal-race-acquire-side' <driver-log>` = **5**,
+  `grep -c '^PASS: T-1076 signal-race-release-side' <driver-log>` = **5**,
+  `grep -c '^PASS: T-1076 signal-mask-shape-pin' <driver-log>` = **5**,
+  `grep -c '^FAIL:' <driver-log>` = **0** — no flake.
+
+  Mutation self-check on the new `signal-mask-shape-pin` test (both
+  mutants built under `$TMPDIR`, never the working tree): a mask-stripped
+  mutant (`grep -v` removing both `  trap '' INT TERM` lines from a
+  scratch copy of `bin/log-run.sh`) makes the pin fail with "expected
+  exactly 2 masked transitions... found 0"; an exit-stripped mutant
+  (replacing `on_lock_signal`'s `exit "$2"` with a no-op) makes the pin
+  fail with "must call exit explicitly" — both confirmed by direct
+  execution this round, against the real pin logic extracted from the
+  committed test file, not reasoned about.
+
+- T-1076 rework round 6 (bounded fix, Codex review round 5 Major —
+  `signal-mask-shape-pin` pinned counts only, never ORDER): strengthened the
+  pin to also assert the RELATIVE LINE ORDER of each critical section's
+  load-bearing statements, not just their occurrence counts. Technique:
+  extract each critical section's own body first (the acquire loop via
+  `sed -n '/^while :; do$/,/^done$/p'`, `release_lock`'s own body via the
+  same anchor pattern already used for `on_lock_signal`'s extraction), then
+  locate each statement's line NUMBER within that small extracted body with
+  a `smp_line_of` helper (`grep -nF` + `head -1` + `cut -d: -f1`,
+  `|| true`-guarded the same way the file's existing count checks already
+  are under `set -euo pipefail`), and assert `mask < mkdir < flag=1 <
+  re-arm` (acquire) / `mask < flag=0 < rmdir < re-arm` (release) as plain
+  integer `-lt` comparisons. Extracting the body FIRST (rather than
+  searching the whole 685-line file) is what makes an unqualified
+  first-match lookup safe — within each extracted body every pattern
+  occurs exactly once.
+
+  One collision found and fixed by this round's own mutation self-check,
+  before the entry was written: the initial `LOCK_ACQUIRED=1` search
+  pattern (no leading whitespace) also matched a COMMENT line inside the
+  acquire loop's body (`bin/log-run.sh:627`, prose describing the very race
+  being guarded against, which happens to quote `` `LOCK_ACQUIRED=1` ``
+  verbatim) — sitting BEFORE the real statement, this made the order check
+  falsely FAIL against the real, correct, committed code. Fixed by
+  anchoring to the real statement's exact 4-space indentation
+  (`'    LOCK_ACQUIRED=1'`), which the `#`-prefixed comment line never
+  carries. Lesson for the next task reaching for this same
+  extract-a-body-then-grep-within-it idiom: a plain, unanchored fixed-string
+  search inside an extracted body is only as safe as that body's own
+  freedom from comment lines that happen to quote the same token — check
+  for that collision explicitly rather than assuming it away.
+
+  Mutation self-check, three mutants, all built under `$TMPDIR`/scratch,
+  never the working tree, each verified via a standalone driver replaying
+  `tests/log-run/run.sh:906-996` (the whole `signal-mask-shape-pin` case)
+  against the mutant path:
+  - mask-stripped (round-5 mutant, re-confirmed): `grep -v` removing both
+    `  trap '' INT TERM` lines -> pin fails with "expected exactly 2 masked
+    transitions... found 0".
+  - exit-stripped (round-5 mutant, re-confirmed): `on_lock_signal`'s
+    `exit "$2"` replaced with a no-op -> pin fails with "must call exit
+    explicitly".
+  - reorder (NEW this round, the exact class the finding named): the
+    acquire-side `  trap '' INT TERM` line moved to directly after
+    `LOCK_ACQUIRED=1` (same total line count as the real file, same total
+    mask-line count of 2 — order broken, not count broken), built via a
+    state-tracked `awk` script (a `past_while` flag is required to
+    distinguish the acquire-side mask from `release_lock`'s own mask, which
+    appears EARLIER in the file when scanning top-to-bottom — a first
+    unguarded attempt, without this flag, stripped the wrong mask instead).
+    `diff` against the real file confirmed exactly one line moved and
+    nothing else changed. Pin fails with "acquire-side order violated — the
+    INT/TERM mask (relative line 9) must precede the mkdir acquire attempt
+    (relative line 7)".
+  All three mutants FAILED the strengthened pin (own command:
+  `bash "$SCRATCH/pin_driver.sh" "$SCRATCH/mutants/<name>.sh"`, exit=1
+  each, each with the message above); the real, committed
+  `bin/log-run.sh` PASSES the same driver (exit=0). `bin/log-run.sh` itself
+  is byte-unchanged this round (`git diff --stat -- bin/log-run.sh` empty).
+
+  **Measured consequence:** `bash tests/log-run/run.sh` run once live, this
+  round: `exit=0 elapsed=159s` (own `date +%s` bracket), consistent with
+  round 5's own ~162-164s measurements (the strengthened pin adds only a
+  handful of `grep`/`sed` calls, no new mutant construction, so no
+  meaningful wall-clock change). `grep -c '^PASS:' <log>` = **38** (unchanged
+  — the strengthened checks live inside the SAME `signal-mask-shape-pin`
+  test/pass banner, no new PASS token added), `grep -c '^PASS: T-1076'
+  <log>` = **16** (unchanged), `grep -c '^FAIL:' <log>` = **0**.
