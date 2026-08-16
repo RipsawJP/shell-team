@@ -43,8 +43,10 @@ contain liveness-declaration.md           skills/run/SKILL.md skills/goal/SKILL.
 contain executor-resolution.md            skills/run/SKILL.md skills/goal/SKILL.md
 contain telemetry-binding.md              skills/run/SKILL.md skills/goal/SKILL.md
 contain adopter-docs-declaration.md       agents/pm-spec.md skills/run/SKILL.md
+contain derived-populations.md            agents/pm-spec.md agents/tech-lead.md agents/engineer.md agents/qa-verifier.md agents/codex-reviewer.md
 marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
 marker  playbook-engineer.md               agents/engineer.md
 marker  playbook-qa-verifier.md            agents/qa-verifier.md
 marker  playbook-tech-lead.md              agents/tech-lead.md
 marker  playbook-pm-spec.md                agents/pm-spec.md
+contain fanout-orchestration.md            skills/run/SKILL.md

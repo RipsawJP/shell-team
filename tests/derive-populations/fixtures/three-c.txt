@@ -1,0 +1,4 @@
+all3
+ac
+bc
+onlyc

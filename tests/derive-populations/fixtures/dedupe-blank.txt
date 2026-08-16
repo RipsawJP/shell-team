@@ -1,0 +1,6 @@
+dup
+dup
+
+only-once
+
+dup

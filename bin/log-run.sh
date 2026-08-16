@@ -7,7 +7,7 @@
 # layout). Two row shapes share the file (T-1011):
 #
 #   SPAN row (T-014/T-015, the original shape) — one call into a sub-agent.
-#     17 keys, no `kind` key at all. Unchanged by this task, byte-for-byte.
+#     21 keys, no `kind` key at all. Unchanged by this task, byte-for-byte.
 #   EVENT row (T-1011) — a transition the loop made *between* spans: a
 #     hand-off, a route-back, a gate verdict, a human stop/GO, a release.
 #     9 keys, discriminated by `"kind":"event"`.
@@ -17,15 +17,16 @@
 # NOTHING and exits 2, so the log never gains a corrupt line. Pure bash, no
 # JSON library, so it runs anywhere the other bin/ scripts do.
 #
-# Usage (span mode, unchanged plus the three T-1058 binding flags):
-#   log-run.sh <loop_id> --run-id R --seq K --span S --phase P \
+# Usage (span mode, unchanged plus the three T-1058 binding flags, the
+# T-1072 --instance discriminator, and T-1076's `--seq K|auto`):
+#   log-run.sh <loop_id> --run-id R --seq K|auto --span S --phase P \
 #              --iteration N --attempt A --status STATUS \
 #              [--model M] [--tokens T] [--tool-uses U] [--duration-ms D] \
 #              [--verdict V] [--usd X] [--error E] [--parent-span-id PS] \
-#              [--provider P] [--effort E] [--adapter A]
+#              [--provider P] [--effort E] [--adapter A] [--instance I]
 #
 # Usage (event mode, T-1011):
-#   log-run.sh <loop_id> --run-id R --seq K --event ID \
+#   log-run.sh <loop_id> --run-id R --seq K|auto --event ID \
 #              [--from X] [--to Y] [--label L]
 #
 #   ID ∈ handoff | rework | gate | human | release. `seq` is ONE monotonic
@@ -38,17 +39,18 @@
 #     gate     --from required, --label required
 #     human    --label required
 #     release  none required
-#   All 16 span-only flags (--span --phase --iteration --attempt --status
+#   All 17 span-only flags (--span --phase --iteration --attempt --status
 #   --model --tokens --tool-uses --duration-ms --verdict --usd --error
-#   --parent-span-id --provider --effort --adapter) are forbidden in event
-#   mode (exit 2, nothing written); `--from`/`--to`/`--label` are forbidden
-#   in span mode (same). `--event` together with `--span` is rejected by name.
+#   --parent-span-id --provider --effort --adapter --instance) are forbidden
+#   in event mode (exit 2, nothing written); `--from`/`--to`/`--label` are
+#   forbidden in span mode (same). `--event` together with `--span` is
+#   rejected by name.
 #
 # Required (span mode): loop_id (positional), --run-id, --seq, --span,
 #           --phase, --iteration, --attempt, --status.
 # Nullable (span mode, omit => null in the row): --model --tokens
 #           --tool-uses --duration-ms --verdict --usd --error
-#           --parent-span-id --provider --effort --adapter.
+#           --parent-span-id --provider --effort --adapter --instance.
 #
 # status  ∈ success | error | timeout | skipped | stopped
 # verdict ∈ PASS | FAIL | APPROVE | REQUEST_CHANGES   (or omit => null)
@@ -65,8 +67,34 @@
 #     --effort value is a validation error exactly like --provider/--adapter.
 #   All three are nullable (omitted => null) and are appended AFTER
 #   `parent_span_id` in the emitted row, so the frozen seventeen keep their
-#   order and their offsets and a row written without them is byte-identical
-#   to one written before this task.
+#   order and their offsets, and a row written without them keeps every key
+#   AHEAD of them at the same name, order and byte offset as one written
+#   before this task — frozen-PREFIX preservation, not whole-row byte
+#   identity: the writer always emits every nullable key, so a row written
+#   without --provider/--effort/--adapter still carries
+#   "provider":null,"effort":null,"adapter":null where a pre-T-1058 row
+#   carried no such keys at all.
+#
+# T-1072 — the per-instance discriminator, appended AFTER `adapter` so the
+# T-1058 fields (and everything ahead of them) keep their order and offsets
+# too:
+#   --instance ∈ the SAME character class as --provider/--adapter
+#     (BINDING_TOKEN_RE, ^[a-z][a-z0-9-]*$), reused rather than widened — one
+#     identifier grammar, not two. Nullable: omitted or an explicit empty
+#     value both record "instance":null. A bare numeric id (`--instance 2`)
+#     is refused by that same character class (it requires a leading
+#     lower-case letter): the field NAMES the instance a merged hand-off
+#     record stays attributable to, and a name that is only a count carries
+#     nothing to attribute by — spell instance ids role-qualified (`qa-1`,
+#     `qa-2`, `engineer-a`), which is legal under the existing class. The
+#     bare `-` is ALSO refused here (it fails the same leading-letter
+#     requirement), unlike --effort: `-` is the binding grammar's own "no
+#     value" spelling for `--effort` only, and --instance has no such
+#     spelling of its own — admitting a second spelling of "no instance"
+#     beside plain omission is exactly the ambiguity that exemption exists
+#     to prevent. Declared, never observed, exactly like
+#     provider/effort/adapter; validated by the writer only — bin/check-run.sh
+#     does not charset-check it.
 #
 # Telemetry is observability-only: callers should treat a non-zero exit as
 # "telemetry not recorded" and carry on — it must never break the loop.
@@ -92,9 +120,66 @@
 # The reverse skew (an old writer, a new checker) is inert: span rows written
 # by an old log-run.sh are still valid under the new checker.
 #
+# T-1076 — the append lock, `--seq auto`, and the new refusal exit code:
+#   Every append (both modes) is serialized behind a directory lock, created
+#   with a plain `mkdir` (NEVER `mkdir -p`, whose success on an existing
+#   directory would defeat the whole mechanism) at
+#   <runs>/.<loop_id>.jsonl.lock — a directory rather than a file, so
+#   `mkdir` alone gives atomic acquire-or-fail with no auxiliary
+#   file-descriptor state, and its dot-prefixed, `.lock`-suffixed name is
+#   invisible to the one `*.jsonl` glob enumeration of the runs dir in this
+#   repository (bin/gen-loop-replay.sh) twice over rather than once.
+#
+#   The bounded wait defaults to 10 seconds, overridable via
+#   `TEAM_LOG_LOCK_TIMEOUT` (a positive integer number of seconds). An
+#   UNSET value substitutes the default before validation ever runs (the
+#   same shape bin/check-acs.sh already uses for CHECK_ACS_TIMEOUT), so it
+#   is silent; a PRESENT value that is non-integer, zero or negative also
+#   falls back to the default, but additionally prints a warning on stderr
+#   naming TEAM_LOG_LOCK_TIMEOUT. If the lock cannot be acquired inside the
+#   bound, the writer writes NOTHING and exits 3 — a code distinct from
+#   0/1/2 — and its stderr names the lock directory's full path and its
+#   mtime. The lock is NEVER stolen: no age heuristic, no PID probe, no
+#   silent steal. Release uses `rmdir` ONLY — a forced, recursive removal
+#   is never spelled anywhere in this script — so release can never destroy contents
+#   a sibling process left inside the lock directory; release is wired to
+#   EXIT/INT/TERM and fires only for a lock THIS process itself acquired
+#   (a guard flag set at acquisition — never at release time). The one
+#   residual case is disclosed rather than engineered away: a writer killed
+#   with SIGKILL while holding the lock leaves the directory behind, and
+#   every later write to that file refuses (exit 3) until an operator
+#   removes it by hand — `rmdir <the printed path>` is always safe, since
+#   `rmdir` itself refuses to remove a non-empty directory.
+#
+#   `--seq auto` is a new, CASE-SENSITIVE accepted literal on the existing
+#   `--seq` flag (`AUTO`/`Auto` stay validation errors, exit 2, nothing
+#   written). A caller-supplied integer always wins and is written verbatim
+#   exactly as before; the target file is consulted ONLY when the literal
+#   `auto` is passed. The derived value is one more than the greatest `seq`
+#   among the lines of the target file whose `run_id` equals this call's
+#   run id — PER run_id, not per file (one file interleaves many run_ids,
+#   and the file's last line is routinely a different run than the one
+#   being written, so `tail -1` would be wrong) — and is 1 when no such
+#   line exists, including when the file itself does not yet exist. Both
+#   row shapes (span and event) share one counter. The scan is
+#   boundary-anchored on `{` or `,`, the same way bin/check-run.sh's
+#   key_present and bin/rollup-runs.sh's field_str already anchor a key, so
+#   a key that is a substring of a longer key, or one that appears inside a
+#   string value, can never match; a line carrying this run_id but no
+#   parseable integer seq contributes nothing to the scan — a documented
+#   limit over hand-corrupted input, not a silent behavior. The derived
+#   value must itself satisfy the existing `^[0-9]{1,9}$` grammar: at the
+#   nine-digit ceiling, `auto` is a VALIDATION ERROR (nothing written, exit
+#   2) rather than a row carrying an out-of-grammar counter — this is the
+#   validation code, not the lock-timeout code, because nothing about the
+#   lock failed. The scan and the append happen under ONE acquisition of
+#   the lock, so no second writer can take the same number in between.
+#
 # Exit: 0 = row appended (and, if checked, passed self-check), 1 = row
 #       appended but failed the post-write self-check, 2 = validation error
-#       (nothing written).
+#       (nothing written), 3 = the append lock could not be acquired within
+#       the bounded wait (nothing written) — the writer never steals a lock
+#       it did not create.
 
 set -euo pipefail
 
@@ -121,7 +206,7 @@ shift
 
 RUN_ID="" SEQ="" SPAN="" PHASE="" ITERATION="" ATTEMPT="" STATUS=""
 MODEL="" TOKENS="" TOOL_USES="" DURATION_MS="" VERDICT="" USD="" ERROR="" PARENT=""
-PROVIDER="" EFFORT="" ADAPTER=""
+PROVIDER="" EFFORT="" ADAPTER="" INSTANCE=""
 EVENT="" FROM="" TO="" LABEL=""
 
 # Every flag actually passed on the command line, verbatim, in encounter
@@ -145,7 +230,7 @@ seen() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--provider|--effort|--adapter|--event|--from|--to|--label)
+    --run-id|--seq|--span|--phase|--iteration|--attempt|--status|--model|--tokens|--tool-uses|--duration-ms|--verdict|--usd|--error|--parent-span-id|--provider|--effort|--adapter|--instance|--event|--from|--to|--label)
       [[ $# -ge 2 ]] || die "missing value for $1"
       SEEN+=("$1")
       case "$1" in
@@ -167,6 +252,7 @@ while [[ $# -gt 0 ]]; do
         --provider)       PROVIDER="$2" ;;
         --effort)         EFFORT="$2" ;;
         --adapter)        ADAPTER="$2" ;;
+        --instance)       INSTANCE="$2" ;;
         --event)          EVENT="$2" ;;
         --from)           FROM="$2" ;;
         --to)             TO="$2" ;;
@@ -182,17 +268,27 @@ if seen --event; then MODE="event"; else MODE="span"; fi
 
 # --- required fields shared by both modes ---
 [[ -n "$RUN_ID" ]] || die "missing required --run-id"
-[[ "$SEQ" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --seq (non-negative int): '${SEQ}'"
+# T-1076: the literal `auto` (case-sensitive) defers the actual --seq value
+# to a per-run_id scan of the target file, taken under the append lock
+# below; a caller-supplied integer is validated here exactly as before and
+# is never subject to that scan.
+SEQ_AUTO=0
+if [[ "$SEQ" == "auto" ]]; then
+  SEQ_AUTO=1
+else
+  [[ "$SEQ" =~ ^[0-9]{1,9}$ ]] || die "missing/invalid --seq (non-negative int, or 'auto'): '${SEQ}'"
+fi
 
-SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id --provider --effort --adapter)
+SPAN_ONLY_FLAGS=(--span --phase --iteration --attempt --status --model --tokens --tool-uses --duration-ms --verdict --usd --error --parent-span-id --provider --effort --adapter --instance)
 EVENT_ONLY_FLAGS=(--from --to --label)
 
 if [[ "$MODE" == "event" ]]; then
   # D5: --event and --span are named explicitly with a frozen message; the
-  # other 15 span-only flags (T-1058 adds --provider/--effort/--adapter to
-  # the array above) are rejected the same way (exit 2, nothing written)
-  # without a frozen message of their own — this mirrors D2's shape-mixing
-  # rule 1:1 rather than deferring the rejection to lint time.
+  # other 16 span-only flags (T-1058 adds --provider/--effort/--adapter and
+  # T-1072 adds --instance to the array above) are rejected the same way
+  # (exit 2, nothing written) without a frozen message of their own — this
+  # mirrors D2's shape-mixing rule 1:1 rather than deferring the rejection
+  # to lint time.
   seen --span && die "--event and --span are mutually exclusive"
   for f in "${SPAN_ONLY_FLAGS[@]}"; do
     [[ "$f" == "--span" ]] && continue
@@ -265,6 +361,15 @@ else
   elif [[ "$EFFORT" == "-" ]]; then
     EFFORT_OUT=""   # the binding grammar's "-" spelling maps to JSON null
   fi
+
+  # --- T-1072: the per-instance discriminator (nullable) ---
+  # Reuses BINDING_TOKEN_RE verbatim rather than declaring a second
+  # constant — one identifier grammar for --provider/--adapter/--instance,
+  # not two. Unlike --effort, --instance has no "no value" spelling of its
+  # own: the bare '-' fails this same regex (its required leading character
+  # is [a-z]), so it is refused here exactly like any other malformed value
+  # — deliberately, per the header paragraph above.
+  [[ -z "$INSTANCE" || "$INSTANCE" =~ $BINDING_TOKEN_RE ]] || die "invalid --instance '${INSTANCE}' (lower-case token: ^[a-z][a-z0-9-]*\$)"
 fi
 
 # Escape a string for embedding in a JSON value, PRESERVING content: backslash
@@ -282,43 +387,91 @@ jesc() {
 jstr() { if [[ -z "$2" ]]; then printf '"%s":null' "$1"; else printf '"%s":"%s"' "$1" "$(jesc "$2")"; fi; }
 jnum() { if [[ -z "$2" ]]; then printf '"%s":null' "$1"; else printf '"%s":%s' "$1" "$2"; fi; }
 
+# T-1076 — compute_auto_seq <file> <run_id>: one more than the greatest `seq`
+# among <file>'s lines whose `run_id` equals <run_id>, or 1 if none exist
+# (including when <file> does not exist yet). Boundary-anchored on `{`/`,`
+# exactly like bin/check-run.sh's key_present and bin/rollup-runs.sh's
+# field_str, so a key that is a substring of a longer key, or one that
+# appears inside a string value, can never match. A line carrying this
+# run_id but no parseable integer seq contributes nothing (documented limit,
+# D4) — it neither raises the max nor aborts the scan. Read-only; never
+# called outside the append lock (D4: the scan and the append happen under
+# one acquisition, so no second writer can take the same number in between).
+#
+# T-1076 round 2 (Codex Major #1): the file stores `run_id` JESC-ESCAPED
+# (backslash doubled, `"` escaped as `\"`), so the comparison must be
+# against that SAME escaped form — comparing the file's escaped text
+# against the caller's raw argument silently restarted the counter at 1 for
+# any run_id containing a backslash or a double-quote. The extraction
+# pattern is ALSO widened, from a plain `[^\"]*` (which stops at the `"`
+# byte inside an escaped `\"`, truncating the captured value before its
+# true end) to one that treats an escaped pair (`\\.` — a literal backslash
+# followed by any one character) as a single atomic unit, so an embedded
+# `\"` or `\\` in the stored value can never be mistaken for the field's
+# closing quote.
+compute_auto_seq() {
+  local file="$1" want_run_id="$2" max=0 line rid seqval want_run_id_esc
+  local run_id_field_re='[{,]"run_id":"((\\.|[^"\\])*)"'
+  want_run_id_esc="$(jesc "$want_run_id")"
+  if [[ -f "$file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      line="${line%$'\r'}"
+      [[ -z "$line" ]] && continue
+      [[ "$line" =~ $run_id_field_re ]] || continue
+      rid="${BASH_REMATCH[1]}"
+      [[ "$rid" == "$want_run_id_esc" ]] || continue
+      [[ "$line" =~ [\{,]\"seq\":([0-9]+) ]] || continue
+      seqval="${BASH_REMATCH[1]}"
+      if [[ "$((10#$seqval))" -gt "$((10#$max))" ]]; then
+        max="$seqval"
+      fi
+    done < "$file"
+  fi
+  printf '%s' "$((10#$max + 1))"
+}
+
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# ROW is assembled in two halves so the one value `--seq auto` cannot know
+# until the append lock is held below — the `seq` field itself — can be
+# filled in last, right before the write. ROW_PRE ends exactly where `seq`
+# belongs; ROW_POST is everything after it, otherwise unchanged from
+# before this task: escaping, the timestamp and both mode branches are all
+# still computed here, outside the critical section.
 if [[ "$MODE" == "event" ]]; then
-  ROW="{"
-  ROW+="$(jstr loop_id "$LOOP_ID"),"
-  ROW+="$(jstr run_id "$RUN_ID"),"
-  ROW+="$(jnum seq "$SEQ"),"
-  ROW+="$(jstr ts "$TS"),"
-  ROW+="$(jstr kind "event"),"
-  ROW+="$(jstr event "$EVENT"),"
-  ROW+="$(jstr from "$FROM"),"
-  ROW+="$(jstr to "$TO"),"
-  ROW+="$(jstr label "$LABEL")"
-  ROW+="}"
+  ROW_PRE="{"
+  ROW_PRE+="$(jstr loop_id "$LOOP_ID"),"
+  ROW_PRE+="$(jstr run_id "$RUN_ID"),"
+  ROW_POST="$(jstr ts "$TS"),"
+  ROW_POST+="$(jstr kind "event"),"
+  ROW_POST+="$(jstr event "$EVENT"),"
+  ROW_POST+="$(jstr from "$FROM"),"
+  ROW_POST+="$(jstr to "$TO"),"
+  ROW_POST+="$(jstr label "$LABEL")"
+  ROW_POST+="}"
 else
-  ROW="{"
-  ROW+="$(jstr loop_id "$LOOP_ID"),"
-  ROW+="$(jstr run_id "$RUN_ID"),"
-  ROW+="$(jnum seq "$SEQ"),"
-  ROW+="$(jstr ts "$TS"),"
-  ROW+="$(jstr span "$SPAN"),"
-  ROW+="$(jstr phase "$PHASE"),"
-  ROW+="$(jnum iteration "$ITERATION"),"
-  ROW+="$(jnum attempt "$ATTEMPT"),"
-  ROW+="$(jstr status "$STATUS"),"
-  ROW+="$(jstr model "$MODEL"),"
-  ROW+="$(jnum tokens "$TOKENS"),"
-  ROW+="$(jnum tool_uses "$TOOL_USES"),"
-  ROW+="$(jnum duration_ms "$DURATION_MS"),"
-  ROW+="$(jstr verdict "$VERDICT"),"
-  ROW+="$(jnum usd "$USD"),"
-  ROW+="$(jstr error "$ERROR"),"
-  ROW+="$(jstr parent_span_id "$PARENT"),"
-  ROW+="$(jstr provider "$PROVIDER"),"
-  ROW+="$(jstr effort "$EFFORT_OUT"),"
-  ROW+="$(jstr adapter "$ADAPTER")"
-  ROW+="}"
+  ROW_PRE="{"
+  ROW_PRE+="$(jstr loop_id "$LOOP_ID"),"
+  ROW_PRE+="$(jstr run_id "$RUN_ID"),"
+  ROW_POST="$(jstr ts "$TS"),"
+  ROW_POST+="$(jstr span "$SPAN"),"
+  ROW_POST+="$(jstr phase "$PHASE"),"
+  ROW_POST+="$(jnum iteration "$ITERATION"),"
+  ROW_POST+="$(jnum attempt "$ATTEMPT"),"
+  ROW_POST+="$(jstr status "$STATUS"),"
+  ROW_POST+="$(jstr model "$MODEL"),"
+  ROW_POST+="$(jnum tokens "$TOKENS"),"
+  ROW_POST+="$(jnum tool_uses "$TOOL_USES"),"
+  ROW_POST+="$(jnum duration_ms "$DURATION_MS"),"
+  ROW_POST+="$(jstr verdict "$VERDICT"),"
+  ROW_POST+="$(jnum usd "$USD"),"
+  ROW_POST+="$(jstr error "$ERROR"),"
+  ROW_POST+="$(jstr parent_span_id "$PARENT"),"
+  ROW_POST+="$(jstr provider "$PROVIDER"),"
+  ROW_POST+="$(jstr effort "$EFFORT_OUT"),"
+  ROW_POST+="$(jstr adapter "$ADAPTER"),"
+  ROW_POST+="$(jstr instance "$INSTANCE")"
+  ROW_POST+="}"
 fi
 
 # Runs dir resolution (precedence):
@@ -340,7 +493,175 @@ elif [[ -z "${RUNS_DIR:-}" ]]; then
   RUNS_DIR="$(bash "$SCRIPT_DIR/team-paths.sh" --get runs 2>/dev/null || printf '.shell-team/runs')"
 fi
 mkdir -p "$RUNS_DIR" || die "cannot create runs dir: $RUNS_DIR"
-printf '%s\n' "$ROW" >> "$RUNS_DIR/${LOOP_ID}.jsonl" || die "cannot append to $RUNS_DIR/${LOOP_ID}.jsonl"
+
+FILE="$RUNS_DIR/${LOOP_ID}.jsonl"
+LOCK_DIR="$RUNS_DIR/.${LOOP_ID}.jsonl.lock"
+
+# --- T-1076: bounded-wait, never-stealing append lock (D1/D2/D3) -----------
+# Default 10s, overridable via TEAM_LOG_LOCK_TIMEOUT. An UNSET value takes
+# the default silently before validation ever runs (the same shape
+# bin/check-acs.sh already uses for CHECK_ACS_TIMEOUT); a PRESENT value that
+# is non-integer, zero or negative also falls back to the default, but
+# additionally warns on stderr naming the variable.
+LOCK_TIMEOUT="${TEAM_LOG_LOCK_TIMEOUT:-10}"
+case "$LOCK_TIMEOUT" in
+  ''|*[!0-9]*)
+    printf 'log-run: ignoring invalid TEAM_LOG_LOCK_TIMEOUT=%s, using default 10\n' "$LOCK_TIMEOUT" >&2 || true
+    LOCK_TIMEOUT=10
+    ;;
+  *)
+    if [ "$((10#$LOCK_TIMEOUT))" -le 0 ]; then
+      printf 'log-run: ignoring invalid TEAM_LOG_LOCK_TIMEOUT=%s, using default 10\n' "$LOCK_TIMEOUT" >&2 || true
+      LOCK_TIMEOUT=10
+    fi
+    ;;
+esac
+
+# lock_mtime <dir> — best-effort human-legible mtime for the refusal
+# message. BSD `stat` (macOS, this repo's own dev host) and GNU `stat` spell
+# the flag differently and neither is guaranteed present, so every arm
+# degrades to "unknown" rather than failing the refusal path itself.
+#
+# T-1076 rework round 3 (Codex round-2 Minor): the previous shape tried the
+# BSD form (`stat -f '%Sm'`) first and fell through to the GNU form only on
+# a non-zero exit. That fallthrough never triggers on GNU/Linux: GNU `stat`
+# parses `-f '%Sm'` as a VALID format string (`%S` is "print the next
+# directive literally if unsupported, else its safe/quoted form" — legal in
+# `-f` mode; the trailing `m` is consumed as a literal character), so the
+# command SUCCEEDS with a nonsensical value (e.g. `4096m`, the filesystem
+# block size followed by a stray `m`) instead of failing over to the
+# correct GNU-form `stat -c '%y'` line below it. Exit status alone cannot
+# discriminate the two dialects here because the wrong-dialect call does
+# not fail. Discriminate on the dialect itself instead, using the
+# `--version` flag as the probe: GNU coreutils' `stat` supports it and
+# exits 0; BSD/macOS `stat` treats it as an unrecognized option and exits
+# non-zero (measured on this repo's own dev host, this session: `stat
+# --version` exits 1 with "illegal option -- -"). Each branch then runs
+# only the format string that dialect actually accepts, so a
+# wrong-dialect call is never attempted and the old silent-garbage path
+# cannot recur.
+#
+# Verified bound, stated honestly: this host is macOS (BSD `stat`), so only
+# the BSD branch below is exercised by this session's own tests. The GNU
+# branch is written from GNU `stat`'s documented `-c`/`--version` behaviour
+# and is NOT independently verified against a live GNU/Linux host here.
+lock_mtime() {
+  local d="$1"
+  if ! command -v stat >/dev/null 2>&1; then
+    printf 'unknown'
+    return 0
+  fi
+  if stat --version >/dev/null 2>&1; then
+    # GNU coreutils stat: --version is recognized.
+    stat -c '%y' "$d" 2>/dev/null && return 0
+  else
+    # BSD/macOS stat: --version is an unrecognized option, not a real probe
+    # of the file, so this branch never mistakes it for a stat target.
+    stat -f '%Sm' "$d" 2>/dev/null && return 0
+  fi
+  printf 'unknown'
+}
+
+# D3: release fires ONLY for a lock this process itself created — guarded by
+# LOCK_ACQUIRED, set at acquisition (never inferred at release time) — and
+# uses `rmdir` ONLY, never a forced recursive removal, so it can never
+# destroy contents a sibling process left inside the lock directory.
+# Installed before the acquisition loop so a signal during the bounded wait
+# is still handled (harmlessly: LOCK_ACQUIRED is still 0 at that point).
+#
+# T-1076 round 2 (Codex Blocker): the mkdir-then-flag-set transition below
+# and the flag-reset-then-rmdir transition inside release_lock are each ONE
+# atomic unit as far as signal delivery is concerned. Bash defers a caught
+# INT/TERM until the currently-running command returns, then runs the trap
+# BEFORE the next statement executes — so a signal landing in the
+# single-statement gap between `mkdir` succeeding and `LOCK_ACQUIRED=1`
+# used to see the flag still 0 and skip the `rmdir`, orphaning the lock on
+# an ordinary INT/TERM (not just SIGKILL, D3's only disclosed residual
+# case); a signal landing between release_lock's own flag reset and its
+# `rmdir` used to re-enter release_lock with the flag already fooled into
+# looking "not held" or (in the pre-fix ordering) still "held", and could
+# `rmdir` whatever a SUCCESSOR process has since created at the same path —
+# a direct violation of the never-steal guarantee. Both transitions are now
+# bracketed with `trap '' INT TERM`: a signal delivered while a signal's
+# disposition is SIG_IGN is discarded by the kernel outright, never queued
+# for later delivery, so nothing can fire mid-transition. Traps are
+# re-armed immediately after each bracket, so the bounded wait below and
+# the rest of the script remain interruptible exactly as before — only the
+# few bracketed statements themselves are ever momentarily signal-deaf.
+# release_lock ALSO flips LOCK_ACQUIRED to 0 BEFORE calling `rmdir` (not
+# after, as a first pass at this fix had it): with the trap already masked
+# for the whole bracket this ordering isn't needed for correctness by
+# itself, but it means a stray re-entry from anywhere outside that bracket
+# (there should be none) fails safe (skips the rmdir) rather than fails
+# open (attempts a second rmdir).
+LOCK_ACQUIRED=0
+release_lock() {
+  trap '' INT TERM
+  if [ "$LOCK_ACQUIRED" = "1" ]; then
+    LOCK_ACQUIRED=0
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+  fi
+  trap 'on_lock_signal INT 130' INT
+  trap 'on_lock_signal TERM 143' TERM
+}
+trap release_lock EXIT
+# INT/TERM need their OWN handler that calls `exit` explicitly — trapping a
+# signal without an explicit exit only runs the handler and then RESUMES the
+# script (bash's own documented trap semantics for a caught signal), so a
+# bare `trap release_lock ... INT TERM` would release the lock early and
+# then keep running to completion regardless of the signal, writing a row
+# despite having been asked to stop. Matches this repo's existing
+# on_signal shape (bin/check-intent.sh, bin/check-refreeze-class.sh).
+# shellcheck disable=SC2329  # invoked indirectly via the signal traps below
+on_lock_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
+  release_lock
+  exit "$2"
+}
+trap 'on_lock_signal INT 130' INT
+trap 'on_lock_signal TERM 143' TERM
+
+lock_start="$(date +%s)"
+while :; do
+  # The mkdir-attempt-then-flag-set pair below is the acquire-side half of
+  # the signal-safety fix described above: masked start to finish, so a
+  # signal landing anywhere between `mkdir` returning and `LOCK_ACQUIRED=1`
+  # executing is simply dropped rather than observed with a half-updated
+  # flag.
+  trap '' INT TERM
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    LOCK_ACQUIRED=1
+  fi
+  trap 'on_lock_signal INT 130' INT
+  trap 'on_lock_signal TERM 143' TERM
+  [ "$LOCK_ACQUIRED" = "1" ] && break
+  lock_now="$(date +%s)"
+  if [ "$(( 10#$lock_now - 10#$lock_start ))" -ge "$((10#$LOCK_TIMEOUT))" ]; then
+    printf 'log-run: could not acquire append lock %s within %ss (existing lock mtime: %s) — refusing to write, exiting 3. If the process that created it was killed, remove it by hand: rmdir %s\n' \
+      "$LOCK_DIR" "$LOCK_TIMEOUT" "$(lock_mtime "$LOCK_DIR")" "$LOCK_DIR" >&2 || true
+    exit 3
+  fi
+  # Whole-second retry granularity (measured, not assumed — see
+  # .shell-team/test-recipe.md's T-1076 entry): fractional `sleep` is a GNU
+  # extension this repository has not verified on every host's /bin/sh.
+  sleep 1
+done
+
+# --- critical section: --seq auto derivation (D4) + the append itself ------
+if [ "$SEQ_AUTO" = "1" ]; then
+  FINAL_SEQ="$(compute_auto_seq "$FILE" "$RUN_ID")"
+  [[ "$FINAL_SEQ" =~ ^[0-9]{1,9}$ ]] || die "computed --seq auto value out of range for run_id '${RUN_ID}' (max 9 digits): '${FINAL_SEQ}'"
+else
+  FINAL_SEQ="$SEQ"
+fi
+
+ROW="${ROW_PRE}$(jnum seq "$FINAL_SEQ"),${ROW_POST}"
+printf '%s\n' "$ROW" >> "$FILE" || die "cannot append to $FILE"
+
+# Release now, deliberately BEFORE the post-write self-check below: that
+# check forks a process and opens no file of its own, and is the last thing
+# that should sit inside a lock (Notes for engineer). The EXIT/INT/TERM trap
+# above still fires afterward, harmlessly, since LOCK_ACQUIRED is now 0.
+release_lock
 
 # Post-write self-check (T-042, best-effort — see header comment). The row
 # above is already on disk and is NEVER rolled back by anything below: a

@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.0.2-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.0.3-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -170,7 +170,8 @@ build sha と uptime を返す /healthz を shell-team で追加して
 
 - **Loop 契約** — 各ループは TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT を `tasks/loops/*.contract.yaml` に宣言し、`bin/check-contract.sh` で lint。BUDGET ＋ STOP は必須。
 - **実行時ガードレール** — `bin/loop-guard.sh` が契約の BUDGET/STOP を実行時に強制（fail-closed な暴走 / 課金 kill-switch）。
-- **テレメトリ** — `/shell-team:run` が各フェーズで 1 `--span` 行、各ハンドオフで 1 `--event` 行（イベント語彙: `handoff|rework|gate|human|release`）を `bin/log-run.sh` で emit、`bin/check-run.sh` が JSONL を lint、`bin/gen-loop-replay.sh` がどちらの行種別も run-replay ページとして描画し直す（[run のリプレイ](#run-のリプレイ)参照）。run 横断のロールアップが、1 run ずつでは見えない系統的な問題も浮かび上がらせる。
+- **テレメトリ** — `/shell-team:run` が各フェーズで 1 `--span` 行、各ハンドオフで 1 `--event` 行（イベント語彙: `handoff|rework|gate|human|release`）を `bin/log-run.sh` で emit、`bin/check-run.sh` が JSONL を lint、`bin/gen-loop-replay.sh` がどちらの行種別も run-replay ページとして描画し直す（[run のリプレイ](#run-のリプレイ)参照）。run 横断のロールアップが、1 run ずつでは見えない系統的な問題も浮かび上がらせる。各 span 行は、どの役割インスタンスが生成したかを示す nullable な `--instance` discriminator も持ち、per-instance の fan-out でもハンドオフ記録がそれを生成したインスタンスに帰属できるようにする。すべての追記は、決して奪い取らないディレクトリロック（既定 10 秒の有界待機、`TEAM_LOG_LOCK_TIMEOUT` で上書き可能）の背後で直列化され、並行ライタが 1 行を混在させることはない——時間内にロックを獲得できない場合は何も書かずに exit 3 で終了し、行を破損させることはない。`--seq auto` は同じロックの下でファイル自身から `run_id` ごとの次のカウンタ値を導出し、自前のカウンタを持ちたくない呼び出し元に使える。
+- **フェーズ内 fan-out** — 機械的に列挙可能な検証作業を持つフェーズは、1 つの役割の N インスタンスへ分割し、`bin/aggregate-verdicts.sh` で N 個の per-instance 部分検証結果を 1 つの正統な verdict へ還元できる（直列実行の代わりに）。あくまで opt-in — 既定でこの fan-out を使うようフェーズが配線されることはない。この選択は Validate フェーズの中で行う。degree の決定則・liveness の要件・テレメトリ規約は run skill 自身の fan-out ステップを参照。
 - **オプトイン triage** — `/shell-team:loop-triage`（`bin/discover-work.sh`）は read-only：CI 失敗 / open PR / ラベル付き issue を見つけて todo 候補を*提案*する（ボードは編集しない）。
 - **モデルルーティング** — エージェントの役割はモデル tier（計画 / 実行 / 別プロバイダレビュー）に振り分けられ、コストが各役割の判断負荷に追従する。モデル環境やコスト構造が変わればいつでも再評価する明示トリガ付き。
 
@@ -227,6 +228,24 @@ bash bin/gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-
 ```
 
 このデモでは `--out` が必須 — 省略するとページが `tests/` 配下の fixture ディレクトリにデフォルトで書き出され、untracked ファイルが残ってしまう。
+
+## 母集団の導出
+
+record の集合演算——母集団総数・差分・bucket 分割——は目視で数えず
+`derive-populations.sh` が生成する: 2〜8 個の名前付き母集団抽出コマンドを
+pin された `LC_ALL=C` collation の下で実行し、record がそのまま埋め込む
+1 つの区切りブロックを出力する。ブロックの直前には、それを再生成する
+正確なコマンドを持つ `- reproduce: <command>` 行が付く。
+
+```bash
+bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
+```
+
+（プラグインをロードしていれば `bin/` は `PATH` に載るので、`bash derive-populations.sh` はそこから解決される——実行ビットには依存しない。`bin/` 接頭辞は不要——`## run のリプレイ` が `gen-loop-replay.sh` に対して文書化している convention と同じ。）各 `--set name=command` 行はキャプチャされ、重複排除され、gap のない・重複のないメンバーシップ signature へ分割される。`--accept-status name=csv` は、既定の `0` に加えて 1 つの名前付き集合に対して追加で受理する exit status を宣言する（「`git grep` はマッチなしで exit `1`」のケース）。完全な文法は `bash derive-populations.sh --help` を参照。
+
+構造的な識別子——`--label`・`--set` の name・`--accept-status` の name——はすべて `^[A-Za-z0-9][A-Za-z0-9_-]*$` に一致しなければならない: 制御文字・`+`（emit される signature が集合名を連結するのに使うバイト）・空白のいずれも不可。`--set` のコマンドは `pipefail` の下で実行されるので、パイプライン途中の正当な非ゼロ exit（例えば `git grep pattern | sort` でマッチが無い場合）はまさに `--accept-status name=1` が宣言のために存在するケースにあたる。
+
+Exit code: `0` ブロックが stdout に書かれた。`1` 入力の*内容*に関する refusal（受理されていない集合の exit status——`pipefail` の下では、パイプライン途中の正当な非ゼロ exit は `--accept-status` と組み合わせる——または制御文字を含むアイテム——stdout は空のまま、決して偽の空集合として扱わない）。`2` 呼び出しに関する usage error（`--label` 欠落、上記文法から外れた識別子、`--set` が 2 未満または 8 超、同名の重複、制御文字を含む `--set` コマンド）。このリポジトリ自身の dogfood された導出例は `docs/loop-engineering/record-set-derivation.md` を参照。
 
 ## 設計上の選択
 

@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.0.2-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.0.3-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -170,7 +170,8 @@ The agent pipeline above is the **inner loop**. An **outer loop** of operating d
 
 - **Loop contracts** — every loop declares TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT in `tasks/loops/*.contract.yaml`; `bin/check-contract.sh` lints them. BUDGET + STOP are mandatory.
 - **Runtime guardrails** — `bin/loop-guard.sh` enforces the contract's BUDGET/STOP at run time (a fail-closed runaway / billing kill-switch).
-- **Telemetry** — `/shell-team:run` emits one `--span` row per phase and one `--event` row per hand-off (event vocabulary: `handoff|rework|gate|human|release`) via `bin/log-run.sh`; `bin/check-run.sh` lints the JSONL, `bin/gen-loop-replay.sh` renders either kind back as a run-replay page (see [Replaying a run](#replaying-a-run)), and cross-run roll-ups surface systemic issues instead of showing up one run at a time.
+- **Telemetry** — `/shell-team:run` emits one `--span` row per phase and one `--event` row per hand-off (event vocabulary: `handoff|rework|gate|human|release`) via `bin/log-run.sh`; `bin/check-run.sh` lints the JSONL, `bin/gen-loop-replay.sh` renders either kind back as a run-replay page (see [Replaying a run](#replaying-a-run)), and cross-run roll-ups surface systemic issues instead of showing up one run at a time. Each span row also carries a nullable `--instance` discriminator naming which instance of a role produced it, so a per-instance fan-out's hand-off records stay attributable to the instance that emitted them. Every append is serialized behind a never-stealing directory lock (default 10s bounded wait, overridable via `TEAM_LOG_LOCK_TIMEOUT`) so concurrent writers can't interleave a row — a lock that can't be acquired in time writes nothing and exits 3 rather than tearing a row — and `--seq auto` derives the next counter per `run_id` from the file itself under that same lock, for a caller that doesn't want to carry its own counter.
+- **Within-phase fan-out** — a phase whose own verification work is mechanically enumerable can split it across N instances of one role and reduce the N per-instance partial verdicts to one authoritative verdict with `bin/aggregate-verdicts.sh`, rather than run serially. Opt-in only — no phase is rewired to fan out by default; the choice is made inside the Validate phase, where the run skill's own fan-out step documents the degree rule, the liveness requirement and the telemetry convention.
 - **Opt-in triage** — `/shell-team:loop-triage` (`bin/discover-work.sh`) is read-only: it finds failing CI / open PRs / labelled issues and *proposes* todo candidates, never editing the board.
 - **Model routing** — agent roles are assigned across model tiers (planning vs. execution vs. cross-provider review) so cost tracks each role's judgment load, with an explicit re-evaluation trigger whenever the model landscape or cost structure shifts.
 
@@ -227,6 +228,25 @@ bash bin/gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-
 ```
 
 `--out` is required in this demo — omitting it would default the page into the fixture directory under `tests/`, leaving an untracked file behind.
+
+## Deriving a population set
+
+A record's set arithmetic — a population total, a set delta, a bucket
+split — is produced by `derive-populations.sh`, never counted by eye: it
+runs two to eight named population-extraction commands under a pinned
+`LC_ALL=C` collation and emits one delimited block a record embeds
+verbatim, preceded by a `- reproduce: <command>` line carrying the exact
+command that regenerates it.
+
+```bash
+bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
+```
+
+(with the plugin loaded, `bin/` is on `PATH`, so `bash derive-populations.sh` resolves it there regardless of the executable bit — no `bin/` prefix needed, the same convention `## Replaying a run` documents for `gen-loop-replay.sh`.) Each `--set name=command` line is captured, deduplicated and partitioned into a gap-free, overlap-free membership signature; `--accept-status name=csv` declares additional exit statuses accepted for one named set beyond the default of `0` (the "`git grep` exits `1` for no match" case). `bash derive-populations.sh --help` documents the full grammar.
+
+Every structural identifier — `--label`, a `--set` name, an `--accept-status` name — must match `^[A-Za-z0-9][A-Za-z0-9_-]*$`: no control character, no `+` (the byte the emitted signature joins set names with), no whitespace. A `--set` command runs under `pipefail`, so a legitimate mid-pipeline non-zero exit (e.g. `git grep pattern | sort` when nothing matches) is exactly the case `--accept-status name=1` exists to declare acceptable.
+
+Exit codes: `0` the block was written to stdout; `1` a refusal about the input's *content* (an unaccepted set exit status — under `pipefail`, pair a legitimate mid-pipeline non-zero exit with `--accept-status` — or an item containing a control character; stdout stays empty, never a false empty set); `2` a usage error about the *invocation* (a missing `--label`, an identifier outside the grammar above, fewer than two or more than eight `--set` values, two sharing a name, or a `--set` command containing a control character). See `docs/loop-engineering/record-set-derivation.md` for this repository's own dogfooded derivations.
 
 ## Design choices
 
