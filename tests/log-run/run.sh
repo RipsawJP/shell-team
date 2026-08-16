@@ -462,28 +462,112 @@ pass "T-1076 lock-timeout-refusal"
 # probe must actually select a form that produces a legible value on THIS
 # host, not silently succeed with a garbled one. Reuses the refusal
 # message captured above rather than re-triggering the refusal path.
-# Honest host bound: this only exercises the BSD branch (`stat -f '%Sm'`),
-# since this host's own `stat --version` fails (measured separately in
-# bin/log-run.sh's own header comment) — the GNU branch is not exercised
-# by this suite.
+#
+# T-1076 rework round 4 (Codex round-3 Blocker fix): round 3's own three
+# assertions here (a month-name check, an HH:MM:SS check, and a year
+# anchored to END-of-string) were written and verified only against this
+# session's own BSD/macOS `stat -f '%Sm'` shape (e.g. "Jan 15 10:30:45
+# 2024") and fail DETERMINISTICALLY against GNU coreutils' `stat -c '%y'`
+# shape — the one this repo's own `ubuntu-latest` CI runner actually
+# produces (e.g. "2024-01-15 10:30:45.123456789 +0000": no month
+# abbreviation at all, and the string ENDS in a UTC offset, not a bare
+# 4-digit year). Rewritten to a platform-agnostic assertion PAIR that
+# holds for both real shapes: an HH:MM:SS-shaped time anywhere in the
+# string, AND a plausible `(19|20)[0-9]{2}` year anywhere in the string
+# (deliberately NOT anchored to either end — GNU's year sits at the very
+# start, BSD's at the very end). The month-name requirement is dropped
+# entirely: GNU's shape carries no month name at all, so requiring one is
+# exactly what made round 3's own assertion BSD-only in the first place.
+#
+# Negative-literal self-check (run BEFORE trusting the pair against real
+# output): confirms the same two-check pair still correctly REJECTS every
+# garbled value this test exists to catch — the round-2 finding's own
+# `4096m`, a plain `unknown` fallback, and QA's own round-3 report
+# variants `4096manual` and `Aug 4096`. None of the four has a
+# colon-separated time, so all four fail on the time check alone,
+# regardless of the year check or any month-shaped substring nearby.
+for lt_bad in '4096m' 'unknown' '4096manual' 'Aug 4096'; do
+  if printf '%s' "$lt_bad" | grep -qE '[0-9]{1,2}:[0-9]{2}:[0-9]{2}' \
+     && printf '%s' "$lt_bad" | grep -qE '(19|20)[0-9]{2}'; then
+    fail "T-1076 lock-mtime-legible: the platform-agnostic time+year check pair wrongly ACCEPTS the garbled literal '$lt_bad'"
+  fi
+done
+pass "T-1076 lock-mtime-legible negative literals — '4096m'/'unknown'/'4096manual'/'Aug 4096' are all correctly rejected by the time+year check pair"
+
 lt_mtime="$(sed -n 's/.*existing lock mtime: \([^)]*\)).*/\1/p' "$TMP/lt-err")"
 [ -n "$lt_mtime" ] || fail "T-1076 lock-mtime-legible: could not extract the mtime field from the refusal message"
 [ "$lt_mtime" != "unknown" ] || fail "T-1076 lock-mtime-legible: lock_mtime fell back to 'unknown' on a host where stat exists"
-# T-1076 rework round 3 mutation self-check: a bare "[0-9]{4}" check is NOT
-# enough here — the exact garbled value the round-2 finding named
-# (`4096m`, GNU stat's own filesystem-block-size output plus a stray
-# literal "m") itself contains four digits and would incorrectly PASS a
-# plain digit-count check. Require the recognizable SHAPE of this host's
-# actual BSD `stat -f '%Sm'` default format instead (a three-letter month
-# abbreviation, a colon-separated time, and a trailing 4-digit year), which
-# `4096m` cannot satisfy.
-printf '%s' "$lt_mtime" | grep -qE '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)' \
-  || fail "T-1076 lock-mtime-legible: mtime '$lt_mtime' has no recognizable month name"
 printf '%s' "$lt_mtime" | grep -qE '[0-9]{1,2}:[0-9]{2}:[0-9]{2}' \
   || fail "T-1076 lock-mtime-legible: mtime '$lt_mtime' has no recognizable HH:MM:SS time"
-printf '%s' "$lt_mtime" | grep -qE '(19|20)[0-9]{2}$' \
-  || fail "T-1076 lock-mtime-legible: mtime '$lt_mtime' does not end in a plausible 4-digit year"
-pass "T-1076 lock-mtime-legible — lock_mtime selects the BSD form on this host and returns a legible timestamp, not 'unknown' or a garbled value"
+printf '%s' "$lt_mtime" | grep -qE '(19|20)[0-9]{2}' \
+  || fail "T-1076 lock-mtime-legible: mtime '$lt_mtime' has no plausible 4-digit year anywhere in the string"
+pass "T-1076 lock-mtime-legible — lock_mtime returns a legible timestamp on this host's own dialect (BSD), not 'unknown' or a garbled value"
+
+# T-1076 rework round 4: actually EXECUTE the GNU-dialect branch on this
+# (BSD) host rather than only reasoning about GNU stat's documented output
+# shape — round 3's own "disclosed as unverified" bound is exactly what let
+# this Blocker through, so disclosure alone does not close this gap again.
+# A PATH-prepended fake `stat` answers `--version` (so lock_mtime's own
+# dialect probe selects the GNU branch, mirroring bin/log-run.sh's real
+# probe) and `-c '%y'` with a realistic GNU-shaped byte string, and FAILS
+# on `-f` (so if the GNU probe were ever wrongly bypassed and the BSD
+# branch attempted anyway against this fake, that surfaces as a loud
+# failure rather than a silently-degraded value). `lock_mtime` itself is
+# extracted from the REAL writer via the same unique-anchor sed-range
+# technique already used elsewhere in this file (verified unique below),
+# so this exercises the actual production function, not a
+# reimplementation of it.
+LT_FN_START='lock_mtime() {'
+[ "$(grep -cFx "$LT_FN_START" "$LOGRUN")" -eq 1 ] || fail "T-1076 lock-mtime-legible setup: lock_mtime start anchor is not unique in $LOGRUN"
+LT_FN_SRC="$TMP/lock_mtime_fn.sh"
+sed -n '/^lock_mtime() {$/,/^}$/p' "$LOGRUN" > "$LT_FN_SRC"
+[ "$(head -n1 "$LT_FN_SRC")" = "$LT_FN_START" ] || fail "T-1076 lock-mtime-legible setup: extracted function does not start with the expected anchor"
+[ "$(tail -n1 "$LT_FN_SRC")" = '}' ] || fail "T-1076 lock-mtime-legible setup: extracted function does not end with a bare closing brace"
+
+LT_STUB_DIR="$TMP/lock-mtime-gnu-stub"
+mkdir -p "$LT_STUB_DIR"
+cat > "$LT_STUB_DIR/stat" <<'STUBEOF'
+#!/usr/bin/env bash
+case "$1" in
+  --version)
+    printf 'stat (GNU coreutils) 8.32\n'
+    exit 0
+    ;;
+  -c)
+    if [ "$2" = '%y' ]; then
+      printf '2024-03-07 10:15:42.123456789 +0000\n'
+      exit 0
+    fi
+    exit 1
+    ;;
+  -f)
+    # A real GNU stat's `-f` means "show filesystem status", not BSD's
+    # `-f FORMAT` — refuse outright so a wrongly-taken BSD branch against
+    # this fake fails loudly instead of returning a silently-degraded value.
+    exit 1
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+STUBEOF
+chmod +x "$LT_STUB_DIR/stat"
+
+LT_DRIVER="$TMP/lock_mtime_driver.sh"
+{
+  cat "$LT_FN_SRC"
+  # shellcheck disable=SC2016  # single-quoted deliberately: `$1` must reach
+  # the driver script literally, to be expanded when THAT script runs, not
+  # by this script right now.
+  printf 'lock_mtime "$1"\n'
+} > "$LT_DRIVER"
+LT_GNU_OUT="$(PATH="$LT_STUB_DIR:$PATH" bash "$LT_DRIVER" /nonexistent-target-unused)"
+printf '%s' "$LT_GNU_OUT" | grep -qE '[0-9]{1,2}:[0-9]{2}:[0-9]{2}' \
+  || fail "T-1076 lock-mtime-legible (GNU stub): stub output '$LT_GNU_OUT' has no recognizable HH:MM:SS time"
+printf '%s' "$LT_GNU_OUT" | grep -qE '(19|20)[0-9]{2}' \
+  || fail "T-1076 lock-mtime-legible (GNU stub): stub output '$LT_GNU_OUT' has no plausible 4-digit year anywhere in the string"
+[ "$LT_GNU_OUT" != "unknown" ] || fail "T-1076 lock-mtime-legible (GNU stub): lock_mtime fell back to 'unknown' against a stub that answers both --version and -c '%y'"
+pass "T-1076 lock-mtime-legible (GNU stub) — lock_mtime selects the GNU branch against a fake GNU stat and returns '$LT_GNU_OUT', which the platform-agnostic check pair accepts"
 
 # --- a writer killed while holding the lock releases it (D3) ---------------
 # A scratch copy of the real writer with one line patched (a `sleep 5`
@@ -695,20 +779,35 @@ REL_END='trap release_lock EXIT'
 [ "$(grep -cFx "$REL_START" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-release-side setup: start anchor is not a unique line in $LOGRUN"
 [ "$(grep -cFx "$REL_END" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-release-side setup: end anchor is not a unique line in $LOGRUN"
 
-# T-1076 rework round 3 (Codex round-2 Blocker fix): widened from the
-# original `sleep 3` to `sleep 8`. The vulnerability window itself is
-# unchanged in SHAPE (still "signal lands after rmdir/marker, before the
-# flag settles"); the width only needs to comfortably outlast the added
-# deterministic pre-kill synchronization below (two sequential ~1s-granularity
-# poll waits — for P1's own marker, then for P2's OWN acquired-marker — must
-# both resolve before the kill is even sent), which the original 3s budget
-# did not account for.
+# T-1076 rework round 3 (Codex round-2 Blocker fix) widened the original
+# `sleep 3` hold to `sleep 8` so the added deterministic pre-kill
+# synchronization (two sequential ~1s-granularity poll waits) fit inside
+# it before the flag settled.
+#
+# T-1076 rework round 4 (Codex round-3 Major fix): that width is STILL a
+# fixed wall-clock BUDGET — if the full pre-kill choreography (P1
+# acquire→write→release, P2 poll-acquire, the parent noticing P2's marker)
+# ever takes longer than 8s under CI contention, this window closes on its
+# own (LOCK_ACQUIRED resets / the FIXED-shape mutant re-arms its traps and
+# returns) before the driver even sends the kill, and the OLD-shape arm's
+# own theft assertion would then fail on scheduling grounds rather than on
+# a real regression. Removed the load-bearing width entirely: the mutant
+# now holds this window open by WAITING ON AN EXPLICIT release-marker file
+# the test driver writes (`${LOCK_DIR}.rel-proceed-marker`), not by
+# sleeping a fixed duration — so no finite width can be exhausted; the
+# driver controls every transition by markers, sending the kill BEFORE
+# ever writing this marker (see `relrace_choreograph` below). The `-lt 60`
+# iteration cap on the wait loop is a pure anti-hang backstop (a test bug
+# that never sends the kill or writes the marker should eventually fail
+# loudly rather than hang the suite forever) — it is NOT sized to budget
+# any correctness-relevant transition, unlike the `sleep 8` it replaces.
 REL_OLD_REPL="$TMP/rel-old-body.txt"
 cat > "$REL_OLD_REPL" <<'EOF'
   if [ "$LOCK_ACQUIRED" = "1" ]; then
     rmdir "$LOCK_DIR" 2>/dev/null || true
     : > "${LOCK_DIR}.rel-probe-marker"
-    sleep 8
+    rp_w=0
+    while [ ! -f "${LOCK_DIR}.rel-proceed-marker" ] && [ "$rp_w" -lt 60 ]; do sleep 1; rp_w=$((rp_w + 1)); done
     LOCK_ACQUIRED=0
   fi
 }
@@ -720,7 +819,8 @@ cat > "$REL_FIXED_REPL" <<'EOF'
     LOCK_ACQUIRED=0
     rmdir "$LOCK_DIR" 2>/dev/null || true
     : > "${LOCK_DIR}.rel-probe-marker"
-    sleep 8
+    rp_w=0
+    while [ ! -f "${LOCK_DIR}.rel-proceed-marker" ] && [ "$rp_w" -lt 60 ]; do sleep 1; rp_w=$((rp_w + 1)); done
   fi
   trap 'on_lock_signal INT 130' INT
   trap 'on_lock_signal TERM 143' TERM
@@ -780,36 +880,53 @@ cat > "$P2_ACQ_REPL" <<'EOF'
 EOF
 REL_P2_RAW="$TMP/relrace-p2-raw.sh"
 replace_range "$LOGRUN" "$REL_P2_RAW" "$ACQ_START" "$ACQ_END" "$P2_ACQ_REPL"
-# Same "hold the lock for a few seconds after acquiring" injection the
-# lock-released-on-signal fixture (SIG_BIN_DIR) already uses, applied here
-# with its OWN (longer) duration: P2 must still be holding the lock at the
-# point this test checks it, which happens only AFTER `wait "$p1_pid"`
-# returns — and for the FIXED-shape arm, P1 does not return until it has run
-# its own full masked window to completion (this file's own REL_OLD_REPL/
-# REL_FIXED_REPL `sleep 8`). P2's hold is set comfortably longer than that
-# (12s > 8s + margin) so the FIXED-shape arm's "the successor's lock must
-# still be there" assertion is never read against a P2 that has already
-# finished its own lifecycle and released its OWN lock for an entirely
-# unrelated, benign reason.
+# T-1076 rework round 3 held P2's lock open with a fixed `sleep 12` (sized
+# ">8s + margin" against REL_OLD_REPL/REL_FIXED_REPL's own then-fixed
+# `sleep 8`) so P2 was still observably holding the lock at the point this
+# test's "successor survives" check runs.
+#
+# T-1076 rework round 4 (Codex round-3 Major fix, same class as P1's own
+# width above): a fixed `sleep 12` is exactly as vulnerable to CI-contention
+# budget exhaustion as P1's `sleep 8` was — and now that P1's own hold is
+# event-driven rather than a fixed width, there is no longer a fixed
+# duration to size a margin against in the first place. Replaced with the
+# SAME event-driven pattern: P2 holds the lock until the test driver writes
+# an explicit `${LOCK_DIR}.p2-proceed-marker` file (written only AFTER the
+# driver's own "successor survives" check has already run — see
+# `relrace_choreograph` below), with the same `-lt 60` anti-hang backstop
+# (not correctness-relevant; P2 is never killed by this test, so the only
+# way it ever proceeds in a healthy run is the marker appearing).
 REL_P2_BIN="$TMP/relrace-p2.sh"
-sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/sleep 12\n&/' \
+sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/p2p_w=0\nwhile [ ! -f "${LOCK_DIR}.p2-proceed-marker" ] \&\& [ "$p2p_w" -lt 60 ]; do sleep 1; p2p_w=$((p2p_w + 1)); done\n&/' \
   "$REL_P2_RAW" > "$REL_P2_BIN"
 bash -n "$REL_P2_BIN" || fail "T-1076 signal-race-release-side setup: P2 mutant has a syntax error"
 cmp -s "$LOGRUN" "$REL_P2_BIN" && fail "T-1076 signal-race-release-side setup: P2 mutant is byte-identical to the real writer"
-grep -q '^sleep 12$' "$REL_P2_BIN" || fail "T-1076 signal-race-release-side setup: P2 mutant's hold injection did not apply"
+grep -q 'p2-proceed-marker' "$REL_P2_BIN" || fail "T-1076 signal-race-release-side setup: P2 mutant's hold injection did not apply"
 grep -q 'p2-acquired-marker' "$REL_P2_BIN" || fail "T-1076 signal-race-release-side setup: P2 mutant's acquired-marker injection did not apply"
 
 # relrace_choreograph <p1-bin> <runs-dir> <loop> <expect-p1-rc> <expect-lock-survives>
-# — runs the shared choreography (P1 acquires+writes+releases with the
-# injected marker/sleep, a dedicated SUCCESSOR mutant P2 that marks its own
-# acquisition and then holds the freed path for 12s, P1 is TERM'd only AFTER
-# P2's own acquired-marker confirms it has genuinely reacquired the freed
-# path) and asserts the two outcomes that distinguish the two shapes.
+# — runs the shared choreography (P1 acquires+writes+releases and then
+# holds its own vulnerable window open on an explicit marker, a dedicated
+# SUCCESSOR mutant P2 that marks its own acquisition and then holds the
+# freed path open on its OWN explicit marker, P1 is TERM'd only AFTER P2's
+# own acquired-marker confirms it has genuinely reacquired the freed path)
+# and asserts the two outcomes that distinguish the two shapes.
+#
+# T-1076 rework round 4 (Codex round-3 Major fix): every hold in this
+# choreography is now driven by an explicit marker file THIS function
+# writes, at the point THIS function has already gathered the fact that
+# marker is meant to certify — never by a fixed sleep width the rest of
+# the choreography has to race against. No step here can be starved by CI
+# contention into skipping past a state this function has not yet
+# observed; the only way it can be SLOW is if the whole choreography takes
+# longer wall-clock time, which does not flip any assertion's verdict.
 relrace_choreograph() {
   local p1bin="$1" runsdir="$2" loop="$3" expect_rc="$4" expect_survive="$5"
   local lockdir="$runsdir/.${loop}.jsonl.lock"
   local marker="${lockdir}.rel-probe-marker"
   local p2marker="${lockdir}.p2-acquired-marker"
+  local p1proceed="${lockdir}.rel-proceed-marker"
+  local p2proceed="${lockdir}.p2-proceed-marker"
   mkdir -p "$runsdir"
 
   TEAM_RUNS_DIR="$runsdir" bash "$p1bin" "$loop" --run-id P1 --seq 1 --span s --phase p \
@@ -821,8 +938,10 @@ relrace_choreograph() {
   [ -d "$lockdir" ] || fail "T-1076 signal-race-release-side setup: P1 never acquired the lock"
 
   # P2: the DEDICATED mutant built above (REL_P2_BIN) — marks its own
-  # acquisition immediately, then holds the lock for 12s so it is still
-  # observably holding it for the checks below.
+  # acquisition immediately, then holds the lock open on its OWN explicit
+  # marker (written by this function below, only once the checks that need
+  # P2 still holding are done) so it is still observably holding it for
+  # the checks below regardless of how long the earlier steps took.
   TEAM_LOG_LOCK_TIMEOUT=30 TEAM_RUNS_DIR="$runsdir" bash "$REL_P2_BIN" "$loop" --run-id P2 --seq 1 \
     --span s --phase p --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
   local p2_pid=$!
@@ -845,17 +964,34 @@ relrace_choreograph() {
 
   kill -TERM "$p1_pid" 2>/dev/null || true
 
+  # T-1076 rework round 4: write P1's own proceed-marker ONLY for the
+  # expect_rc=0 (FIXED-shape) call. FIXED-shape masks INT/TERM entirely
+  # during this window (SIG_IGN discards a signal at delivery time, it is
+  # never queued for later redelivery), so the kill just sent is a genuine
+  # no-op there and P1 would otherwise sit in its own wait loop until the
+  # (non-load-bearing) 60s backstop fires — write the marker immediately so
+  # it proceeds to a normal exit right away instead. For the expect_rc!=0
+  # (OLD-shape) call this marker is deliberately NEVER written by this
+  # function: OLD-shape's traps stay unmasked, so the kill above is
+  # delivered essentially instantly and the process is gone (via
+  # on_lock_signal's own `exit`) well before any marker file could matter —
+  # writing one here would only invite a needless race against that signal
+  # delivery for no benefit.
+  if [ "$expect_rc" -eq 0 ]; then
+    : > "$p1proceed"
+  fi
+
   set +e
   wait "$p1_pid" 2>/dev/null
   local p1_rc=$?
   set -e
   [ "$p1_rc" -eq "$expect_rc" ] || fail "T-1076 signal-race-release-side ($p1bin): expected P1 exit $expect_rc, got $p1_rc"
 
-  # Check shortly after `wait "$p1_pid"` returns, well before the
-  # successor's own 12s hold would end (chosen to comfortably outlast the
-  # FIXED-shape arm's own full 8s masked window plus this wait) — this is
-  # the window in which the OLD-shape mutant's reentrant release_lock()
-  # would have already rmdir'd the successor's live lock out from under it.
+  # Check shortly after `wait "$p1_pid"` returns — P2 is still holding the
+  # lock open on its own explicit marker at this point (not yet written
+  # below), regardless of how long the steps above took. This is the
+  # window in which the OLD-shape mutant's reentrant release_lock() would
+  # have already rmdir'd the successor's live lock out from under it.
   sleep 1
   local survives=1
   [ -d "$lockdir" ] || survives=0
@@ -864,6 +1000,13 @@ relrace_choreograph() {
   else
     [ "$survives" -eq 0 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor's live lock survived — the OLD-shape reentrant rmdir should have deleted it (reproducing the pre-fix bug)"
   fi
+
+  # T-1076 rework round 4: only NOW, after the survives check above has
+  # already run, tell P2 it may leave its own hold loop — replacing round
+  # 3's fixed `sleep 12` (a width that had to "comfortably outlast" P1's
+  # own then-fixed width) with an explicit release the driver controls
+  # once it is actually done needing P2 to still hold the lock.
+  : > "$p2proceed"
 
   set +e
   wait "$p2_pid" 2>/dev/null
@@ -886,27 +1029,33 @@ pass "T-1076 signal-race-release-side — OLD-shape's reentrant release deletes 
 # weakening a positive assertion above.
 #
 # T-1076 rework round 3 (Codex round-2 Major, disclosed rather than
-# barrier-forced): this arm's `detected` outcome rests on an UNSYNCHRONIZED
-# TOCTOU race between CONT_N concurrent writers against a lock-DISABLED
-# mutant (`if true; then` — no serialization attempt at all), not on an
-# explicit barrier that forces two writers through the scan-then-append
-# window at the same instant. A true barrier would require pausing the
-# mutant's own compute-then-append critical section on a shared rendezvous
-# controllable from this test — restructuring the very TOCTOU mechanism
-# this arm exists to observe, which is a materially different, heavier
-# change than this bounded rework's own scope covers; it is not attempted
-# here. What this arm actually guarantees, stated as a bound rather than a
-# certainty: with CONT_N (>= 8) writers each performing CONT_M (>= 20)
-# fully-unserialized read-scan-then-append cycles against ONE shared file
-# (>= 160 total appends), at least one collision is empirically
-# near-certain on any real multi-core host — this session's own tally
-# below, and the round-2 provenance record's own two independent prior
-# runs, both observed `detected` every time. A `not-detected` outcome
-# remains structurally possible (a genuinely serialized scheduler could, in
-# principle, never interleave two writers), which is exactly why AC10's own
-# grammar accepts BOTH tokens and requires a `- limit:` line when the
-# not-detected token appears — that escalation path is the honest answer to
-# this residual, not a barrier this round adds.
+# barrier-forced) — reworded again in round 4 (Codex round-3 Minor: round
+# 3's own wording overclaimed relative to its own evidence — "guarantees"
+# and "near-certain... on any real multi-core host" are both stronger
+# claims than a handful of runs on one host actually supports): this arm's
+# `detected` outcome rests on an UNSYNCHRONIZED TOCTOU race between CONT_N
+# concurrent writers against a lock-DISABLED mutant (`if true; then` — no
+# serialization attempt at all), not on an explicit barrier that forces
+# two writers through the scan-then-append window at the same instant.
+# Adding such a barrier (pausing the mutant's own compute-then-append
+# critical section on a shared rendezvous controllable from this test) is
+# a plausible middle ground that would not need to touch the TOCTOU
+# mechanism itself — it is a SCOPE CHOICE for this bounded rework, not
+# attempted here for that reason, not because it is technically
+# impossible. What this arm actually MEASURES, stated as the evidence
+# itself rather than a universal claim: with CONT_N (>= 8) writers each
+# performing CONT_M (>= 20) fully-unserialized read-scan-then-append
+# cycles against ONE shared file (>= 160 total appends), `detected` was
+# observed in EVERY recorded run of this arm on this host — this session's
+# own tally below, plus the round-2 and round-3 provenance records' own
+# prior runs, all `detected`, zero `not-detected` observed anywhere in
+# this task's history. This is evidence, not a structural guarantee, and
+# is not established for any other host or scheduler. A `not-detected`
+# outcome remains structurally possible (a genuinely serialized scheduler
+# could, in principle, never interleave two writers), which is exactly why
+# AC10's own grammar accepts BOTH tokens and requires a `- limit:` line
+# when the not-detected token appears — that escalation path is the
+# honest answer to this residual, not a barrier this round adds.
 # =====================================================================
 NEG_BIN_DIR="$TMP/negctrl-bin"
 mkdir -p "$NEG_BIN_DIR"
