@@ -815,3 +815,27 @@ that file's order.
   proves nothing about the resolver and is not the workaround to reach for.
   The ancestor-symlink property of this same resolver is covered by the
   T-1057 entry above (issue #218) and is not restated here.
+- T-1070: measuring `bin/check-handoff.sh`'s own runtime needs three things
+  this repo's other suites haven't needed before. **(1)** No `timeout` binary
+  resolves on this host by default (matching `bin/check-acs.sh`'s own header)
+  — bound a slow pre-fix run yourself; do not assume a runaway command will
+  be killed. **(2)** Pin the board being timed to a committed blob (`git show
+  <ref>:<path> > scratch`) and read that SAME scratch file from both the
+  pre-change and post-change implementation — the board is a live,
+  append-only artifact and re-reading the working tree between arms compares
+  different bytes without saying so. **(3)** Bash's own `time` reserved word
+  (`TIMEFORMAT='%R'` for a bare wall-clock-seconds line) only respects
+  `TIMEFORMAT` when the invoking shell is bash itself — the Bash tool in this
+  environment runs commands through `zsh`, so a bare `{ time cmd; }` at the
+  top level prints zsh's own multi-field format regardless of `TIMEFORMAT`;
+  wrap the whole timing block in an explicit `bash -c '...'` (or put it
+  inside a `#!/usr/bin/env bash` script and invoke that) to get the `%R`
+  format reliably. Obtaining a SECOND bash `<major.minor>` floor beyond this
+  host's stock 3.2.57 needed a source build (no bash 5 package is reachable
+  within this sandbox's network allow-list, and no prebuilt macOS binary is
+  published for one) from `gitGNU/gnu_bash`'s GitHub mirror (`bash-4.4` tag —
+  that mirror carries no tag past 4.4), configured with
+  `CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int"`
+  (recent clang treats an implicit function declaration in this 1990s-era C
+  source as a hard error by default) and built entirely under an isolated
+  scratch prefix, never installed onto `PATH` or the host package manager.

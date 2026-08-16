@@ -54,7 +54,29 @@ decoy_bad_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-bad-out.XXXXXX")"
 decoy_bad_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-bad-err.XXXXXX")"
 decoy_good_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-good-out.XXXXXX")"
 decoy_good_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-decoy-good-err.XXXXXX")"
+# T-1070: six section-structure fixtures (no fixture before this task covered
+# any section-structure shape at all — every existing fixture above covers a
+# grammar shape instead). One pair of scratch files per fixture.
+no_active_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-no-active-out.XXXXXX")"
+no_active_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-no-active-err.XXXXXX")"
+active_last_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-active-last-out.XXXXXX")"
+active_last_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-active-last-err.XXXXXX")"
+empty_active_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-empty-active-out.XXXXXX")"
+empty_active_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-empty-active-err.XXXXXX")"
+active_eof_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-active-eof-out.XXXXXX")"
+active_eof_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-active-eof-err.XXXXXX")"
+dup_active_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-dup-active-out.XXXXXX")"
+dup_active_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-dup-active-err.XXXXXX")"
+long_line_out="$(mktemp "${TMPDIR:-/tmp}/check-handoff-long-line-out.XXXXXX")"
+long_line_err="$(mktemp "${TMPDIR:-/tmp}/check-handoff-long-line-err.XXXXXX")"
 trap 'rm -f "$valid_out" "$valid_err" "$bf_out" "$bf_err" "$flag_out" "$flag_err" "$crlf_out" "$crlf_err" "$ws_out" "$ws_err" "$tab_out" "$tab_err" "$strand_top_out" "$strand_top_err" "$strand_bound_out" "$strand_bound_err" "$strand_tol_out" "$strand_tol_err" "$strand_crlf_out" "$strand_crlf_err" "$strand_crlf_fix" "$strand_clean_out" "$strand_clean_err" "$decoy_bad_out" "$decoy_bad_err" "$decoy_good_out" "$decoy_good_err"' EXIT
+# T-1070: bash only honors the LAST `trap ... EXIT` registration for a given
+# signal, so the six new fixtures' scratch files cannot be folded into the
+# line above without rewriting its text — and this suite's own additive-only
+# discipline (T-1070 AC9) requires that line to survive byte-for-byte. This
+# second registration is therefore the one that actually runs at exit; it
+# repeats the original file list verbatim and adds the six new pairs.
+trap 'rm -f "$valid_out" "$valid_err" "$bf_out" "$bf_err" "$flag_out" "$flag_err" "$crlf_out" "$crlf_err" "$ws_out" "$ws_err" "$tab_out" "$tab_err" "$strand_top_out" "$strand_top_err" "$strand_bound_out" "$strand_bound_err" "$strand_tol_out" "$strand_tol_err" "$strand_crlf_out" "$strand_crlf_err" "$strand_crlf_fix" "$strand_clean_out" "$strand_clean_err" "$decoy_bad_out" "$decoy_bad_err" "$decoy_good_out" "$decoy_good_err" "$no_active_out" "$no_active_err" "$active_last_out" "$active_last_err" "$empty_active_out" "$empty_active_err" "$active_eof_out" "$active_eof_err" "$dup_active_out" "$dup_active_err" "$long_line_out" "$long_line_err"' EXIT
 
 # AC4: valid fixture exits 0. The fixture also includes T-103 with a
 # backtick-wrapped uppercase token in the title (`API`/`URL`) — that line
@@ -301,6 +323,81 @@ set -e
 [[ "$decoy_good_rc" -eq 0 ]] || fail "decoy-real-flag-valid: expected exit 0, got $decoy_good_rc (stderr: $(cat "$decoy_good_err"))"
 [[ ! -s "$decoy_good_err" ]] || fail "decoy-real-flag-valid: expected empty stderr, got: $(cat "$decoy_good_err")"
 printf 'PASS: T-1031 decoy-real-flag-valid — false-FAIL direction closed (a decoy title token does not block a well-formed real slot; lints clean)\n'
+
+# ============================================================================
+# T-1070: section-structure shapes — no fixture before this task covered any
+# of these (the corpus covered grammar exhaustively, section structure not at
+# all). Each fixture below is named literally by its own filename so a
+# byte-for-byte grep for "<name>.md" finds it.
+# ============================================================================
+
+# no-active.md: no `## Active` heading anywhere in the file. The whole-file
+# awk pass must still traverse to EOF and emit nothing — cost unchanged,
+# behavior unchanged (T-1070's early-exit invariant).
+set +e
+bash "$SCRIPT" "$FIX/no-active.md" >"$no_active_out" 2>"$no_active_err"
+no_active_rc=$?
+set -e
+[[ "$no_active_rc" -eq 0 ]] || fail "no-active.md expected exit 0, got $no_active_rc (stderr: $(cat "$no_active_err"))"
+[[ ! -s "$no_active_err" ]] || fail "no-active.md expected empty stderr, got: $(cat "$no_active_err")"
+# shellcheck disable=SC2016  # backticks are literal prose, not expansion
+printf 'PASS: T-1070 no-active — a file with no `## Active` heading at all lints clean (exit 0, no stderr)\n'
+
+# active-last.md: `## Active` is the LAST section — it never closes via a
+# later `## ` heading, so extraction must still reach EOF to see its lines.
+set +e
+bash "$SCRIPT" "$FIX/active-last.md" >"$active_last_out" 2>"$active_last_err"
+active_last_rc=$?
+set -e
+[[ "$active_last_rc" -eq 0 ]] || fail "active-last.md expected exit 0, got $active_last_rc (stderr: $(cat "$active_last_err"))"
+[[ ! -s "$active_last_err" ]] || fail "active-last.md expected empty stderr, got: $(cat "$active_last_err")"
+# shellcheck disable=SC2016  # backticks are literal prose, not expansion
+printf 'PASS: T-1070 active-last — `## Active` as the final section (no closing heading) still lints clean, reaching EOF\n'
+
+# empty-active.md: `## Active` heading immediately followed by the next
+# heading, with zero content lines in between.
+set +e
+bash "$SCRIPT" "$FIX/empty-active.md" >"$empty_active_out" 2>"$empty_active_err"
+empty_active_rc=$?
+set -e
+[[ "$empty_active_rc" -eq 0 ]] || fail "empty-active.md expected exit 0, got $empty_active_rc (stderr: $(cat "$empty_active_err"))"
+[[ ! -s "$empty_active_err" ]] || fail "empty-active.md expected empty stderr, got: $(cat "$empty_active_err")"
+# shellcheck disable=SC2016  # backticks are literal prose, not expansion
+printf 'PASS: T-1070 empty-active — an `## Active` section with zero content lines lints clean\n'
+
+# active-eof.md: `## Active` runs to EOF with no closing heading at all, and
+# carries a strand as the very last line in the file — the violation must
+# still be reported even though nothing follows it.
+set +e
+bash "$SCRIPT" "$FIX/active-eof.md" >"$active_eof_out" 2>"$active_eof_err"
+active_eof_rc=$?
+set -e
+[[ "$active_eof_rc" -eq 1 ]] || fail "active-eof.md expected exit 1, got $active_eof_rc (stderr: $(cat "$active_eof_err"))"
+grep -qF -- ':15: stranded continuation line' "$active_eof_err" \
+  || fail "active-eof.md: expected a strand reported at line 15 (got: $(cat "$active_eof_err"))"
+printf 'PASS: T-1070 active-eof — a strand as the last line of a file with no closing heading is still reported (exit 1, line 15)\n'
+
+# dup-active.md: a SECOND `## Active` heading later in the file, after
+# `## Done`, opens NOTHING — the `!seen` single-section rule — even though
+# its own content is shaped like a violation.
+set +e
+bash "$SCRIPT" "$FIX/dup-active.md" >"$dup_active_out" 2>"$dup_active_err"
+dup_active_rc=$?
+set -e
+[[ "$dup_active_rc" -eq 0 ]] || fail "dup-active.md expected exit 0, got $dup_active_rc (stderr: $(cat "$dup_active_err"))"
+[[ ! -s "$dup_active_err" ]] || fail "dup-active.md expected empty stderr (the second Active section must never be read), got: $(cat "$dup_active_err")"
+# shellcheck disable=SC2016  # backticks are literal prose, not expansion
+printf 'PASS: T-1070 dup-active — a second `## Active` heading later in the file opens nothing (its violation-shaped content is never read)\n'
+
+# long-line.md: a several-kilobyte, multibyte continuation line under a
+# well-formed entry — must lint clean and run fast (the active-axis fix).
+set +e
+bash "$SCRIPT" "$FIX/long-line.md" >"$long_line_out" 2>"$long_line_err"
+long_line_rc=$?
+set -e
+[[ "$long_line_rc" -eq 0 ]] || fail "long-line.md expected exit 0, got $long_line_rc (stderr: $(cat "$long_line_err"))"
+[[ ! -s "$long_line_err" ]] || fail "long-line.md expected empty stderr, got: $(cat "$long_line_err")"
+printf 'PASS: T-1070 long-line — a several-kilobyte multibyte continuation line under a valid entry lints clean\n'
 
 printf 'OK\n'
 exit 0

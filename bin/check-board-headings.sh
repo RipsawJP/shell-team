@@ -163,7 +163,7 @@ fi
 #
 # whole-board scope (spec terminology table): the `## Active` and `## Done`
 # sections ONLY. This mirrors check-handoff.sh's `in_active`-flag section
-# tracking (bin/check-handoff.sh:47-51) rather than scanning the whole file:
+# tracking (bin/check-handoff.sh:65-69) rather than scanning the whole file:
 # without it, a checkbox-shaped `T-NNN` line that lands in ANY other `## `
 # section (Reserved / Planned / Format, or a future section) would be picked
 # up too. Today's tasks/todo.md happens not to trigger this (Reserved/Planned

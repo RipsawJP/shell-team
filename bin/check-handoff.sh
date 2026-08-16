@@ -50,9 +50,21 @@ flag_allowed() {
 # Extract the Active section while preserving original line numbers.
 # Output format: `<lineno>\t<line>` for each line strictly between the
 # first `## Active` heading and the next `## ` heading.
+#
+# T-1070: `exit` (rather than clearing `in_active` and reading on) the moment
+# the section closes, so this pass costs nothing proportional to `## Done`'s
+# size — the board's append-only growth axis this checker must stop tracking.
+# Three invariants survive this change (T-1070 profile's Notes for engineer):
+# `NR` is awk's own running input-line counter, untouched by `exit`, so every
+# emitted line number is still the original file's; a file with NO `## Active`
+# heading never makes `in_active` true, so the `exit` branch is never taken
+# and the whole file is still read to EOF with unchanged behavior and cost;
+# and a SECOND `## Active` heading later in the file is never reached at all
+# once the first section closes and this program exits, which satisfies the
+# `!seen` single-section rule even more strongly than clearing a flag did.
 active_block="$(awk '
   /^## Active[[:space:]]*$/ && !seen { seen=1; in_active=1; next }
-  in_active && /^## / { in_active=0 }
+  in_active && /^## / { exit }
   in_active { printf "%d\t%s\n", NR, $0 }
 ' "$FILE")"
 
@@ -133,7 +145,26 @@ while IFS= read -r raw; do
   # extraction and would otherwise break the LINE_RE `$` anchor.
   content="${content%$'\r'}"
   # Blank line: neutral no-op, leaves in_entry untouched.
-  [[ -z "${content//[[:space:]]/}" ]] && continue
+  #
+  # T-1070: an anchored whole-string regex match, not a global pattern
+  # substitution. `${content//[[:space:]]/}` rebuilds the ENTIRE string on
+  # every call and is quadratic (or worse) in the line's own length —
+  # confirmed by an isolated micro-benchmark run under this task (doubling a
+  # synthetic line's length roughly quadrupled-to-sextupled the substitution's
+  # own cost, independent of locale), which is exactly issue #256's
+  # attribution and this checker's `active`-axis dominant cost path.
+  # `[[ "$content" =~ ^[[:space:]]*$ ]]` decides the identical question — is
+  # every character in `[[:space:]]` — without ever constructing a rewritten
+  # copy, and for the overwhelmingly common case (a non-blank line whose
+  # first non-whitespace character sits a few columns in) the anchored match
+  # fails as soon as that character is reached, rather than scanning to the
+  # end. `[[:space:]]` here is the SAME bracket-expression character class
+  # used both ways, so the locale-dependent verdict a byte like U+3000
+  # (ideographic space) or U+00A0 (no-break space) receives is unchanged —
+  # verified empirically against both forms under `C` and a UTF-8 locale
+  # (`docs/loop-engineering/check-handoff-scaling.md`'s `## Profile` section
+  # records the comparison) before this replacement was made.
+  [[ "$content" =~ ^[[:space:]]*$ ]] && continue
 
   # Continuation line (indented, non-blank): fine while in_entry, a strand
   # otherwise. Either way it is never itself validated against LINE_RE.
