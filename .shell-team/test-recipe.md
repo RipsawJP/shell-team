@@ -1227,3 +1227,72 @@ that file's order.
   fail with "must call exit explicitly" — both confirmed by direct
   execution this round, against the real pin logic extracted from the
   committed test file, not reasoned about.
+
+- T-1076 rework round 6 (bounded fix, Codex review round 5 Major —
+  `signal-mask-shape-pin` pinned counts only, never ORDER): strengthened the
+  pin to also assert the RELATIVE LINE ORDER of each critical section's
+  load-bearing statements, not just their occurrence counts. Technique:
+  extract each critical section's own body first (the acquire loop via
+  `sed -n '/^while :; do$/,/^done$/p'`, `release_lock`'s own body via the
+  same anchor pattern already used for `on_lock_signal`'s extraction), then
+  locate each statement's line NUMBER within that small extracted body with
+  a `smp_line_of` helper (`grep -nF` + `head -1` + `cut -d: -f1`,
+  `|| true`-guarded the same way the file's existing count checks already
+  are under `set -euo pipefail`), and assert `mask < mkdir < flag=1 <
+  re-arm` (acquire) / `mask < flag=0 < rmdir < re-arm` (release) as plain
+  integer `-lt` comparisons. Extracting the body FIRST (rather than
+  searching the whole 685-line file) is what makes an unqualified
+  first-match lookup safe — within each extracted body every pattern
+  occurs exactly once.
+
+  One collision found and fixed by this round's own mutation self-check,
+  before the entry was written: the initial `LOCK_ACQUIRED=1` search
+  pattern (no leading whitespace) also matched a COMMENT line inside the
+  acquire loop's body (`bin/log-run.sh:627`, prose describing the very race
+  being guarded against, which happens to quote `` `LOCK_ACQUIRED=1` ``
+  verbatim) — sitting BEFORE the real statement, this made the order check
+  falsely FAIL against the real, correct, committed code. Fixed by
+  anchoring to the real statement's exact 4-space indentation
+  (`'    LOCK_ACQUIRED=1'`), which the `#`-prefixed comment line never
+  carries. Lesson for the next task reaching for this same
+  extract-a-body-then-grep-within-it idiom: a plain, unanchored fixed-string
+  search inside an extracted body is only as safe as that body's own
+  freedom from comment lines that happen to quote the same token — check
+  for that collision explicitly rather than assuming it away.
+
+  Mutation self-check, three mutants, all built under `$TMPDIR`/scratch,
+  never the working tree, each verified via a standalone driver replaying
+  `tests/log-run/run.sh:906-996` (the whole `signal-mask-shape-pin` case)
+  against the mutant path:
+  - mask-stripped (round-5 mutant, re-confirmed): `grep -v` removing both
+    `  trap '' INT TERM` lines -> pin fails with "expected exactly 2 masked
+    transitions... found 0".
+  - exit-stripped (round-5 mutant, re-confirmed): `on_lock_signal`'s
+    `exit "$2"` replaced with a no-op -> pin fails with "must call exit
+    explicitly".
+  - reorder (NEW this round, the exact class the finding named): the
+    acquire-side `  trap '' INT TERM` line moved to directly after
+    `LOCK_ACQUIRED=1` (same total line count as the real file, same total
+    mask-line count of 2 — order broken, not count broken), built via a
+    state-tracked `awk` script (a `past_while` flag is required to
+    distinguish the acquire-side mask from `release_lock`'s own mask, which
+    appears EARLIER in the file when scanning top-to-bottom — a first
+    unguarded attempt, without this flag, stripped the wrong mask instead).
+    `diff` against the real file confirmed exactly one line moved and
+    nothing else changed. Pin fails with "acquire-side order violated — the
+    INT/TERM mask (relative line 9) must precede the mkdir acquire attempt
+    (relative line 7)".
+  All three mutants FAILED the strengthened pin (own command:
+  `bash "$SCRATCH/pin_driver.sh" "$SCRATCH/mutants/<name>.sh"`, exit=1
+  each, each with the message above); the real, committed
+  `bin/log-run.sh` PASSES the same driver (exit=0). `bin/log-run.sh` itself
+  is byte-unchanged this round (`git diff --stat -- bin/log-run.sh` empty).
+
+  **Measured consequence:** `bash tests/log-run/run.sh` run once live, this
+  round: `exit=0 elapsed=159s` (own `date +%s` bracket), consistent with
+  round 5's own ~162-164s measurements (the strengthened pin adds only a
+  handful of `grep`/`sed` calls, no new mutant construction, so no
+  meaningful wall-clock change). `grep -c '^PASS:' <log>` = **38** (unchanged
+  — the strengthened checks live inside the SAME `signal-mask-shape-pin`
+  test/pass banner, no new PASS token added), `grep -c '^PASS: T-1076'
+  <log>` = **16** (unchanged), `grep -c '^FAIL:' <log>` = **0**.

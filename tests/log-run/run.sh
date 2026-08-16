@@ -917,6 +917,20 @@ pass "T-1076 signal-race-release-side — the shipped code's masked release tran
 # handler's own explicit exit — comment prose discussing the same phrase
 # is prefixed with `#` and never matches these exact, unindented literal
 # forms.
+#
+# T-1076 rework round 6 (Codex round 5 Major): the count checks above
+# alone cannot catch a silent REORDER — moving the mask, the mkdir
+# acquire, the LOCK_ACQUIRED flag flip, or a re-arm to a different
+# position within its own critical section keeps every count identical
+# (still 2 masks, still 1 exit trap, still 3 INT/3 TERM re-arms) while
+# reintroducing exactly the race this task exists to close. The block
+# below extracts each critical section's own body — the acquire loop,
+# and release_lock's own body, via the same sed-range technique already
+# used above for on_lock_signal — and asserts the RELATIVE line order of
+# its load-bearing statements within that body: mask < mkdir < flag=1 <
+# re-arm (acquire side), mask < flag=0 < rmdir < re-arm (release side).
+# An extraction or a lookup that comes back empty is its own named
+# failure, never a silent pass (a missing statement is not "order OK").
 # =====================================================================
 SMP_MASK_COUNT="$(grep -cFx "  trap '' INT TERM" "$LOGRUN" || true)"
 [ "$SMP_MASK_COUNT" = "2" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 2 masked transitions (acquire loop + release_lock), found $SMP_MASK_COUNT"
@@ -933,7 +947,53 @@ SMP_INT_ARM="$(grep -cF "trap 'on_lock_signal INT 130' INT" "$LOGRUN" || true)"
 SMP_TERM_ARM="$(grep -cF "trap 'on_lock_signal TERM 143' TERM" "$LOGRUN" || true)"
 [ "$SMP_INT_ARM" = "3" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 3 INT-arming lines (initial install + 2 re-arms), found $SMP_INT_ARM"
 [ "$SMP_TERM_ARM" = "3" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 3 TERM-arming lines (initial install + 2 re-arms), found $SMP_TERM_ARM"
-pass "T-1076 signal-mask-shape-pin — bin/log-run.sh still carries both masked transitions (trap '' INT TERM x2), the dedicated on_lock_signal handler with its explicit exit, and all 3 INT/TERM re-arm points"
+
+# --- round 6: order, not just count -----------------------------------
+smp_line_of() {  # $1 = body text to search, $2 = fixed-string pattern -> first matching line NUMBER relative to that body (empty if not found)
+  local body="$1" pattern="$2"
+  printf '%s\n' "$body" | grep -nF -- "$pattern" | head -1 | cut -d: -f1 || true
+}
+
+SMP_ACQ_BODY="$(sed -n '/^while :; do$/,/^done$/p' "$LOGRUN")"
+[ -n "$SMP_ACQ_BODY" ] || fail "T-1076 signal-mask-shape-pin: acquire-loop body extraction was empty (order check needs it)"
+SMP_REL_BODY="$(sed -n '/^release_lock() {/,/^}$/p' "$LOGRUN")"
+[ -n "$SMP_REL_BODY" ] || fail "T-1076 signal-mask-shape-pin: release_lock body extraction was empty (order check needs it)"
+
+SMP_ACQ_MASK_LN="$(smp_line_of "$SMP_ACQ_BODY" "  trap '' INT TERM")"
+# shellcheck disable=SC2016  # single-quoted deliberately: this is the
+# literal SOURCE line to match in bin/log-run.sh, not an expansion here.
+SMP_ACQ_MKDIR_LN="$(smp_line_of "$SMP_ACQ_BODY" 'if mkdir "$LOCK_DIR" 2>/dev/null; then')"
+SMP_ACQ_FLAG1_LN="$(smp_line_of "$SMP_ACQ_BODY" '    LOCK_ACQUIRED=1')"
+SMP_ACQ_REARM_INT_LN="$(smp_line_of "$SMP_ACQ_BODY" "trap 'on_lock_signal INT 130' INT")"
+SMP_ACQ_REARM_TERM_LN="$(smp_line_of "$SMP_ACQ_BODY" "trap 'on_lock_signal TERM 143' TERM")"
+[ -n "$SMP_ACQ_MASK_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order check could not locate the INT/TERM mask inside the acquire loop"
+[ -n "$SMP_ACQ_MKDIR_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order check could not locate the mkdir acquire attempt inside the acquire loop"
+[ -n "$SMP_ACQ_FLAG1_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order check could not locate LOCK_ACQUIRED=1 inside the acquire loop"
+[ -n "$SMP_ACQ_REARM_INT_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order check could not locate the INT re-arm inside the acquire loop"
+[ -n "$SMP_ACQ_REARM_TERM_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order check could not locate the TERM re-arm inside the acquire loop"
+[ "$SMP_ACQ_MASK_LN" -lt "$SMP_ACQ_MKDIR_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order violated — the INT/TERM mask (relative line $SMP_ACQ_MASK_LN) must precede the mkdir acquire attempt (relative line $SMP_ACQ_MKDIR_LN)"
+[ "$SMP_ACQ_MKDIR_LN" -lt "$SMP_ACQ_FLAG1_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order violated — the mkdir acquire attempt (relative line $SMP_ACQ_MKDIR_LN) must precede LOCK_ACQUIRED=1 (relative line $SMP_ACQ_FLAG1_LN)"
+[ "$SMP_ACQ_FLAG1_LN" -lt "$SMP_ACQ_REARM_INT_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order violated — LOCK_ACQUIRED=1 (relative line $SMP_ACQ_FLAG1_LN) must precede the INT re-arm (relative line $SMP_ACQ_REARM_INT_LN)"
+[ "$SMP_ACQ_FLAG1_LN" -lt "$SMP_ACQ_REARM_TERM_LN" ] || fail "T-1076 signal-mask-shape-pin: acquire-side order violated — LOCK_ACQUIRED=1 (relative line $SMP_ACQ_FLAG1_LN) must precede the TERM re-arm (relative line $SMP_ACQ_REARM_TERM_LN)"
+
+SMP_REL_MASK_LN="$(smp_line_of "$SMP_REL_BODY" "  trap '' INT TERM")"
+SMP_REL_FLAG0_LN="$(smp_line_of "$SMP_REL_BODY" 'LOCK_ACQUIRED=0')"
+# shellcheck disable=SC2016  # single-quoted deliberately: this is the
+# literal SOURCE text to match in bin/log-run.sh, not an expansion here.
+SMP_REL_RMDIR_LN="$(smp_line_of "$SMP_REL_BODY" 'rmdir "$LOCK_DIR"')"
+SMP_REL_REARM_INT_LN="$(smp_line_of "$SMP_REL_BODY" "trap 'on_lock_signal INT 130' INT")"
+SMP_REL_REARM_TERM_LN="$(smp_line_of "$SMP_REL_BODY" "trap 'on_lock_signal TERM 143' TERM")"
+[ -n "$SMP_REL_MASK_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order check could not locate the INT/TERM mask inside release_lock"
+[ -n "$SMP_REL_FLAG0_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order check could not locate LOCK_ACQUIRED=0 inside release_lock"
+[ -n "$SMP_REL_RMDIR_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order check could not locate rmdir inside release_lock"
+[ -n "$SMP_REL_REARM_INT_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order check could not locate the INT re-arm inside release_lock"
+[ -n "$SMP_REL_REARM_TERM_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order check could not locate the TERM re-arm inside release_lock"
+[ "$SMP_REL_MASK_LN" -lt "$SMP_REL_FLAG0_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order violated — the INT/TERM mask (relative line $SMP_REL_MASK_LN) must precede LOCK_ACQUIRED=0 (relative line $SMP_REL_FLAG0_LN)"
+[ "$SMP_REL_FLAG0_LN" -lt "$SMP_REL_RMDIR_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order violated — LOCK_ACQUIRED=0 (relative line $SMP_REL_FLAG0_LN) must precede rmdir (relative line $SMP_REL_RMDIR_LN)"
+[ "$SMP_REL_RMDIR_LN" -lt "$SMP_REL_REARM_INT_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order violated — rmdir (relative line $SMP_REL_RMDIR_LN) must precede the INT re-arm (relative line $SMP_REL_REARM_INT_LN)"
+[ "$SMP_REL_RMDIR_LN" -lt "$SMP_REL_REARM_TERM_LN" ] || fail "T-1076 signal-mask-shape-pin: release-side order violated — rmdir (relative line $SMP_REL_RMDIR_LN) must precede the TERM re-arm (relative line $SMP_REL_REARM_TERM_LN)"
+
+pass "T-1076 signal-mask-shape-pin — bin/log-run.sh still carries both masked transitions (trap '' INT TERM x2), the dedicated on_lock_signal handler with its explicit exit, all 3 INT/TERM re-arm points, and each critical section's own load-bearing relative order (mask < mkdir < flag=1 < re-arm; mask < flag=0 < rmdir < re-arm)"
 
 # =====================================================================
 # T-1076 AC10: the negative control. A lock-disabled mutant, built
