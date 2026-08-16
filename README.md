@@ -228,6 +228,25 @@ bash bin/gen-loop-replay.sh 20260801T000000Z-flagrail --runs-dir tests/gen-loop-
 
 `--out` is required in this demo — omitting it would default the page into the fixture directory under `tests/`, leaving an untracked file behind.
 
+## Deriving a population set
+
+A record's set arithmetic — a population total, a set delta, a bucket
+split — is produced by `derive-populations.sh`, never counted by eye: it
+runs two to eight named population-extraction commands under a pinned
+`LC_ALL=C` collation and emits one delimited block a record embeds
+verbatim, preceded by a `- reproduce: <command>` line carrying the exact
+command that regenerates it.
+
+```bash
+bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
+```
+
+(with the plugin loaded, `bin/` is on `PATH`, so `bash derive-populations.sh` resolves it there regardless of the executable bit — no `bin/` prefix needed, the same convention `## Replaying a run` documents for `gen-loop-replay.sh`.) Each `--set name=command` line is captured, deduplicated and partitioned into a gap-free, overlap-free membership signature; `--accept-status name=csv` declares additional exit statuses accepted for one named set beyond the default of `0` (the "`git grep` exits `1` for no match" case). `bash derive-populations.sh --help` documents the full grammar.
+
+Every structural identifier — `--label`, a `--set` name, an `--accept-status` name — must match `^[A-Za-z0-9][A-Za-z0-9_-]*$`: no control character, no `+` (the byte the emitted signature joins set names with), no whitespace. A `--set` command runs under `pipefail`, so a legitimate mid-pipeline non-zero exit (e.g. `git grep pattern | sort` when nothing matches) is exactly the case `--accept-status name=1` exists to declare acceptable.
+
+Exit codes: `0` the block was written to stdout; `1` a refusal about the input's *content* (an unaccepted set exit status — under `pipefail`, pair a legitimate mid-pipeline non-zero exit with `--accept-status` — or an item containing a control character; stdout stays empty, never a false empty set); `2` a usage error about the *invocation* (a missing `--label`, an identifier outside the grammar above, fewer than two or more than eight `--set` values, two sharing a name, or a `--set` command containing a control character). See `docs/loop-engineering/record-set-derivation.md` for this repository's own dogfooded derivations.
+
 ## Design choices
 
 - **Read-only Orchestrator**: `tech-lead` only plans — the main session executes the map.
