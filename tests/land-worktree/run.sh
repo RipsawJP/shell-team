@@ -88,18 +88,26 @@ next_idx() {
   printf '%s' "$p"
 }
 
-# mk_commit <repo> <parent> <msg> [<mode> <path> <content>]... | [rm <path>]...
-# Builds one commit whose tree is <parent>'s tree with the given ops applied,
-# via a private scratch index — never a working-tree checkout, so any path
-# (embedded space/tab/newline) and any entry kind (100644/100755/120000, or
-# a removal) is representable regardless of what this host's filesystem
-# would tolerate in a real checkout. Prints the new commit sha.
+# mk_commit <repo> <parent-or-empty> <msg> [<mode> <path> <content>]... |
+#           [rm <path>]...
+# Builds one commit whose tree is <parent>'s tree with the given ops
+# applied, via a private scratch index — never a working-tree checkout, so
+# any path (embedded space/tab/newline) and any entry kind
+# (100644/100755/120000/160000, or a removal) is representable regardless
+# of what this host's filesystem would tolerate in a real checkout.
+# <parent> may be the empty string, meaning "no parent" (a root commit):
+# the index starts empty rather than seeded via `read-tree`, and
+# `commit-tree` is called with no `-p` at all — used by the composition
+# transition-matrix fixtures below to build a fresh base commit directly,
+# without a throwaway unrelated ancestor. Prints the new commit sha.
 mk_commit() {
   local repo="$1" parent="$2" msg="$3"
   shift 3
   local idx
   idx="$(next_idx)"
-  GIT_INDEX_FILE="$idx" git -C "$repo" read-tree "$parent"
+  if [ -n "$parent" ]; then
+    GIT_INDEX_FILE="$idx" git -C "$repo" read-tree "$parent"
+  fi
   while [ "$#" -ge 1 ]; do
     local mode="$1"
     if [ "$mode" = "rm" ]; then
@@ -116,7 +124,11 @@ mk_commit() {
   local tree
   tree="$(GIT_INDEX_FILE="$idx" git -C "$repo" write-tree)"
   rm -f "$idx" 2>/dev/null || true
-  git -C "$repo" commit-tree "$tree" -p "$parent" -m "$msg"
+  if [ -n "$parent" ]; then
+    git -C "$repo" commit-tree "$tree" -p "$parent" -m "$msg"
+  else
+    git -C "$repo" commit-tree "$tree" -m "$msg"
+  fi
 }
 
 # make_shared_base <repo> — a base commit carrying four files several
@@ -394,6 +406,258 @@ done
 OVERLAP_CASE_COUNT=$((OVERLAP_CASE_COUNT + 1))
 REFUSAL_CLASS_COUNT=$((REFUSAL_CLASS_COUNT + 1))
 pass "T-1077 overlap-quotepath-independent"
+
+# =============================================================================
+# Composition transition-matrix group (rework: T-1077 round-1 review
+# Finding 1, Blocker — entry-type-unaware composition). A single worker's
+# own claim set can transition any claimed path between {absent, blob,
+# symlink, tree, gitlink}; each case below lands a clean single worker
+# (no cross-worker overlap involved) exercising one matrix cell, and
+# asserts the FINAL composed tree, not merely the exit code.
+# =============================================================================
+
+# tree_line <repo> <ref> <path> -> prints the matching `git ls-tree` line
+# for <path> at <ref>, or nothing if absent.
+tree_line() {
+  git -C "$1" ls-tree "$2" -- ":(literal)$3" 2>/dev/null
+}
+
+# composition-file-to-directory: base has a blob "x"; worker replaces it
+# with a directory "x/y". Composes correctly: "x" is gone, only "x/y"
+# exists — the exact shape Codex's round-1 reproduction found corrupted
+# (a bogus extra "xy" entry) before this rework's two-pass fix.
+FD_REPO="$(new_repo)"
+FD_BASE_SHA="$(mk_commit "$FD_REPO" "" base 100644 x "file content")"
+git -C "$FD_REPO" branch onto "$FD_BASE_SHA"
+git -C "$FD_REPO" checkout -q --detach "$FD_BASE_SHA"
+FD_WORKER="$(mk_commit "$FD_REPO" "$FD_BASE_SHA" worker rm x 100644 x/y "nested content")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$FD_REPO" --base "$FD_BASE_SHA" --onto onto --worker "$FD_WORKER"
+fd_ok=1
+[ "$LAND_RC" = "0" ] || fd_ok=0
+# "x" legitimately still appears as a non-recursive `ls-tree` line — as the
+# TREE object that now contains "y" (ordinary git structure, not a bug);
+# what must NOT happen is "x" resolving as a leaf BLOB entry, or the
+# bogus extra "xy" (no slash) entry Codex's own reproduction found.
+if tree_line "$FD_REPO" onto x | grep -qE '^100644 blob '; then
+  fd_ok=0
+fi
+[ -z "$(tree_line "$FD_REPO" onto xy)" ] || fd_ok=0
+tree_line "$FD_REPO" onto x/y | grep -qE '^100644 blob ' || fd_ok=0
+[ "$(git -C "$FD_REPO" ls-tree -r onto | grep -c . || true)" = "1" ] || fd_ok=0
+if [ "$fd_ok" = "1" ]; then
+  pass "T-1077 composition-file-to-directory"
+else
+  fail "composition-file-to-directory: expected exactly one entry (x/y), no stray x or xy ($(git -C "$FD_REPO" ls-tree -r onto 2>&1))"
+fi
+
+# composition-directory-to-file: the reverse — base has a directory "x/y";
+# worker replaces it with a plain file "x". Composes correctly: "x/y" is
+# gone, "x" is a blob — the shape that used to misclassify as `structural`
+# (or fail outright, order-dependently) before this rework.
+DF_REPO="$(new_repo)"
+DF_BASE_SHA="$(mk_commit "$DF_REPO" "" base 100644 x/y "nested content")"
+git -C "$DF_REPO" branch onto "$DF_BASE_SHA"
+git -C "$DF_REPO" checkout -q --detach "$DF_BASE_SHA"
+DF_WORKER="$(mk_commit "$DF_REPO" "$DF_BASE_SHA" worker rm x/y 100644 x "now a file")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$DF_REPO" --base "$DF_BASE_SHA" --onto onto --worker "$DF_WORKER"
+df_ok=1
+[ "$LAND_RC" = "0" ] || df_ok=0
+[ -z "$(tree_line "$DF_REPO" onto x/y)" ] || df_ok=0
+tree_line "$DF_REPO" onto x | grep -qE '^100644 blob ' || df_ok=0
+[ "$(git -C "$DF_REPO" ls-tree -r onto | grep -c . || true)" = "1" ] || df_ok=0
+if [ "$df_ok" = "1" ]; then
+  pass "T-1077 composition-directory-to-file"
+else
+  fail "composition-directory-to-file: expected exactly one entry (x, a blob), got ($(git -C "$DF_REPO" ls-tree -r onto 2>&1)) rc=$LAND_RC err=$(cat "$LAND_ERR" 2>/dev/null)"
+fi
+
+# composition-mode-flip-644-to-755 / -755-to-644: a mode-only change on an
+# otherwise-untouched blob composes with the new mode and the SAME content
+# sha (never re-reading blob content, per D5).
+MF1_REPO="$(new_repo)"
+MF1_BASE_SHA="$(mk_commit "$MF1_REPO" "" base 100644 s.sh "script")"
+git -C "$MF1_REPO" branch onto "$MF1_BASE_SHA"
+git -C "$MF1_REPO" checkout -q --detach "$MF1_BASE_SHA"
+MF1_WORKER="$(mk_commit "$MF1_REPO" "$MF1_BASE_SHA" worker 100755 s.sh "script")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$MF1_REPO" --base "$MF1_BASE_SHA" --onto onto --worker "$MF1_WORKER"
+if [ "$LAND_RC" = "0" ] && tree_line "$MF1_REPO" onto s.sh | grep -qE '^100755 blob '; then
+  pass "T-1077 composition-mode-flip-644-to-755"
+else
+  fail "composition-mode-flip-644-to-755: expected mode 100755 ($(tree_line "$MF1_REPO" onto s.sh))"
+fi
+
+MF2_REPO="$(new_repo)"
+MF2_BASE_SHA="$(mk_commit "$MF2_REPO" "" base 100755 s.sh "script")"
+git -C "$MF2_REPO" branch onto "$MF2_BASE_SHA"
+git -C "$MF2_REPO" checkout -q --detach "$MF2_BASE_SHA"
+MF2_WORKER="$(mk_commit "$MF2_REPO" "$MF2_BASE_SHA" worker 100644 s.sh "script")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$MF2_REPO" --base "$MF2_BASE_SHA" --onto onto --worker "$MF2_WORKER"
+if [ "$LAND_RC" = "0" ] && tree_line "$MF2_REPO" onto s.sh | grep -qE '^100644 blob '; then
+  pass "T-1077 composition-mode-flip-755-to-644"
+else
+  fail "composition-mode-flip-755-to-644: expected mode 100644 ($(tree_line "$MF2_REPO" onto s.sh))"
+fi
+
+# composition-blob-to-symlink / -symlink-to-blob: an entry-KIND change
+# (not just a mode-only bit flip) composes with the correct mode AND the
+# worker's own sha (a symlink's blob content is its target string, never
+# resolved/dereferenced).
+BS_REPO="$(new_repo)"
+BS_BASE_SHA="$(mk_commit "$BS_REPO" "" base 100644 link "blobcontent" 100644 target.txt "target")"
+git -C "$BS_REPO" branch onto "$BS_BASE_SHA"
+git -C "$BS_REPO" checkout -q --detach "$BS_BASE_SHA"
+BS_WORKER="$(mk_commit "$BS_REPO" "$BS_BASE_SHA" worker 120000 link "target.txt")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$BS_REPO" --base "$BS_BASE_SHA" --onto onto --worker "$BS_WORKER"
+if [ "$LAND_RC" = "0" ] && tree_line "$BS_REPO" onto link | grep -qE '^120000 blob '; then
+  pass "T-1077 composition-blob-to-symlink"
+else
+  fail "composition-blob-to-symlink: expected mode 120000 ($(tree_line "$BS_REPO" onto link))"
+fi
+
+SB_REPO="$(new_repo)"
+SB_BASE_SHA="$(mk_commit "$SB_REPO" "" base 120000 link "target.txt" 100644 target.txt "target")"
+git -C "$SB_REPO" branch onto "$SB_BASE_SHA"
+git -C "$SB_REPO" checkout -q --detach "$SB_BASE_SHA"
+SB_WORKER="$(mk_commit "$SB_REPO" "$SB_BASE_SHA" worker 100644 link "now a real file, not a symlink")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$SB_REPO" --base "$SB_BASE_SHA" --onto onto --worker "$SB_WORKER"
+if [ "$LAND_RC" = "0" ] && tree_line "$SB_REPO" onto link | grep -qE '^100644 blob '; then
+  pass "T-1077 composition-symlink-to-blob"
+else
+  fail "composition-symlink-to-blob: expected mode 100644 ($(tree_line "$SB_REPO" onto link))"
+fi
+
+# composition-gitlink-refused-new: the worker introduces a NEW gitlink
+# (submodule) entry — declared out of scope by the Input space's own
+# closing bullet ("Submodules... not modelled"); refused (`structural`),
+# never silently staged.
+GLN_REPO="$(new_repo)"
+GLN_BASE_SHA="$(mk_commit "$GLN_REPO" "" base 100644 base.txt "base")"
+git -C "$GLN_REPO" branch onto "$GLN_BASE_SHA"
+git -C "$GLN_REPO" checkout -q --detach "$GLN_BASE_SHA"
+GLN_WORKER="$(mk_commit "$GLN_REPO" "$GLN_BASE_SHA" worker 160000 sub 1111111111111111111111111111111111111111)"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$GLN_REPO" --base "$GLN_BASE_SHA" --onto onto --worker "$GLN_WORKER"
+assert_empty_stdout_refusal "composition-gitlink-refused-new" 2 structural
+pass "T-1077 composition-gitlink-refused-new"
+
+# composition-gitlink-refused-existing: the worker touches a path that is
+# ALREADY a gitlink at the coordinator tip (the worker's own diff against
+# base shows it changing) — also refused, never silently staged or
+# removed.
+GLE_REPO="$(new_repo)"
+GLE_BASE_SHA="$(mk_commit "$GLE_REPO" "" base 160000 sub 1111111111111111111111111111111111111111)"
+git -C "$GLE_REPO" branch onto "$GLE_BASE_SHA"
+git -C "$GLE_REPO" checkout -q --detach "$GLE_BASE_SHA"
+GLE_WORKER="$(mk_commit "$GLE_REPO" "$GLE_BASE_SHA" worker 160000 sub 2222222222222222222222222222222222222222)"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+run_land "$GLE_REPO" --base "$GLE_BASE_SHA" --onto onto --worker "$GLE_WORKER"
+assert_empty_stdout_refusal "composition-gitlink-refused-existing" 2 structural
+pass "T-1077 composition-gitlink-refused-existing"
+
+# =============================================================================
+# TOCTOU re-verification group (rework: T-1077 round-1 review Finding 2,
+# Major + same-class Minor). Each case holds the lock manually (mkdir at
+# the exact computed lock path), starts the coordinator in the background
+# against an --onto/--worker-tree that is CLEAN at invocation time (so the
+# pre-lock check passes), mutates the precondition WHILE the coordinator
+# is genuinely blocked waiting for the lock, then releases the lock and
+# confirms the coordinator's OWN post-lock recheck catches the change —
+# proving the recheck is real and not merely present in the source.
+# =============================================================================
+
+# toctou-onto-checked-out-during-wait
+TO_REPO="$(new_repo)"
+TO_BASE_SHA="$(mk_commit "$TO_REPO" "" base 100644 base.txt "base")"
+git -C "$TO_REPO" branch onto "$TO_BASE_SHA"
+git -C "$TO_REPO" checkout -q --detach "$TO_BASE_SHA"
+TO_WORKER="$(mk_commit "$TO_REPO" "$TO_BASE_SHA" worker 100644 w.txt "content")"
+WORKER_COUNT=$((WORKER_COUNT + 1))
+TO_LOCKDIR="$(lockdir_of "$TO_REPO")"
+mkdir "$TO_LOCKDIR"
+(
+  cd "$TO_REPO" || exit 1
+  if TEAM_LAND_LOCK_TIMEOUT=30 bash "$BIN" --base "$TO_BASE_SHA" --onto onto --worker "$TO_WORKER" \
+    >"$T/toctou-onto.out" 2>"$T/toctou-onto.err"; then
+    to_rc=0
+  else
+    to_rc=$?
+  fi
+  echo "$to_rc" > "$T/toctou-onto.rc"
+) >/dev/null 2>&1 &
+TO_BG_PID=$!
+# Wait for the background coordinator to genuinely be blocked on the lock
+# (the pre-lock --onto-checked-out check has already passed by the time
+# it starts polling for the lock — this repo's `onto` was clean at launch).
+to_i=0
+while kill -0 "$TO_BG_PID" 2>/dev/null; do
+  to_i=$((to_i + 1))
+  [ "$to_i" -ge 20 ] && break
+  sleep 0.1 2>/dev/null || sleep 1
+  # Once ~0.5s has passed the coordinator has certainly reached its
+  # polling loop (mkdir attempts happen well within that window); check
+  # out `onto` in a second worktree now, while it is still blocked.
+  if [ "$to_i" -eq 5 ]; then
+    TO_WT="$T/toctou-onto-wt"
+    git -C "$TO_REPO" worktree add -q "$TO_WT" onto
+  fi
+done
+rmdir "$TO_LOCKDIR" 2>/dev/null || true
+wait "$TO_BG_PID" 2>/dev/null || true
+TO_RC="$(cat "$T/toctou-onto.rc" 2>/dev/null || true)"
+LAND_RC="$TO_RC"; LAND_OUT="$T/toctou-onto.out"; LAND_ERR="$T/toctou-onto.err"
+assert_empty_stdout_refusal "toctou-onto-checked-out-during-wait" 2 structural
+pass "T-1077 toctou-onto-checked-out-during-wait"
+git -C "$TO_REPO" worktree remove --force "$T/toctou-onto-wt" >/dev/null 2>&1 || true
+
+# toctou-worker-tree-dirty-during-wait
+TW_REPO="$(new_repo)"
+TW_BASE_SHA="$(mk_commit "$TW_REPO" "" base 100644 base.txt "base")"
+git -C "$TW_REPO" branch onto "$TW_BASE_SHA"
+git -C "$TW_REPO" branch twworker "$TW_BASE_SHA"
+git -C "$TW_REPO" checkout -q --detach "$TW_BASE_SHA"
+TW_WT="$T/toctou-worker-wt"
+git -C "$TW_REPO" worktree add -q "$TW_WT" twworker
+printf 'w\n' > "$TW_WT/w.txt"
+git -C "$TW_WT" add w.txt
+git -C "$TW_WT" commit -q -m worker
+WORKER_COUNT=$((WORKER_COUNT + 1))
+TW_LOCKDIR="$(lockdir_of "$TW_REPO")"
+mkdir "$TW_LOCKDIR"
+(
+  cd "$TW_REPO" || exit 1
+  if TEAM_LAND_LOCK_TIMEOUT=30 bash "$BIN" --base "$TW_BASE_SHA" --onto onto --worker twworker --worker-tree "$TW_WT" \
+    >"$T/toctou-wt.out" 2>"$T/toctou-wt.err"; then
+    tw_rc=0
+  else
+    tw_rc=$?
+  fi
+  echo "$tw_rc" > "$T/toctou-wt.rc"
+) >/dev/null 2>&1 &
+TW_BG_PID=$!
+tw_i=0
+while kill -0 "$TW_BG_PID" 2>/dev/null; do
+  tw_i=$((tw_i + 1))
+  [ "$tw_i" -ge 20 ] && break
+  sleep 0.1 2>/dev/null || sleep 1
+  if [ "$tw_i" -eq 5 ]; then
+    # Dirty the worker's worktree while the coordinator is still blocked
+    # waiting for the lock (it was clean when the pre-lock check ran).
+    printf 'uncommitted\n' >> "$TW_WT/base.txt"
+  fi
+done
+rmdir "$TW_LOCKDIR" 2>/dev/null || true
+wait "$TW_BG_PID" 2>/dev/null || true
+TW_RC="$(cat "$T/toctou-wt.rc" 2>/dev/null || true)"
+LAND_RC="$TW_RC"; LAND_OUT="$T/toctou-wt.out"; LAND_ERR="$T/toctou-wt.err"
+assert_empty_stdout_refusal "toctou-worker-tree-dirty-during-wait" 1 diverged
+pass "T-1077 toctou-worker-tree-dirty-during-wait"
+git -C "$TW_REPO" worktree remove --force "$TW_WT" >/dev/null 2>&1 || true
 
 # =============================================================================
 # diverged / empty-landing / ref-moved / structural / lock group

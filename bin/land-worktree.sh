@@ -251,24 +251,41 @@ LOCK_DIR="$GCD/land-worktree.lock"
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/land-worktree.XXXXXX")" \
   || die 2 structural "cannot create a scratch directory under \${TMPDIR:-/tmp}"
 
-# --onto must not be checked out in ANY worktree of this repository (D5):
-# advancing a checked-out branch's ref by compare-and-swap would leave that
-# worktree's own index and working tree silently disagreeing with it. Read
-# into a file first, not piped straight into `grep -q` — under `pipefail`,
-# `grep -q`'s early exit on the first match can SIGPIPE the upstream
-# `git worktree list` and turn a genuine match into a spurious pipeline
-# failure (repo lesson).
-WT_LIST="$WORKDIR/worktrees.list"
-git worktree list --porcelain > "$WT_LIST" 2>/dev/null \
-  || die 2 structural "failed to enumerate this repository's worktrees"
-if grep -qxF "branch $ONTO_REF" "$WT_LIST"; then
-  die 2 structural "--onto ($ONTO_ARG -> $ONTO_REF) is checked out in a worktree of this repository"
-fi
+# check_onto_not_checked_out — --onto must not be checked out in ANY
+# worktree of this repository (D5): advancing a checked-out branch's ref by
+# compare-and-swap would leave that worktree's own index and working tree
+# silently disagreeing with it. Read into a file first, not piped straight
+# into `grep -q` — under `pipefail`, `grep -q`'s early exit on the first
+# match can SIGPIPE the upstream `git worktree list` and turn a genuine
+# match into a spurious pipeline failure (repo lesson).
+#
+# Rework (Finding 2, round 1 Major, TOCTOU): a single pre-lock call is not
+# enough — a worktree can check out `--onto` during the bounded wait for
+# the lock, and the compare-and-swap only protects against the coordinator
+# REF moving, never against some OTHER worktree's own index/working-tree
+# state going stale relative to it. Defined as a function, called once
+# pre-lock (fail fast, before making a caller wait on a request that would
+# refuse anyway) and once more inside the critical section, immediately
+# before composition — the two call sites share this one definition so
+# they can never drift apart from each other.
+check_onto_not_checked_out() {
+  local list="$WORKDIR/worktrees.list"
+  git worktree list --porcelain > "$list" 2>/dev/null \
+    || die 2 structural "failed to enumerate this repository's worktrees"
+  if grep -qxF "branch $ONTO_REF" "$list"; then
+    die 2 structural "--onto ($ONTO_ARG -> $ONTO_REF) is checked out in a worktree of this repository"
+  fi
+}
 
 # --worker-tree, if given, must genuinely be a worktree of THIS repository
 # (identity is the shared git directory, the authoritative test — two
 # worktrees of the same repository always share the identical
-# git-common-dir, by construction).
+# git-common-dir, by construction). Identity/existence is a structural,
+# one-time fact about repository topology (not state that goes stale the
+# way a checked-out branch or a dirty working tree does), so it is
+# validated once, here, pre-lock — not re-verified post-lock (see the
+# TOCTOU inventory in this task's provenance record for the full
+# apply/not-apply reasoning).
 WORKER_TREE_LINE="not-checked"
 if [ -n "$WORKER_TREE" ]; then
   [ -d "$WORKER_TREE" ] || die 2 structural "--worker-tree is not a directory: $WORKER_TREE"
@@ -286,6 +303,25 @@ if [ -n "$WORKER_TREE" ]; then
   WORKER_TREE_LINE="$WORKER_TREE"
 fi
 
+check_onto_not_checked_out
+
+# check_worker_tree_clean — the worker's worktree (if any) carries no
+# uncommitted or untracked-non-ignored changes (D4). Same TOCTOU shape as
+# check_onto_not_checked_out above, and the SAME class per this loop's
+# same-class-2 rule (the reviewer's own synthesis ledger names it as one
+# class with the --onto race, narrower blast radius) — bulk-applied
+# alongside it rather than left as a standalone deferral: called once
+# pre-lock, once more post-lock.
+check_worker_tree_clean() {
+  [ -n "$WORKER_TREE" ] || return 0
+  local dirty
+  dirty="$(git -C "$WORKER_TREE" status --porcelain --untracked-files=normal 2>&1)" \
+    || die 2 structural "failed to read --worker-tree status: $WORKER_TREE"
+  if [ -n "$dirty" ]; then
+    die 1 diverged "the worker's worktree ($WORKER_TREE) carries uncommitted or untracked-non-ignored changes"
+  fi
+}
+
 # --- content refusals independent of the coordinator ref (D4/D6, exit 1) ----
 if git merge-base --is-ancestor "$B" "$W"; then
   rc_anc=0
@@ -298,13 +334,7 @@ elif [ "$rc_anc" -ne 0 ]; then
   die 2 structural "git merge-base --is-ancestor failed unexpectedly (exit $rc_anc)"
 fi
 
-if [ -n "$WORKER_TREE" ]; then
-  WT_DIRTY="$(git -C "$WORKER_TREE" status --porcelain --untracked-files=normal 2>&1)" \
-    || die 2 structural "failed to read --worker-tree status: $WORKER_TREE"
-  if [ -n "$WT_DIRTY" ]; then
-    die 1 diverged "the worker's worktree ($WORKER_TREE) carries uncommitted or untracked-non-ignored changes"
-  fi
-fi
+check_worker_tree_clean
 
 if git diff --quiet "$B" "$W"; then
   rc_diff=0
@@ -396,6 +426,18 @@ done
 
 T="$(git rev-parse --verify --quiet "${ONTO_REF}^{commit}" 2>/dev/null)" \
   || die 2 structural "--onto no longer resolves to a commit: $ONTO_ARG ($ONTO_REF)"
+
+# TOCTOU re-verification (Finding 2, round 1 Major + same-class Minor): the
+# pre-lock reads of these two preconditions only prove they held BEFORE the
+# bounded wait for the lock — a worktree can check out `--onto`, or a
+# worker's worktree can become dirty, during that same wait, and the
+# compare-and-swap below only protects the coordinator REF from moving; it
+# does nothing for some OTHER worktree's own index/working tree silently
+# disagreeing with a ref this call is about to advance. Re-run both here,
+# now that the lock is actually held and nothing can change either
+# condition again before `update-ref` (below).
+check_onto_not_checked_out
+check_worker_tree_clean
 
 # Claim sets (D3/D7): derived fresh from git, NUL-separated, rename-blind
 # (--no-renames, so a rename claims both its old and new path), unaffected
@@ -508,33 +550,125 @@ fi
 
 # --- compose the tree (D5): coordinator tip's tree, with exactly the
 #     worker's claimed paths taking their state at the worker tip — via a
-#     private scratch index only, never the real index, never a worktree. --
+#     private scratch index only, never the real index, never a worktree.
+#
+# Entry-type-aware, two-pass (rework: Finding 1, round 1 Blocker). A single
+# claimed path can transition between ANY of {absent, blob, symlink, tree,
+# gitlink} at either end (Input space item 5: "a directory replaced by a
+# file, or a file replaced by a directory" is a DECLARED-REACHABLE input
+# class this composition must handle correctly, not merely fail closed
+# on). `git diff --name-only` always reports such a replacement as TWO
+# separate leaf-path entries (the old leaf disappearing, the new leaf
+# appearing) — e.g. `x` deleted and `x/y` added, or the reverse — so both
+# halves are always present among this worker's own WPATHS; the ordering
+# of the two passes below is what makes composing them correct regardless
+# of which order git's diff happened to list them in:
+#   pass 1 (REMOVE) — every claimed path that is ABSENT at the worker tip,
+#     OR whose worker-tip entry is a TREE (the worker converted this path
+#     from a leaf into a directory — its own leaf entry must be cleared;
+#     the real replacement content arrives via the sibling claimed child
+#     path, e.g. "x/y" alongside "x"), is force-removed FIRST.
+#   pass 2 (ADD) — every claimed path that resolves to a blob or symlink
+#     (100644/100755/120000 — the MODE alone distinguishes a symlink from
+#     a regular blob; ls-tree's TYPE column reports "blob" for both) is
+#     staged via --cacheinfo SECOND, once pass 1 has already cleared any
+#     stale directory/file conflict at that exact path.
+# Removing every "goes away or becomes a directory" path before adding any
+# "becomes a leaf" path — for the WHOLE claim set, not interleaved
+# per-path — is what makes this correct regardless of processing order.
+# The original bug interleaved remove/add per path in array order, which
+# reproduced exactly the two failure modes Codex's round-1 review found:
+# a corrupted "phantom" tree entry composing file->directory (nothing
+# removed the old leaf's own now-wrong TREE-typed cacheinfo before adding
+# the child), and a spurious "appears as both a file and a directory"
+# refusal composing directory->file when the new leaf was staged before
+# its old directory's children were cleared.
+#
+# Gitlinks (mode 160000, ls-tree TYPE "commit") are declared OUT OF SCOPE
+# by the Input space's own closing bullet ("Submodules... not modelled")
+# — never silently staged. Checked on BOTH sides: the coordinator tip's
+# OWN pre-landing state at this path (read directly from $T, not through
+# the mutating scratch index — equivalent to reading it from the base,
+# since any path reaching composition is, by the disjointness check
+# already passed, identical between base and T), and the worker's own end
+# state. A landing that would introduce, remove or touch a gitlink at a
+# claimed path refuses (`structural`) rather than risk composing
+# something this mechanism has never modelled — distinct from the
+# directory<->file case above, which IS a declared-reachable, in-scope
+# input class and therefore composes rather than refuses.
 SCRATCH_IDX="$WORKDIR/index"
 GIT_INDEX_FILE="$SCRATCH_IDX" git read-tree "$T" \
   || die 2 structural "failed to seed the scratch index from the coordinator tip"
 
+declare -a WKIND=()   # absent | blob | tree, per claimed path (gitlink refuses immediately)
+declare -a WMODE=()
+declare -a WSHA=()
+
 ci=0
 while [ "$ci" -lt "$WCOUNT" ]; do
   p="${WPATHS[$ci]}"
-  entry="$(git ls-tree -z "$W" -- ":(literal)$p")"
-  if [ -z "$entry" ]; then
-    # Absent at the worker tip relative to the base: a deletion. Force-remove
-    # works even when the path is not currently present in the scratch
-    # index at all (measured live against this exact private-index shape),
-    # so this is safe regardless of whether the coordinator tip already
-    # lacked it.
-    GIT_INDEX_FILE="$SCRATCH_IDX" git update-index --force-remove -- "$p" \
-      || die 2 structural "failed to remove a deleted path from the scratch index: $(printf '%q' "$p")"
+
+  old_entry="$(git ls-tree -z "$T" -- ":(literal)$p")"
+  new_entry="$(git ls-tree -z "$W" -- ":(literal)$p")"
+
+  old_type=""
+  if [ -n "$old_entry" ]; then
+    old_hdr="${old_entry%%$'\t'*}"
+    old_rest="${old_hdr#* }"
+    old_type="${old_rest%% *}"
+  fi
+
+  if [ -z "$new_entry" ]; then
+    WKIND[ci]="absent"
   else
-    hdr="${entry%%$'\t'*}"
-    mode="${hdr%% *}"
-    rest="${hdr#* }"
-    sha="${rest#* }"
-    # Reusing the tree entry's own mode+sha directly (never reading blob
-    # content) is what carries a symlink as a symlink entry rather than as
-    # its target's contents, and an executable-bit-only change correctly,
-    # with no special-casing needed for either.
-    GIT_INDEX_FILE="$SCRATCH_IDX" git update-index --add --cacheinfo "$mode" "$sha" "$p" \
+    new_hdr="${new_entry%%$'\t'*}"
+    new_mode="${new_hdr%% *}"
+    new_rest="${new_hdr#* }"
+    new_type="${new_rest%% *}"
+    new_sha="${new_rest#* }"
+    if [ "$new_type" = "tree" ]; then
+      WKIND[ci]="tree"
+    elif [ "$new_type" = "commit" ]; then
+      WKIND[ci]="gitlink"
+    else
+      WKIND[ci]="blob"
+      WMODE[ci]="$new_mode"
+      WSHA[ci]="$new_sha"
+    fi
+  fi
+
+  if [ "$old_type" = "commit" ] || [ "${WKIND[ci]}" = "gitlink" ]; then
+    pq="$(printf '%q' "$p")"
+    die 2 structural "path $pq touches a gitlink (submodule) entry, which this mechanism does not compose (Input space: submodules are not modelled)"
+  fi
+
+  ci=$((ci + 1))
+done
+
+# Pass 1 — removals (absent at the worker tip, or the worker converted
+# this leaf path into a directory).
+ci=0
+while [ "$ci" -lt "$WCOUNT" ]; do
+  if [ "${WKIND[$ci]}" = "absent" ] || [ "${WKIND[$ci]}" = "tree" ]; then
+    p="${WPATHS[$ci]}"
+    GIT_INDEX_FILE="$SCRATCH_IDX" git update-index --force-remove -- "$p" \
+      || die 2 structural "failed to remove a path from the scratch index: $(printf '%q' "$p")"
+  fi
+  ci=$((ci + 1))
+done
+
+# Pass 2 — additions (a blob or symlink at the worker tip), only after
+# every removal above has already cleared any stale directory/file
+# conflict at that exact path. Reusing the tree entry's own mode+sha
+# directly (never reading blob content) is what carries a symlink as a
+# symlink entry rather than as its target's contents, and an
+# executable-bit-only change correctly, with no special-casing needed for
+# either.
+ci=0
+while [ "$ci" -lt "$WCOUNT" ]; do
+  if [ "${WKIND[$ci]}" = "blob" ]; then
+    p="${WPATHS[$ci]}"
+    GIT_INDEX_FILE="$SCRATCH_IDX" git update-index --add --cacheinfo "${WMODE[$ci]}" "${WSHA[$ci]}" "$p" \
       || die 2 structural "failed to stage a changed path into the scratch index: $(printf '%q' "$p")"
   fi
   ci=$((ci + 1))
