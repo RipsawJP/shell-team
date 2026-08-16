@@ -1369,3 +1369,26 @@ that file's order.
   detection, which is this suite's version of the paired-control-proves-
   the-pinning-has-teeth discipline: proving the ONE ambient setting that
   could matter here does not, rather than pinning settings that cannot.
+- T-1078: `CHECK_ACS_TIMEOUT=120` is sufficient for
+  `T-1078-tier3-pilot.md` itself (spec preamble's own stated value; no
+  raise beyond that needed). `CHECK_ACS_TIMEOUT=300` was needed for the
+  five older, heavier merged specs this task's own Blast radius exercise
+  re-ran in full at both the branch point and HEAD
+  (`T-1069-phase-multiplexing.md`, `T-1073-harness-agent-concurrency.md`,
+  `T-1074-fanout-orchestration.md`,
+  `T-1075-fanout-adoption-versioning.md`,
+  `T-1077-worktree-reconcile.md`); `T-1077`'s own full suite alone took
+  long enough to need a dedicated single, longer-timeout invocation
+  rather than sharing a 2-minute parallel batch with the other four. A
+  later task doing the same kind of base-vs-head re-run for a merged
+  spec that reads this note should expect the same 300s floor, not
+  120s. **A `git worktree add --detach <path> <ref>` scratch clone does
+  not carry the gitignored runs corpus** (`.shell-team/runs/*.jsonl`):
+  any criterion reading that corpus (e.g. T-1076's own **AC15**) reads
+  `not-met`/FAIL in a scratch worktree even when it is `met`/PASS in the
+  long-lived checkout, which is a measurement artefact of the worktree
+  itself, not a regression — already documented once in
+  `T-1075-fanout-adoption-versioning.md`'s own Blast radius entry above,
+  and reproduced identically here; a later task differencing base vs
+  head via a scratch worktree should expect and disclose this same
+  artefact rather than chase it as a real flip.
