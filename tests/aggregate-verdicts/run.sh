@@ -330,6 +330,101 @@ else
 fi
 
 # =============================================================================
+# case: double-sentinel-refused — round 2 rework, Codex review round 1 Major
+# 1: a part carrying TWO `- sentinel:` lines for the same claimed,
+# zero-verdict unit must refuse (round 1's committed script wrongly
+# aggregated this at exit 0, promoting both lines into the region). This
+# asserts the specific new refusal directly (not a round-1-script
+# scratch-diff), since the earlier behaviour is already fully described by
+# the review record and the fix is small enough that the direct assertion
+# is the cheaper, equally-conclusive check.
+# =============================================================================
+DS_POP="$T/ds-pop"; printf '%s\n' u1 u2 > "$DS_POP"
+DS_PART="$T/ds-part"
+printf '%s\n' '- unit: u1' '- unit: u2' '- verdict: u1 — AC1: PASS' '- sentinel: u2 — exit=2 no-verdict-lines' '- sentinel: u2 — exit=2 no-verdict-lines' > "$DS_PART"
+DS_OUT="$T/ds.out"; DS_ERR="$T/ds.err"
+rc_ds="$(run_agg "$DS_OUT" "$DS_ERR" --label ds --population "$DS_POP" --part qa-1="$DS_PART")"
+cls_ds="$(sed -n '1s/^aggregate-verdicts: \([a-z-][a-z-]*\):.*/\1/p' "$DS_ERR")"
+if [ "$rc_ds" = "1" ] && [ "$cls_ds" = "malformed-record" ] && [ ! -s "$DS_OUT" ]; then
+  pass "T-1074 double-sentinel-refused"
+else
+  fail "T-1074 double-sentinel-refused: expected exit 1 / malformed-record / empty stdout for two sentinel lines on one zero-verdict unit, got rc=$rc_ds class=$cls_ds"
+fi
+
+# =============================================================================
+# case: whitespace-only-tab-refused — round 2 rework, Codex review round 1
+# Major 2: a part-file line consisting SOLELY of one literal TAB must refuse
+# control-character (round 1's blank-line filter silently stripped it as
+# "blank" before has_control_char ever ran).
+# =============================================================================
+WSTAB_POP="$T/wstab-pop"; printf '%s\n' u1 u2 > "$WSTAB_POP"
+WSTAB_TAB="$(printf '\t')"
+WSTAB_PART="$T/wstab-part"
+printf '%s\n' '- unit: u1' '- unit: u2' '- verdict: u1 — AC1: PASS' '- verdict: u2 — AC1: PASS' "$WSTAB_TAB" > "$WSTAB_PART"
+WSTAB_OUT="$T/wstab.out"; WSTAB_ERR="$T/wstab.err"
+rc_wstab="$(run_agg "$WSTAB_OUT" "$WSTAB_ERR" --label wstab --population "$WSTAB_POP" --part qa-1="$WSTAB_PART")"
+cls_wstab="$(sed -n '1s/^aggregate-verdicts: \([a-z-][a-z-]*\):.*/\1/p' "$WSTAB_ERR")"
+if [ "$rc_wstab" = "1" ] && [ "$cls_wstab" = "control-character" ] && [ ! -s "$WSTAB_OUT" ]; then
+  pass "T-1074 whitespace-only-tab-refused"
+else
+  fail "T-1074 whitespace-only-tab-refused: expected exit 1 / control-character / empty stdout for a lone-TAB part-file line, got rc=$rc_wstab class=$cls_wstab"
+fi
+
+# =============================================================================
+# case: population-whitespace-only-tab-refused — the same Major 2 ordering
+# bug at its OTHER call site (the population file's own blank-line filter,
+# bin/aggregate-verdicts.sh's Phase 0), closed the same way.
+# =============================================================================
+POPTAB_POP="$T/poptab-pop"
+printf '%s\n' u1 u2 "$WSTAB_TAB" > "$POPTAB_POP"
+POPTAB_PART="$T/poptab-part"
+printf '%s\n' '- unit: u1' '- unit: u2' '- verdict: u1 — AC1: PASS' '- verdict: u2 — AC1: PASS' > "$POPTAB_PART"
+POPTAB_OUT="$T/poptab.out"; POPTAB_ERR="$T/poptab.err"
+rc_poptab="$(run_agg "$POPTAB_OUT" "$POPTAB_ERR" --label poptab --population "$POPTAB_POP" --part qa-1="$POPTAB_PART")"
+cls_poptab="$(sed -n '1s/^aggregate-verdicts: \([a-z-][a-z-]*\):.*/\1/p' "$POPTAB_ERR")"
+if [ "$rc_poptab" = "1" ] && [ "$cls_poptab" = "control-character" ] && [ ! -s "$POPTAB_OUT" ]; then
+  pass "T-1074 population-whitespace-only-tab-refused"
+else
+  fail "T-1074 population-whitespace-only-tab-refused: expected exit 1 / control-character / empty stdout for a lone-TAB population-file line, got rc=$rc_poptab class=$cls_poptab"
+fi
+
+# =============================================================================
+# case: spaces-only-line-refused — the fail-closed reading of D2's "Blank
+# lines are ignored" (recorded in .shell-team/provenance/T-1074.md): a line
+# consisting solely of spaces is NOT read as blank, so it survives to the
+# per-line shape check and refuses malformed-record (matching none of the
+# three record shapes), rather than being silently dropped.
+# =============================================================================
+WSSPACE_POP="$T/wsspace-pop"; printf '%s\n' u1 u2 > "$WSSPACE_POP"
+WSSPACE_PART="$T/wsspace-part"
+printf '%s\n' '- unit: u1' '- unit: u2' '- verdict: u1 — AC1: PASS' '- verdict: u2 — AC1: PASS' '   ' > "$WSSPACE_PART"
+WSSPACE_OUT="$T/wsspace.out"; WSSPACE_ERR="$T/wsspace.err"
+rc_wsspace="$(run_agg "$WSSPACE_OUT" "$WSSPACE_ERR" --label wsspace --population "$WSSPACE_POP" --part qa-1="$WSSPACE_PART")"
+cls_wsspace="$(sed -n '1s/^aggregate-verdicts: \([a-z-][a-z-]*\):.*/\1/p' "$WSSPACE_ERR")"
+if [ "$rc_wsspace" = "1" ] && [ "$cls_wsspace" = "malformed-record" ] && [ ! -s "$WSSPACE_OUT" ]; then
+  pass "T-1074 spaces-only-line-refused"
+else
+  fail "T-1074 spaces-only-line-refused: expected exit 1 / malformed-record / empty stdout for a spaces-only part-file line, got rc=$rc_wsspace class=$cls_wsspace"
+fi
+
+# =============================================================================
+# case: empty-line-still-ignored — regression: a GENUINELY empty (zero-
+# length) line among otherwise well-formed content stays silently ignored
+# and the fan-out still aggregates at exit 0, unaffected by narrowing the
+# blank-line filter to '^$'.
+# =============================================================================
+WSEMPTY_POP="$T/wsempty-pop"; printf '%s\n' u1 u2 > "$WSEMPTY_POP"
+WSEMPTY_PART="$T/wsempty-part"
+printf '%s\n' '- unit: u1' '- unit: u2' '' '- verdict: u1 — AC1: PASS' '- verdict: u2 — AC1: PASS' > "$WSEMPTY_PART"
+WSEMPTY_OUT="$T/wsempty.out"; WSEMPTY_ERR="$T/wsempty.err"
+rc_wsempty="$(run_agg "$WSEMPTY_OUT" "$WSEMPTY_ERR" --label wsempty --population "$WSEMPTY_POP" --part qa-1="$WSEMPTY_PART")"
+if [ "$rc_wsempty" = "0" ] && [ -s "$WSEMPTY_OUT" ] && [ "$(grep -c . "$WSEMPTY_ERR" || true)" = "0" ]; then
+  pass "T-1074 empty-line-still-ignored"
+else
+  fail "T-1074 empty-line-still-ignored: expected a genuinely empty line to stay silently ignored (exit 0), got rc=$rc_wsempty"
+fi
+
+# =============================================================================
 # case: duplicate-labelled-ac — the concrete, documented hazard D4 is
 # designed to survive: a spec quoting a duplicate-labelled AC inside a
 # fenced illustrative example produces two IDENTICAL "**AC1**: PASS"-shaped

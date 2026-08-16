@@ -235,7 +235,16 @@ has_control_char() {
 # Phase 0 — validate the fixed population: non-empty, free of control
 # characters, free of a duplicate entry.
 # ---------------------------------------------------------------------------
-grep -v '^[[:space:]]*$' "$POP" > "$WORKDIR/pop.raw" 2>/dev/null || true
+# "Blank" is read narrowly (a strictly zero-length line), not as
+# "whitespace-only" (D2 says "Blank lines are ignored" and does not say
+# whitespace-only lines count as blank; the fail-closed reading is chosen —
+# see .shell-team/provenance/T-1074.md). Filtering whitespace-only lines out
+# BEFORE the control-character check ran was the exact bug Codex review
+# round 1's Major 2 reproduced: a lone-TAB line was silently dropped as
+# "blank" and never reached has_control_char. Narrowing the filter to '^$'
+# means a TAB-only line now survives into pop.raw, where has_control_char
+# below still inspects it.
+grep -v '^$' "$POP" > "$WORKDIR/pop.raw" 2>/dev/null || true
 popcount="$(grep -c . "$WORKDIR/pop.raw" 2>/dev/null || true)"
 [ -n "$popcount" ] || popcount=0
 if [ "$((10#$popcount))" -eq 0 ]; then
@@ -275,7 +284,12 @@ while [ "$i" -lt "$n" ]; do
     die 3 empty-part "part '$pname' file is empty: $pfile"
   fi
 
-  grep -v '^[[:space:]]*$' "$pfile" > "$WORKDIR/part.$i.raw" 2>/dev/null || true
+  # Same narrow "blank" reading as Phase 0's population read, above — a
+  # whitespace-only line (e.g. a lone TAB) is not blank, so it survives to
+  # has_control_char just below, and then to the per-line shape check
+  # further down if it contains no control character (e.g. a spaces-only
+  # line refuses as malformed-record, matching none of the three shapes).
+  grep -v '^$' "$pfile" > "$WORKDIR/part.$i.raw" 2>/dev/null || true
   if has_control_char "$WORKDIR/part.$i.raw"; then
     die 1 control-character "part '$pname' ($pfile) contains a control character"
   fi
@@ -393,8 +407,16 @@ while [ "$i" -lt "$n" ]; do
 done
 
 # 2e — sentinel exclusivity: for every claimed unit, either it has one or
-# more verdicts and no sentinel, or zero verdicts and exactly one sentinel —
-# never both absent and never both present.
+# more verdicts and no sentinel, or zero verdicts and EXACTLY one sentinel —
+# never both absent, never both present, and never more than one sentinel
+# for a zero-verdict unit (D3: "carries exactly one `- sentinel:` line" —
+# a second sentinel line for the same zero-verdict unit was Codex review
+# round 1's Major 1, silently accepted with both lines promoted; classified
+# malformed-record, since D3's "exactly one" is a cardinality shape D3 fixes
+# for the unit's own record set, the same way D2's per-line shapes are
+# fixed, and no other closed-vocabulary token names a duplicate sentinel
+# without misdescribing the mechanism — see
+# .shell-team/provenance/T-1074.md).
 while IFS= read -r unit; do
   [ -n "$unit" ] || continue
   v="$(grep -Fxc -- "$unit" "$WORKDIR/verdictunits.all" 2>/dev/null || true)"
@@ -403,6 +425,9 @@ while IFS= read -r unit; do
   [ -n "$s" ] || s=0
   if [ "$((10#$v))" -eq 0 ] && [ "$((10#$s))" -eq 0 ]; then
     die 1 missing-sentinel "unit '$unit' has no verdict and no sentinel"
+  fi
+  if [ "$((10#$v))" -eq 0 ] && [ "$((10#$s))" -gt 1 ]; then
+    die 1 malformed-record "unit '$unit' carries $s '- sentinel:' lines but D3 requires exactly one for a zero-verdict unit"
   fi
   if [ "$((10#$v))" -gt 0 ] && [ "$((10#$s))" -gt 0 ]; then
     die 1 sentinel-with-verdicts "unit '$unit' has both a sentinel and at least one verdict"
