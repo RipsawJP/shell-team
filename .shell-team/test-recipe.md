@@ -1067,3 +1067,92 @@ that file's order.
   faster to iterate on than re-running the whole ~189s suite for every
   probe, and the anchors stay in sync with the real file since they are
   read from it live rather than copied.
+- T-1076 round 4 (surgical rework, Codex review round 3 — Blocker + Major +
+  Minor): three fixes, all confined to `tests/log-run/run.sh` (no
+  production-code change this round — `bin/log-run.sh`'s own `lock_mtime`
+  was re-read and confirmed correct; the defect was entirely in the test's
+  own assertions).
+  1. **`lock-mtime-legible` (Blocker) — the round-3 assertions were
+     BSD-shape-only and would fail deterministically on this repo's own
+     `ubuntu-latest` CI (GNU `stat -c '%y'`).** Round 3's own "disclosed as
+     unverified" bound on the GNU branch is exactly what let this Blocker
+     through, so this round closes the gap by EXECUTING the GNU branch,
+     not by disclosing it more carefully a second time. Fixed two ways:
+     (a) rewrote the three round-3 assertions (month name, HH:MM:SS,
+     year-anchored-to-tail) into a platform-agnostic pair — an
+     HH:MM:SS-shaped time anywhere in the string, AND a plausible
+     `(19|20)[0-9]{2}` year anywhere in the string, neither anchored to
+     either end — verified to hold for both BSD's default format (`Jan 15
+     10:30:45 2024`) and GNU's documented format
+     (`2024-01-15 10:30:45.123456789 +0000`), and to still reject all four
+     garbled values this test exists to catch (`4096m`, `unknown`,
+     `4096manual`, `Aug 4096` — none has a colon-separated time, so all
+     four fail the time check alone) via a dedicated negative-literal loop
+     run before the real-host assertion. (b) built a PATH-prepended fake
+     `stat` (answers `--version` so `lock_mtime`'s own dialect probe
+     selects the GNU branch, `-c '%y'` with a realistic GNU byte string,
+     refuses `-f` outright) and ran the REAL `lock_mtime` function —
+     extracted from `bin/log-run.sh` with `sed -n
+     '/^lock_mtime() {$/,/^}$/p'`, the same unique-anchor technique this
+     file already uses elsewhere, not a reimplementation — against that
+     stub, live, on this session's own macOS host. Stub run's actual
+     output, captured this session: `2024-03-07 10:15:42.123456789
+     +0000`, printed via `PASS: T-1076 lock-mtime-legible (GNU stub) —
+     lock_mtime selects the GNU branch against a fake GNU stat and
+     returns '2024-03-07 10:15:42.123456789 +0000', which the
+     platform-agnostic check pair accepts` — an executed positive
+     control, not another round of reasoning about a documented format
+     string.
+  2. **`signal-race-release-side` (Major) — the reworked choreography's
+     ordering was already deterministic (round 3's own fix), but the
+     `sleep 8` (both P1 mutants) / `sleep 12` (the dedicated P2 mutant)
+     widths remained fixed wall-clock BUDGETS: exhausted under enough CI
+     contention, either could let a mutant complete its own lifecycle and
+     return before the driver even sent — or benefited from — the kill,
+     flipping the verdict on scheduling grounds. This is the third
+     consecutive round this exact fixture family drew a scheduling-timing
+     finding, which the review itself reads as a signal about the
+     fixed-sleep-margin PATTERN, not about any one width. Removed the
+     load-bearing widths entirely: `REL_OLD_REPL`/`REL_FIXED_REPL` now
+     wait on an explicit `${LOCK_DIR}.rel-proceed-marker` file the test
+     driver writes (gated so it is only ever written for the
+     `expect_rc=0` FIXED-shape call — OLD-shape's kill is delivered
+     essentially instantly since its traps stay unmasked, so it never
+     needs or waits on this marker), and the dedicated P2 mutant
+     (`REL_P2_BIN`) now waits on `${LOCK_DIR}.p2-proceed-marker`, written
+     by the driver only after the "successor survives" check has already
+     run. Both waits carry a `-lt 60` iteration cap as a pure anti-hang
+     backstop (a test bug that never sends the kill or writes the marker
+     should eventually fail loudly rather than hang the suite forever) —
+     it is NOT sized to budget any correctness-relevant transition, unlike
+     the widths it replaces. Verified with a standalone extraction driver
+     (the same technique round 3 recorded, reused rather than reinvented:
+     `replace_range`, `ACQ_START`/`ACQ_END`, the release-side block, all
+     replayed from the real file's own anchors) run 5 consecutive times:
+     `grep -c '^=== iteration' <log>` = **5**, `grep -c '^PASS: T-1076
+     signal-race-release-side' <log>` = **5**, `grep -c '^FAIL:' <log>` =
+     **0** — no flake, both the OLD-shape theft arm and the FIXED-shape
+     absorb arm passing on every run. Per-iteration wall time (this driver
+     also runs the unrelated `signal-race-acquire-side` case in the same
+     pass): 5 iterations totaled ~7 minutes on this shared, contended
+     sandbox host (~82s/iteration average) — measured once in isolation
+     (release-side only, no acquire-side): a single run took 69s. Neither
+     number is directly comparable to round 3's own recorded ~30-35s
+     figure (different isolation scope, different host-contention sample
+     at measurement time); recorded here as this round's own honest
+     measurement, not a claimed improvement or regression.
+  3. **AC10 disclosure comment (Minor) — wording only.** Removed
+     "guarantees" and "near-certain... on any real multi-core host" (an
+     unqualified universal claim from a sample of runs on one host);
+     restated as the measured evidence only (`detected` observed in every
+     recorded run of this arm across this task's full history, not
+     established for any other host or scheduler), and reframed the
+     omitted synchronization barrier as a scope choice for this bounded
+     rework rather than a technical necessity. No change to the test's
+     actual behavior or pass/fail outcome.
+  Full-suite re-verification this round: `bash tests/log-run/run.sh` run
+  once, live, this session — see this task's own hand-off for the exact
+  PASS/FAIL tally command and result; budget the same `CHECK_ACS_TIMEOUT`
+  window recorded above (this round did not reduce the suite's own
+  worst-case wall-clock ceiling, since AC9/AC10 each still run the whole
+  suite once).
