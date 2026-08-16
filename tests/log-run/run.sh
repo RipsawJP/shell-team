@@ -642,16 +642,45 @@ done
 pass "T-1076 seq-auto-escaping — --seq auto continues the count for run_ids containing backslash/quote characters"
 
 # =====================================================================
-# T-1076 round 2 (Codex Blocker fix) — signal-timing race regression on
-# the LOCK_ACQUIRED guard. Two windows, each pinned by an A/B comparison:
-# an OLD-SHAPE mutant that structurally reproduces round-1's reviewed
-# code (no `trap '' INT TERM` masking around the transition) against a
-# FIXED-SHAPE mutant carrying the SAME artificially-widened window but
-# with this round's masking intact. Both mutants in a pair inject an
-# identical `sleep 3` at the transition so the otherwise-nanosecond-scale
-# race becomes a deterministic multi-second window a real signal can be
-# aimed into — the comparison is the test: same window, different shape,
-# different (and opposite) outcome.
+# T-1076 signal-mask regression coverage.
+#
+# Rounds 2-4 pinned this behaviour with an A/B comparison: an OLD-SHAPE
+# mutant reconstructing round-1's pre-fix code (no `trap '' INT TERM`
+# masking around the acquire/release transitions) run against a
+# FIXED-SHAPE mutant carrying the shipped masking. Four consecutive
+# review rounds drew a timing-adjacent Blocker/Major finding from that
+# exact fixture family — round 2 found two real signal races in the
+# shipped code (closed there); round 3 found a scheduling-dependent kill
+# in the release-side choreography (closed there); round 4 found the
+# fixed-width `sleep` budgets that choreography depended on were
+# themselves a regression risk and replaced them with marker-driven
+# waits — and that very fix introduced the round-4 finding this round
+# closes: the OLD-shape arm's re-entrant `release_lock()` call ALSO
+# waited on `rel-proceed-marker`, a marker the driver deliberately never
+# writes for that arm, so the killed OLD-shape holder actually exited
+# only once the 60-iteration anti-hang backstop fired — an unconditional
+# ~60s stall, contradicting three shipped round-4 claims (a code
+# comment, a provenance decision entry, and a test-recipe entry — all
+# three corrected as part of this round; see
+# `.shell-team/provenance/T-1076.md`'s round-5 entries and
+# `.shell-team/test-recipe.md`'s T-1076 round-5 entry).
+#
+# T-1076 rework round 5 (operator-ratified design-premise change, board
+# record `d726e80`): rather than patch this fixture family a fourth
+# time, the OLD-shape reproduction machinery is RETIRED — the mutant
+# construction, its A/B assertions, and the re-entrant-release
+# choreography that kept generating a new timing defect every round it
+# was touched. The historical proof that the pre-fix code genuinely
+# carried the acquire-side orphan and the release-side theft stays
+# banked, EXECUTED, in `.shell-team/reviews/T-1076.md` rounds 2-4 — it
+# is not re-derived here. Ongoing regression protection for the signal
+# masking passes to two things instead: the FIXED-shape determinism
+# tests below (the SHIPPED code, driven through the same acquire/release
+# choreography, absorbing a real `kill -TERM` cleanly) and the
+# grep-level shape pin further down (`signal-mask-shape-pin`), which
+# fails the instant the masking brackets are silently removed from
+# `bin/log-run.sh` without needing to construct or run any mutant at
+# all.
 # =====================================================================
 
 # replace_range SRC DST START-LINE END-LINE REPLFILE — replaces every line
@@ -693,15 +722,12 @@ ACQ_END='  [ "$LOCK_ACQUIRED" = "1" ] && break'
 [ "$(grep -cFx "$ACQ_START" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-acquire-side setup: start anchor is not a unique line in $LOGRUN"
 [ "$(grep -cFx "$ACQ_END" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-acquire-side setup: end anchor is not a unique line in $LOGRUN"
 
-ACQ_OLD_REPL="$TMP/acq-old-body.txt"
-cat > "$ACQ_OLD_REPL" <<'EOF'
-  if mkdir "$LOCK_DIR" 2>/dev/null; then
-    sleep 3
-    LOCK_ACQUIRED=1
-  fi
-EOF
-ACQ_FIXED_REPL="$TMP/acq-fixed-body.txt"
-cat > "$ACQ_FIXED_REPL" <<'EOF'
+# The shipped masking (bin/log-run.sh:625-636), reproduced with an
+# injected sleep that widens the otherwise nanosecond-scale window into a
+# multi-second one a real signal can be aimed into deterministically.
+# Not an OLD-vs-FIXED comparison any more — this IS the shipped shape.
+ACQ_REPL="$TMP/acq-body.txt"
+cat > "$ACQ_REPL" <<'EOF'
   trap '' INT TERM
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     sleep 3
@@ -711,109 +737,52 @@ cat > "$ACQ_FIXED_REPL" <<'EOF'
   trap 'on_lock_signal TERM 143' TERM
 EOF
 
-ACQ_OLD_BIN="$TMP/acqrace-old.sh"
-ACQ_FIXED_BIN="$TMP/acqrace-fixed.sh"
-replace_range "$LOGRUN" "$ACQ_OLD_BIN" "$ACQ_START" "$ACQ_END" "$ACQ_OLD_REPL"
-replace_range "$LOGRUN" "$ACQ_FIXED_BIN" "$ACQ_START" "$ACQ_END" "$ACQ_FIXED_REPL"
-bash -n "$ACQ_OLD_BIN" || fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant has a syntax error"
-bash -n "$ACQ_FIXED_BIN" || fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant has a syntax error"
-cmp -s "$LOGRUN" "$ACQ_OLD_BIN" && fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant is byte-identical to the real writer"
-cmp -s "$LOGRUN" "$ACQ_FIXED_BIN" && fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant is byte-identical to the real writer"
-grep -q '^    sleep 3$' "$ACQ_OLD_BIN" || fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant's sleep injection did not apply"
-grep -q '^    sleep 3$' "$ACQ_FIXED_BIN" || fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant's sleep injection did not apply"
+ACQ_BIN="$TMP/acqrace.sh"
+replace_range "$LOGRUN" "$ACQ_BIN" "$ACQ_START" "$ACQ_END" "$ACQ_REPL"
+bash -n "$ACQ_BIN" || fail "T-1076 signal-race-acquire-side setup: mutant has a syntax error"
+cmp -s "$LOGRUN" "$ACQ_BIN" && fail "T-1076 signal-race-acquire-side setup: mutant is byte-identical to the real writer"
+grep -q '^    sleep 3$' "$ACQ_BIN" || fail "T-1076 signal-race-acquire-side setup: sleep injection did not apply"
 
-# OLD-shape: mkdir succeeds, enters the injected sleep with NO trap mask —
-# an on_lock_signal fired here sees LOCK_ACQUIRED still 0, skips the
-# rmdir, and the lock is orphaned; exit 143.
-AOR_DIR="$TMP/acqrace-old-runs"
-mkdir -p "$AOR_DIR"
-TEAM_RUNS_DIR="$AOR_DIR" bash "$ACQ_OLD_BIN" acqrace --run-id A --seq 1 --span s --phase p \
+# mkdir succeeds inside the masked bracket; the injected sleep lives
+# entirely inside `trap '' INT TERM` .. re-arm, so a real TERM sent while
+# it sleeps is dropped by the kernel rather than observed: the mutant
+# finishes normally — row written, lock released, exit 0.
+AR_DIR="$TMP/acqrace-runs"
+mkdir -p "$AR_DIR"
+TEAM_RUNS_DIR="$AR_DIR" bash "$ACQ_BIN" acqrace --run-id A --seq 1 --span s --phase p \
   --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
-aor_pid=$!
-aor_w=0
-while [ ! -d "$AOR_DIR/.acqrace.jsonl.lock" ] && [ "$aor_w" -lt 15 ]; do
+ar_pid=$!
+ar_w=0
+while [ ! -d "$AR_DIR/.acqrace.jsonl.lock" ] && [ "$ar_w" -lt 15 ]; do
   sleep 1
-  aor_w=$((aor_w + 1))
+  ar_w=$((ar_w + 1))
 done
-[ -d "$AOR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side setup: OLD-shape mutant's lock directory never appeared"
-kill -TERM "$aor_pid" 2>/dev/null || true
+[ -d "$AR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side setup: lock directory never appeared"
+kill -TERM "$ar_pid" 2>/dev/null || true
 set +e
-wait "$aor_pid" 2>/dev/null
-aor_rc=$?
+wait "$ar_pid" 2>/dev/null
+ar_rc=$?
 set -e
-[ "$aor_rc" -eq 143 ] || fail "T-1076 signal-race-acquire-side: OLD-shape mutant expected exit 143 (killed by TERM), got $aor_rc"
-[ -d "$AOR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side: OLD-shape mutant's lock directory should have been ORPHANED (reproducing the pre-fix bug) but it is gone"
-[ ! -e "$AOR_DIR/acqrace.jsonl" ] || fail "T-1076 signal-race-acquire-side: OLD-shape mutant should not have appended a row"
+[ "$ar_rc" -eq 0 ] || fail "T-1076 signal-race-acquire-side: expected exit 0 (signal masked/dropped), got $ar_rc"
+[ ! -d "$AR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side: should have released its lock cleanly, not left it behind"
+[ -f "$AR_DIR/acqrace.jsonl" ] || fail "T-1076 signal-race-acquire-side: should still have appended its row despite the signal"
+pass "T-1076 signal-race-acquire-side — the shipped code absorbs a real TERM landing inside the widened acquire-side window (exit 0, lock released cleanly, row still appended)"
 
-# FIXED-shape: mkdir succeeds inside the masked bracket; the injected sleep
-# still lives entirely inside `trap '' INT TERM` .. re-arm, so the SAME
-# signal, sent at the SAME point, is dropped by the kernel rather than
-# observed — the mutant finishes normally: row written, lock released,
-# exit 0.
-AFR_DIR="$TMP/acqrace-fixed-runs"
-mkdir -p "$AFR_DIR"
-TEAM_RUNS_DIR="$AFR_DIR" bash "$ACQ_FIXED_BIN" acqrace --run-id A --seq 1 --span s --phase p \
-  --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
-afr_pid=$!
-afr_w=0
-while [ ! -d "$AFR_DIR/.acqrace.jsonl.lock" ] && [ "$afr_w" -lt 15 ]; do
-  sleep 1
-  afr_w=$((afr_w + 1))
-done
-[ -d "$AFR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side setup: FIXED-shape mutant's lock directory never appeared"
-kill -TERM "$afr_pid" 2>/dev/null || true
-set +e
-wait "$afr_pid" 2>/dev/null
-afr_rc=$?
-set -e
-[ "$afr_rc" -eq 0 ] || fail "T-1076 signal-race-acquire-side: FIXED-shape mutant expected exit 0 (signal masked/dropped), got $afr_rc"
-[ ! -d "$AFR_DIR/.acqrace.jsonl.lock" ] || fail "T-1076 signal-race-acquire-side: FIXED-shape mutant should have released its lock cleanly, not left it behind"
-[ -f "$AFR_DIR/acqrace.jsonl" ] || fail "T-1076 signal-race-acquire-side: FIXED-shape mutant should still have appended its row despite the signal"
-pass "T-1076 signal-race-acquire-side — OLD-shape orphans the lock on a plain TERM (exit 143), FIXED-shape absorbs the identical signal and completes cleanly (exit 0)"
-
-# --- release-side window (the more severe one): signal between `rmdir`
-#     success and LOCK_ACQUIRED reset, racing a SUCCESSOR that has since
-#     acquired the SAME path -----------------------------------------------
+# --- release-side window: signal between `LOCK_ACQUIRED=0` and `rmdir`,
+#     racing a SUCCESSOR that has since acquired the SAME path -----------
 REL_START='release_lock() {'
 REL_END='trap release_lock EXIT'
 [ "$(grep -cFx "$REL_START" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-release-side setup: start anchor is not a unique line in $LOGRUN"
 [ "$(grep -cFx "$REL_END" "$LOGRUN")" -eq 1 ] || fail "T-1076 signal-race-release-side setup: end anchor is not a unique line in $LOGRUN"
 
-# T-1076 rework round 3 (Codex round-2 Blocker fix) widened the original
-# `sleep 3` hold to `sleep 8` so the added deterministic pre-kill
-# synchronization (two sequential ~1s-granularity poll waits) fit inside
-# it before the flag settled.
-#
-# T-1076 rework round 4 (Codex round-3 Major fix): that width is STILL a
-# fixed wall-clock BUDGET — if the full pre-kill choreography (P1
-# acquire→write→release, P2 poll-acquire, the parent noticing P2's marker)
-# ever takes longer than 8s under CI contention, this window closes on its
-# own (LOCK_ACQUIRED resets / the FIXED-shape mutant re-arms its traps and
-# returns) before the driver even sends the kill, and the OLD-shape arm's
-# own theft assertion would then fail on scheduling grounds rather than on
-# a real regression. Removed the load-bearing width entirely: the mutant
-# now holds this window open by WAITING ON AN EXPLICIT release-marker file
-# the test driver writes (`${LOCK_DIR}.rel-proceed-marker`), not by
-# sleeping a fixed duration — so no finite width can be exhausted; the
-# driver controls every transition by markers, sending the kill BEFORE
-# ever writing this marker (see `relrace_choreograph` below). The `-lt 60`
-# iteration cap on the wait loop is a pure anti-hang backstop (a test bug
-# that never sends the kill or writes the marker should eventually fail
-# loudly rather than hang the suite forever) — it is NOT sized to budget
-# any correctness-relevant transition, unlike the `sleep 8` it replaces.
-REL_OLD_REPL="$TMP/rel-old-body.txt"
-cat > "$REL_OLD_REPL" <<'EOF'
-  if [ "$LOCK_ACQUIRED" = "1" ]; then
-    rmdir "$LOCK_DIR" 2>/dev/null || true
-    : > "${LOCK_DIR}.rel-probe-marker"
-    rp_w=0
-    while [ ! -f "${LOCK_DIR}.rel-proceed-marker" ] && [ "$rp_w" -lt 60 ]; do sleep 1; rp_w=$((rp_w + 1)); done
-    LOCK_ACQUIRED=0
-  fi
-}
-EOF
-REL_FIXED_REPL="$TMP/rel-fixed-body.txt"
-cat > "$REL_FIXED_REPL" <<'EOF'
+# Same widening technique as the acquire-side block above, on the shipped
+# release_lock body: an injected explicit hold (a marker-file wait, not a
+# fixed sleep — T-1076 rework round 4 already established that a fixed
+# width here is its own regression risk) so the test can land a real
+# TERM squarely inside the masked reset-then-rmdir transition and observe
+# a live successor's lock across it.
+REL_REPL="$TMP/rel-body.txt"
+cat > "$REL_REPL" <<'EOF'
   trap '' INT TERM
   if [ "$LOCK_ACQUIRED" = "1" ]; then
     LOCK_ACQUIRED=0
@@ -827,47 +796,23 @@ cat > "$REL_FIXED_REPL" <<'EOF'
 }
 EOF
 
-replace_range "$LOGRUN" "$TMP/relrace-old-raw.sh" "$REL_START" "$REL_END" "$REL_OLD_REPL"
-replace_range "$LOGRUN" "$TMP/relrace-fixed-raw.sh" "$REL_START" "$REL_END" "$REL_FIXED_REPL"
+replace_range "$LOGRUN" "$TMP/relrace-raw.sh" "$REL_START" "$REL_END" "$REL_REPL"
 
-# A SECOND, independent injection layered on top of the release-side one:
-# P1 must hold the lock long enough for the choreography below to reliably
-# OBSERVE it doing so (poll granularity is whole seconds) before P1 even
-# reaches its release call — a single, uncontended row write completes in
-# well under a second, which measurably raced the poll loop before this
-# was added. Reuses the exact same anchor/technique as the
-# lock-released-on-signal fixture above (a plain sleep inserted right
-# before the critical-section comment), just with its own duration.
-REL_OLD_BIN="$TMP/relrace-old.sh"
-REL_FIXED_BIN="$TMP/relrace-fixed.sh"
+# A second, independent injection: P1 must hold the lock long enough for
+# the choreography below to reliably OBSERVE it doing so (poll granularity
+# is whole seconds) before P1 even reaches its release call.
+REL_BIN="$TMP/relrace.sh"
 sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/sleep 2\n&/' \
-  "$TMP/relrace-old-raw.sh" > "$REL_OLD_BIN"
-sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/sleep 2\n&/' \
-  "$TMP/relrace-fixed-raw.sh" > "$REL_FIXED_BIN"
-grep -q '^sleep 2$' "$REL_OLD_BIN" || fail "T-1076 signal-race-release-side setup: OLD-shape mutant's pre-write hold injection did not apply"
-grep -q '^sleep 2$' "$REL_FIXED_BIN" || fail "T-1076 signal-race-release-side setup: FIXED-shape mutant's pre-write hold injection did not apply"
-bash -n "$REL_OLD_BIN" || fail "T-1076 signal-race-release-side setup: OLD-shape mutant has a syntax error"
-bash -n "$REL_FIXED_BIN" || fail "T-1076 signal-race-release-side setup: FIXED-shape mutant has a syntax error"
-cmp -s "$LOGRUN" "$REL_OLD_BIN" && fail "T-1076 signal-race-release-side setup: OLD-shape mutant is byte-identical to the real writer"
-cmp -s "$LOGRUN" "$REL_FIXED_BIN" && fail "T-1076 signal-race-release-side setup: FIXED-shape mutant is byte-identical to the real writer"
-grep -q 'rel-probe-marker' "$REL_OLD_BIN" || fail "T-1076 signal-race-release-side setup: OLD-shape mutant's marker injection did not apply"
-grep -q 'rel-probe-marker' "$REL_FIXED_BIN" || fail "T-1076 signal-race-release-side setup: FIXED-shape mutant's marker injection did not apply"
+  "$TMP/relrace-raw.sh" > "$REL_BIN"
+grep -q '^sleep 2$' "$REL_BIN" || fail "T-1076 signal-race-release-side setup: pre-write hold injection did not apply"
+bash -n "$REL_BIN" || fail "T-1076 signal-race-release-side setup: mutant has a syntax error"
+cmp -s "$LOGRUN" "$REL_BIN" && fail "T-1076 signal-race-release-side setup: mutant is byte-identical to the real writer"
+grep -q 'rel-probe-marker' "$REL_BIN" || fail "T-1076 signal-race-release-side setup: marker injection did not apply"
 
-# T-1076 rework round 3 (Codex round-2 Blocker fix): a DEDICATED mutant for
-# the SUCCESSOR (P2) that marks its own acquisition the instant its own
-# `mkdir` succeeds — before doing anything else, including the hold sleep
-# below. Round 2's version of this fixture used the plain fixed writer
-# (SIG_BIN_DIR) as P2 and then signalled P1 the moment P1's OWN post-rmdir
-# marker appeared, WITHOUT first confirming P2 had actually reacquired the
-# just-freed path: whether the OLD-shape mutant's reentrant rmdir found a
-# live successor lock to steal then depended on whether P2's ~1s mkdir-retry
-# cadence happened to have already won the freed path in the window between
-# P1's rmdir and the kill — a coin flip on the same ~1-second scale as the
-# test's own poll granularity. Reuses the SAME acquire-loop anchors already
-# validated above (ACQ_START/ACQ_END) on a fresh copy of the real writer:
-# the fixed (masked) acquire-side shape, plus one added line writing a
-# dedicated marker inside the same masked bracket, immediately after
-# `LOCK_ACQUIRED=1`.
+# The dedicated SUCCESSOR (P2) mutant: marks its own acquisition the
+# instant its own `mkdir` succeeds, inside the same masked acquire
+# bracket already validated above (ACQ_START/ACQ_END), then holds the
+# freed path open on its OWN explicit marker.
 P2_ACQ_REPL="$TMP/p2-acq-body.txt"
 cat > "$P2_ACQ_REPL" <<'EOF'
   trap '' INT TERM
@@ -880,22 +825,6 @@ cat > "$P2_ACQ_REPL" <<'EOF'
 EOF
 REL_P2_RAW="$TMP/relrace-p2-raw.sh"
 replace_range "$LOGRUN" "$REL_P2_RAW" "$ACQ_START" "$ACQ_END" "$P2_ACQ_REPL"
-# T-1076 rework round 3 held P2's lock open with a fixed `sleep 12` (sized
-# ">8s + margin" against REL_OLD_REPL/REL_FIXED_REPL's own then-fixed
-# `sleep 8`) so P2 was still observably holding the lock at the point this
-# test's "successor survives" check runs.
-#
-# T-1076 rework round 4 (Codex round-3 Major fix, same class as P1's own
-# width above): a fixed `sleep 12` is exactly as vulnerable to CI-contention
-# budget exhaustion as P1's `sleep 8` was — and now that P1's own hold is
-# event-driven rather than a fixed width, there is no longer a fixed
-# duration to size a margin against in the first place. Replaced with the
-# SAME event-driven pattern: P2 holds the lock until the test driver writes
-# an explicit `${LOCK_DIR}.p2-proceed-marker` file (written only AFTER the
-# driver's own "successor survives" check has already run — see
-# `relrace_choreograph` below), with the same `-lt 60` anti-hang backstop
-# (not correctness-relevant; P2 is never killed by this test, so the only
-# way it ever proceeds in a healthy run is the marker appearing).
 REL_P2_BIN="$TMP/relrace-p2.sh"
 sed 's/^# --- critical section: --seq auto derivation (D4) + the append itself ------$/p2p_w=0\nwhile [ ! -f "${LOCK_DIR}.p2-proceed-marker" ] \&\& [ "$p2p_w" -lt 60 ]; do sleep 1; p2p_w=$((p2p_w + 1)); done\n&/' \
   "$REL_P2_RAW" > "$REL_P2_BIN"
@@ -904,120 +833,107 @@ cmp -s "$LOGRUN" "$REL_P2_BIN" && fail "T-1076 signal-race-release-side setup: P
 grep -q 'p2-proceed-marker' "$REL_P2_BIN" || fail "T-1076 signal-race-release-side setup: P2 mutant's hold injection did not apply"
 grep -q 'p2-acquired-marker' "$REL_P2_BIN" || fail "T-1076 signal-race-release-side setup: P2 mutant's acquired-marker injection did not apply"
 
-# relrace_choreograph <p1-bin> <runs-dir> <loop> <expect-p1-rc> <expect-lock-survives>
-# — runs the shared choreography (P1 acquires+writes+releases and then
-# holds its own vulnerable window open on an explicit marker, a dedicated
-# SUCCESSOR mutant P2 that marks its own acquisition and then holds the
-# freed path open on its OWN explicit marker, P1 is TERM'd only AFTER P2's
-# own acquired-marker confirms it has genuinely reacquired the freed path)
-# and asserts the two outcomes that distinguish the two shapes.
-#
-# T-1076 rework round 4 (Codex round-3 Major fix): every hold in this
-# choreography is now driven by an explicit marker file THIS function
-# writes, at the point THIS function has already gathered the fact that
-# marker is meant to certify — never by a fixed sleep width the rest of
-# the choreography has to race against. No step here can be starved by CI
-# contention into skipping past a state this function has not yet
-# observed; the only way it can be SLOW is if the whole choreography takes
-# longer wall-clock time, which does not flip any assertion's verdict.
-relrace_choreograph() {
-  local p1bin="$1" runsdir="$2" loop="$3" expect_rc="$4" expect_survive="$5"
-  local lockdir="$runsdir/.${loop}.jsonl.lock"
-  local marker="${lockdir}.rel-probe-marker"
-  local p2marker="${lockdir}.p2-acquired-marker"
-  local p1proceed="${lockdir}.rel-proceed-marker"
-  local p2proceed="${lockdir}.p2-proceed-marker"
-  mkdir -p "$runsdir"
+# Runs the choreography (P1 acquires+writes, then holds its own
+# release-side window open on an explicit marker; a dedicated SUCCESSOR
+# P2 marks its own acquisition and holds the freed path open on its OWN
+# explicit marker; P1 is TERM'd only AFTER P2's own acquired-marker
+# confirms it has genuinely reacquired the freed path) and asserts the
+# shipped code absorbs the signal cleanly without disturbing the
+# successor.
+relrace_runsdir="$TMP/relrace-runs"
+relrace_lockdir="$relrace_runsdir/.relrace.jsonl.lock"
+relrace_marker="${relrace_lockdir}.rel-probe-marker"
+relrace_p2marker="${relrace_lockdir}.p2-acquired-marker"
+relrace_p1proceed="${relrace_lockdir}.rel-proceed-marker"
+relrace_p2proceed="${relrace_lockdir}.p2-proceed-marker"
+mkdir -p "$relrace_runsdir"
 
-  TEAM_RUNS_DIR="$runsdir" bash "$p1bin" "$loop" --run-id P1 --seq 1 --span s --phase p \
-    --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
-  local p1_pid=$!
+TEAM_RUNS_DIR="$relrace_runsdir" bash "$REL_BIN" relrace --run-id P1 --seq 1 --span s --phase p \
+  --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+relrace_p1_pid=$!
 
-  local w=0
-  while [ ! -d "$lockdir" ] && [ "$w" -lt 15 ]; do sleep 1; w=$((w + 1)); done
-  [ -d "$lockdir" ] || fail "T-1076 signal-race-release-side setup: P1 never acquired the lock"
+relrace_w=0
+while [ ! -d "$relrace_lockdir" ] && [ "$relrace_w" -lt 15 ]; do sleep 1; relrace_w=$((relrace_w + 1)); done
+[ -d "$relrace_lockdir" ] || fail "T-1076 signal-race-release-side setup: P1 never acquired the lock"
 
-  # P2: the DEDICATED mutant built above (REL_P2_BIN) — marks its own
-  # acquisition immediately, then holds the lock open on its OWN explicit
-  # marker (written by this function below, only once the checks that need
-  # P2 still holding are done) so it is still observably holding it for
-  # the checks below regardless of how long the earlier steps took.
-  TEAM_LOG_LOCK_TIMEOUT=30 TEAM_RUNS_DIR="$runsdir" bash "$REL_P2_BIN" "$loop" --run-id P2 --seq 1 \
-    --span s --phase p --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
-  local p2_pid=$!
+TEAM_LOG_LOCK_TIMEOUT=30 TEAM_RUNS_DIR="$relrace_runsdir" bash "$REL_P2_BIN" relrace --run-id P2 --seq 1 \
+  --span s --phase p --iteration 0 --attempt 1 --status success >/dev/null 2>&1 &
+relrace_p2_pid=$!
 
-  w=0
-  while [ ! -f "$marker" ] && [ "$w" -lt 15 ]; do sleep 1; w=$((w + 1)); done
-  [ -f "$marker" ] || fail "T-1076 signal-race-release-side setup: P1 never reached its post-rmdir marker"
+relrace_w=0
+while [ ! -f "$relrace_marker" ] && [ "$relrace_w" -lt 15 ]; do sleep 1; relrace_w=$((relrace_w + 1)); done
+[ -f "$relrace_marker" ] || fail "T-1076 signal-race-release-side setup: P1 never reached its post-rmdir marker"
 
-  # T-1076 rework round 3 (Codex round-2 Blocker fix): do NOT signal P1
-  # until P2 has ITSELF written its own acquired-marker — proof, written by
-  # P2, that P2's own `mkdir` on the just-freed path has already succeeded.
-  # This replaces round 2's post-kill "give the successor a moment" wait
-  # (which ran AFTER the kill and so could not retroactively fix the
-  # ordering) with a pre-kill wait on a fact P2 itself asserts, forcing the
-  # theft window rather than hoping two independent ~1s poll cadences land
-  # in the right relative order.
-  w=0
-  while [ ! -f "$p2marker" ] && [ "$w" -lt 20 ]; do sleep 1; w=$((w + 1)); done
-  [ -f "$p2marker" ] || fail "T-1076 signal-race-release-side setup: successor never (re)acquired the freed lock path before the kill"
+# Do NOT signal P1 until P2 has ITSELF written its own acquired-marker —
+# proof, written by P2, that P2's own `mkdir` on the just-freed path has
+# already succeeded — forcing the theft-window ordering structurally
+# rather than racing two independent poll cadences.
+relrace_w=0
+while [ ! -f "$relrace_p2marker" ] && [ "$relrace_w" -lt 20 ]; do sleep 1; relrace_w=$((relrace_w + 1)); done
+[ -f "$relrace_p2marker" ] || fail "T-1076 signal-race-release-side setup: successor never (re)acquired the freed lock path before the kill"
 
-  kill -TERM "$p1_pid" 2>/dev/null || true
+kill -TERM "$relrace_p1_pid" 2>/dev/null || true
+# Write P1's own proceed-marker immediately: the shipped code masks
+# INT/TERM entirely during this window (SIG_IGN discards a signal at
+# delivery time — it is never queued for later redelivery), so the kill
+# just sent is a genuine no-op here, and there is no reason to make P1
+# wait any longer than the choreography above already required.
+: > "$relrace_p1proceed"
 
-  # T-1076 rework round 4: write P1's own proceed-marker ONLY for the
-  # expect_rc=0 (FIXED-shape) call. FIXED-shape masks INT/TERM entirely
-  # during this window (SIG_IGN discards a signal at delivery time, it is
-  # never queued for later redelivery), so the kill just sent is a genuine
-  # no-op there and P1 would otherwise sit in its own wait loop until the
-  # (non-load-bearing) 60s backstop fires — write the marker immediately so
-  # it proceeds to a normal exit right away instead. For the expect_rc!=0
-  # (OLD-shape) call this marker is deliberately NEVER written by this
-  # function: OLD-shape's traps stay unmasked, so the kill above is
-  # delivered essentially instantly and the process is gone (via
-  # on_lock_signal's own `exit`) well before any marker file could matter —
-  # writing one here would only invite a needless race against that signal
-  # delivery for no benefit.
-  if [ "$expect_rc" -eq 0 ]; then
-    : > "$p1proceed"
-  fi
+set +e
+wait "$relrace_p1_pid" 2>/dev/null
+relrace_p1_rc=$?
+set -e
+[ "$relrace_p1_rc" -eq 0 ] || fail "T-1076 signal-race-release-side: expected P1 to absorb the signal and exit 0, got $relrace_p1_rc"
 
-  set +e
-  wait "$p1_pid" 2>/dev/null
-  local p1_rc=$?
-  set -e
-  [ "$p1_rc" -eq "$expect_rc" ] || fail "T-1076 signal-race-release-side ($p1bin): expected P1 exit $expect_rc, got $p1_rc"
+# Checked shortly after `wait "$relrace_p1_pid"` returns — P2 is still
+# holding the lock open on its own explicit marker at this point,
+# regardless of how long the steps above took.
+sleep 1
+[ -d "$relrace_lockdir" ] || fail "T-1076 signal-race-release-side: the successor's live lock did not survive — the shipped release path should never touch a lock it did not create"
+relrace_p1_rows="$(grep -c '"run_id":"P1"' "$relrace_runsdir/relrace.jsonl" 2>/dev/null || true)"
+[ "$relrace_p1_rows" = "1" ] || fail "T-1076 signal-race-release-side: expected exactly one row from P1 (a re-entrant release must never produce an extra append), got $relrace_p1_rows"
 
-  # Check shortly after `wait "$p1_pid"` returns — P2 is still holding the
-  # lock open on its own explicit marker at this point (not yet written
-  # below), regardless of how long the steps above took. This is the
-  # window in which the OLD-shape mutant's reentrant release_lock() would
-  # have already rmdir'd the successor's live lock out from under it.
-  sleep 1
-  local survives=1
-  [ -d "$lockdir" ] || survives=0
-  if [ "$expect_survive" = "1" ]; then
-    [ "$survives" -eq 1 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor's live lock did not survive — it should not have been touched"
-  else
-    [ "$survives" -eq 0 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor's live lock survived — the OLD-shape reentrant rmdir should have deleted it (reproducing the pre-fix bug)"
-  fi
+: > "$relrace_p2proceed"
+set +e
+wait "$relrace_p2_pid" 2>/dev/null
+relrace_p2_rc=$?
+set -e
+[ "$relrace_p2_rc" -eq 0 ] || fail "T-1076 signal-race-release-side: the successor writer itself should still exit 0"
 
-  # T-1076 rework round 4: only NOW, after the survives check above has
-  # already run, tell P2 it may leave its own hold loop — replacing round
-  # 3's fixed `sleep 12` (a width that had to "comfortably outlast" P1's
-  # own then-fixed width) with an explicit release the driver controls
-  # once it is actually done needing P2 to still hold the lock.
-  : > "$p2proceed"
+pass "T-1076 signal-race-release-side — the shipped code's masked release transition absorbs a real TERM landing inside the reset-then-rmdir window (exit 0, exactly one row from P1, successor's live lock left untouched)"
 
-  set +e
-  wait "$p2_pid" 2>/dev/null
-  local p2_rc=$?
-  set -e
-  [ "$p2_rc" -eq 0 ] || fail "T-1076 signal-race-release-side ($p1bin): the successor writer itself should still exit 0"
-}
-
-relrace_choreograph "$REL_OLD_BIN" "$TMP/relrace-old-runs" relrace 143 0
-relrace_choreograph "$REL_FIXED_BIN" "$TMP/relrace-fixed-runs" relrace 0 1
-pass "T-1076 signal-race-release-side — OLD-shape's reentrant release deletes a live successor's lock (never-steal violated), FIXED-shape's masked release leaves it untouched"
+# =====================================================================
+# T-1076 rework round 5: signal-mask shape pin. Ongoing regression
+# protection for the acquire/release signal masking, replacing the
+# retired OLD-shape reproduction above — a fast, deterministic,
+# grep-level check that fails the instant the masking brackets are
+# silently removed from bin/log-run.sh, without constructing or running
+# any mutant. Pinned precisely enough that deleting the masking fails it
+# (mutation self-checked in this round's provenance record), but loose
+# enough that an innocent comment edit does not: it matches only the two
+# executable `trap '' INT TERM` lines (2-space indented, inside the
+# acquire loop and release_lock) and the dedicated on_lock_signal
+# handler's own explicit exit — comment prose discussing the same phrase
+# is prefixed with `#` and never matches these exact, unindented literal
+# forms.
+# =====================================================================
+SMP_MASK_COUNT="$(grep -cFx "  trap '' INT TERM" "$LOGRUN" || true)"
+[ "$SMP_MASK_COUNT" = "2" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 2 masked transitions (acquire loop + release_lock), found $SMP_MASK_COUNT"
+SMP_EXIT_TRAP_COUNT="$(grep -cFx 'trap release_lock EXIT' "$LOGRUN" || true)"
+[ "$SMP_EXIT_TRAP_COUNT" = "1" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 1 'trap release_lock EXIT' installation, found $SMP_EXIT_TRAP_COUNT"
+grep -q '^on_lock_signal() {' "$LOGRUN" || fail "T-1076 signal-mask-shape-pin: on_lock_signal handler is missing"
+SMP_HANDLER_BODY="$(sed -n '/^on_lock_signal() {/,/^}$/p' "$LOGRUN")"
+[ -n "$SMP_HANDLER_BODY" ] || fail "T-1076 signal-mask-shape-pin: on_lock_signal handler body extraction was empty"
+# shellcheck disable=SC2016  # single-quoted deliberately: this is the
+# literal SOURCE text to match inside on_lock_signal's body, not an
+# expansion here.
+printf '%s\n' "$SMP_HANDLER_BODY" | grep -qF 'exit "$2"' || fail "T-1076 signal-mask-shape-pin: on_lock_signal must call exit explicitly (a bare trap resumes the script instead of terminating it)"
+SMP_INT_ARM="$(grep -cF "trap 'on_lock_signal INT 130' INT" "$LOGRUN" || true)"
+SMP_TERM_ARM="$(grep -cF "trap 'on_lock_signal TERM 143' TERM" "$LOGRUN" || true)"
+[ "$SMP_INT_ARM" = "3" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 3 INT-arming lines (initial install + 2 re-arms), found $SMP_INT_ARM"
+[ "$SMP_TERM_ARM" = "3" ] || fail "T-1076 signal-mask-shape-pin: expected exactly 3 TERM-arming lines (initial install + 2 re-arms), found $SMP_TERM_ARM"
+pass "T-1076 signal-mask-shape-pin — bin/log-run.sh still carries both masked transitions (trap '' INT TERM x2), the dedicated on_lock_signal handler with its explicit exit, and all 3 INT/TERM re-arm points"
 
 # =====================================================================
 # T-1076 AC10: the negative control. A lock-disabled mutant, built

@@ -1156,3 +1156,73 @@ that file's order.
   window recorded above (this round did not reduce the suite's own
   worst-case wall-clock ceiling, since AC9/AC10 each still run the whole
   suite once).
+
+- T-1076 rework round 5 (operator-ratified design-premise change, board
+  record `d726e80`, "b GO"): retired the OLD-shape reproduction machinery
+  from `signal-race-acquire-side` and `signal-race-release-side` — the
+  mutant construction, its A/B assertions, and (release-side) the
+  re-entrant-release choreography that itself generated round 4's
+  finding — after this exact fixture family drew an independent
+  timing-adjacent Blocker or Major finding in four consecutive review
+  rounds. Kept the FIXED-shape determinism tests (the shipped code,
+  driven through the same choreography, absorbing a real `kill -TERM`
+  cleanly: lock released, exactly one row from the killed holder rather
+  than a duplicate, successor's lock left untouched, lock reusable), and
+  added a new grep-level regression test, `signal-mask-shape-pin`, as the
+  fixture family's ongoing regression protection — see
+  `.shell-team/provenance/T-1076.md`'s two round-5 decision entries for
+  the full rationale and the mutation self-check.
+
+  **Correction (round 4's own finding, this round):** round 4's own entry
+  immediately above states, of the `-lt 60` marker-wait backstop, that it
+  "is NOT sized to budget any correctness-relevant transition" and that
+  "OLD-shape's kill is delivered essentially instantly since its traps
+  stay unmasked, so it never needs or waits on this marker." Both claims
+  are FALSE for the OLD-shape arm specifically, per round 4's own review
+  (`.shell-team/reviews/T-1076.md`, appended at `17ee49f`): the OLD-shape
+  arm's re-entrant `release_lock()` call also waited on
+  `rel-proceed-marker` (a marker the driver deliberately never wrote for
+  that arm), so the killed OLD-shape holder in fact exited only once the
+  60-iteration backstop fired — an unconditional ~60s stall, and a very
+  real correctness-relevant-to-the-test-itself transition the backstop
+  was budgeting. This entry corrects both claims rather than editing the
+  round-4 prose above (this section is an append-only log; the round-4
+  entry is left standing as a historical record of what round 4 shipped
+  and believed at the time). The retirement above removes the OLD-shape
+  arm entirely, so neither claim describes any code that still exists
+  after this round; the surviving FIXED-shape arm was never subject to
+  either claim — its own `p1proceed` marker is always written
+  immediately after the kill, by design, so its own 60-iteration backstop
+  genuinely never fires in a healthy run.
+
+  **Measured consequence:** `bash tests/log-run/run.sh`, one live run this
+  session (own `date +%s` bracket): `exit=0 elapsed=164s` — down from round
+  4's own recorded `elapsed=227s`, a ~63s reduction, consistent with the
+  ~60s unconditional stall this round removes together with the retired
+  arm's own remaining setup/comparison steps. `grep -c '^PASS:' <log>` =
+  **38** (37 round-4 tokens, unchanged for `signal-race-acquire-side` and
+  `signal-race-release-side` — each still emits exactly ONE `PASS:` token,
+  same as before the retirement, since retiring the OLD-shape arm removed
+  setup/comparison code but not either case's own single pass banner —
+  plus 1 new token for `signal-mask-shape-pin`), `grep -c '^PASS: T-1076'
+  <log>` = **16**, `grep -c '^FAIL:' <log>` = **0**.
+
+  The two retained signal-mask tests plus the new shape pin were also run
+  5 consecutive times each, isolated from the rest of the suite, via a
+  standalone extraction driver replaying `tests/log-run/run.sh`'s own
+  lines 644-936 (the retained/rewritten block) against a fresh harness:
+  `grep -c '^=== iteration' <driver-log>` = **5**,
+  `grep -c '^PASS: T-1076 signal-race-acquire-side' <driver-log>` = **5**,
+  `grep -c '^PASS: T-1076 signal-race-release-side' <driver-log>` = **5**,
+  `grep -c '^PASS: T-1076 signal-mask-shape-pin' <driver-log>` = **5**,
+  `grep -c '^FAIL:' <driver-log>` = **0** — no flake.
+
+  Mutation self-check on the new `signal-mask-shape-pin` test (both
+  mutants built under `$TMPDIR`, never the working tree): a mask-stripped
+  mutant (`grep -v` removing both `  trap '' INT TERM` lines from a
+  scratch copy of `bin/log-run.sh`) makes the pin fail with "expected
+  exactly 2 masked transitions... found 0"; an exit-stripped mutant
+  (replacing `on_lock_signal`'s `exit "$2"` with a no-op) makes the pin
+  fail with "must call exit explicitly" — both confirmed by direct
+  execution this round, against the real pin logic extracted from the
+  committed test file, not reasoned about.
