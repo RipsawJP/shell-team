@@ -351,16 +351,21 @@ branch is stacked on; `<integration-branch>` is a parameter naming
 **your own repository's integration branch** — `develop` in this
 repository, `main` in many others — substituted for your own convention
 rather than coerced into this one. The first arm is
-`git merge-base "<predecessor-branch>" HEAD`, deliberately not a
-`rev-parse` of the predecessor branch tip: a rework round that advances
-the predecessor branch after this branch was cut moves that branch's
-tip but not the common ancestor, and the common ancestor is what
-"branch point" means here. The fallback arm,
+`git merge-base "<predecessor-branch>" HEAD` when the predecessor
+resolves as a local branch, deliberately not a `rev-parse` of its tip: a
+rework round that advances the predecessor branch after this branch was
+cut moves that branch's tip but not the common ancestor, and the common
+ancestor is what "branch point" means here. Where the existence test
+instead found the predecessor only as a remote-tracking ref, the same
+arm is `git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD`
+— that same full ref path, never the bare predecessor name, which a
+checkout carrying no local branch of that name cannot resolve
+(`fatal: Not a valid object name`). The fallback arm,
 `git merge-base "<integration-branch>" HEAD`, is taken once the
-predecessor branch no longer resolves — the era in which it has merged
-and been deleted. The arm is selected by an explicit
-`git show-ref --verify --quiet` branch-existence test — checked
-against `refs/heads/<predecessor-branch>` where the predecessor
+predecessor resolves in **neither** namespace and is genuinely gone —
+the era in which it has merged and been deleted. The arm is selected by
+an explicit `git show-ref --verify --quiet` branch-existence test —
+checked against `refs/heads/<predecessor-branch>` where the predecessor
 resolves as a local branch, or against
 `refs/remotes/<remote>/<predecessor-branch>` where a fresh clone or a
 CI checkout only fetched it as a remote-tracking ref and never checked
@@ -370,17 +375,34 @@ assumed to be `refs/heads/` alone — and never by a `2>/dev/null ||`
 chain, because a `||` chain cannot distinguish "the predecessor branch
 is gone" (the expected era change, which must fall back) from
 "`git merge-base` failed for another reason" (which must fail closed).
-No 40-hex commit literal is ever written into a criterion. Two
-residual cases are disclosed rather than engineered around, on the
-same footing: a predecessor branch deleted without being merged makes
-the fallback arm resolve the integration branch's tip, which is not
-the branch point — that invalidates the whole stack and is a
+No 40-hex commit literal is ever written into a criterion.
+
+A checkout where the predecessor resolves in **neither** namespace —
+never fetched at all: a shallow or `--single-branch` clone, or a CI
+checkout that fetched only the child branch — is not the era the
+fallback arm exists for. Whether the predecessor has an open PR is a
+fact of the repository's state of record (the train the branch sits
+in), never of what your checkout happens to have fetched, so this case
+is not a `not-applicable` declaration either: fetch the predecessor
+first, or route back, rather than freeze on the arm the existence
+test's absence silently selects — that absence looks identical, at the
+existence test alone, to a genuine merge, and freezing through it is
+ruled out.
+
+Three residual cases are disclosed rather than engineered around, on
+the same footing: a predecessor branch deleted without being merged
+makes the fallback arm resolve the integration branch's tip, which is
+not the branch point — that invalidates the whole stack and is a
 route-back, not something a criterion should paper over; and a
-predecessor branch rebased or force-pushed after your branch was cut,
-where the recorded common ancestor may no longer be an ancestor of the
-predecessor's new tip, so `merge-base` resolves a commit earlier than
-the real branch point — also a route-back rather than a case either
-arm is redesigned to survive.
+predecessor branch rebased, force-pushed, or squash-merged after your
+branch was cut is a route-back on the same footing rather than a case
+either arm is redesigned to survive — rebase and force-push move the
+predecessor's tip so the recorded common ancestor may no longer be an
+ancestor of it, and a squash merge instead lands the predecessor's
+changes on the integration branch as a commit sharing no SHA with any
+of its originals, so `merge-base` resolves a commit earlier than the
+real branch point even once the era-change fallback correctly fires —
+different mechanisms, the same consequence.
 
 Enforcement today is a **duty, not a checker**, on the same footing as
 the adopter-facing-documentation declaration above: at a task's first
