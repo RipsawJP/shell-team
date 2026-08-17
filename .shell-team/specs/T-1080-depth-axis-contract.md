@@ -311,7 +311,9 @@ Every normative directive in the frozen region maps to an Acceptance Criterion o
 
 ## Pre-commitment disposition record
 
-No drop has fired. This section carries zero `- dropped-surface: ` lines. If the pre-commitment's trigger fires, the executing round appends exactly one conformant line of the shape `- dropped-surface: <s6|s7> — <where its requirements went, naming the follow-up issue>` here, at column 0, which is what waives the corresponding criterion's positive obligations without a re-freeze.
+The pre-commitment's factual trigger fired (2026-08-17): two consecutive Codex review rounds (round 1's Major #2, round 2's Major) landed an independent Major against surface S7 — round 1 found S7 deferred only the commit half of the isolation gap, not the reviewer's other mandated writes; round 2 found the resulting `$TMPDIR`-buffering fix unreconciled with `bin/codex-capture.sh`'s own fail-closed `--alloc`/`--publish` design. Per the frozen disposition, drop **①** (S7) executes first, exactly as authored: its contract text is removed from both agent files (`agents/codex-reviewer.md`, `agents/qa-verifier.md`) and from the orchestrator's own side (`skills/run/SKILL.md`), and both rounds' findings travel to a new follow-up issue as its requirement list rather than being re-derived here.
+
+- dropped-surface: s7 — issue #309 carries both rounds' findings (round 1's deferred-writes-not-deferred-commits gap and round 2's `codex-capture.sh`/`--reviews-dir` reconciliation gap) as its re-landing requirement list; a future attempt at surface S7 starts from that issue rather than re-deriving the two gaps from these review records.
 
 ## Assumptions
 
