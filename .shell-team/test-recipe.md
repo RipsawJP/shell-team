@@ -1412,3 +1412,32 @@ that file's order.
   keep the literal lowercase token verbatim inside the prose
   (`` `tie-break` ``) rather than relying on a capitalized natural-language
   heading to satisfy a case-sensitive literal check.
+- T-1080: `CHECK_ACS_TIMEOUT=120` is sufficient for
+  `T-1080-depth-axis-contract.md` itself (no full fixture suite runs beyond
+  `tests/loop-guard/run.sh`, the one bounded exception this task's own
+  `- verification-class: no-mechanism` licenses; the heaviest commands are
+  `bin/check-pii-shapes.sh --base` and `bin/check-handoff.sh`).
+  `CHECK_ACS_TIMEOUT=100`–`120` was also sufficient for every merged spec
+  this task's `## Blast radius` read-set sweep re-ran (T-1068, T-1069,
+  T-1072 through T-1079, T-1001, T-1041). Two traps worth recording for a
+  future task that adds a lowercase-literal-and-capitalized-heading pair
+  in the same section (e.g. a body heading `**Indirection, ...**` next to a
+  `- check:` that greps a lowercase word from that same heading's own
+  vocabulary): `grep -qF` is case-sensitive, and a heading capitalized for
+  readability does not satisfy a check requiring the lowercase substring —
+  confirmed live, this task's own `## Blast radius`'s `**Indirection, named
+  and discharged.**` paragraph did not itself contain the lowercase
+  substring `indirection` anywhere, only the capitalized word, and
+  `check-acs.sh`'s **AC18** FAILED until a lowercase occurrence was added
+  inline in that same paragraph's prose. Second, this task's own three
+  `git status --porcelain -- bin/ tests/` working-tree-subject clauses in
+  three *other*, already-merged specs (`T-1074-fanout-orchestration.md`
+  **AC9**, `T-1076-log-run-locking.md` **AC10**,
+  `T-1077-worktree-reconcile.md` **AC3**) read `FAIL` at HEAD the moment
+  this task's own edit to `bin/loop-guard.sh` was still uncommitted, and
+  returned to `PASS` once that edit was committed — a base-vs-head
+  Blast-radius measurement taken with an uncommitted diff under `bin/` or
+  `tests/` will misreport any such clause as newly reddened; measure after
+  committing, or disclose the measurement's own uncommitted-diff timing
+  explicitly rather than reporting the flip as caused by the diff's
+  content.

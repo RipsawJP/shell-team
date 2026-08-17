@@ -38,6 +38,16 @@
 #
 # Exit: 0 = CONTINUE, 3 = STOP (terminal condition), 2 = STOP:guard_error
 #       (could not evaluate — fail-closed). stdout always carries the decision.
+#
+# Concurrent-review-window counting carve-out (T-1080, S5, comment/header
+# text only — the decision logic below is unmodified). Inside a declared
+# concurrent-review-window, a codex-reviewer verdict computed concurrently
+# against a commit qa-verifier's own subsequent FAIL rejects is discarded.
+# This extends the same carve-out skills/run/SKILL.md's own T-1002
+# interventions-gate bullet already draws for a pre-Validate gate failure,
+# and is spelled identically, verbatim, in that file's own caller-side
+# --iteration definition:
+#   a discarded concurrent-review-window verdict is not a cycle and adds nothing to this count
 
 set -euo pipefail
 
