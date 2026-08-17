@@ -235,13 +235,13 @@ Every check runs from the repository root, resolves the branch point itself with
 
 **Discharge, and its disclosed shortfall.** The `literal-readers` bucket is run in full at both refs, criterion by criterion. For the `board-readers` bucket, three things are run and the shortfall against an exhaustive per-file sweep is disclosed rather than claimed away, on the precedent T-1078 set and QA accepted: (1) the board's own diff against the branch point is shown purely additive, with no existing entry line or heading touched; (2) `bin/check-handoff.sh` and `bin/check-board-headings.sh --base <ref>` — the two universal board checkers every one of those criteria's board-facing clause ultimately calls — are run against the edited board; (3) at least two members spanning the population's age extremes are run in full at both refs as a concrete probe for an incidental flip. What stays unmeasured is stated in one sentence in the engineer's own hand-off: no exhaustive `board-readers × 2 refs` sweep was run, and none is claimed.
 
-- population derivation: filled at the freeze (2026-08-17) by the coordinating session — the block below is the verbatim output of the command on the `- reproduce:` line.
+- population derivation: filled at the freeze (2026-08-17) by the coordinating session — the block below is the verbatim output of the command on the `- reproduce:` line. **Round-2 correction (2026-08-17, Codex review round 1, Major #3):** the freeze-time command's two grep sets matched this spec's own file (both `phase-multiplexing` and `team-paths.sh --get todo` occur in this spec's own v2 body), so re-running the freeze-time command against the committed spec no longer reproduced the recorded 8/69/1 figures — it returned 9/70/1 instead, with this file itself falling into the `literal-readers+board-readers` bucket rather than staying in its own isolated `self` bucket. Both grep sets below now exclude `.shell-team/specs/T-1079-tier2-judge.md` via a `:!` pathspec, which is what keeps the recorded 8/69/1 figures stable across this task's own edits to its own file — the sibling-spec population the Blast radius table actually runs is unchanged either way.
 
 <!-- BEGIN derivation: t1079-read-set -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
-- set: literal-readers — status: 0 — lines: 8 — items: 8 — command: git grep -ln -- 'phase-multiplexing' -- '.shell-team/specs/*.md' | LC_ALL=C sort
-- set: board-readers — status: 0 — lines: 69 — items: 69 — command: git grep -ln -- 'team-paths.sh --get todo' -- '.shell-team/specs/*.md' | LC_ALL=C sort
+- set: literal-readers — status: 0 — lines: 8 — items: 8 — command: git grep -ln -- 'phase-multiplexing' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1079-tier2-judge.md' | LC_ALL=C sort
+- set: board-readers — status: 0 — lines: 69 — items: 69 — command: git grep -ln -- 'team-paths.sh --get todo' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1079-tier2-judge.md' | LC_ALL=C sort
 - set: self — status: 0 — lines: 1 — items: 1 — command: printf '%s\n' .shell-team/specs/T-1079-tier2-judge.md
 - union: items: 70
 - bucket: board-readers — items: 61
@@ -318,7 +318,7 @@ Every check runs from the repository root, resolves the branch point itself with
 - bucket: self — items: 1
   - .shell-team/specs/T-1079-tier2-judge.md
 <!-- END derivation: t1079-read-set -->
-  - reproduce: bash bin/derive-populations.sh --label t1079-read-set --set "literal-readers=git grep -ln -- 'phase-multiplexing' -- '.shell-team/specs/*.md' | LC_ALL=C sort" --set "board-readers=git grep -ln -- 'team-paths.sh --get todo' -- '.shell-team/specs/*.md' | LC_ALL=C sort" --set "self=printf '%s\n' .shell-team/specs/T-1079-tier2-judge.md"
+  - reproduce: bash bin/derive-populations.sh --label t1079-read-set --set "literal-readers=git grep -ln -- 'phase-multiplexing' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1079-tier2-judge.md' | LC_ALL=C sort" --set "board-readers=git grep -ln -- 'team-paths.sh --get todo' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1079-tier2-judge.md' | LC_ALL=C sort" --set "self=printf '%s\n' .shell-team/specs/T-1079-tier2-judge.md"
 
 **Measured by the engineer (2026-08-17), replacing every predicted cell.** Method: a `git worktree add --detach` scratch clone pinned to this task's own branch point `1bf663d07d64e04aa57e8140ae2d9d5459ad4526` for the base side; this checkout for the head side; `CHECK_ACS_TIMEOUT=300` for the eight literal-readers-bucket specs (`T-1069`, `T-1070`, `T-1072`, `T-1073`, `T-1074`, `T-1075`, `T-1077`, `T-1078`), run in full at both refs; `CHECK_ACS_TIMEOUT=180` for the two board-readers full-suite samples spanning the population's age extremes (`T-1000-operating-conventions.md`, `T-1076-log-run-locking.md`). Every row below matched the freeze-time prediction **except one, corrected in place**: `T-1072-telemetry-span-discriminator.md` **AC6**/**AC7** (not individually enumerated at freeze time) flipped FAIL→PASS between base and head — disclosed below as a scratch-worktree artefact, not an effect of this task's diff.
 
