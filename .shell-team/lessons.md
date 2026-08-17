@@ -1213,3 +1213,33 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: A helper that derives populations and counts closes only the arithmetic half of the whole-set-claim class; which claims exist to be checked — the inventory of every all/every/none/count assertion in a record — is a second population that recurs as hand-swept prose until it too is command-derived, so a record-heavy task enumerates its own claim sites mechanically (a grep over the record's own sections) and attaches a reproduce command per site, not only per count.
 - **Why**: The cycle after the population-derivation helper shipped, the same defect class recurred four times in one task's reporting — unexecuted matrix rows, a count off by one, an analogy-reasoned cell — and converged only under an operator ruling; the helper had mechanized the computation while the selection of what to compute stayed manual, which is the same generator one level up.
 - **How to apply**: When a task's record states multiple set or count claims, the engineer derives the claim-site inventory itself with a command (grep over the engineer-owned sections), fills a reproduce command per site, and QA re-runs the inventory command before trusting any per-site verdict; mechanizing this as a checklist or checker is a candidate next-task.
+
+## 2026-08-17 — A frozen zero-at-base premise about borrowed vocabulary is measured at the branch point, never inferred from the task's own coinage sweep
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-17.md
+- **Rule**: When a spec frozen on a stacked branch asserts a literal count premise (especially `= 0`) about a string token's occurrences at the branch point, and that token is generic, reusable vocabulary (an invariant-lock id, a status flag, any name coined by another document) rather than a coinage unique to this task, the freeze-time premise sweep measures that count at the branch point independently — a sweep scoped to "the new literals this task introduces" says nothing about tokens already carried onto the stack by merged sibling tasks.
+- **Why**: T-1080's AC5 froze "`both-gates-green` occurs zero times in `skills/run/SKILL.md` at the branch point"; the token was borrowed from another document's vocabulary and two merged tasks (T-1074/T-1077) had already written it there, so the criterion was unsatisfiable by construction — the engineer escalated BLOCKED and a class-B re-freeze converted it to a base-relative delta. The adjacent corpus entry (write accounting criteria as base-relative deltas, never absolute literals) governs how to write the criterion; this entry governs what the freeze sweep must cover, which is where the defect actually entered.
+- **How to apply**: pm-spec's premise sweep classifies every literal count premise as own-coinage or borrowed; borrowed ones get a live measurement command against the branch-point blob quoted in the spec's Assumptions before the freeze, and the orchestrator's freeze attestation treats an unmeasured borrowed-vocabulary count premise as a broken check line.
+
+## 2026-08-17 — A quantitative conclusion's QA PASS is necessary, never sufficient: the conclusion holds when the cross-provider re-derivation reaches it independently
+- **Category**: verification-discipline
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-17.md
+- **Rule**: For an acceptance criterion whose substance is a narrative conclusion derived from numeric substitution — a break-even inequality's direction, a cost comparison's basis, a specific measured figure's provenance — QA's `PASS` gates progression but does not settle the conclusion; the conclusion is treated as settled only when the cross-provider review's independent re-derivation reaches the same direction from the same recorded inputs. This entry retires when script-generated record tables (issue #268) remove the recall-written numeric prose it guards.
+- **Why**: Three times in one cycle (T-1078 rounds 1 and 2, T-1079 round 1), and in earlier cycles before it, the cross-provider reviewer caught a quantitative defect QA had passed — a conclusion contradicting its own inequality, a fabricated substitution of an unobserved value, a units mismatch, a non-reproducing derivation. QA's arithmetic re-checks verify the computation and stay blind to what is being compared; the second model family substituting the numbers itself is the only verification that has repeatedly caught this class.
+- **How to apply**: The orchestrator's QA briefing for any task carrying such criteria names them and states that their PASS is provisional; the review briefing asks the reviewer, by name, to substitute the model's own recorded numbers into its own inequality and check the conclusion's direction; neither gate is skipped because the other already ran.
+
+## 2026-08-17 — CI-equivalence is scoped by mechanically reverse-mapping edited files to the suites that read them, never by a conditional trigger someone remembers
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-17.md (post-retro addendum, ratified 2026-08-17)
+- **Rule**: When a task edits shipped files, the set of CI-wired suites its verification must run is derived mechanically — reverse-map each edited path to the suites that read it (`grep -rl -- '<edited-path>' tests/*/run.sh` plus the workflow's dogfood steps naming it) — and that derived list is the reached-steps scope; a conditional full-suite trigger ("run everything only if X changed") silently under-scopes whenever a suite reads a file for its own reasons the condition never anticipated.
+- **Why**: T-1080 edited `agents/codex-reviewer.md`; `tests/codex-skeleton-hygiene/run.sh` reads that file and contracts marker→command adjacency inside its fenced blocks. The spec's CI-equivalence clause named two reached suites explicitly and gated the full list behind a loop-guard-executable-change condition that never fired, so three QA rounds and three review rounds all passed a diff that CI then failed — the machine gate was the last line of defence for a scoping decision every human-shaped reviewer had accepted.
+- **How to apply**: pm-spec writes the reached-suite list into the spec by running the reverse-map command over the task's declared file set and quoting it; QA re-runs the same command at verification time against the actual diff's file list and treats any suite present in its output but absent from the spec's list as reached, running it rather than arguing scope.
