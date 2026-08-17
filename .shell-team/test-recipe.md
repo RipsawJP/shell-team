@@ -1342,3 +1342,30 @@ that file's order.
   criteria at all (`bin/check-acs.sh` reports
   `no acceptance criteria (- [ ] **ACn** / **AC-N**) found` for both,
   identically on base and head) — expected, not a sweep defect.
+- T-1077: `bash tests/land-worktree/run.sh` measured wall-clock, this host,
+  this session: `elapsed=17s` (own `date +%s` bracket, one live run;
+  `grep -c '^PASS:' <log>` = **34**, `grep -c '^FAIL:' <log>` = **0**) —
+  comfortably inside a `CHECK_ACS_TIMEOUT` of **300**, the value this task's
+  own `bash bin/check-acs.sh` run used (AC2/AC3/AC5/AC10 each run the whole
+  suite, or a whole sibling suite, inside one `- check:` line). Host: macOS,
+  bash 3.2.57, git 2.53.0. Fractional `sleep 0.1` measured to work on this
+  host (used only by the suite's own two test-only rendezvous seams — the
+  `ref-moved` and `lock-released-on-signal` fixtures — never by the shipped
+  coordinator's own lock retry loop, which keeps T-1076's whole-second
+  `sleep 1` for portability toward an unknown adopter host, per this task's
+  own provenance record). Git-config pinning: this suite does not pin an
+  ambient config file the way `tests/rollup-track/run.sh` pins
+  `core.excludesFile`, because none of `bin/land-worktree.sh`'s own git
+  invocations read a config value that could silently change its behavior —
+  every diff/ls-tree call passes `--no-renames`/`-z` explicitly (a CLI flag
+  always overrides its matching config key in git, by git's own documented
+  precedence; there is no "config could silently win" case to guard here
+  the way an unpinned `core.excludesFile` genuinely could for a
+  `check-ignore` call), and `core.quotepath` — the one setting D7 itself
+  names as a real question — is exercised BOTH ways
+  (`overlap-quotepath-independent`, one throwaway repo configured
+  `core.quotepath=true` and a second configured `core.quotepath=false`)
+  and confirmed to make no difference to the tool's own overlap
+  detection, which is this suite's version of the paired-control-proves-
+  the-pinning-has-teeth discipline: proving the ONE ambient setting that
+  could matter here does not, rather than pinning settings that cannot.
