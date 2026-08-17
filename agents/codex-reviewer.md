@@ -36,15 +36,9 @@ Same-family models share blind spots. By routing the final review through Codex 
    # T-107-step: alloc
    codex-capture.sh --alloc --stem T-XXX-codex-primary
    ```
+   Inside a declared `concurrent-review-window` (T-1080, S2/S6) only: before running the `codex` block immediately below, `git worktree add --detach <scratch> <the launch brief's own pinned SHA>` (the same pattern this task's own Blast-radius section uses for a base-side read), and substitute that `<scratch>` path for `<repo>` in that block, so the command reads the pinned commit rather than the moving working tree. In serial operation — the shipped default and the only mode today — `<repo>` is simply this checkout, unchanged, and no scratch worktree is created.
    ```bash
    # T-107-step: codex
-   # Inside a declared concurrent-review-window (T-1080, S2/S6) only: before this
-   # invocation, `git worktree add --detach <scratch> <the launch brief's own pinned
-   # SHA>` (the same pattern this task's own Blast-radius section uses for a
-   # base-side read) and substitute that <scratch> path for <repo> below, so this
-   # command reads the pinned commit rather than the moving working tree. In
-   # serial operation — the shipped default and the only mode today — <repo> is
-   # simply this checkout, unchanged, and no scratch worktree is created.
    codex exec --sandbox read-only --cd <repo> review --base <base> --json -o "<RAW_OUT>" > "<RAW_JSONL>" 2>&1
    ```
    ```bash
@@ -66,13 +60,9 @@ Same-family models share blind spots. By routing the final review through Codex 
    # T-107-step: alloc
    codex-capture.sh --alloc --stem T-XXX-codex-adversarial
    ```
+   Inside a declared `concurrent-review-window` (T-1080, S2/S6) only: the same `<scratch>`-for-`<repo>` substitution named at the primary read path above applies here too — Codex then runs `git diff`/`nl -ba` against the pinned scratch worktree rather than the moving working tree. In serial operation — the shipped default and the only mode today — `<repo>` is unchanged.
    ```bash
    # T-107-step: codex
-   # Inside a declared concurrent-review-window (T-1080, S2/S6) only: the same
-   # <scratch>-for-<repo> substitution named at the primary read path above
-   # applies here too — Codex then runs `git diff`/`nl -ba` against the pinned
-   # scratch worktree rather than the moving working tree. In serial operation
-   # — the shipped default and the only mode today — <repo> is unchanged.
    codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
      "Review the diff between <base> and HEAD. \
    Read the files yourself with git diff / nl -ba — do not expect any diff in this prompt. \
