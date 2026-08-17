@@ -193,24 +193,92 @@ Every check runs from the repository root, resolves the branch point itself with
 - reproduce: bash bin/derive-populations.sh --label t1080-read-set --set "note-readers=git grep -ln -- 'agent-concurrency.md' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1080-depth-axis-contract.md' | LC_ALL=C sort" --set "shipped-file-readers=git grep -ln -e 'agents/qa-verifier.md' -e 'agents/codex-reviewer.md' -e 'skills/run/SKILL.md' -e 'bin/loop-guard.sh' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1080-depth-axis-contract.md' | LC_ALL=C sort" --set "self=printf '%s\n' .shell-team/specs/T-1080-depth-axis-contract.md"
 
 <!-- BEGIN derivation: t1080-read-set -->
-PLACEHOLDER — the engineer replaces this block with the verbatim block `bin/derive-populations.sh` emits for the `- reproduce:` command above, before the measured table below replaces the predicted one. This placeholder is not a derivation and no count is read from it.
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: note-readers — status: 0 — lines: 9 — items: 9 — command: git grep -ln -- 'agent-concurrency.md' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1080-depth-axis-contract.md' | LC_ALL=C sort
+- set: shipped-file-readers — status: 0 — lines: 54 — items: 54 — command: git grep -ln -e 'agents/qa-verifier.md' -e 'agents/codex-reviewer.md' -e 'skills/run/SKILL.md' -e 'bin/loop-guard.sh' -- '.shell-team/specs/*.md' ':!.shell-team/specs/T-1080-depth-axis-contract.md' | LC_ALL=C sort
+- set: self — status: 0 — lines: 1 — items: 1 — command: printf '%s\n' .shell-team/specs/T-1080-depth-axis-contract.md
+- union: items: 56
+- bucket: note-readers — items: 1
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+- bucket: note-readers+shipped-file-readers — items: 8
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+- bucket: self — items: 1
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+- bucket: shipped-file-readers — items: 46
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
 <!-- END derivation: t1080-read-set -->
 
-**Indirection, named and discharged.** A derivation over literal bytes cannot see a criterion that reaches its target through a path built at run time — `bin/team-paths.sh --get todo` is the live instance in this corpus, and a criterion naming a file only through a shell variable is the general class. Those criteria are invisible to the derivation above in principle, not by oversight. Disposition: the board-reading population is discharged at the representative scope this repository's own precedent fixes — the board's own diff against the branch point shown to be purely additive, both universal board checkers (`bin/check-handoff.sh`, `bin/check-board-headings.sh`) run green, and at least two full-suite samples spanning the population's age extremes run at both refs — with the shortfall stated once: no exhaustive board-readers × 2-refs sweep is run and none is claimed.
+**Indirection, named and discharged.** A derivation over literal bytes cannot see a criterion that reaches its target through indirection — a path built at run time — `bin/team-paths.sh --get todo` is the live instance in this corpus, and a criterion naming a file only through a shell variable is the general class. Those criteria are invisible to the derivation above in principle, not by oversight. Disposition: the board-reading population is discharged at the representative scope this repository's own precedent fixes — the board's own diff against the branch point shown to be purely additive, both universal board checkers (`bin/check-handoff.sh`, `bin/check-board-headings.sh`) run green, and at least two full-suite samples spanning the population's age extremes run at both refs — with the shortfall stated once: no exhaustive board-readers × 2-refs sweep is run and none is claimed.
 
-**Predicted at freeze time; the engineer replaces every cell with a measurement and states each correction.**
+**Measured** (engineer, this round). Base-side verdicts read from a `git worktree add --detach "$TMPDIR/t1080-blast-base" "$B"` scratch tree pinned to this task's own branch point (`cf643a9d7513bf745337b164f31619ebe4c31d0a`); head-side verdicts read from this checkout after this round's edits (uncommitted at measurement time; the three `git status --porcelain -- bin/ tests/` clauses below were re-confirmed clean after this round's own commit — see the note under the table). `CHECK_ACS_TIMEOUT=100`–`120` throughout; no spec in this population needed a higher value. Every predicted row below is corrected in place to what was actually measured rather than defended.
 
 - predicted-red: 4
 
-| Merged criterion | What it reads | base: (predicted) | head: (predicted) | Why |
+| Merged criterion | What it reads | base: (measured) | head: (measured) | Why |
 |---|---|---|---|---|
-| `.shell-team/specs/T-1078-tier3-pilot.md` **AC14** | thirteen byte identities including `skills/run/SKILL.md` and `docs/loop-engineering/agent-concurrency.md`, plus `git diff --name-only <its branch point>...HEAD -- bin/ tests/ templates/ agents/ skills/ .github/` empty | base: PASS | head: FAIL | Newly reddened, by construction: this task edits two of its byte-frozen paths and puts four paths into its six-directory diff. Merge-point-scoped in its own right; disclosed, not repaired. |
+| `.shell-team/specs/T-1078-tier3-pilot.md` **AC14** | thirteen byte identities including `skills/run/SKILL.md` and `docs/loop-engineering/agent-concurrency.md`, plus `git diff --name-only <its branch point>...HEAD -- bin/ tests/ templates/ agents/ skills/ .github/` empty | base: PASS | head: FAIL | Newly reddened, by construction: this task edits two of its byte-frozen paths and puts four paths into its six-directory diff. Merge-point-scoped in its own right; disclosed, not repaired. **Correction**: T-1078's own `AC15`/`AC16` are `FAIL` at **both** refs (pre-existing, unrelated to this task's diff — its own merge-point scope lock and board-delta criteria, already stale before this task started); the freeze-time table only enumerated AC14 for this spec, so this is disclosed here rather than silently folded into "newly reddened." |
 | `.shell-team/specs/T-1079-tier2-judge.md` **AC13** | fifteen byte identities including all four shipped files this task edits and the note, plus the same six-directory diff clause | base: PASS | head: FAIL | Newly reddened, by construction — this is the criterion most precisely aimed at what this task does. Disclosed, not repaired. |
 | `.shell-team/specs/T-1079-tier2-judge.md` **AC15** | its own merge-point scope lock | base: PASS | head: FAIL | Newly reddened: this task's files sit outside T-1079's allow-list. Exactly the staleness that criterion's own body declares. |
-| `.shell-team/specs/T-1079-tier2-judge.md` **AC16** | board delta of exactly base+1 against **its** branch point | base: PASS | head: FAIL | Newly reddened: the board gains this task's entry, so the delta measured from T-1079's branch point is +2. |
-| `.shell-team/specs/T-1073-harness-agent-concurrency.md` **AC12** | `agent-concurrency.md` **and** `phase-multiplexing.md` byte-identical to **its** branch point | base: FAIL | head: FAIL | **Already red at this task's branch point** — T-1079 edited `phase-multiplexing.md`, measured in T-1079's own Blast-radius table (`T-1073` measured `AC12 AC14` at both refs). This task adds a second reason to a criterion whose verdict does not move; it is the intended discharge of T-1073's own hand-forward follow-up and must be recorded by QA as a known red with this reason rather than kicked back. **This corrects a relayed premise**: the routing brief predicted this criterion would *turn* red here. |
-| `.shell-team/specs/T-1068-agent-concurrency.md` **AC1**, **AC4** | the note's ten headings; the `- substrate: ` grammar closure, the ≥6 floor and four named ids | base: PASS | head: PASS | The errata stay inside the closed `provided|absent` vocabulary and rename no heading; **AC13** here re-derives the same invariants so a grammar break fails inside this task. Predicted unchanged — the engineer confirms by running T-1068's whole spec at both refs. |
-| `.shell-team/specs/T-1069-phase-multiplexing.md`, `T-1074` **AC14**/**AC18**, `T-1075` **AC4**/**AC14**/**AC15**/**AC17**, `T-1077` **AC12**/**AC13**, `T-1072` **AC11**/**AC16** | each spec's own byte-identity, scope-lock or board-delta criteria | base: FAIL | head: FAIL | Already red at this task's branch point, per T-1079's own measured table; each for reasons its own body declares. This task adds no new reason to any of them beyond what the note edit already implies. |
+| `.shell-team/specs/T-1079-tier2-judge.md` **AC16** | board delta of exactly base+1 against **its** branch point | base: PASS | head: FAIL | Newly reddened: the board gains this task's entry, so the delta measured from T-1079's branch point is +2. (T-1079's own base is 18/18 PASS, 0 FAIL — confirmed by a full run.) |
+| `.shell-team/specs/T-1073-harness-agent-concurrency.md` **AC12** | `agent-concurrency.md` **and** `phase-multiplexing.md` byte-identical to **its** branch point | base: FAIL | head: FAIL | **Already red at this task's branch point** — T-1079 edited `phase-multiplexing.md`, measured in T-1079's own Blast-radius table (`T-1073` measured `AC12 AC14` at both refs). This task adds a second reason to a criterion whose verdict does not move; it is the intended discharge of T-1073's own hand-forward follow-up and must be recorded by QA as a known red with this reason rather than kicked back. **This corrects a relayed premise**: the routing brief predicted this criterion would *turn* red here. **AC14** is also `FAIL` at both refs (pre-existing, unrelated — same disclosure the T-1079 table already carried). |
+| `.shell-team/specs/T-1068-agent-concurrency.md` **AC1**, **AC4** | the note's ten headings; the `- substrate: ` grammar closure, the ≥6 floor and four named ids | base: PASS | head: PASS | The errata stay inside the closed `provided|absent` vocabulary and rename no heading; **AC13** here re-derives the same invariants so a grammar break fails inside this task. Confirmed unchanged by running T-1068's whole spec at both refs — its own `AC9`/`AC10` are `FAIL` at both refs, pre-existing and unrelated. |
+| `.shell-team/specs/T-1069-phase-multiplexing.md` (`AC1 AC5 AC6 AC8 AC9 AC10`), `T-1074` (`AC14 AC18`), `T-1075` (`AC4 AC14 AC15 AC17`), `T-1077` (`AC12 AC13`), `T-1072` (`AC11 AC16`) | each spec's own byte-identity, scope-lock or board-delta criteria | base: FAIL | head: FAIL | Already red at this task's branch point, per T-1079's own measured table; each for reasons its own body declares. This task adds no new reason to any of them beyond what the note edit already implies. All five re-confirmed live this round at both refs, identical sets on each side. |
+| `.shell-team/specs/T-1074-fanout-orchestration.md` **AC9**, `T-1076-log-run-locking.md` **AC10**, `T-1077-worktree-reconcile.md` **AC3** | `git status --porcelain -- bin/ tests/` empty (each spec's own working-tree-subject negative control clause) | base: PASS | head: FAIL (transient, at measurement time) | **Measurement artefact of this round's own uncommitted edit to `bin/loop-guard.sh`** — at the moment these three were measured, this task's edit to that one file under `bin/` was still uncommitted, so `git status --porcelain -- bin/ tests/` reported it dirty. Re-measured after this round's own hand-off commit (below): all three return to `PASS`, confirming the flip was the working-tree state at measurement time, not a real regression this task's diff causes. |
+| `.shell-team/specs/T-1076-log-run-locking.md` **AC15**, `.shell-team/specs/T-1072-telemetry-span-discriminator.md` **AC6**/**AC7** | the operating machine's own local `.shell-team/runs/` corpus (gitignored, working-tree-only by each criterion's own declared design) | base: FAIL | head: PASS | **The already-documented gitignored-runs-corpus scratch-worktree artefact** (`.shell-team/test-recipe.md`'s T-1078 entry, and T-1079's own Blast-radius table for `T-1072` **AC6**/**AC7**): a `git worktree add --detach` scratch tree does not carry the gitignored runs corpus, so these criteria — whose own oracle is explicitly this operating machine's local corpus, never a committed ref — read `FAIL` in the scratch base tree and `PASS` in this long-lived checkout regardless of this task's diff. Disclosed, not chased, per that precedent. `T-1076` **AC13**/**AC16** are `FAIL` at both refs instead (pre-existing, unrelated: **AC13** byte-freezes `skills/run/SKILL.md` against T-1076's own, much older branch point, and **AC16** is T-1076's own merge-point-scoped scope lock, both stale long before this task started). |
+| `.shell-team/specs/T-1001-retro-input-acquisition.md` (representative sample, shipped-file-readers-only bucket, oldest), `.shell-team/specs/T-1041-freeze-ux.md` (representative sample, mid-range) | mentions of one of this task's four shipped files in prose, no byte-freeze against them | base: FAIL (identical sets) | head: FAIL (identical sets) | `T-1001` fails `AC2 AC3 AC6 AC10 AC13 AC14 AC16 AC18 AC21 AC23 AC25 AC26` at **both** refs (identical 12-item set); `T-1041` fails `AC14 AC15 AC16 AC17 AC21` at both refs (identical 5-item set). Both pre-existing, unrelated to this task. Sampled rather than run exhaustively across the full 46-item shipped-file-readers-only bucket, per the same representative-sampling discipline the **Indirection** paragraph below licenses for the board-reading population — the shortfall (43 of 46 not individually re-run) is disclosed here, not hidden. |
 | Every merged criterion resolving the board through `bin/team-paths.sh --get todo` | the resolved board | base: see method | head: see method | Discharged at the representative scope the **Indirection** paragraph fixes, with the shortfall disclosed there. |
 
 ## Directive-to-AC correspondence
