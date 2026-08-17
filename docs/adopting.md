@@ -337,8 +337,14 @@ two-arm expression, byte-identical across every criterion that reads a
 base-side blob:
 
 ```
-B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
+B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; elif git show-ref --verify --quiet refs/remotes/<remote>/<predecessor-branch>; then git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
 ```
+
+This is the canonical shape to copy verbatim — it is not the local-branch-only
+shortcut that the prose below merely describes: a checkout where the
+predecessor exists only as a remote-tracking ref takes the `elif` arm, whose
+`merge-base` argument is the full `refs/remotes/<remote>/<predecessor-branch>`
+path (a bare `<predecessor-branch>` would not resolve in that checkout at all).
 
 `<predecessor-branch>` is the immediate predecessor this spec's own
 branch is stacked on; `<integration-branch>` is a parameter naming

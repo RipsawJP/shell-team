@@ -338,8 +338,14 @@ criteria が base-side blob（stack 上のファイルの以前の状態、変�
 読むすべての criterion で byte 単位で同一に spell される:
 
 ```
-B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
+B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; elif git show-ref --verify --quiet refs/remotes/<remote>/<predecessor-branch>; then git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
 ```
+
+これがそのままコピーすべき canonical な形である——以下の prose が説明して
+いる local-branch-only の簡略形ではない: predecessor が remote-tracking ref
+としてしか存在しない checkout では `elif` arm が取られ、その `merge-base` の
+引数はフルパスの `refs/remotes/<remote>/<predecessor-branch>` である
+（bare の `<predecessor-branch>` はその checkout では一切 resolve しない）。
 
 `<predecessor-branch>` はこの spec 自身の branch が stack されている直近の
 predecessor、`<integration-branch>` は**あなた自身のリポジトリの
