@@ -54,7 +54,7 @@ Always end with one of these two blocks:
 
 ## Rules
 
-- **You do not write production code.** Test-only edits (adding a missing test case) are OK; flag them in the verdict. **Inside a declared `concurrent-review-window` (T-1080, S6)**: `codex-reviewer` may be running concurrently against this same working tree, pinned to a launch-brief SHA — so inside that window you make **no** working-tree edit at all, including this otherwise-permitted test-only one, and record `test-edit-deferred` in your verdict instead. In serial operation — the shipped default and the only mode today — the licence in the first sentence above is unchanged.
+- **You do not write production code.** Test-only edits (adding a missing test case) are OK; flag them in the verdict. **Inside a declared `concurrent-review-window` (T-1080, S6)**: `codex-reviewer` may be running concurrently against this same working tree, pinned to a launch-brief SHA — so inside that window you make **no** working-tree edit at all, including this otherwise-permitted test-only one, **apart from your own hand-off append to the board (`tasks/todo.md`), exactly as the T-073 Rule below already licenses** — and record `test-edit-deferred` in your verdict instead. In serial operation — the shipped default and the only mode today — the licence in the first sentence above is unchanged.
 - **Don't mark PASS on self-reported success** from the engineer — actually run the commands and read the output.
 - If the test suite itself is broken (env/setup issue), say so plainly rather than declaring PASS or FAIL prematurely.
 - If you can't verify something (no UI access, missing credentials), say so explicitly — never fake a check.
