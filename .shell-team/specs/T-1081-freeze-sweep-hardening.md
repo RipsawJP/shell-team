@@ -179,6 +179,82 @@ Every `not applicable` cell for the two agent files rests on a first-hand measur
 | 28 | The pre-commitment's trigger, drop order and authority (**D6**) | info-only (not promoted to AC) — a conditional disposition, not an output; if it fires, the record is a board entry and an interventions line, which **AC16** already gates for conformance |
 | 29 | The fallback's `develop` is this repository's instantiation, not a shipped requirement | **AC2** (the shipped literal is the `<integration-branch>` placeholder), **AC14** (the adopter doc says so) |
 
+## Blast radius
+
+**Population — merged specs whose `- check:` lines read either edited prose path**, derived by `bin/derive-populations.sh`, never counted by eye:
+
+- reproduce: `bash bin/derive-populations.sh --label t1081-blast-radius --set 'pm-spec-check-specs=grep -lE "check:.*agents/pm-spec\.md" .shell-team/specs/*.md' --set 'skill-run-check-specs=grep -lE "check:.*skills/run/SKILL\.md" .shell-team/specs/*.md'`
+
+<!-- BEGIN derivation: t1081-blast-radius -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: pm-spec-check-specs — status: 0 — lines: 29 — items: 29 — command: grep -lE "check:.*agents/pm-spec\.md" .shell-team/specs/*.md
+- set: skill-run-check-specs — status: 0 — lines: 36 — items: 36 — command: grep -lE "check:.*skills/run/SKILL\.md" .shell-team/specs/*.md
+- union: items: 49
+- bucket: pm-spec-check-specs — items: 13
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+- bucket: pm-spec-check-specs+skill-run-check-specs — items: 16
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+- bucket: skill-run-check-specs — items: 20
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+<!-- END derivation: t1081-blast-radius -->
+
+The union is **49 already-merged spec files** (this task's own spec is inside the "both" bucket only because its own drafted criteria — AC1–AC9, AC17 — themselves read either path; that is this task's own deliverable, not a downstream effect on a sibling task).
+
+**Criterion-level differencing, run live rather than assumed.** Every `- check:` line in those 49 files whose text mentions either edited path was extracted mechanically — `grep -nE 'check:.*(agents/pm-spec\.md|skills/run/SKILL\.md)' .shell-team/specs/*.md | sort -u | wc -l` → **177** lines — and each was run once against the branch point's content (this task's own uncommitted diff reverted with `git stash push -u`, since most of these check lines read dozens of unrelated repository paths by relative name and cannot be satisfied by substituting one file's blob) and again at HEAD (`git stash pop`), and the two 177-line verdict sets were differenced line by line. Result: **63/177 passed at the branch point, 72/177 passed at HEAD**, and the **only** 9 lines whose verdict changed are this spec's own `.shell-team/specs/T-1081-freeze-sweep-hardening.md:61,63,65,67,69,71,73,75,77` — **AC1–AC9**, this task's own criteria turning from red (this task's content did not exist yet) to green (it now does), which is this task's own deliverable landing rather than a downstream effect. **Zero criteria belonging to any of the other 48 already-merged spec files changed verdict** — the read-set-scoped downstream-impact inventory this `no-mechanism` task owes therefore closes with no blast radius against any sibling task.
+
+The 105 lines that failed identically at both refs are disclosed rather than silently absorbed into the "no change" verdict: a representative sample — `T-1009-doc-drift-and-false-ci-claim.md`'s AC pinned to the fixed commit `0906862` (a diff-scope-closure form, `agents/pm-spec.md` line 81's own already-documented staleness norm: the expected file set no longer describes reality once later tasks land on the same base) and `T-1061-adopter-docs-gate.md`'s AC2 pinned to the long-merged `chore/lesson-promotion-2026-08-11` (its purely-additive assertion already read 3 lines as "missing" at the *committed* HEAD that predates this session's own edits, reproduced independently of any uncommitted change) — was traced to that same pre-existing, systemic staleness in both cases, unrelated to this task's diff and out of this task's scope to repair (this task's own Non-goals: no retro-annotation of any already-merged frozen spec).
+
+**Indirection class, named and discharged.** (i) A criterion reaching either edited path only through `templates/prompt-blocks/registry.txt` rather than a literal path byte: `tests/check-prompt-sync/run.sh`, already run live under **AC17** (exit 0) — discharged by running it, not by disclosure. (ii) A criterion reaching either path through an `agents/*.md` glob pathspec rather than the literal file name: measured, exactly two such check lines exist in the corpus outside this spec (`T-1055-adapter-envelope.md:152` and `:163`, both `git grep -l -e '<flag>' -- ... 'agents/*.md' ...`); both were run live at HEAD and both exit 0 — unaffected because neither of this task's two new checklist items introduces any of the flag tokens those lines test for (`--config`, `--binding`, `--adapters`, `--definitions`, `--contract`, `--doc`, `effort-unsupported`, `authority-channel-conflict`, `binding-invalid`). (iii) A path built at run time from `bin/team-paths.sh --get`: measured **not to apply** — `team-paths.sh --get` resolves base-dir-relative per-repo artifacts (`todo`, `specs`, `reviews`, `interventions`, …), never a plugin-shipped agent or skill file path, so no criterion reaches `agents/pm-spec.md` or `skills/run/SKILL.md` through it; the corpus's 185 lines calling `team-paths.sh --get` are excluded from this population on that measured ground rather than run.
+
+**What stays unmeasured, disclosed rather than hidden.** No CI-equivalent step beyond the three suites **AC17** already runs was re-swept, and no spec added or reworded between this measurement and merge is covered — bounded by this task's `no-mechanism` verification class and by the diff's confirmed purely-additive shape (`git diff --numstat "$B" -- agents/pm-spec.md skills/run/SKILL.md` → `2 0 agents/pm-spec.md` and `2 0 skills/run/SKILL.md`, insertions only, zero deletions), which is why the population actually reading either edited path is the one swept exhaustively above rather than the whole corpus.
+
 ## Assumptions
 
 - **MEASURED, first-hand — count-premise classification (own-coinage vs borrowed).** This spec makes **no** absolute count premise about any token at the branch point, which is the strongest available discharge of the very rule it ships. The one token this task introduces, `base-ref-discriminator`, is classified **borrowed-stem**: its hyphenated declaration-key form is new, but its vocabulary is lifted from the board's existing `- base-ref discriminator:` prose lines and from `agents/pm-spec.md` line 88's heading, which is exactly the borrowing shape the corpus entry warns about. Measured from this role: `base-ref-discriminator` (all-hyphen form) returns **zero** matches across this clean checkout at the branch tip. That measurement is deliberately **not** carried into any `- check:` line as a zero premise — **AC10** asserts the declaration's presence at HEAD and nothing about the base count. **The freeze run must re-measure and report beside this line**: `git show <branch point>:agents/pm-spec.md | grep -c base-ref-discriminator` and the same over `skills/run/SKILL.md` and `docs/adopting.md`, from the branch point's committed blobs rather than the working tree.

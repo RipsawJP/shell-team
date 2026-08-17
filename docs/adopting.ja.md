@@ -316,6 +316,69 @@ mechanical check の役割ではない。path の allowlist を作れば adopter
 はタスクの bootstrap freeze でのみ適用され、すでに記録済みのハッシュの
 re-freeze では適用されない。
 
+## stacked-branch base-ref discriminator と borrowed-vocabulary sweep の宣言
+
+T-1081 以降に凍結するすべての spec は、凍結された intent block 内の 1 行
+（上記の `- user-visible:` / `- verification-class:` と同じ宣言領域）で
+追加の宣言を持つ: トップレベルの bullet
+`- base-ref-discriminator: <instantiate した two-arm 式>` または
+`- base-ref-discriminator: not-applicable — <reason>`。これは stacked
+branch 上の spec だけでなく、**最初の凍結を行うすべての spec** に必須
+である——base-side blob を一切読まない spec にとっては後者の形が正しい
+答えになる。
+
+spec が 1 つ以上のまだ open な predecessor PR の上に stack され、その
+criteria が base-side blob（stack 上のファイルの以前の状態、変更前の値）
+を読む場合、そこに書く値は 1 つの two-arm 式であり、base-side blob を
+読むすべての criterion で byte 単位で同一に spell される:
+
+```
+B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
+```
+
+`<predecessor-branch>` はこの spec 自身の branch が stack されている直近の
+predecessor、`<integration-branch>` は**あなた自身のリポジトリの
+integration branch** を指す parameter である——この repository では
+`develop`、他の多くの repository では `main` であり、この repository の
+convention に矯正されるのではなく自分の convention を代入する。第一の
+arm は `git merge-base "<predecessor-branch>" HEAD` であり、意図的に
+predecessor branch tip の `rev-parse` ではない: この branch を切った後に
+predecessor branch を進める rework round は、そのブランチの tip を動かす
+が共通の祖先は動かさない。ここで "branch point" が意味するのはその共通の
+祖先である。fallback arm `git merge-base "<integration-branch>" HEAD` は、
+predecessor branch がもはや resolve しなくなった時点——merge され削除さ
+れた era——で取られる。arm の選択は明示的な `git show-ref --verify
+--quiet` による branch-existence test で行い、`2>/dev/null ||` チェーン
+では行わない: `||` チェーンは「predecessor branch が消えた」（fall back
+すべき想定された era の変化）と「`git merge-base` が別の理由で失敗した」
+（fail closed すべき場合）を区別できないためである。40 桁の commit
+literal はどの criterion にも一切書かれない。1 つの残余ケースは engineer
+して回避するのではなく開示される: merge されずに削除された predecessor
+branch は fallback arm に integration branch の tip を resolve させてしま
+い、それは branch point ではない——それは stack 全体を無効化する
+route-back であり、criterion で覆い隠すべきものではない。
+
+現時点の強制は上記の adopter-facing documentation の宣言と同じ足場で
+**チェッカーではなく duty** である: タスクの最初の凍結時に coordinating
+session がこの宣言領域を自分で読み、宣言が無い・2 つ以上ある・宣言領域外
+に置かれている spec を refuse する。機械的なチェッカーはまだ出荷されて
+いない。
+
+この宣言と並行して、すべての spec の凍結時 premise sweep は、文字列
+token の出現回数についてのすべての literal count premise——特に `= 0`
+という premise——を `own-coinage`（このタスク自身が導入する literal）か
+`borrowed`（他の document が既に coin した token: invariant-lock id、
+status flag、grammar family name、その他の既存 vocabulary）のいずれかに
+classify する。これは spec author の凍結時 duty である: borrowed な
+token はすべて spec 自身の `## Assumptions` セクションに、それを確認する
+measurement command と共に enumerate され、execution 能力を持つ側が凍結
+前にその command を branch point の committed blob に対して live に実行
+し、測定値を assumption の傍に記録する。「このタスクが導入する新しい
+literal」だけに scope した sweep では不十分である——merged された sibling
+task によって既に stack に持ち込まれた token を見逃してしまう——そして
+測定されなかった borrowed-vocabulary count premise は broken check line
+として扱われる。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。

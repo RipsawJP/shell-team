@@ -1441,3 +1441,31 @@ that file's order.
   committing, or disclose the measurement's own uncommitted-diff timing
   explicitly rather than reporting the flip as caused by the diff's
   content.
+- T-1081: two environment facts measured on this host, worth knowing
+  before writing a `- check:` line or a verification script here.
+  **(1)** `diff <(cmd1) <(cmd2)` (process substitution) fails with
+  `diff: /dev/fd/NN: Operation not permitted` under this sandbox — `diff`
+  cannot read a `/dev/fd` argument here — while `comm <(cmd1) <(cmd2)`
+  reads the same kind of argument successfully; where a check needs a
+  byte-identity comparison, extract each side to a **regular file** under
+  `"$TMPDIR"` first and `diff -q`/`cmp -s` the two files, and where a
+  check needs a set-difference (e.g. "every line on the left also
+  appears on the right"), `comm`'s own process-substitution form is fine
+  as-is. Do not "normalize" every such check to one spelling — the two
+  forms exist because of this asymmetry, not by inconsistency.
+  **(2)** A bare `/tmp/...` path is denied for writing on this host, while
+  `"${TMPDIR:-/tmp}"/...` (or bare `"$TMPDIR"`) succeeds — always resolve
+  a scratch path through `${TMPDIR:-/tmp}` in a `- check:` line or a
+  verification script, never hardcode `/tmp` directly. Third, an
+  instrumentation trap independent of either fact above: GNU `timeout`
+  is **not installed** on this host's `bash` (`timeout: command not
+  found`, exit 127) — a probe script that wraps each candidate command in
+  `timeout N bash -c "$cmd"` to bound a sweep's runtime will report every
+  single command as failed, uniformly and silently, with no diagnostic
+  distinguishing "the command genuinely failed" from "the wrapper itself
+  doesn't exist" (confirmed live: a 177-line population sweep reported
+  0/177 passing under the `timeout`-wrapped script and a genuine
+  63/72-ish split once the wrapper was removed) — never trust a uniform
+  all-fail or all-pass result from a bulk probe without first confirming,
+  via a single known-good positive control run through the same wrapper,
+  that the wrapper itself executes the command at all.

@@ -314,6 +314,73 @@ path allowlist would coerce every adopter's repository into this one's
 layout. The duty applies at a task's bootstrap freeze only, never at a
 re-freeze of an already-recorded hash.
 
+## Declaring the stacked-branch base-ref discriminator and the borrowed-vocabulary sweep
+
+Every spec frozen from T-1081 onward additionally declares, on one line
+inside its own frozen intent block, in the same declaration region the
+`- user-visible:` and `- verification-class:` keys above already occupy:
+a top-level bullet `- base-ref-discriminator: <the instantiated
+two-arm expression>` or `- base-ref-discriminator: not-applicable —
+<reason>`. This is required of every first-freeze spec, not only one
+frozen on a stacked branch, because the second form is the correct
+answer for a spec whose criteria read no base-side blob at all.
+
+Where a spec is frozen on a branch stacked behind one or more still-open
+predecessor PRs and its criteria read a base-side blob (a stack-delivered
+file's prior state, a pre-change value), the value spelled there is one
+two-arm expression, byte-identical across every criterion that reads a
+base-side blob:
+
+```
+B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
+```
+
+`<predecessor-branch>` is the immediate predecessor this spec's own
+branch is stacked on; `<integration-branch>` is a parameter naming
+**your own repository's integration branch** — `develop` in this
+repository, `main` in many others — substituted for your own convention
+rather than coerced into this one. The first arm is
+`git merge-base "<predecessor-branch>" HEAD`, deliberately not a
+`rev-parse` of the predecessor branch tip: a rework round that advances
+the predecessor branch after this branch was cut moves that branch's
+tip but not the common ancestor, and the common ancestor is what
+"branch point" means here. The fallback arm,
+`git merge-base "<integration-branch>" HEAD`, is taken once the
+predecessor branch no longer resolves — the era in which it has merged
+and been deleted. The arm is selected by an explicit
+`git show-ref --verify --quiet` branch-existence test and never by a
+`2>/dev/null ||` chain, because a `||` chain cannot distinguish "the
+predecessor branch is gone" (the expected era change, which must fall
+back) from "`git merge-base` failed for another reason" (which must
+fail closed). No 40-hex commit literal is ever written into a
+criterion. One residual case is disclosed rather than engineered
+around: a predecessor branch deleted without being merged makes the
+fallback arm resolve the integration branch's tip, which is not the
+branch point — that invalidates the whole stack and is a route-back,
+not something a criterion should paper over.
+
+Enforcement today is a **duty, not a checker**, on the same footing as
+the adopter-facing-documentation declaration above: at a task's first
+freeze the coordinating session reads the declaration region itself and
+refuses a spec carrying none, more than one, or one placed outside the
+declaration region. No mechanical checker ships for it yet.
+
+Alongside that declaration, every spec's freeze-time premise sweep
+classifies each literal count premise it makes about a string token's
+occurrences — especially a `= 0` premise — as `own-coinage` (a literal
+the task itself introduces) or `borrowed` (a token another document
+already coined: an invariant-lock id, a status flag, a grammar family
+name, or any other pre-existing vocabulary). This is freeze-time duty
+on the spec author: every borrowed token is enumerated in the spec's
+own `## Assumptions` section together with the measurement command
+that confirms it, and the execution-capable side runs that command
+live against the branch point's committed blob before the freeze,
+recording the measured value beside the assumption. A sweep scoped
+only to "the new literals this task introduces" is not sufficient — a
+token already carried onto the stack by a merged sibling task escapes
+it, and an unmeasured borrowed-vocabulary count premise is treated as a
+broken check line.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
