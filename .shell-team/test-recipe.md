@@ -1392,3 +1392,23 @@ that file's order.
   and reproduced identically here; a later task differencing base vs
   head via a scratch worktree should expect and disclose this same
   artefact rather than chase it as a real flip.
+- T-1079: `CHECK_ACS_TIMEOUT=120` is sufficient for
+  `T-1079-tier2-judge.md` itself (spec preamble's own stated value; the
+  heaviest commands are `bin/check-pii-shapes.sh --base` and
+  `bin/check-intent.sh`, no full fixture suite runs, no other spec's own
+  full suite is re-run — this task's declared `- verification-class:
+  no-mechanism` prices the Blast radius at read-set scope, not a
+  full-population re-run). One authoring trap worth recording for a
+  future task adding a new `- judge-*: `/`- cost-input: `-style label
+  family with a literal-text requirement (a `tie-break`, a bounded
+  mechanism name, a phase-position phrase): a bolded Markdown span
+  (`**Tie-break, ...**`) capitalizing the FIRST letter of a literal a
+  `grep -qF` check requires in its exact-case form defeats that check
+  silently — `grep -qF` is case-sensitive under `LC_ALL=C`, and
+  "Tie-break" does not match a check requiring the substring
+  `tie-break`. Confirmed live: writing the section heading as
+  "**Tie-break, stated once...**" left `check-acs.sh`'s AC3 FAILED
+  (`grep -qF -- 'tie-break' "$T/sec"` found nothing); the fix was to
+  keep the literal lowercase token verbatim inside the prose
+  (`` `tie-break` ``) rather than relying on a capitalized natural-language
+  heading to satisfy a case-sensitive literal check.
