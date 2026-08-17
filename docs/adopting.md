@@ -322,8 +322,13 @@ inside its own frozen intent block, in the same declaration region the
 a top-level bullet `- base-ref-discriminator: <the instantiated
 two-arm expression>` or `- base-ref-discriminator: not-applicable —
 <reason>`. This is required of every first-freeze spec, not only one
-frozen on a stacked branch, because the second form is the correct
-answer for a spec whose criteria read no base-side blob at all.
+frozen on a stacked branch. The two forms are not a free choice: the
+two-arm expression is the value only when some criterion reads a
+base-side blob **and** the branch has an open predecessor at authoring
+time (classified once — a later era change, such as the predecessor
+merging mid-task, never reclassifies it); every other case — no
+base-side blob read at all, or no open predecessor to name — takes
+`not-applicable — <reason>` naming the branch's own actual base ref.
 
 Where a spec is frozen on a branch stacked behind one or more still-open
 predecessor PRs and its criteria read a base-side blob (a stack-delivered
@@ -348,16 +353,28 @@ tip but not the common ancestor, and the common ancestor is what
 `git merge-base "<integration-branch>" HEAD`, is taken once the
 predecessor branch no longer resolves — the era in which it has merged
 and been deleted. The arm is selected by an explicit
-`git show-ref --verify --quiet` branch-existence test and never by a
-`2>/dev/null ||` chain, because a `||` chain cannot distinguish "the
-predecessor branch is gone" (the expected era change, which must fall
-back) from "`git merge-base` failed for another reason" (which must
-fail closed). No 40-hex commit literal is ever written into a
-criterion. One residual case is disclosed rather than engineered
-around: a predecessor branch deleted without being merged makes the
-fallback arm resolve the integration branch's tip, which is not the
-branch point — that invalidates the whole stack and is a route-back,
-not something a criterion should paper over.
+`git show-ref --verify --quiet` branch-existence test — checked
+against `refs/heads/<predecessor-branch>` where the predecessor
+resolves as a local branch, or against
+`refs/remotes/<remote>/<predecessor-branch>` where a fresh clone or a
+CI checkout only fetched it as a remote-tracking ref and never checked
+it out locally; the existence test must find the predecessor in
+whichever namespace your checkout actually carries it in, never
+assumed to be `refs/heads/` alone — and never by a `2>/dev/null ||`
+chain, because a `||` chain cannot distinguish "the predecessor branch
+is gone" (the expected era change, which must fall back) from
+"`git merge-base` failed for another reason" (which must fail closed).
+No 40-hex commit literal is ever written into a criterion. Two
+residual cases are disclosed rather than engineered around, on the
+same footing: a predecessor branch deleted without being merged makes
+the fallback arm resolve the integration branch's tip, which is not
+the branch point — that invalidates the whole stack and is a
+route-back, not something a criterion should paper over; and a
+predecessor branch rebased or force-pushed after your branch was cut,
+where the recorded common ancestor may no longer be an ancestor of the
+predecessor's new tip, so `merge-base` resolves a commit earlier than
+the real branch point — also a route-back rather than a case either
+arm is redesigned to survive.
 
 Enforcement today is a **duty, not a checker**, on the same footing as
 the adopter-facing-documentation declaration above: at a task's first

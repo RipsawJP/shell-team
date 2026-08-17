@@ -324,8 +324,13 @@ T-1081 以降に凍結するすべての spec は、凍結された intent block
 `- base-ref-discriminator: <instantiate した two-arm 式>` または
 `- base-ref-discriminator: not-applicable — <reason>`。これは stacked
 branch 上の spec だけでなく、**最初の凍結を行うすべての spec** に必須
-である——base-side blob を一切読まない spec にとっては後者の形が正しい
-答えになる。
+である。2 つの形は自由選択ではない: two-arm 式が値になるのは、いずれかの
+criterion が base-side blob を読み、かつ branch が authoring time に
+open な predecessor を持つ場合**のみ**である（分類は 1 回きりで、
+predecessor が途中で merge されるような era の変化によって再分類される
+ことはない）。それ以外のすべてのケース——base-side blob を一切読まない、
+または open な predecessor が無い——では、branch 自身の実際の base ref
+を名指しする `not-applicable — <reason>` を取る。
 
 spec が 1 つ以上のまだ open な predecessor PR の上に stack され、その
 criteria が base-side blob（stack 上のファイルの以前の状態、変更前の値）
@@ -348,15 +353,27 @@ predecessor branch を進める rework round は、そのブランチの tip を
 祖先である。fallback arm `git merge-base "<integration-branch>" HEAD` は、
 predecessor branch がもはや resolve しなくなった時点——merge され削除さ
 れた era——で取られる。arm の選択は明示的な `git show-ref --verify
---quiet` による branch-existence test で行い、`2>/dev/null ||` チェーン
-では行わない: `||` チェーンは「predecessor branch が消えた」（fall back
-すべき想定された era の変化）と「`git merge-base` が別の理由で失敗した」
-（fail closed すべき場合）を区別できないためである。40 桁の commit
-literal はどの criterion にも一切書かれない。1 つの残余ケースは engineer
-して回避するのではなく開示される: merge されずに削除された predecessor
-branch は fallback arm に integration branch の tip を resolve させてしま
-い、それは branch point ではない——それは stack 全体を無効化する
-route-back であり、criterion で覆い隠すべきものではない。
+--quiet` による branch-existence test で行う——predecessor が local
+branch として resolve する場合は `refs/heads/<predecessor-branch>` に
+対して、fresh clone や CI checkout が fetch しただけで local に
+checkout していない remote-tracking ref としてしか存在しない場合は
+`refs/remotes/<remote>/<predecessor-branch>` に対して行い、この
+existence test は `refs/heads/` だけを前提にせず、この checkout が
+実際に predecessor を持っている namespace のほうで見つけなければなら
+ない——そして `2>/dev/null ||` チェーンでは行わない: `||` チェーンは
+「predecessor branch が消えた」（fall back すべき想定された era の変化）
+と「`git merge-base` が別の理由で失敗した」（fail closed すべき場合）を
+区別できないためである。40 桁の commit literal はどの criterion にも
+一切書かれない。2 つの残余ケースが、同じ扱いで、回避策を講じるのでは
+なく開示される: 1 つ目は、merge されずに削除された predecessor branch
+が fallback arm に integration branch の tip を resolve させてしまい、
+それは branch point ではない——それは stack 全体を無効化する
+route-back であり、criterion で覆い隠すべきものではない。2 つ目は、
+この branch を切った後に predecessor branch が rebase または force-push
+された場合で、記録済みの共通の祖先が predecessor の新しい tip の祖先で
+はなくなっている可能性があり、`merge-base` は本当の branch point より
+前の commit を resolve してしまう——これも同じ扱いの route-back であり、
+どちらの arm もこれを生き延びるように再設計されてはいない。
 
 現時点の強制は上記の adopter-facing documentation の宣言と同じ足場で
 **チェッカーではなく duty** である: タスクの最初の凍結時に coordinating
