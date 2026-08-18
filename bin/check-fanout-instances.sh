@@ -74,7 +74,7 @@
 #
 # Class vocabulary (closed; every token below is a real `die` call site's
 # own class argument, re-derived and cross-checked against this table):
-#   class: usage exit=2 a malformed invocation — missing/unknown flag, an unreadable path, a bad --label grammar
+#   class: usage exit=2 a malformed invocation — missing/unknown flag, an unreadable or non-regular-file path, a bad --label grammar
 #   class: block-not-found exit=2 the given --label names no fanout-verdict block in the aggregation file
 #   class: duplicate-block exit=1 the aggregation file carries two or more blocks for the given --label
 #   class: malformed-block exit=1 a '- part:' line in the block violates the part-name grammar, or the block's own metadata is unreadable
@@ -267,6 +267,23 @@ fi
 
 [ -r "$TELEMETRY" ] || die 2 usage "--telemetry path not readable: $TELEMETRY"
 [ -r "$AGGREGATION" ] || die 2 usage "--aggregation path not readable: $AGGREGATION"
+
+# A path that passes -r (a directory, a FIFO, a device node such as
+# /dev/null are all "readable" by that test) but is not a regular file is an
+# invocation defect, not a content defect: reading a directory through the
+# `read` builtin below (Phase 1) emits an uncontrolled bash engine message on
+# stderr and this checker fell through to the wrong exit-3 class rather than
+# refusing at the invocation-check stage (QA round 1, T-1082). Guarded
+# uniformly for BOTH path arguments rather than only the one QA reproduced,
+# since the underlying class — "caller-supplied path is not a regular
+# file" — applies identically to --aggregation (whose current grep-based
+# read only happens to degrade cleanly for a directory, not by design, and
+# would not necessarily degrade as cleanly for every non-regular shape). A
+# FIFO fails this test without ever being opened, so no blocking read is
+# risked; a symlink is judged by what it resolves to, matching -r's own
+# symlink-following behaviour.
+[ -f "$TELEMETRY" ] || die 2 usage "--telemetry path is not a regular file: $TELEMETRY"
+[ -f "$AGGREGATION" ] || die 2 usage "--aggregation path is not a regular file: $AGGREGATION"
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/check-fanout-instances.XXXXXX")" || die 2 usage "cannot create a scratch directory under \${TMPDIR:-/tmp}"
 # shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below

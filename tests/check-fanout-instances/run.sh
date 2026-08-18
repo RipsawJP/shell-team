@@ -116,6 +116,65 @@ usage_case "bad --label grammar" "" --telemetry "$TEL_MAIN" --run-id R1 --phase 
 usage_case "a label naming no block" "block-not-found" --telemetry "$TEL_MAIN" --run-id R1 --phase verify --aggregation "$AGGF" --label nosuchlabel
 
 # =============================================================================
+# case: usage — a caller-supplied path that passes -r but is not a regular
+# file (T-1082 QA round 1 rework: a directory as --telemetry reached the
+# `read` builtin and leaked an uncontrolled bash engine message to stderr,
+# misclassifying the refusal as no-rows/exit 3 instead of usage/exit 2 —
+# breaking the frozen "exactly one classified stderr line" contract). Every
+# non-regular-file shape reachable on this platform, for BOTH path
+# arguments: a directory, /dev/null, a FIFO (must never be opened — a
+# blocking read on an unconnected FIFO was independently confirmed to hang
+# the pre-fix script for both --telemetry and --aggregation) and a symlink
+# to a directory. A symlink to a REGULAR file is the positive control: it
+# must still pass straight through, proving the new guard does not
+# overtighten past what -f itself already resolves.
+# =============================================================================
+nonregular_case() {
+  # nonregular_case <desc> <args...> — exit 2, class usage, empty stdout,
+  # and (unlike the generic usage_case helper above) exactly ONE stderr
+  # line — the precise property QA's finding demanded and the generic
+  # helper does not itself check.
+  local desc="$1"; shift
+  local rc out_n err_n
+  rc="$(run_check "$T/nr.out" "$T/nr.err" "$@")"
+  out_n="$(grep -c . "$T/nr.out" || true)"
+  err_n="$(grep -c . "$T/nr.err" || true)"
+  if [ "$rc" = "2" ] && [ "$out_n" = "0" ] && [ "$err_n" = "1" ] && grep -q 'usage' "$T/nr.err" && grep -q 'not a regular file' "$T/nr.err"; then
+    pass "usage: $desc exits 2, class usage, empty stdout, exactly one stderr line"
+  else
+    fail "usage: $desc — expected rc=2/out=0/err=1 lines with class usage and 'not a regular file', got rc=$rc out_n=$out_n err_n=$err_n err=$(cat "$T/nr.err" 2>/dev/null)"
+  fi
+}
+
+DIR_TEL="$T/nonregular-dir-tel"; mkdir -p "$DIR_TEL"
+DIR_AGG="$T/nonregular-dir-agg"; mkdir -p "$DIR_AGG"
+FIFO_TEL="$T/nonregular-fifo-tel"; mkfifo "$FIFO_TEL"
+FIFO_AGG="$T/nonregular-fifo-agg"; mkfifo "$FIFO_AGG"
+LINK_DIR_TEL="$T/nonregular-link-dir-tel"; ln -s "$DIR_TEL" "$LINK_DIR_TEL"
+LINK_DIR_AGG="$T/nonregular-link-dir-agg"; ln -s "$DIR_AGG" "$LINK_DIR_AGG"
+
+nonregular_case "directory as --telemetry" --telemetry "$DIR_TEL" --run-id R1 --phase verify --aggregation "$AGGF" --label t1082-suite
+nonregular_case "directory as --aggregation" --telemetry "$TEL_MAIN" --run-id R1 --phase verify --aggregation "$DIR_AGG" --label t1082-suite
+nonregular_case "/dev/null as --telemetry" --telemetry /dev/null --run-id R1 --phase verify --aggregation "$AGGF" --label t1082-suite
+nonregular_case "/dev/null as --aggregation" --telemetry "$TEL_MAIN" --run-id R1 --phase verify --aggregation /dev/null --label t1082-suite
+nonregular_case "a FIFO as --telemetry (never opened)" --telemetry "$FIFO_TEL" --run-id R1 --phase verify --aggregation "$AGGF" --label t1082-suite
+nonregular_case "a FIFO as --aggregation (never opened)" --telemetry "$TEL_MAIN" --run-id R1 --phase verify --aggregation "$FIFO_AGG" --label t1082-suite
+nonregular_case "a symlink to a directory as --telemetry" --telemetry "$LINK_DIR_TEL" --run-id R1 --phase verify --aggregation "$AGGF" --label t1082-suite
+nonregular_case "a symlink to a directory as --aggregation" --telemetry "$TEL_MAIN" --run-id R1 --phase verify --aggregation "$LINK_DIR_AGG" --label t1082-suite
+
+# Positive control: a symlink to a REGULAR file is not a non-regular-file
+# path (-f follows the symlink to its target) and must pass straight
+# through exactly as the unmutated ok-success case above does.
+LINK_TEL="$T/nonregular-link-regular-tel"; ln -s "$TEL_MAIN" "$LINK_TEL"
+LINK_AGG="$T/nonregular-link-regular-agg"; ln -s "$AGGF" "$LINK_AGG"
+rc="$(run_check "$T/nrok.out" "$T/nrok.err" --telemetry "$LINK_TEL" --run-id R1 --phase verify --aggregation "$LINK_AGG" --label t1082-suite)"
+if [ "$rc" = "0" ] && [ "$(grep -c . "$T/nrok.out" || true)" = "1" ] && grep -q '^check-fanout-instances: ok: ' "$T/nrok.out" && [ "$(grep -c . "$T/nrok.err" || true)" = "0" ]; then
+  pass "usage: a symlink to a regular file for both --telemetry and --aggregation still passes (positive control)"
+else
+  fail "usage: symlink-to-regular-file positive control — rc=$rc out=$(cat "$T/nrok.out" 2>/dev/null) err=$(cat "$T/nrok.err" 2>/dev/null)"
+fi
+
+# =============================================================================
 # case: duplicate-block — a file carrying two blocks for the requested label
 # exits 1, never 2 — a content ambiguity, not an invocation defect.
 # =============================================================================
