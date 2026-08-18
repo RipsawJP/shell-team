@@ -1487,3 +1487,32 @@ that file's order.
   ANSI-C-quoted em dash, boundary-anchored key matching) rather than
   reinventing it — a real time-saver when a new checker reads a sibling
   checker's own output format.
+- T-1083: no new `bin/` script, no new test suite (`- verification-class:
+  mechanism`, but the diff is a documentation/prompt-block surface, not a
+  script). The **probe venue procedure** (orchestrator-only, per the same
+  no-Agent/Task-token measurement T-1073 already established): a throwaway
+  `git clone --no-hardlinks` under `$TMPDIR`, pinned to the branch point,
+  with `TEAM_RUNS_DIR` pointed **inside that clone** for every telemetry
+  write the probe agents make — never into this checkout's own
+  `.shell-team/runs/` corpus. Verify the real checkout stayed clean
+  afterward with `git status --short` and `git ls-files --others
+  --exclude-standard`, both read empty, rather than assumed. `CHECK_ACS_TIMEOUT`
+  needs raising above the 120 s default for this spec's own full sweep
+  (this task used 300, per the spec's Notes for engineer) because **AC19**
+  runs five checkers including `check-handoff.sh` over the real board.
+  Separately, this task's own **AC21** full-population Blast-radius sweep
+  (87 specs at the branch point, run at both refs) is materially different
+  from a single spec's own suite: a `git worktree add --detach <scratch>
+  <branch-point>` gives a real base-side checkout `bin/check-acs.sh --root
+  <scratch> <scratch>/<spec>` can run against, and running the 87-spec
+  population **serially** at even a 90 s per-check cap takes on the order
+  of hours on this host — `xargs -P <cores>` fan-out (one `check-acs.sh`
+  invocation pair per spec, run in parallel, each writing to its own named
+  output file, with a `tail -1 | grep -q '^check-acs: '` completion-marker
+  check before trusting a partial or truncated output file, per the T-1082
+  entry's own killed-mid-sweep lesson above) is what makes this tractable
+  in one sitting; do not attempt the 87-spec population serially.
+  Numeric criteria in this spec compare 19-digit epoch-nanosecond values
+  via `$(( 10#$v ))` bash arithmetic — never `awk`/`sort -n` (a double
+  cannot hold them exactly), the same discipline T-1069/T-1071/T-1072/
+  T-1073 already established.

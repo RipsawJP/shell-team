@@ -142,3 +142,117 @@ Read in the real checkout at 1787063497808615000, after every arm had finished:
 - resolved agent identity: `subagent_type=shell-team:qa-verifier`, model `sonnet` (verbatim from the emitted span rows), for every instance in every arm.
 - per-call foreground-Bash timeouts passed to instances: 300000 ms explicit on every unit call except instance-death setup 1's qa-2 (no guidance, completed anyway) and setup 2's qa-2 (120000 ms explicit, the pinned default, which fired).
 - `TEAM_RUNS_DIR` pointed inside the throwaway clone for every telemetry write; the real checkout's own runs corpus received none of the probe's rows.
+## Terms and closed vocabularies
+
+Restated from `.shell-team/specs/T-1083-agent-launch-fanout.md`'s frozen
+`<!-- BEGIN probe-protocol: T-1083 -->` … `<!-- END probe-protocol: T-1083 -->`
+region — a faithful restatement for a reader who has not opened the spec, never a
+re-derivation of the protocol's own design choices.
+
+- Verdict (closed, exactly one recorded in `## Verdict and licence conditions` below), borrowed verbatim from T-1073's own frozen vocabulary, no new token: `concurrent-overlapping` / `serialized` / `queued-partial` (carries a measured cap `k`) / `launch-refused` / `undetermined`.
+- Licence conditions (closed, seven — one more than T-1073's six, `plugin-role-subagent-type` added because this task's own boundary is the agent type, not merely overlap), each recorded `met` or `not-met` with its own evidence: `plugin-role-subagent-type`, `production-unit`, `real-population`, `same-machine-session`, `clock-source-monotonic`, `overlap-margin-exceeds-launch-latency`, `aggregation-end-to-end`. Any condition reading `not-met` confines the verdict to `undetermined` or `launch-refused`.
+- Arm ids (closed, five, with a fixed drop order): `plugin-role-n2` (never dropped), `aggregation-live` (never dropped), `instance-death` (never dropped), `plugin-role-n4` (droppable second), `launch-refused` (droppable first).
+- Evidence channels (closed, three, borrowed verbatim from T-1073 rather than re-coined, each with a fixed evidentiary role):
+  - channel: agent-self-timestamps — primary — each instance's own first and last timestamp, the only channel measured from inside the agents.
+  - channel: batch-vs-sum — necessary-condition — the orchestrator's batch wall clock against the summed per-instance durations; necessary for overlap, never sufficient alone.
+  - channel: orchestrator-span-rows — secondary-attribution — span rows carrying `--instance <role-qualified-id>` and `--seq auto`, emitted by the orchestrator, never self-emitted by an instance; in this task additionally the input `bin/check-fanout-instances.sh` reads.
+- Launch-record grammar (closed, frozen before the probe ran — see `## Probe evidence` above for the field-by-field definition): `launch-record 1` / `- population:` / `- requested-n:` / `- achieved-n:` / `- cap-ground:` / `- assign:` / `- liveness:` / `- launched-epoch:` / `- completed-epoch:` / `launch-record-end`.
+
+## Probe protocol (frozen before execution)
+
+Restated from the same frozen region, for a reader who has not opened the spec.
+
+**Venue.** A throwaway `git clone --no-hardlinks` under `$TMPDIR`, checked out to the branch point, is the only tree any probe agent touches — `git worktree add` is never used for this venue, since a worktree registers under `.git/worktrees` in the real checkout and turns cleanup into a destructive step this task takes no version of. Telemetry is written into that clone with `TEAM_RUNS_DIR` pointed inside it. No probe agent writes to the real checkout, verified rather than promised (`## Probe evidence`, "Post-arm cleanliness reads").
+
+**Unit and population.** The production unit is `bash bin/check-acs.sh <spec>` over real committed specs in the pinned clone. The population is written to a population file before any instance is launched and never re-selected after a verdict is seen; per-spec costs are measured singly before any arm runs so the fan-out's own unit durations sit above the measured launch latency by a declared margin factor of at least 3 and below the liveness check's stall threshold. The unit is the run, never its verdict — a non-zero `unit_rc` from a stale merge-point-scoped lock is expected.
+
+**Clock source.** The probe records which clock it read and verifies it before relying on it: a source whose nanosecond field does not expand (BSD `date`'s literal `N`) is `unusable` and is substituted. Every timestamp is an integer of digits only.
+
+**The launch record — grammar, frozen.** One file per fan-out at `<runs>/fanout-<label>.launch`, `<runs>` resolved via `bin/team-paths.sh --get runs`, `<label>` the same `--label` value passed to both shipped checkers. Written before any instance is launched, except the two epoch fields. The field-by-field grammar is quoted verbatim in `## Probe evidence` above (the `aggregation-live` arm's own launch record) and defined identically in `templates/prompt-blocks/fanout-orchestration.md` and its `skills/run/SKILL.md` mirror (**AC1**–**AC3**). Four fields are `audit-only` (`- liveness:`, `- launched-epoch:`, `- completed-epoch:`, `- cap-ground:`) because every gated field is already an argument to a shipped fail-closed checker — no third checker is built.
+
+**Arms.** Five, with a closed id vocabulary and a fixed drop order: `plugin-role-n2` (two instances of one `agents/*.md`-derived plugin role, never dropped), `aggregation-live` (the same instances' real part files reduced and verified, never dropped, the only end-to-end evidence precondition 3 has ever had), `instance-death` (one instance genuinely writes no or a partial part, aggregation refused with exit 3, no `TaskStop`, no `kill`, never dropped), `plugin-role-n4` (the same launch-and-overlap shape at `N = min(<unit count>, cap)`, no aggregation, droppable second), `launch-refused` (an induced genuine launch refusal, droppable first).
+
+**Liveness, never dropped.** A per-instance liveness check runs alongside each instance, started at launch, through a harness-tracked background launch and never a bare shell `&`. The evidence carries at least two heartbeat samples timestamped inside the window in which that arm's instances were still running, each watchdog's launch command verbatim, and its final disposition — satisfying, for this arm's shape, the structurally-correct-watchdog requirement recorded in issue #274's body, cited as prior art since that issue is closed.
+
+**Verdict.** Exactly one, from T-1073's frozen five-value vocabulary, under seven licence conditions, each `met`/`not-met` with its own evidence. Any condition reading `not-met` confines the verdict to `undetermined` or `launch-refused`.
+
+- probe-arm: plugin-role-n2 — executed — two instances of `shell-team:qa-verifier` launched as parallel `Agent` tool calls inside one orchestrator message; a real two-instance overlap measured (margin 140.385 s against a maximum single launch latency of 9.651 s, ≈14.5×); never dropped, per the pre-commitment.
+- probe-arm: aggregation-live — executed — the plugin-role-n2 instances' real part files reduced by `bin/aggregate-verdicts.sh` (exit 0) and verified by `bin/check-fanout-instances.sh` (exit 0) against the probe's own real telemetry under label `t1083live`; never dropped, the only end-to-end evidence precondition 3 has ever had.
+- probe-arm: instance-death — executed — its defining condition (a genuine part-write failure refused with exit 3, `missing-part`) fired on setup 2, after setup 1 did not realize it (the unit ran to completion inside the agent's turn with no explicit timeout, disclosed as an agent-autonomy finding in `## Limits` below rather than smoothed over); never dropped.
+- probe-arm: plugin-role-n4 — executed — four instances of `shell-team:qa-verifier` launched together inside one orchestrator message; a genuine four-way overlap window of 100.573 s measured; no aggregation and no `- checker-result:` line of its own, per the frozen protocol; droppable second, not dropped this round.
+- probe-arm: launch-refused — executed — an `Agent` tool call against the deliberately nonexistent plugin role `shell-team:nonexistent-probe-role` was refused synchronously by the harness, with the verbatim error quoted in `## Probe evidence` above; droppable first, not dropped this round.
+
+## Launch record and aggregation analysis
+
+Every number below is re-derived from `## Probe evidence` above by bash integer
+arithmetic (`$(( 10#$v ))` throughout — never `awk`/`sort -n`, since a 19-digit
+epoch-nanosecond value exceeds a double's exact-integer range); each carries a
+`- reproduce:` line that recomputes it from the raw digits quoted there.
+
+**`plugin-role-n2` overlap** (channel ①, `agent-self-timestamps`, primary — `max(first)`=1787062355026208000 (`qa-2`), `min(last)`=1787062495411558000 (`qa-2`)):
+
+- overlap: plugin-role-n2 — overlapping — margin_ns=140385350000 — ≈140.385 s of genuine two-instance simultaneous execution.
+  - reproduce: `f1=1787062348069595000; f2=1787062355026208000; l1=1787062539566586000; l2=1787062495411558000; maxf=$(( 10#$f1 > 10#$f2 ? 10#$f1 : 10#$f2 )); minl=$(( 10#$l1 < 10#$l2 ? 10#$l1 : 10#$l2 )); echo $(( minl - maxf ))` → `140385350000`
+
+**Launch latencies** (`first` minus `launched-epoch=1787062345375523000`):
+
+- qa-1: `echo $(( 10#1787062348069595000 - 10#1787062345375523000 ))` → `2694072000` (≈2.694 s)
+- qa-2: `echo $(( 10#1787062355026208000 - 10#1787062345375523000 ))` → `9650685000` (≈9.651 s)
+- The overlap margin (≈140.385 s) exceeds the maximum single launch latency (≈9.651 s) by ≈14.5×, comfortably above the frozen margin-factor floor of 3.
+  - reproduce: `margin=140385350000; ll=9650685000; awk -v m="$margin" -v l="$ll" 'BEGIN{printf "%.2f\n", m/l}'` → `14.55`
+
+**Batch-vs-sum** (channel ②, necessary-condition — `batch_ns` = `completed-epoch − launched-epoch`; `sum_ns` = the two instances' own `duration_ms` from the span rows quoted in `## Probe evidence` above):
+
+- batch-vs-sum: plugin-role-n2 — batch_ns=228634007000 — sum_ns=353021000000 — batch ≈228.6 s vs a serial sum of ≈353.0 s (batch ≈65% of sum, consistent with two instances running concurrently for most of the window).
+  - reproduce: `echo $(( 10#1787062574009530000 - 10#1787062345375523000 ))` → `228634007000` (batch); `echo $(( 202638 + 150383 ))` → `353021` ms = `353021000000` ns (sum)
+
+**`plugin-role-n4` overlap** (four-way, `max(first)`=1787063177712739000 (`qa-4`), `min(last)`=1787063278285424000 (`qa-4`)):
+
+- overlap: plugin-role-n4 — overlapping — margin_ns=100572685000 — ≈100.573 s during which all four instances were simultaneously executing (a genuine four-way overlap, not merely pairwise ones); this arm ran no aggregation, per the frozen protocol, so it contributes no `overlap-margin-exceeds-launch-latency` evidence of its own — that condition is licensed by `plugin-role-n2` above.
+  - reproduce: `f1=1787063166889477000; f2=1787063174568990000; f3=1787063177385099000; f4=1787063177712739000; l1=1787063398101265000; l2=1787063354573439000; l3=1787063290605795000; l4=1787063278285424000; maxf=$(( 10#$f1 )); for v in $f2 $f3 $f4; do vv=$(( 10#$v )); [ "$vv" -gt "$maxf" ] && maxf=$vv; done; minl=$(( 10#$l1 )); for v in $l2 $l3 $l4; do vv=$(( 10#$v )); [ "$vv" -lt "$minl" ] && minl=$vv; done; echo $(( minl - maxf ))` → `100572685000`
+
+**Aggregation and attribution, end to end.** The `aggregation-live` arm's launch record (quoted in `## Probe evidence` above, region `<!-- BEGIN launch-record: aggregation-live -->` … `<!-- END launch-record: aggregation-live -->`) carries two `- assign:` lines whose instance-id set is `{qa-1, qa-2}`; the `<!-- BEGIN fanout-verdict: t1083live -->` block quoted in the same section carries two `- part:` lines whose name set is also `{qa-1, qa-2}` — the two sets are equal in both directions, which is the whole no-new-checker argument made measurable: the record's assignments are the aggregator's own arguments, so the identity a third checker would otherwise have been built to assert already holds by construction (**AC14**). Both shipped checkers exited 0 against the probe's own real telemetry and real part files (`## Probe evidence`, "The aggregation and attribution commands").
+
+## Verdict and licence conditions
+
+- verdict: concurrent-overlapping — every licence condition below reads `met`; the plugin-role-n2 arm shows a genuine, large, positive overlap margin (≈140.385 s) exceeding the maximum single launch latency (≈9.651 s) by ≈14.5×, the batch-vs-sum necessary condition agrees (batch ≈228.6 s far below the summed ≈353.0 s), the plugin-role-n4 arm independently reproduces a four-way overlap (≈100.573 s) at a different agent type from T-1073's own general-purpose result, and the aggregation-live arm ran the full shipped fail-closed pair end to end against real telemetry and real part files. This is the repository's first empirical crossing of T-1073's own declared `unobserved` plugin-role boundary.
+- licence-condition: plugin-role-subagent-type — met — `## Agent-type boundary` below records `subagent_type=shell-team:qa-verifier` verbatim for every instance in every arm; not `general-purpose`, the value that would have silently reproduced T-1073's own result instead of extending it.
+- licence-condition: production-unit — met — the unit is literally `bash bin/check-acs.sh <spec>`, this repository's own acceptance-criteria gate (`## Probe evidence`, "Execution conditions" — per-spec unit costs), unchanged from T-1073's own choice.
+- licence-condition: real-population — met — the population is real, committed spec paths at the pinned branch point (T-1044, T-1077, T-1072, T-1074, and others measured singly before any arm ran), never a synthetic fixture.
+- licence-condition: same-machine-session — met — every arm, every instance and the orchestrator's own heartbeats and span rows ran on this task's one operator machine, in one continuous session (clock reads span from 1787061684842511000 to 1787063497808615000, ≈30 minutes), inside the same throwaway clone.
+- licence-condition: clock-source-monotonic — met — `date +%s%N` was verified to expand (19-digit integers, no literal `N`) before reliance, cross-checked against a `python3 time.time_ns()` read agreeing within 150 ms, and every recorded `last` exceeds its own `first` with no negative delta anywhere in the `agent-timestamp` lines quoted in `## Probe evidence` above.
+- licence-condition: overlap-margin-exceeds-launch-latency — met — the plugin-role-n2 margin (≈140.385 s) exceeds the maximum single launch latency (≈9.651 s) by ≈14.5×, independently exceeding the frozen margin-factor floor of 3.
+- licence-condition: aggregation-end-to-end — met — `bin/aggregate-verdicts.sh` and `bin/check-fanout-instances.sh` both exited 0 against the probe's own real telemetry and real part files (`## Probe evidence`, checker-result lines), and the `- assign:`/`- part:` instance-id sets agree in both directions (`## Launch record and aggregation analysis` above).
+
+No licence condition above reads `not-met`, which is the coupling this verdict requires: under the closed vocabulary, `concurrent-overlapping` may not carry a `not-met` condition, and none does.
+
+## Implications for T-1084 and T-1085
+
+- implication: concurrent-overlapping — T-1073's own declared `unobserved` plugin-role boundary (`harness-agent-concurrency.md:373`–`374`/`390`) is closed: this task's `plugin-role-n2` and `plugin-role-n4` arms measured genuine, large, positive overlap margins for `subagent_type=shell-team:qa-verifier`, and the `aggregation-live` arm ran the shipped fail-closed pair end to end against real telemetry. T-1084 may dispatch plugin-role instances concurrently; the remaining named gates are the dispatcher's own scheduling design (T-1084) and default-path firing (T-1085).
+- implication: serialized — NOT MET this round (the measured verdict is `concurrent-overlapping`, above). Had this been the recorded verdict instead, the boundary would have closed negatively: T-1084 would be redesigned around serial plugin-role execution or around general-purpose worker agents driving plugin-role work, and T-1085's default-path firing would wait.
+- implication: queued-partial — NOT MET this round. Had this been the recorded verdict, T-1084's degree rule would be capped at the measured `k` this note would then state on its own `- measured-k:` line (no such line exists this round, since the recorded verdict is `concurrent-overlapping`).
+- implication: launch-refused — NOT MET as the recorded **verdict** (the recorded verdict is `concurrent-overlapping`, above) — distinct from the fact that the `launch-refused` **arm** did run and did induce a genuine synchronous refusal (`## Probe evidence`, "Arm: launch-refused"); an arm executing and a verdict being licensed are different facts, and only the latter is what this line reports. Had the verdict itself been `launch-refused`, plugin-role fan-out would not be available in this harness at all, and both T-1084 and T-1085 would be re-planned.
+- implication: undetermined — NOT MET this round. Had this been the recorded verdict, nothing would be licensed, and this note would state what would settle it (a re-probe correcting whichever licence condition read `not-met`).
+- umbrella: 277 — open — this task delivers precondition 3's launch-record half (`## Probe protocol` and `templates/prompt-blocks/fanout-orchestration.md`'s launch-record grammar); the live-firing half remains owed to T-1085, and precondition 2 is not re-litigated (T-1073 already discharged it for general-purpose agents; this task extends its boundary rather than re-deciding it).
+- prior-art: 274 — closed — closed `completed` on 2026-08-17 at the engineer-parallel sprint's batch close-out (its seven contract surfaces shipped in T-1080), measured live rather than assumed; cited here only for the structurally-correct-watchdog requirement its body recorded, which this task's liveness evidence (two per-instance `- liveness:` lines, eight heartbeat samples inside the `plugin-role-n2` intersection window, `## Probe evidence` above) satisfies for this arm's shape. Nothing here reopens, re-files, or records it as an outstanding obligation.
+
+## Agent-type boundary
+
+- agent-type: plugin-role-n2 — subagent_type=shell-team:qa-verifier — model=sonnet — recorded verbatim from the emitted span rows and the launch record quoted in `## Probe evidence` above, for every instance in every arm (`plugin-role-n2`, `plugin-role-n4` and the refused instance in `launch-refused` all targeted the same plugin-role namespace); not `general-purpose`, the value that would have silently reproduced T-1073's own result instead of extending it. The role derives from `agents/qa-verifier.md` (`tools: Read, Grep, Glob, Bash`, `model: sonnet`) — the one role among this repository's nine `agents/*.md` definitions that can run `bash bin/check-acs.sh`, which is why it was launched rather than a role picked for convenience.
+- unobserved: whether this result generalizes to a different plugin role, a different model, a different harness version or a different machine — recorded as a stated gap in `## Limits` below, never inferred past.
+- claim-under-test: T-1073's own declared `unobserved` boundary — "whether general-purpose Agent-tool concurrency extends to a plugin-role subagent type" (`harness-agent-concurrency.md:374`) — under-test-not-evidence.
+
+## Supersession and follow-ups
+
+- supersedes: `docs/loop-engineering/harness-agent-concurrency.md`'s `## Agent-type boundary` `- unobserved:` line (lines 373–374 and 390) — that line disclosed, as a stated gap rather than an inference, that whether general-purpose Agent-tool concurrency extends to a plugin-role subagent type was `unobserved`; this task's `plugin-role-n2`/`plugin-role-n4` measurements are the empirical confirmation that boundary disclosed as missing.
+- follow-up: when `docs/loop-engineering/harness-agent-concurrency.md` is next touched by a maintainer round, edit its `## Agent-type boundary` `- unobserved:` line to point at this note's `concurrent-overlapping` verdict instead of restating the gap — out of this task's own scope (`## Non-goals`: `docs/loop-engineering/harness-agent-concurrency.md` stays byte-identical here; the supersession is declared, not performed).
+- follow-up: issue #277's remaining live-firing half (default-path firing) is T-1085's; issue #274's citation here is prior-art only and owes no further edit from this task.
+
+## Limits and what is not computable
+
+- Machine-local, single-host, single-session: every timing figure in this note (launch latencies, overlap margins, batch/sum durations) is a property of this one operator machine at 8 logical CPUs (`getconf _NPROCESSORS_ONLN`), on 2026-08-18, and carries no git-ref label — a ref does not determine a machine-local timing.
+- Agent population: every probe instance this round was `subagent_type=shell-team:qa-verifier`, `model=sonnet`; whether the result generalizes to a different plugin role, a different model, or a different machine is `unobserved` (`## Agent-type boundary` above), not inferred.
+- No second repetition of `plugin-role-n2` and no `repetition-variance` licence condition, per the frozen Non-goals: T-1073 already disclosed the n=2 spread for this harness (≈3.8%); this task's question is a boundary question — does a plugin-role subagent type launch concurrently at all — not a timing-precision question, and one execution with a margin (≈140.385 s) exceeding the measured launch latency (≈9.651 s) by ≈14.5× answers it.
+- No inferential-statistics claim anywhere in this note: no significance test, no confidence interval, no variance model, no regression, and no dollar-cost, vendor-price or token-multiplier estimate.
+- **`instance-death`'s agent-autonomy observation, disclosed rather than smoothed over.** Setup 1 of the `instance-death` arm expected the documented 120 s sub-agent foreground-Bash default to truncate a 156.4 s unit run with no explicit timeout parameter; it did not — the unit ran to completion inside the agent's own turn (`## Probe evidence`, "Arm: instance-death"). The most plausible mechanism, not further instrumented from outside, is that the instance chose an explicit timeout on its own initiative. The lesson this note draws: **an implicit default is not a bound a probe (or any future fan-out orchestration) may rely on; only an explicitly pinned parameter is** — which is exactly what setup 2 then did (an explicit 120000 ms timeout), and which is exactly what fired the genuine `missing-part` refusal this arm exists to produce.
+- Model, harness-version and machine generalization: unobserved, exactly as T-1073 recorded its own — nothing here claims this result holds on a different model, a different harness version, or a different machine.
