@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1083** N-agent launch fan-out: the launch record defined where the shipped step already references it, and an orchestrator-run probe that fires the whole fan-out once with real plugin-role agents, real aggregation and a real instance death — `READY_FOR_QA` — spec: .shell-team/specs/T-1083-agent-launch-fanout.md
+- [ ] **T-1083** N-agent launch fan-out: the launch record defined where the shipped step already references it, and an orchestrator-run probe that fires the whole fan-out once with real plugin-role agents, real aggregation and a real instance death — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1083-agent-launch-fanout.md
   - source: GitHub issue **#277**, adoption preconditions 2 (residual) and 3 (residual). This is the approved sprint-dispatcher backlog's **step 3**; T-1084 (the dispatcher proper) and T-1085 (default-path live firing) follow it and are out of scope here. Issue state relayed via the tech-lead Routing Map; not readable from `pm-spec`, so the freeze run measures and reports it.
   - premise correction carried into this task: `.shell-team/interventions/T-1083.md` (commit `411ddde`) records that issue #277's body is **stale** on precondition 2. Measured first-hand by `pm-spec` at authoring: `docs/loop-engineering/harness-agent-concurrency.md:361` records precondition 2 as **MET** for general-purpose agents, and `:373`–`:374`/`:390` record the one boundary left `unobserved` — every T-1073 probe agent was `subagent_type=general-purpose, model=haiku`, and the `plugin-role-confirmation` arm was dropped droppable-first and never ran. This task closes that boundary rather than re-litigating precondition 2.
   - branch: `feature/1083-agent-launch-fanout` — stacked on `feature/1082-telemetry-discriminator` (PR #318) at tip `01ef110`; PR base stays `develop`, merges at the sprint batch GO.
@@ -171,6 +171,45 @@ No licence-condition claim rests on an unnamed or unquoted fact.
 ### Local test result — T-1083 (round 5, rework — Codex round 2 fix under the operator's final-round GO, orchestrator-produced)
 
 The operator granted a final narrowly-scoped round (2026-08-19, "最終1ラウンド許可") after Codex round 2 found the provenance-misstatement class's fourth site (note line 16, "resolved model recorded verbatim from the emitted span rows"). Fix: the sentence rewritten to the declared-label framing with an inline correction note citing `bin/log-run.sh`'s own header (model stays unvalidated and opaque, deliberately). **Class closure is mechanical this time, not judged**: the signature phrase `verbatim from the emitted span rows` is ASSERTED at zero sites — the two residual grep hits (lines 16, 148) both sit inside *(Corrected …)* annotations quoting the superseded wording as what was removed, which is the disclosure pattern itself. `check-pii-shapes --base 01ef110…` clean; evidence recommitted; `- probe-evidence-sha` updated; AC7/AC8 re-anchored (below). Flag → READY_FOR_QA.
+
+### QA round 5 — T-1083 (final round, under the operator's final-round GO)
+
+**Scope: narrow delta over Codex round 2's REQUEST_CHANGES (`.shell-team/reviews/T-1083.md`, second verdict block, `c404ee7`), verifying the orchestrator's fix at `e5aaa2d` (evidence) + `385c631` (board). Per the task framing, a further same-class finding here defeats the final round and routes T-1083 back to planning — none was found.**
+
+**1. Mechanical class-signature enumeration (own run).** `grep -n 'verbatim from the emitted span rows' docs/loop-engineering/agent-launch-fanout.md` → exactly 2 hits, lines 16 and 148. Read both in place: line 16's live sentence now reads "model `sonnet` — the orchestrator's own launch parameter, a declared label like the type itself…" with the flagged phrase appearing only inside the trailing `*(Corrected 2026-08-19, review round 2: this sentence originally claimed…)*` annotation, quoting the superseded wording as what was removed. Line 148's hit is likewise only inside its own pre-existing `*(Corrected 2026-08-19, QA round 3: …)*` annotation (unchanged this round). Zero live assertions of the signature phrase — matches the orchestrator's mechanical closure claim exactly.
+
+**2. Broader sweep for other phrasings of the same class (own choosing).** `grep -n "resolved\|span row\|harness evidence\|harness-observed\|harness-derived\|confirm\|proves\|independently"` over the whole note — every hit inspected. All live claims about `subagent_type`/`model` (lines 136, 148, 225, 247) consistently frame both values as the orchestrator's own **declared launch parameters**, explicitly *not* harness-originated evidence of the resolved type, corroborated only indirectly via the `launch-refused` arm's synchronous-refusal behavior — no site asserts span rows or the launch record as the *source* of `subagent_type`/`model`. Checked AC22(h)'s frozen spec wording ("the resolved `subagent_type` and model verbatim") for the same defect: this is an instruction to restate the values exactly (adverbial "verbatim" modifying the act of restating), not a provenance claim about where they came from — its discharge point (note line 148, "Orchestrator conditions for the record (AC22 items h and i)") already carries the round-3 correction. No new site found.
+
+**3. Line 16 consistency and citation, own read.**
+- Cross-checked line 16 against the epistemic-status paragraph (line 136) and line 148: same footing throughout — `subagent_type`/`model` are declared labels, span rows are the orchestrator's own telemetry labels, not independent harness confirmation.
+- `bin/log-run.sh` header, read directly: `sed -n '58,62p' bin/log-run.sh` → line 62 reads "`model` stays unvalidated and opaque, deliberately" — matches the correction note's citation ("keeps `model` unvalidated and opaque deliberately"), real and accurate.
+
+**4. Byte-locks re-anchored, own `cmp` (this round's own commit pair).**
+- AC7: extracted `## Probe evidence (raw, orchestrator-produced)` through the line before `## Terms and closed vocabularies` from commit `e5aaa2d` and from HEAD (`385c631`) → `cmp` → byte-identical, 148 lines both sides.
+- AC8: extracted `<!-- BEGIN probe-protocol: T-1083 -->` … `<!-- END probe-protocol: T-1083 -->` from the spec at `e5aaa2d` and at HEAD → `cmp` → byte-identical, 34 lines both sides.
+
+**5. Regressions, own run:**
+- `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh .shell-team/specs/T-1083-agent-launch-fanout.md 2>&1 | tail -1` → `check-acs: 21 passed, 0 failed, 1 skipped, 0 unrecognized`.
+- `bash bin/check-intent.sh .shell-team/specs/T-1083-agent-launch-fanout.md .shell-team/todo.md` → `check-intent: aligned: T-1083 v2 (fb11f4d6dd9f7ce5c6be28be12fe379d451033ed) matches …`, exit 0.
+- `bash bin/check-pii-shapes.sh --base 01ef1108836839120217accfd8a56be4ed2ae008` → `check-pii-shapes: clean (no PII-shaped bytes found)`.
+- `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0.
+- `bash bin/check-board-headings.sh .shell-team/todo.md --base 01ef1108836839120217accfd8a56be4ed2ae008` → exit 0.
+- `bash bin/check-prompt-sync.sh` → `check-prompt-sync: all registered prompt blocks in sync`, exit 0.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1083.md` → `check-provenance: conformant: .shell-team/provenance/T-1083.md (6 decision entries, 0 sentinel)`, exit 0.
+- `bash bin/check-interventions.sh --task T-1083 -- .shell-team/interventions/T-1083.md` → `check-interventions: conformant: .shell-team/interventions/T-1083.md (3 entries, 0 sentinel)`, exit 0.
+
+**Summarized sources / runtime-AC audit:** unchanged from rounds 1 and 4 (this round's delta is a single sentence in the byte-locked evidence, not a spec or Summarized-sources edit); no new source claim or runtime-AC item introduced this round to re-audit.
+
+**Edge cases tried:** deliberately tested the false-positive direction — whether AC22(h)'s frozen "model verbatim" wording is itself a same-class site (it is not: adverbial "verbatim," discharged correctly at line 148); whether "recorded verbatim as declared labels" at line 136 (pre-existing, unedited text) reads as a provenance overclaim in the opposite direction (it does not — "verbatim" there describes the note's own transcription of the orchestrator's launch parameters, not an assertion about the harness resolving them).
+
+**Risk notes for reviewer:** none. The class is now closed by a mechanical, re-verifiable test (grep for the exact signature phrase, confirm every hit sits inside a `*(Corrected …)*` annotation) rather than by a fresh judgment call each round — this is a stronger closure than rounds 3/4 used, and it held up under an independent broader-phrasing sweep of my own.
+
+### QA verdict: PASS
+- Task: T-1083 → READY_FOR_REVIEW
+- Tests: `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh .shell-team/specs/T-1083-agent-launch-fanout.md 2>&1 | tail -1` → `check-acs: 21 passed, 0 failed, 1 skipped, 0 unrecognized`
+- Acceptance criteria: 21/21 machine-checked (AC1–AC21, unaffected by this round's single-sentence prose fix, confirmed via the unchanged check-acs result); AC22 items (h)/(i) — the items this round's fix sits inside — re-examined and confirmed still satisfied; AC7/AC8 byte-locks re-anchored against `e5aaa2d`↔HEAD (own `cmp`, both byte-identical)
+- Edge cases tried: mechanical class-signature enumeration (`grep -n 'verbatim from the emitted span rows'` → 2 hits, both inside correction annotations); broader own-choosing sweep for other phrasings of the same provenance-misstatement class (none found, including a deliberate false-positive check on AC22(h)'s frozen wording)
+- Risk notes for reviewer: this is the final round under the operator's final-round GO; no same-class finding survived, so the final round is not defeated — class closure is now grep-mechanical (signature phrase asserted nowhere outside correction annotations) rather than judgment-based, which should make any future recurrence trivially detectable
 
 ### Local test result — T-1083 (round 4, rework — QA round 3 fix under the operator's one-round extension GO, orchestrator-produced)
 
