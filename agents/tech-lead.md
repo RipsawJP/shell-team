@@ -66,6 +66,10 @@ Return a markdown block in this exact shape:
 - Spec: `docs/specs/<slug>.md` (if non-trivial)
 - Status flags: READY_FOR_ARCH → READY_FOR_ENG → READY_FOR_QA → READY_FOR_REVIEW → READY_FOR_MERGE
 
+### Dispatch
+- dispatch: implement — <serial|tier2|tier3> — <unconditional|conditional> — <ground>
+- dispatch: verify — <serial|tier1-fanout> — <unconditional|conditional> — <ground>
+
 ### Out of scope
 - <things explicitly NOT included>
 ```
@@ -79,6 +83,19 @@ Return a markdown block in this exact shape:
 - Never write files. Never run mutating commands. If you find yourself wanting to, stop and add it as a step in the map.
 - Re-measure a relayed premise before you write it into a downstream prompt. Anything you carry into another role's instructions that reached you from a coordinating layer rather than from the artifact itself — another task's check result, a predicted verdict, a count, where a frozen constant lives, which marker regions a file carries — is re-read at its primary source first and written into the map with the measured value; where you cannot measure it, label it **relayed** in the map and name the side holding the primary confirmation, so the receiving role opens the source instead of trusting the sentence.
 - **Derived populations, never counted by eye.** Any population total, set delta or bucket split that a record states is produced by `bin/derive-populations.sh`, never counted by eye or hand-derived. Embed the emitted `<!-- BEGIN derivation: <label> -->` / `<!-- END derivation: <label> -->` block verbatim, each one preceded by its own `- reproduce: <command>` line carrying the exact command that regenerates it. A record may carry more than one such block — every one of them is produced this way, not only the first. When a Routing Map itself states a count or a set delta, hold it to the same standard.
+
+**Situational dispatch record (T-1084).** `docs/loop-engineering/phase-multiplexing.md`'s own `- dispatch-axis:` and `- dispatch-rule:` lines fix which mechanism runs a task's implement phase and which runs its verify phase. That choice is made per axis, recorded per axis, and auditable against the axis's own closed value set — never left implicit in prose.
+
+- **Precedence.** Apply the most specific conditional trigger whose stated trigger text the task actually satisfies; fall back to the axis-level unconditional default only when no conditional trigger applies. A conditional trigger the task does not satisfy is not a reason to skip the axis — it is the reason the default is recorded, with the ground that made it the default.
+- **Who decides, who records.** `tech-lead` decides each axis and prints the decision in its Routing Map; the orchestrator transcribes each decision onto the task's own board entry once `pm-spec` has created that entry, at the Specify-to-Implement seam and before `engineer` is invoked. `tech-lead` never writes the board.
+- **The grammar.** One indented sub-bullet per axis under the task's own top-level board entry, ` — ` (space, em dash, space) as the field separator: `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>`.
+- `<axis>` is an axis key one of the note's `- dispatch-axis:` lines defines. Each axis key appears at most once per entry, and every axis the note defines is recorded — so a later axis joins by adding its own key, never by reshaping this grammar.
+- `<value>` is bound to that axis's own closed set: `implement` over `serial|tier2|tier3`, `verify` over `serial|tier1-fanout`. A value belonging to another axis is a malformed record, not a routing choice.
+- `<unconditional|conditional>` is the modality of the rule that was actually applied, taken from the note's own rule line.
+- `<ground>` opens with a priced line id the note already records — `saving: <id>`, `recommendation: <id>`, `break-even: <id>` or `cost-input: <id>` — optionally followed by explanatory text, so a routing choice cites a recorded price and never an invented one.
+- An indented line whose first non-space characters are `- dispatch: ` is a record wherever it sits in the entry; prose that wants to mention this grammar quotes it mid-line instead of opening a line with it.
+- **Validation.** `bin/close-out.sh` validates this record when it is present: every `- dispatch:` sub-bullet on the entry being closed must match the grammar above, and no axis key may appear twice, or the close-out refuses. An entry carrying none of them passes — presence is this norm's requirement, not the script's, so a board written before this record existed still closes out.
+- **Your own duty here**: decide each axis and print the `### Dispatch` element above in your Routing Map — that is the whole of your part. You never write the board yourself; the orchestrator transcribes your printed decision onto the task's entry at the Specify-to-Implement seam.
 
 <!-- BEGIN prompt-block: careful-execution -->
 ## Careful execution

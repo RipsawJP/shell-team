@@ -22,10 +22,12 @@
 #      the generated block).
 #
 # Before any of the above runs, fail-closed gates must pass, in order: T-068's
-# pending fast-follow disposition gate, then T-1017's interventions gate,
-# then T-1022's source-line gate —
+# pending fast-follow disposition gate, then T-1084's situational dispatch
+# record gate (validate-if-present — silent when no `- dispatch:` sub-bullet
+# exists), then T-1017's interventions gate, then T-1022's source-line gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
 #   a source line the hand-off lint would reject refuses the close-out before any board write.
+#   a malformed `- dispatch:` sub-bullet refuses the close-out before any board write.
 # The interventions record is resolved from $TEAM_INTERVENTIONS_DIR (same
 # override precedence as $TEAM_TODO below) or else the sibling team-paths.sh,
 # then verified with the sibling check-interventions.sh --task T-NNN. The
@@ -204,6 +206,74 @@ if sed -n "${A_START},${A_END}p" "$BOARD" \
      | grep -E -- '^[[:space:]]*- fast-follow disposition \(' \
      | grep -Fq 'pending:'; then
   fail "$TASK has an unresolved pending fast-follow disposition — resolve it to a filed issue number or a waived reason before close-out (a pending disposition must not survive close-out)"
+fi
+
+# --- fail-closed gate: the situational dispatch record grammar (T-1084) -------
+# A validate-if-present content gate, in the exact shape of the `pending:`
+# gate above: it says NOTHING when the task's Active entry carries no
+# `- dispatch:` sub-bullet at all (adopter back-compat — presence is the
+# shipped norm text's requirement, `templates/prompt-blocks/dispatch-record.md`,
+# never this script's), and it refuses (exit 1) the first malformed record it
+# finds. Scan just this task's Active entry range (A_START..A_END). The scan
+# grep is ANCHORED to a `- dispatch:` sub-bullet's line-start shape
+# (^whitespace + "- dispatch: ") so hand-off PROSE that merely quotes the
+# grammar mid-line (e.g. a backticked example inside a note) is NOT mistaken
+# for a real record — same discipline as the `pending:` gate's anchored first
+# match above.
+#
+# The axis -> closed-value-set table is the ONE place a later axis (issue
+# #274's depth axis) is added; nothing below hardcodes a count of axes.
+DISPATCH_AXIS_TABLE="implement:serial|tier2|tier3
+verify:serial|tier1-fanout"
+
+DISPATCH_LINES="$(sed -n "${A_START},${A_END}p" "$BOARD" \
+     | grep -E -- '^[[:space:]]*- dispatch: ' || true)"
+
+if [ -n "$DISPATCH_LINES" ]; then
+  DISPATCH_SEEN_AXES=" "
+  while IFS= read -r d_line; do
+    [ -n "$d_line" ] || continue
+
+    # Extract the four ` — `-separated fields (space, em dash, space). The
+    # ground field is free text and may itself contain further ` — `
+    # sequences (T-1084 Input space) — each extraction below anchors on the
+    # FIRST three separators only and lets the ground's own pattern (.*)
+    # swallow everything after the third, so an em dash inside the
+    # explanatory prose never truncates it.
+    d_axis="$(printf '%s\n' "$d_line" | sed -nE 's/^[[:space:]]*- dispatch: ([a-z0-9-]+) — .*$/\1/p')"
+    d_value="$(printf '%s\n' "$d_line" | sed -nE 's/^[[:space:]]*- dispatch: [a-z0-9-]+ — ([a-z0-9-]+) — .*$/\1/p')"
+    d_modality="$(printf '%s\n' "$d_line" | sed -nE 's/^[[:space:]]*- dispatch: [a-z0-9-]+ — [a-z0-9-]+ — ([a-z]+) — .*$/\1/p')"
+    d_ground="$(printf '%s\n' "$d_line" | sed -nE 's/^[[:space:]]*- dispatch: [a-z0-9-]+ — [a-z0-9-]+ — [a-z]+ — (.*)$/\1/p')"
+
+    if [ -z "$d_axis" ] || [ -z "$d_value" ] || [ -z "$d_modality" ] || [ -z "$d_ground" ]; then
+      fail "$TASK has a malformed dispatch record (does not match the grammar '- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>'): $d_line"
+    fi
+
+    d_row="$(printf '%s\n' "$DISPATCH_AXIS_TABLE" | grep -E -- "^${d_axis}:" || true)"
+    if [ -z "$d_row" ]; then
+      fail "$TASK has a malformed dispatch record (axis '$d_axis' is not one of the note's own dispatch-axis keys): $d_line"
+    fi
+
+    case "$DISPATCH_SEEN_AXES" in
+      *" $d_axis "*)
+        fail "$TASK has a malformed dispatch record (axis '$d_axis' appears more than once on this entry): $d_line"
+        ;;
+    esac
+    DISPATCH_SEEN_AXES="${DISPATCH_SEEN_AXES}${d_axis} "
+
+    d_valueset="${d_row#*:}"
+    if ! printf '%s\n' "$d_value" | grep -qE -- "^(${d_valueset})\$"; then
+      fail "$TASK has a malformed dispatch record (value '$d_value' is not in axis '$d_axis''s closed set '${d_valueset}'): $d_line"
+    fi
+
+    if ! printf '%s\n' "$d_modality" | grep -qE -- '^(unconditional|conditional)$'; then
+      fail "$TASK has a malformed dispatch record (modality '$d_modality' is not unconditional or conditional): $d_line"
+    fi
+
+    if ! printf '%s\n' "$d_ground" | grep -qE -- '^(saving|recommendation|break-even|cost-input): '; then
+      fail "$TASK has a malformed dispatch record (ground does not open with saving:/recommendation:/break-even:/cost-input:): $d_line"
+    fi
+  done <<< "$DISPATCH_LINES"
 fi
 
 # --- fail-closed gate: the task's interventions record exists and conforms ----

@@ -236,28 +236,132 @@ Line-number pins in merged specs make *where* text is inserted a real decision, 
 - reproduce: bin/derive-populations.sh --label t1084-spec-population --set "at-branch-point=git ls-tree -r --name-only $(if git show-ref --verify --quiet refs/heads/feature/1083-agent-launch-fanout; then git merge-base 'feature/1083-agent-launch-fanout' HEAD; else git merge-base 'develop' HEAD; fi) -- .shell-team/specs | grep '\.md$'" --set "at-now=git ls-files -- .shell-team/specs/*.md"
 
 <!-- BEGIN derivation: t1084-spec-population -->
-PLACEHOLDER — the engineer replaces this whole block with the verbatim output of the `- reproduce:` line above, run at final state. AC16 fails while this placeholder stands.
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: at-branch-point — status: 0 — lines: 88 — items: 88 — command: git ls-tree -r --name-only 012bd9c6b081bd12e864a3ffecfb514add3a2f21 -- .shell-team/specs | grep '\.md$'
+- set: at-now — status: 0 — lines: 89 — items: 89 — command: git ls-files -- .shell-team/specs/*.md
+- union: items: 89
+- bucket: at-branch-point+at-now — items: 88
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1020-supersede-adjudication.md
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+  - .shell-team/specs/T-1032-audit-prose-accuracy.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1046-ignored-base-verdict.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1067-context-lifecycle.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
+  - .shell-team/specs/design-note-T-1012.md
+- bucket: at-now — items: 1
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
 <!-- END derivation: t1084-spec-population -->
 
-**Predictions, to be confirmed or corrected by the measured table.** Each is a prediction this spec freezes so that a measurement contradicting it is a recorded finding rather than a quiet edit.
+**Measured, correcting the frozen predictions below — corrections stated, never defended.** The frozen prediction was **0 genuinely new reds**. The measurement finds **2 genuine new reds** this task's diff causes (both real, permanent conflicts with a merged spec's own invariant — not measurement artifacts), plus one already-self-disclosed merge-point-scoped staleness the frozen prediction's own general row already covered, plus a population of measurement-environment artifacts the same class T-1082/T-1083's own Blast radius sections already disclosed and named.
 
-- predicted-red: 0 genuinely new reds caused by this task's diff. Every criterion named below is predicted either unchanged-green or already-red-for-another-task's-reason.
+**Method actually used.** `git worktree add --detach <scratch> 012bd9c6b081bd12e864a3ffecfb514add3a2f21` gave a real base-side checkout; `bash bin/check-acs.sh <spec>` was run once per spec at that worktree and once per spec against this checkout's own working tree (the post-implementation state, ahead of this task's own commit), via an `xargs -P 8` fan-out (falling back to `-P 3`/`-P 4` serial retries for a handful of heavier specs that hit the shared 90 s `CHECK_ACS_TIMEOUT` under contention — `.shell-team/test-recipe.md`'s T-1084 entry records the procedure and the pitfalls hit doing this). Every one of the 88 base-side and 89 head-side raw outputs was confirmed complete (`tail -1 | grep -q '^check-acs: '`) and free of a second, racily-interleaved run (`grep -c '^check-acs: [0-9]* passed'` = 1) before any verdict was trusted; one head-side file (`T-111-pii-shape-checker.md`) failed that second check on first pass — two overlapping `check-acs.sh` invocations had written to the same output file — and was re-run alone. **Key reconciliation**: `1456` distinct `(spec, AC)` keys at the base ref, `1473` at head, `0` present only at base, `17` present only at head — all seventeen belonging to `T-1084-dispatch-routing-record.md` itself (its own 16 `- check:` lines plus **AC17**'s `SKIP`), exactly the `+1`-spec delta the population derivation above already shows.
+
+- predicted-red: 2 (measured; the frozen prediction of 0 is corrected by this measurement, not defended)
 
 | Merged criterion | What it reads | Base | Head | Why |
 |---|---|---|---|---|
-| `T-1079` **AC11** | the note's `- dispatch-axis:`/`- dispatch-rule:`/`- dispatch-note:` totals and grammars, re-derived at run time | PASS | PASS | the note is byte-untouched (**AC10**) |
-| `T-1069` **AC6**, **AC7** | the note's cost/recommendation lines | PASS | PASS | same reason; both relayed from the tech-lead map and re-measured by the sweep |
-| `T-1083` **AC18** | `phase-multiplexing.md`, `agent-concurrency.md`, `harness-agent-concurrency.md` byte-identical to *its* branch point | PASS | PASS | none of the three is touched |
-| `T-1082` **AC12** | a stored derivation pinning `skills/run/SKILL.md:177`/`:197` and `fanout-orchestration.md:18` | **FAIL** | **FAIL** | already red at this branch point (T-1083's own sweep recorded it as that task's one new red); this task's step-1 insertion shifts the same pins further without changing the verdict |
-| `T-1075` **AC3** | byte-identity lock on `templates/prompt-blocks/fanout-orchestration.md` | **FAIL** | **FAIL** | pre-existing, broken by T-1082 one car back; this task leaves that file byte-identical (**AC11**) |
-| `T-1079` **AC13** | `skills/run/SKILL.md`, `agents/*.md`, `templates/prompt-blocks/fanout-orchestration.md` byte-identical to *its* branch point, plus an empty `bin/ tests/ templates/ agents/ skills/` diff | **FAIL** | **FAIL** | pre-existing (T-1082/T-1083 already edited those paths); this task edits them again, verdict unchanged |
-| `T-1071`'s `spec-population` derivation criterion | `git ls-files -- .shell-team/specs/*.md` against a pinned tree | **FAIL** | **FAIL** | pre-existing since the corpus grew past its recorded `at-now: 76`; this task adds one more spec, verdict unchanged |
-| `T-1081` **AC13** | that task's own merge-point-scoped scope lock | **FAIL** | **FAIL** | merge-point-scoped, disclosed by that spec itself |
-| `T-1074`'s criteria over the canonical fan-out block's line grammars | `templates/prompt-blocks/fanout-orchestration.md` | PASS | PASS | block byte-identical (**AC11**) |
-| every merged spec's own scope-lock criterion | a `git diff --name-only <its base>...HEAD` allow-list | as measured | as measured | merge-point-scoped by construction; each such spec says so in its own criterion body |
-| criteria counting `.shell-team/specs/*.md` or `^contain ` registry rules | populations this task grows by one each | as measured | as measured | the two population classes this task's own files join; the sweep must name every one it finds |
+| `T-1048` **AC12** | `bin/close-out.sh` and `tests/close-out/run.sh` byte-identical to base ref `e2c8bd9` (a **permanent** lock on the dropped close-out wiring's absence, with no `stale-at`/merge-point-scoped disclaimer) | PASS | **FAIL — genuine new red** | this task's own deliverable is a new gate inside `bin/close-out.sh` plus new fixtures in `tests/close-out/run.sh`; both files now differ from `e2c8bd9` by design. This is a real, permanent conflict between T-1048's own frozen invariant and this task's mandate, not a transient artifact — T-1048's AC12 would need its own rework (widening its lock, or a `stale-at` disclaimer) to stop reporting this red; this task does not open that file's frozen intent block and does not repair it here. |
+| `T-1083` **AC2** | `skills/run/SKILL.md` is asserted a **pure superset** of its own branch-point blob — "every line present at the branch point is still present at HEAD, so the fan-out step's neighbours were not rewritten" (no `stale-at` disclaimer) | PASS | **FAIL — genuine new red** | this task's own **AC6** requires the pre-existing "Within-phase fan-out decision point (T-1075)" bullet to be rewritten in place (demoted to a mechanics pointer) — the placement decision this spec's own `## Placement decisions` section states deliberately. The old bullet's exact text no longer exists verbatim anywhere in `skills/run/SKILL.md`, so T-1083 AC2's whole-line-survival half fails. Also a real, disclosed, permanent conflict — not this task's frozen scope-lock criterion (**AC15**) to repair, since **AC15**'s own allow-list only fixes what *this* task's diff may touch, not what an *earlier* task's own criterion may assume about that diff. |
+| `T-1083` **AC20** | that task's own merge-point-scoped scope lock (`git diff --name-only <its base>...HEAD` allow-list) | PASS | FAIL | **T-1083's own spec says so about itself**: "This criterion is merge-point-scoped and is expected to go stale after merge... not a defect to chase." Exactly the general row the frozen prediction table already carried ("every merged spec's own scope-lock criterion... merge-point-scoped by construction"); T-1084 stacking further commits on `feature/1083-agent-launch-fanout` is precisely what that disclaimer anticipates. |
+| `T-1079` **AC11** | the note's `- dispatch-axis:`/`- dispatch-rule:`/`- dispatch-note:` totals and grammars, re-derived at run time | PASS | PASS | the note is byte-untouched (**AC10**) — prediction confirmed |
+| `T-1069` **AC6**, **AC7** | the note's cost/recommendation lines | PASS | PASS | prediction confirmed |
+| `T-1083` **AC18** | `phase-multiplexing.md`, `agent-concurrency.md`, `harness-agent-concurrency.md` byte-identical to *its* branch point | PASS | PASS | prediction confirmed |
+| `T-1082` **AC12** | a stored derivation pinning `skills/run/SKILL.md:177`/`:197` and `fanout-orchestration.md:18` | **FAIL** | **FAIL** | prediction confirmed — already red at the branch point, unaffected by this task's diff |
+| `T-1075` **AC3** | byte-identity lock on `templates/prompt-blocks/fanout-orchestration.md` | **FAIL** | **FAIL** | prediction confirmed |
+| `T-1079` **AC13** | `skills/run/SKILL.md`, `agents/*.md`, `templates/prompt-blocks/fanout-orchestration.md` byte-identical to *its* branch point, plus an empty `bin/ tests/ templates/ agents/ skills/` diff | **FAIL** | **FAIL** | prediction confirmed |
+| `T-1071`'s `spec-population` derivation criterion | `git ls-files -- .shell-team/specs/*.md` against a pinned tree | **FAIL** | **FAIL** | prediction confirmed |
+| `T-1081` **AC13** | that task's own merge-point-scoped scope lock | **FAIL** | **FAIL** | prediction confirmed |
+| `T-1074`'s criteria over the canonical fan-out block's line grammars | `templates/prompt-blocks/fanout-orchestration.md` | PASS | PASS | prediction confirmed — block byte-identical (**AC11**) |
+| `T-1061` **AC1** (pre-existing, unrelated) | a duplicated `- [ ] **AC1**` label (a real criterion plus a documentation-example pair `check-acs.sh`'s label scan cannot distinguish) | PASS+FAIL (both present, both refs) | PASS+FAIL (both present, both refs) | the exact pre-existing defect T-1083's own Blast radius already disclosed; excluded from the systematic key-by-key diff above because the duplicate key would otherwise cross-multiply into four spurious rows, and re-verified here to still be identical on both sides |
+| `T-1034` **AC9** (measurement-environment artifact, corrected) | a `SIGTERM`-timing test (background `sleep`/`kill -TERM`/`wait`, asserting exit `143`) | FAIL in the raw 8-way-parallel sweep | PASS in the raw sweep | **re-verified individually, sequentially, contention-free: PASS at BOTH refs.** The raw sweep's FAIL was a timing artifact of running this test under heavy concurrent CPU load (8-way `xargs -P 8` fan-out), not a base-vs-head delta; this task touches nothing this criterion reads. |
+| `T-1066` **AC5**, **AC7**; `T-1072` **AC6**, **AC7**; `T-1076` **AC15**; `T-1082` **AC6** (measurement-environment artifacts, the same class T-1082/T-1083's own Blast radius sections already disclosed) | each reads this checkout's own machine-local `.shell-team/runs/shell-team.jsonl` (or a file it derives), sparse in the pinned base-side worktree and grown by this very sweep's own telemetry-writing checks by the time the head-side sweep ran | FAIL (raw sweep) | PASS (raw sweep) | **re-verified individually, sequentially, contention-free: matches the raw sweep exactly (FAIL at base, PASS at head) for all six** — confirming this is the telemetry-corpus-growth artifact, not a code delta this task's diff causes. None of the six reads any file this task touches. |
+| `T-1074` **AC9**, `T-1076` **AC10**, `T-1077` **AC3** (transient — resolves once this task's own implementation is committed) | `git status --porcelain -- bin/ tests/` must be empty at check time | PASS | FAIL at measurement time, **PASS once committed** (re-verified after this task's own commit — see the hand-off) | at measurement time this task's own `bin/close-out.sh` and `tests/close-out/run.sh` edits were genuinely uncommitted working-tree changes; the check is a working-tree-dirtiness gate, not a base-vs-head content lock, and clears the instant those two files are committed like any other task's implementation |
+| every other merged spec's own scope-lock criterion | a `git diff --name-only <its base>...HEAD` allow-list | as measured | as measured | merge-point-scoped by construction; each such spec says so in its own criterion body; none besides `T-1083` **AC20** above turned up in the key-by-key diff |
+| criteria counting `.shell-team/specs/*.md` or `^contain ` registry rules | populations this task grows by one each | as measured | as measured | confirmed: the spec-population derivation above shows `88→89`; `registry.txt`'s `^contain ` count grows by exactly one (**AC3**) |
 
-Two classes the sweep must look for specifically, because they are the ones this diff can move without any prediction above anticipating them: **(i)** any criterion pinning an absolute line number in `skills/run/SKILL.md`, `agents/tech-lead.md` or `templates/prompt-blocks/registry.txt`; **(ii)** any criterion asserting a total over `agents/*.md`, `templates/prompt-blocks/*`, `bin/*` or the registry's rules, which this task grows by one file, one rule and zero scripts respectively.
+Two classes the sweep looked for specifically, because they are the ones this diff can move without any prediction above anticipating them: **(i)** any criterion pinning an absolute line number in `skills/run/SKILL.md`, `agents/tech-lead.md` or `templates/prompt-blocks/registry.txt` — none turned up besides the already-disclosed `T-1082` **AC12** pin (unaffected, still FAIL/FAIL); **(ii)** any criterion asserting a total over `agents/*.md`, `templates/prompt-blocks/*`, `bin/*` or the registry's rules — none turned up as a new red; the two genuine new reds above (`T-1048` **AC12**, `T-1083` **AC2**) are both **byte-identity / line-survival** locks, a third class this sweep's own two named classes did not anticipate and which the sweep caught only by actually running every criterion rather than searching for a mention.
 
 ## Pre-commitment (AI self-discipline — self-imposed at freeze, not operator-ratified)
 
