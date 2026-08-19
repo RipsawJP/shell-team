@@ -13,7 +13,7 @@ Produced by the coordinating session (the orchestrator) on 2026-08-18, before th
 
 ### Arm: plugin-role-n2 (with aggregation-live on the same instances)
 
-Two instances of the plugin role `shell-team:qa-verifier` (an `agents/qa-verifier.md`-derived agent; resolved model recorded verbatim from the emitted span rows below: `sonnet`) were launched as two parallel `Agent` tool calls inside one orchestrator message. Population (2 real committed spec paths) and the launch record were written before the launch; the two epoch fields were appended at the moments they name.
+Two instances of the plugin role `shell-team:qa-verifier` (an `agents/qa-verifier.md`-derived agent; model `sonnet` — the orchestrator's own launch parameter, a declared label like the type itself; see the epistemic-status paragraph in the launch-refused arm) were launched as two parallel `Agent` tool calls inside one orchestrator message. *(Corrected 2026-08-19, review round 2: this sentence originally claimed the model was "recorded verbatim from the emitted span rows" — the fourth and, by mechanical signature enumeration, last site of the provenance-misstatement class; the span rows' `"model"` field is itself the orchestrator's own telemetry label, per `bin/log-run.sh`'s own header, which keeps `model` unvalidated and opaque deliberately.)* Population (2 real committed spec paths) and the launch record were written before the launch; the two epoch fields were appended at the moments they name.
 
 The launch record the probe wrote, quoted verbatim from `<venue-clone>/.shell-team/runs/fanout-t1083live.launch` (the path resolved through `bin/team-paths.sh --get runs` inside the clone):
 
