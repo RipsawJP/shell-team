@@ -216,10 +216,28 @@ fi
 # never this script's), and it refuses (exit 1) the first malformed record it
 # finds. Scan just this task's Active entry range (A_START..A_END). The scan
 # grep is ANCHORED to a `- dispatch:` sub-bullet's line-start shape
-# (^whitespace + "- dispatch: ") so hand-off PROSE that merely quotes the
+# (^whitespace + "- dispatch:") so hand-off PROSE that merely quotes the
 # grammar mid-line (e.g. a backticked example inside a note) is NOT mistaken
 # for a real record — same discipline as the `pending:` gate's anchored first
 # match above.
+#
+# Round-1 rework (Codex review): the anchor deliberately carries NO
+# trailing-space requirement after the colon. A candidate-scan anchor of
+# `^[[:space:]]*- dispatch: ` (trailing space required) made a line opening
+# `- dispatch:` with anything else there — a tab, two spaces, no space at
+# all — INVISIBLE to the whole gate: never even inspected, not merely
+# refused on a looser check (a full silent bypass, reproduced live against
+# this script). Every one of those whitespace variants must be SEEN by the
+# scan; the strict per-field `sed` extraction below (which still requires
+# the canonical single-space " — "-separated shape) then fails closed on
+# them via the existing empty-field check, exactly as it already does for a
+# wrong internal separator. A line not opening with the literal bullet
+# marker "- dispatch:" at all (a double-hyphen "-- dispatch:", a missing
+# colon) stays outside this gate's scan, unchanged from before this round —
+# that is the same scope boundary the pre-existing `pending:` gate above
+# also has (its own anchor requires the single-hyphen "- " bullet marker
+# literally), not a new gap this task's own diff introduces, and no
+# reachable input class in this spec's `## Input space` names it.
 #
 # The axis -> closed-value-set table is the ONE place a later axis (issue
 # #274's depth axis) is added; nothing below hardcodes a count of axes.
@@ -227,7 +245,7 @@ DISPATCH_AXIS_TABLE="implement:serial|tier2|tier3
 verify:serial|tier1-fanout"
 
 DISPATCH_LINES="$(sed -n "${A_START},${A_END}p" "$BOARD" \
-     | grep -E -- '^[[:space:]]*- dispatch: ' || true)"
+     | grep -E -- '^[[:space:]]*- dispatch:' || true)"
 
 if [ -n "$DISPATCH_LINES" ]; then
   DISPATCH_SEEN_AXES=" "
@@ -270,8 +288,14 @@ if [ -n "$DISPATCH_LINES" ]; then
       fail "$TASK has a malformed dispatch record (modality '$d_modality' is not unconditional or conditional): $d_line"
     fi
 
-    if ! printf '%s\n' "$d_ground" | grep -qE -- '^(saving|recommendation|break-even|cost-input): '; then
-      fail "$TASK has a malformed dispatch record (ground does not open with saving:/recommendation:/break-even:/cost-input:): $d_line"
+    # Round-1 rework (Codex review): the prefix-and-space were checked but
+    # never the id itself, so `recommendation: ` (prefix, space, nothing) — a
+    # realistic authoring slip (dropping the id while leaving the label) —
+    # passed this check. Requires a non-empty `[a-z0-9-]+`-shaped token
+    # immediately after the matched prefix, the same id shape AC9's own
+    # extraction pattern already assumes.
+    if ! printf '%s\n' "$d_ground" | grep -qE -- '^(saving|recommendation|break-even|cost-input): [a-z0-9-]+'; then
+      fail "$TASK has a malformed dispatch record (ground does not open with a non-empty id after saving:/recommendation:/break-even:/cost-input:): $d_line"
     fi
   done <<< "$DISPATCH_LINES"
 fi

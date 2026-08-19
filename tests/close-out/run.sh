@@ -1150,4 +1150,51 @@ dispatch_case T-976 "$OKI\n  - dispatch: depth — serial — unconditional — 
 dispatch_case T-977 "$OKI\n  - dispatch: verify — serial — maybe — recommendation: tier1-verification-fanout" 1 "modality 'maybe'" "bad modality refuses"
 dispatch_case T-978 "$OKI\n  - dispatch: verify — serial — unconditional — because I said so" 1 'ground does not open with' "groundless ground refuses"
 
+# ============================================================================
+# T-1084 round-1 rework (Codex review, commit d69cb16): the two Major findings
+# were one class — "the gate validates a narrower line shape than the set of
+# lines it must judge" — not two isolated spots. Each fixture below is one
+# enumerated shape variant from that class, each proven SEEN and REFUSED
+# (never silently invisible), plus one positive control proving the widened
+# candidate-scan anchor still recognizes the reachable tab-indentation case
+# correctly. `TAB` holds one real tab byte (not the two-character escape
+# `\t`, which `printf %b` would otherwise need to interpret) so it can be
+# spliced into a fixture body unescaped.
+# ============================================================================
+TAB="$(printf '\t')"
+
+# --- whitespace-after-"dispatch:" variants (Major 2's own class) -----------
+# Before this round: the candidate scan required a literal ASCII space right
+# after the colon, so any of these three lines was never even inspected —
+# an exit-0, silent bypass. After: the scan anchor drops the trailing-space
+# requirement (every variant is SEEN), and the strict per-field grammar
+# below — unchanged, still exactly one canonical space — refuses each one
+# via the existing empty-field check.
+dispatch_case T-979 "$OKI\n  - dispatch:${TAB}verify — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "tab-after-dispatch-colon refuses (Major 2's exact reproduction — seen and refused, not silently invisible)"
+dispatch_case T-980 "$OKI\n  - dispatch:  verify — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "double-space-after-dispatch-colon refuses"
+dispatch_case T-981 "$OKI\n  - dispatch:verify — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "no-space-after-dispatch-colon refuses"
+
+# --- ground-prefix-id emptiness (Major 1's own class) -----------------------
+# Before this round: `recommendation: ` (prefix, space, nothing) passed the
+# ground check, because it verified the prefix and the following space only
+# and never that a non-empty id token follows.
+dispatch_case T-982 "$OKI\n  - dispatch: verify — serial — unconditional — recommendation: " 1 "does not open with a non-empty id" "empty-priced-line-id refuses (Major 1's exact reproduction)"
+
+# --- emptiness on the other three fields, so the fixture matrix does not ---
+# --- lean on the ground fix alone to prove the class is closed -------------
+dispatch_case T-983 "$OKI\n  - dispatch:  — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "empty-axis-field refuses"
+dispatch_case T-984 "$OKI\n  - dispatch: verify —  — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "empty-value-field refuses"
+dispatch_case T-985 "$OKI\n  - dispatch: verify — serial —  — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "empty-modality-field refuses"
+
+# --- the ` — ` separator itself: a spacing variant (missing space before the
+# --- em dash) must be seen-and-refused, matching the already-correct
+# --- behavior for a wrong separator character entirely (T-974's sibling) ---
+dispatch_case T-986 "$OKI\n  - dispatch: verify—serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "missing-space-before-em-dash-separator refuses"
+
+# --- positive control: the reachable tab-indented sub-bullet class (this
+# --- spec's own ## Input space) still recognizes and validates a CONFORMANT
+# --- record correctly once the candidate anchor is widened — the widening
+# --- must not turn a real record invisible or falsely reject it -----------
+dispatch_case T-987 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout" 0 silent "tab-indented conformant record still passes (positive control on the widened anchor)"
+
 printf '\nAll close-out assertions passed.\n'
