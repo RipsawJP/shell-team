@@ -50,3 +50,4 @@ marker  playbook-qa-verifier.md            agents/qa-verifier.md
 marker  playbook-tech-lead.md              agents/tech-lead.md
 marker  playbook-pm-spec.md                agents/pm-spec.md
 contain fanout-orchestration.md            skills/run/SKILL.md
+contain dispatch-record.md                 agents/tech-lead.md skills/run/SKILL.md

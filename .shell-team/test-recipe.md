@@ -59,6 +59,30 @@ that file's order.
 <!-- Append-only log: when a task (T-NNN) establishes a new environment
      procedure, add it here with the task id so the next task inherits it. -->
 
+- T-1084: an `xargs -P <cores>`-fan-out full-population Blast-radius sweep
+  (see the T-1083 entry above for the base pattern) that exceeds this
+  session's own foreground-Bash-call timeout auto-backgrounds — but that
+  auto-background can itself be silently `killed` by the harness partway
+  through (observed: 63/88 outputs written, then stopped, no error surfaced
+  beyond the background task's own `status: killed` notification). Launch
+  the fan-out **explicitly** with `run_in_background: true` from the start
+  rather than relying on the timeout-triggered auto-background, and after
+  ANY interruption (killed or otherwise), recompute the remaining
+  population as a set difference (`comm -23 <the full population, sorted>
+  <the outputs already written, sorted>`) and re-launch only that
+  remainder — never assume a partial output directory means the population
+  is done, and never re-run the whole population from scratch (wasteful and
+  risks a second timing-out attempt on the same slow specs). Separately,
+  even a completed-count match is not sufficient: verify every single
+  output file's own `tail -1 | grep -q '^check-acs: '` completion marker
+  (per the T-1082 entry above) before trusting any of them — this sweep's
+  first full pass produced 14/88 outputs that reached the 88-file COUNT
+  but were individually truncated mid-run (the shared 90s `CHECK_ACS_TIMEOUT`
+  under 8-way contention was too tight for a handful of the heavier specs,
+  T-1082/T-1083-class full-suite-referencing ones among them); those 14
+  were re-run individually at a smaller parallelism factor (`-P 4`) and a
+  higher `CHECK_ACS_TIMEOUT=300` to let them complete without contention.
+
 - T-111: `bash bin/check-acs.sh --dry-run <spec>` then `bash bin/check-acs.sh
   <spec>` (live) is the mechanical per-AC gate; run both, in that order,
   before trusting a spec's acceptance criteria are green. A `check:` line

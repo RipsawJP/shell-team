@@ -1090,4 +1090,111 @@ grep -qxF -- '- [x] T-800 an old loose entry with no spec path' "$DSL_ROOT/todo.
   || fail "closeout-done-section-loose-entry-unaffected: the pre-existing loose Done entry must survive byte-identically"
 pass "closeout-done-section-loose-entry-unaffected — no check is widened to ## Done and no existing ## Done entry is repaired"
 
+# ============================================================================
+# T-1084: situational dispatch routing record — a validate-if-present content
+# gate over `- dispatch:` sub-bullets, in the exact shape of the T-068
+# `pending:` gate's own fixture pattern above. Nine cases: four the gate must
+# say NOTHING about (an absent, partial, conformant or merely-quoted record —
+# adopter back-compat) and five it must refuse with exit 1 and the literal
+# "malformed dispatch record" on stderr.
+# ============================================================================
+DISPATCH_ROOT="$TMP/dispatch-fixtures"
+mkdir -p "$DISPATCH_ROOT"
+
+# $1 = task id (unique per case, so no fixture collides with another),
+# $2 = the Active entry's sub-bullet body (printf %b — \n is a real newline,
+# so a two-line body is passed as one string), $3 = expected exit code,
+# $4 = "silent" (the gate must say nothing) or a substring the refusal's
+# stderr must carry beyond the shared "malformed dispatch record" literal,
+# $5 = the assertion name (reported as "T-1084 <name>").
+dispatch_case() {
+  local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5"
+  local root="$DISPATCH_ROOT/$task"
+  mkdir -p "$root"
+  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
+  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
+    "$task" "$body" > "$root/todo.md"
+  cp "$root/todo.md" "$root/todo.orig"
+  local rc=0
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" \
+      bash "$CLOSEOUT" --task "$task" --date 2026-08-19 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
+  [ "$rc" -eq "$expect_rc" ] || fail "T-1084 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  if [ "$mode" = silent ]; then
+    grep -qF -- 'malformed dispatch record' "$root/err" \
+      && fail "T-1084 $name: the gate must say NOTHING here — found the refusal literal in stderr"
+    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
+      || fail "T-1084 $name: close-out should have moved the entry to Done"
+  else
+    cmp -s "$root/todo.orig" "$root/todo.md" \
+      || fail "T-1084 $name: a refused close-out must leave the board byte-untouched"
+    grep -qF -- 'malformed dispatch record' "$root/err" \
+      || fail "T-1084 $name: refusal stderr must carry the literal 'malformed dispatch record'"
+    grep -qF -- "$mode" "$root/err" \
+      || fail "T-1084 $name: refusal stderr must carry the offending detail '$mode' (stderr: $(cat "$root/err"))"
+  fi
+  pass "T-1084 $name"
+}
+
+OKI='  - dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge'
+OKV='  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout'
+
+dispatch_case T-970 "$OKI\n$OKV" 0 silent "conformant two-axis record passes the gate"
+dispatch_case T-971 '  - source: fixture' 0 silent "absent record passes (adopter back-compat)"
+dispatch_case T-972 "$OKI" 0 silent "single-axis (partial) record passes — completeness is norm text, not the gate's business"
+# shellcheck disable=SC2016  # backtick-quoted example is literal fixture text, not a substitution
+dispatch_case T-973 '  - note: quoting `- dispatch: verify — tier2 — unconditional — x` inline' 0 silent "mid-line prose quote is not mistaken for a record"
+dispatch_case T-974 "$OKI\n  - dispatch: verify — tier2 — unconditional — recommendation: tier1-verification-fanout" 1 "'tier2' is not in axis 'verify'" "cross-axis value refuses"
+dispatch_case T-975 "$OKI\n$OKI" 1 "'implement' appears more than once" "duplicate axis refuses"
+dispatch_case T-976 "$OKI\n  - dispatch: depth — serial — unconditional — recommendation: tier1-verification-fanout" 1 "axis 'depth' is not one" "unknown axis refuses"
+dispatch_case T-977 "$OKI\n  - dispatch: verify — serial — maybe — recommendation: tier1-verification-fanout" 1 "modality 'maybe'" "bad modality refuses"
+dispatch_case T-978 "$OKI\n  - dispatch: verify — serial — unconditional — because I said so" 1 'ground does not open with' "groundless ground refuses"
+
+# ============================================================================
+# T-1084 round-1 rework (Codex review, commit d69cb16): the two Major findings
+# were one class — "the gate validates a narrower line shape than the set of
+# lines it must judge" — not two isolated spots. Each fixture below is one
+# enumerated shape variant from that class, each proven SEEN and REFUSED
+# (never silently invisible), plus one positive control proving the widened
+# candidate-scan anchor still recognizes the reachable tab-indentation case
+# correctly. `TAB` holds one real tab byte (not the two-character escape
+# `\t`, which `printf %b` would otherwise need to interpret) so it can be
+# spliced into a fixture body unescaped.
+# ============================================================================
+TAB="$(printf '\t')"
+
+# --- whitespace-after-"dispatch:" variants (Major 2's own class) -----------
+# Before this round: the candidate scan required a literal ASCII space right
+# after the colon, so any of these three lines was never even inspected —
+# an exit-0, silent bypass. After: the scan anchor drops the trailing-space
+# requirement (every variant is SEEN), and the strict per-field grammar
+# below — unchanged, still exactly one canonical space — refuses each one
+# via the existing empty-field check.
+dispatch_case T-979 "$OKI\n  - dispatch:${TAB}verify — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "tab-after-dispatch-colon refuses (Major 2's exact reproduction — seen and refused, not silently invisible)"
+dispatch_case T-980 "$OKI\n  - dispatch:  verify — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "double-space-after-dispatch-colon refuses"
+dispatch_case T-981 "$OKI\n  - dispatch:verify — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "no-space-after-dispatch-colon refuses"
+
+# --- ground-prefix-id emptiness (Major 1's own class) -----------------------
+# Before this round: `recommendation: ` (prefix, space, nothing) passed the
+# ground check, because it verified the prefix and the following space only
+# and never that a non-empty id token follows.
+dispatch_case T-982 "$OKI\n  - dispatch: verify — serial — unconditional — recommendation: " 1 "does not open with a non-empty id" "empty-priced-line-id refuses (Major 1's exact reproduction)"
+
+# --- emptiness on the other three fields, so the fixture matrix does not ---
+# --- lean on the ground fix alone to prove the class is closed -------------
+dispatch_case T-983 "$OKI\n  - dispatch:  — serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "empty-axis-field refuses"
+dispatch_case T-984 "$OKI\n  - dispatch: verify —  — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "empty-value-field refuses"
+dispatch_case T-985 "$OKI\n  - dispatch: verify — serial —  — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "empty-modality-field refuses"
+
+# --- the ` — ` separator itself: a spacing variant (missing space before the
+# --- em dash) must be seen-and-refused, matching the already-correct
+# --- behavior for a wrong separator character entirely (T-974's sibling) ---
+dispatch_case T-986 "$OKI\n  - dispatch: verify—serial — unconditional — recommendation: tier1-verification-fanout" 1 "does not match the grammar" "missing-space-before-em-dash-separator refuses"
+
+# --- positive control: the reachable tab-indented sub-bullet class (this
+# --- spec's own ## Input space) still recognizes and validates a CONFORMANT
+# --- record correctly once the candidate anchor is widened — the widening
+# --- must not turn a real record invisible or falsely reject it -----------
+dispatch_case T-987 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout" 0 silent "tab-indented conformant record still passes (positive control on the widened anchor)"
+
 printf '\nAll close-out assertions passed.\n'
