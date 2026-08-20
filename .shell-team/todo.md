@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1085** Default-path firing of the verify-axis tier1-fanout dispatch: the shipped precedence rule, the transcribed board record and the shipped fan-out mechanics run once end to end on this task's own full-population blast-radius sweep, against a same-population serial baseline, producing one release-citable reachability verdict — `REWORK` — spec: .shell-team/specs/T-1085-default-path-firing.md
+- [ ] **T-1085** Default-path firing of the verify-axis tier1-fanout dispatch: the shipped precedence rule, the transcribed board record and the shipped fan-out mechanics run once end to end on this task's own full-population blast-radius sweep, against a same-population serial baseline, producing one release-citable reachability verdict — `READY_FOR_QA` — spec: .shell-team/specs/T-1085-default-path-firing.md
   - source: the approved sprint-dispatcher backlog's **step 5** and GitHub issue **#277**'s remaining live-firing half, which `docs/loop-engineering/agent-launch-fanout.md:242` records as "owed to T-1085" (read first-hand by `pm-spec`; the issue body itself is **relayed** — this role holds no GitHub-reading tool — so the freeze run measures and reports it). This is the sprint's **final** task and its **release gate**: the measured verdict decides the planned minor release (`met`) against merge-only (`not-met`, the approved fallback). No issue is closed here; #277's close decision belongs to the batch close-out.
   - branch: `feature/1085-default-path-firing` — stacked on `feature/1084-dispatcher` (PR #325) at tip `9c950d7`; PR base stays `develop`, merges at the sprint batch GO.
   - dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge (not-yet: no judge role exists to run, so no second candidate is available to discard; the deliverable is one note plus this task's records, a non-partitionable edit set; tier3's conditional trigger is also unsatisfied — reconcile has not been re-verified at a scale larger and more balanced than the pilot, and `saving: tier3-work-splitting` is measured negative at exactly this scale)
@@ -60,7 +60,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 **(g)/(h)/(i) — owed by the orchestrator, not fabricated here.** Per this criterion's own text, items (g) (firing's own execution conditions), (h) (post-arm cleanliness reads and venue confirmation) and (i) (relayed-premise re-measurement) belong to the coordinating session and are referenced as such rather than duplicated or guessed at by this round.
 
-**Notes for QA.** The verdict is `met` (all seven chain links `evidenced`, all six licence conditions `met`) — see `## Verdict and licence conditions`. The 43.84%-vs-45.66% distinction (this task's own measured saving, on its own full population, at N=8) is stated with the claim-ceiling attribution on every line mentioning either figure — worth a fresh read rather than a skim, since the two numbers sit close together in the note. The genuine-overlap margin is stated against the instances' own launch-dispersion spread rather than against `first − launched-epoch` (T-1083's own idiom) — a disclosed, reasoned departure (`## Default-path chain and aggregation analysis`), not an oversight. Three genuine new reds against `T-1084`'s own criteria (AC14/AC15/AC16) are real, permanent (until `T-1084`'s own owners choose to re-freeze), and structural consequences of this task stacking a second board entry and a second new spec file on top of T-1084's own merge-point-scoped locks — this task's own AC1/AC18 confirm its own diff stays inside its declared allow-list and reopens no other spec's frozen intent.
+**Notes for QA.** The verdict is `met` (all seven chain links `evidenced`, all six licence conditions `met`) — see `## Verdict and licence conditions`. The 43.84%-vs-45.66% distinction (this task's own measured saving, on its own full population, at N=8) is stated with the claim-ceiling attribution on every line mentioning either figure — worth a fresh read rather than a skim, since the two numbers sit close together in the note. The genuine-overlap margin is stated against the instances' own launch-dispersion spread rather than against `first − launched-epoch` (T-1083's own idiom) — a disclosed, reasoned departure (`## Default-path chain and aggregation analysis`), not an oversight. **[Superseded, round 3 rework (`9b385bc`), corrected further round 4 (this commit) — this paragraph is kept verbatim as the round-2 record; it no longer describes the note's own text. The margin is now stated against the frozen wording's own metric (`first − launched-epoch`, disclosed negative at `qa-8`'s `-13881421000` ns) per the cross-provider review round-1 Major and QA round-2's own follow-up finding; dispersion is retained only as a demoted, non-load-bearing secondary cross-check. See the "Engineer rework" sub-sections below for the corrected record.]** Three genuine new reds against `T-1084`'s own criteria (AC14/AC15/AC16) are real, permanent (until `T-1084`'s own owners choose to re-freeze), and structural consequences of this task stacking a second board entry and a second new spec file on top of T-1084's own merge-point-scoped locks — this task's own AC1/AC18 confirm its own diff stays inside its declared allow-list and reopens no other spec's frozen intent.
 
 **Mechanical sweep — own run, post-commit (`9790afa`).** `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh .shell-team/specs/T-1084-dispatch-routing-record.md 2>&1 | tail -3` → **`check-acs: 16 passed, 0 failed, 1 skipped, 0 unrecognized`** (AC17 SKIP by design). `bash bin/check-prompt-sync.sh` → `check-prompt-sync: all registered prompt blocks in sync`. `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0. `bash bin/check-board-headings.sh .shell-team/todo.md --base 012bd9c6b081bd12e864a3ffecfb514add3a2f21` → exit 0. `bash bin/check-pii-shapes.sh --base 012bd9c6b081bd12e864a3ffecfb514add3a2f21` → `check-pii-shapes: clean (no PII-shaped bytes found)`. `bash bin/check-provenance.sh .shell-team/provenance/T-1084.md` → `check-provenance: conformant: ... (3 decision entries, 0 sentinel)`. `bash bin/check-interventions.sh --task T-1084 -- .shell-team/interventions/T-1084.md` → `conformant: ... (0 entries, 1 sentinel)` (this file was already created and committed at the T-1084 freeze — pm-spec/coordinating session's record, not written by this role; no interruption occurred during implementation). `bash bin/check-intent.sh .shell-team/specs/T-1084-dispatch-routing-record.md .shell-team/todo.md` → `check-intent: aligned: T-1084 v1 (1cd29f980384d18dc2565b9557025d5290c21094) matches ...`. `shellcheck bin/close-out.sh tests/close-out/run.sh` → exit 0, no output. `bash tests/close-out/run.sh` → `grep -c '^PASS' <log>` = **75**, `grep -c '^PASS: T-1084' <log>` = **9**, `grep -c '^FAIL' <log>` = **0**.
 
@@ -177,6 +177,68 @@ Reported item by item per the frozen criterion's own text; these three items are
 **Mechanical sweep (own run, live) — all green.** `check-acs.sh` → 18 passed/0 failed/1 skipped (AC3's evidence byte-lock confirmed as part of this run); `check-intent.sh` → `aligned: T-1085 v2 (249b76b2a6aa19f4135807ff80bb2b7179859e67)`; `check-handoff.sh` → exit 0; `check-provenance.sh` → conformant (10 decision entries, 0 sentinel); `check-interventions.sh --task T-1085` → conformant (7 entries, 0 sentinel); `check-pii-shapes.sh --base $(git merge-base feature/1084-dispatcher HEAD)` → clean. The failing item is a prose-consistency defect no `- check:` line covers.
 
 **Suggested next step for the engineer.** Re-run the class-sweep discipline against `## Limits and what is not computable` (and any other prose outside the two already-swept tables) for the same substitute-metric defect class, fix line 712 to match the corrected basis, and re-grep the whole file for "dispersion" before re-submitting for QA round 3.
+
+### Engineer rework — T-1085 (round 4 / rework 2, closing QA round 2's class-sweep-coverage FAIL)
+
+**Scope and rule applied.** QA round 2 (`.shell-team/reviews/T-1085.md` "QA round 2 — T-1085") returned `FAIL` not on the two Major fixes themselves (both independently re-derived and confirmed correct) but on class-sweep coverage: `docs/loop-engineering/default-path-firing.md:712` still asserted the pre-round-3 dispersion basis. This is the substitute-metric defect class's **second cumulative occurrence** (round-1 review Major → round-3 fix → round-2 QA catching a sibling miss), so the **same-class-2 rule** applies: full-inventory-and-bulk-apply, mechanically enumerated, not a spot patch of line 712 alone.
+
+**Mechanical inventory (signature: `dispersion`, case-insensitive, plus a read for any other "stated/margin against" phrasing) — every file this task's own records touch.**
+
+| # | file | line | text (excerpt) | inside byte-locked evidence? | disposition |
+|---|---|---|---|---|---|
+| 1 | `docs/loop-engineering/default-path-firing.md` | 636 | "...round-2 text stated the margin against the instances' own launch dispersion instead..." (historical framing, correctly labelled round-2/superseded) | no (`## Default-path chain and aggregation analysis`, 598–637) | not-apply — already correct |
+| 2 | `docs/loop-engineering/default-path-firing.md` | 645 | "...launch-dispersion figure...is carried alongside purely as a secondary, informational cross-check and is not what this `met` value rests on" | no (`## Verdict and licence conditions`, 638–657) | not-apply — already correct |
+| 3 | `docs/loop-engineering/default-path-firing.md` | 712 | "...a non-empty intersection window with a stated margin against the instances' own launch dispersion..." — **live, unqualified, contradicts 636/645** | no (`## Limits and what is not computable`, 703–717) | **apply — fixed this round** |
+| — | `docs/loop-engineering/default-path-firing.md` | (61–597) | `## Firing evidence (raw, orchestrator-produced)` — checked for any `dispersion` occurrence | **yes** | **n/a — zero occurrences found**; the section's own disclosure 1 names only the `launched-epoch` recording-latency fact, never asserts dispersion as the margin's basis (verified per the coordinator's instruction) |
+| 4 | `.shell-team/todo.md` | 63 | round-2 engineer hand-off's own "Notes for QA": "...margin is stated against the instances' own launch-dispersion spread rather than against `first − launched-epoch`..." — **live, unqualified, contradicts the round-3 fix** | n/a (board, not the note) | **apply — fixed this round** (bracketed supersession annotation, historical text preserved per this corpus's append-only-record discipline) |
+| 5 | `.shell-team/todo.md` | 128 | round-3 rework sub-section's own Finding-1 description ("...because the shipped text recorded `met` against a substitute — launch dispersion...") | n/a | not-apply — correctly describes the (then-current) defect being fixed, historical |
+| 6 | `.shell-team/todo.md` | 136 | round-3 class-sweep table row 4 ("yes — was dispersion, now fixed") | n/a | not-apply — correct, historical |
+| 7 | `.shell-team/todo.md` | 175 | QA round 2's own `FAIL driver` paragraph, quoting the defect | n/a | not-apply — QA's own record of the finding, correct as written, not this role's to edit |
+| 8 | `.shell-team/todo.md` | 179 | QA round 2's own `Suggested next step` | n/a | not-apply — QA's own text |
+| 9 | `.shell-team/provenance/T-1085.md` | 22 | round-3 decision entry: "...round-2 choice to state `genuine-overlap`'s margin against instance launch dispersion instead of `first − launched-epoch`) is **superseded, not deleted**..." | n/a | not-apply — already correctly framed as historical/superseded |
+| 10 | `.shell-team/provenance/T-1085.md` | 23 | round-3 reason text, same framing | n/a | not-apply — correct |
+| — | `.shell-team/interventions/T-1085.md` | — | full-file grep | n/a | not-apply — zero occurrences (not this role's file to edit regardless) |
+| — | `.shell-team/specs/T-1085-default-path-firing.md` | — | full-file grep | n/a | not-apply — zero occurrences (frozen, not editable regardless); note: the spec's own `## Input space` "Sub-second overlap discrimination" bullet already states the metric as "margin against the maximum single launch latency" — the corrected note line 712 now mirrors this exactly |
+| — | `.shell-team/reviews/T-1085.md` | — | full-file grep (17 occurrences) | n/a | not-apply — QA/reviewer's own record, out of this role's edit scope |
+
+**Fixes applied (2 sites, both `docs/loop-engineering/default-path-firing.md`'s sibling being row 3, and the board being row 4).**
+- Row 3 (note, line 712): rewrote to state the margin against the frozen protocol's own metric (`first − launched-epoch`, disclosed negative at `qa-8`'s `-13881421000` ns), explicitly cross-referencing the spec's own `## Input space` wording and explicitly disclaiming reliance on the demoted dispersion cross-check.
+- Row 4 (board, line 63): appended a bracketed, dated supersession annotation directly after the stale sentence, rather than rewriting the round-2 hand-off's own original words — preserving the historical record intact per this corpus's append-only-record discipline while removing the live contradiction.
+
+**Post-fix signature enumeration (mechanical closure, not prose judgment).**
+```
+$ grep -n -i 'dispersion' docs/loop-engineering/default-path-firing.md
+636:...round-2 text stated the margin against the instances' own launch dispersion instead... [historical, correct]
+645:...launch-dispersion figure...is carried alongside purely as a secondary...cross-check... [demoted, correct]
+712:...never a claim resting on the demoted launch-dispersion cross-check... [FIXED — now consistent with 636/645]
+
+$ grep -n -i 'dispersion' .shell-team/todo.md
+63:...[Superseded, round 3 rework (`9b385bc`), corrected further round 4 (this commit)...] [FIXED — now annotated]
+128, 136:  round-3 rework sub-section, correct historical framing
+175, 179:  QA round 2's own record, correct, not edited
+
+$ grep -n -i 'dispersion' .shell-team/provenance/T-1085.md
+22, 23: round-3 decision entries, correct historical framing (both explicitly "superseded, not deleted")
+
+$ grep -n -i 'dispersion' .shell-team/interventions/T-1085.md
+(no hits)
+
+$ grep -n -i 'dispersion' .shell-team/specs/T-1085-default-path-firing.md
+(no hits)
+```
+Every remaining occurrence is accounted for in the inventory table above as not-apply/already-fixed/historical; none is a live, unqualified assertion of the dispersion basis.
+
+**Verification, live this round.**
+- `export CHECK_ACS_TIMEOUT=300; bash bin/check-acs.sh .shell-team/specs/T-1085-default-path-firing.md 2>&1 | tail -1` → **`check-acs: 18 passed, 0 failed, 1 skipped, 0 unrecognized`** (all 18 individually confirmed PASS this round).
+- `bash bin/check-intent.sh .shell-team/specs/T-1085-default-path-firing.md .shell-team/todo.md` → `check-intent: aligned: T-1085 v2 (249b76b2a6aa19f4135807ff80bb2b7179859e67) matches ...` (spec itself untouched this round; confirmed both before and after this round's edits, byte-identical output both times).
+- AC3's evidence byte-lock re-confirmed directly (not only via AC3's own PASS): extracted `## Firing evidence` from `git show 6937e19c203a7323b89862d0fa2bcbd4cf4b5d21:docs/loop-engineering/default-path-firing.md` and from the working tree with AC3's own `awk` extraction, `cmp` → identical.
+- `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0.
+- `B=$(git merge-base feature/1084-dispatcher HEAD); bash bin/check-pii-shapes.sh --base "$B"` → `check-pii-shapes: clean (no PII-shaped bytes found)`.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1085.md` → `check-provenance: conformant: .shell-team/provenance/T-1085.md (13 decision entries, 0 sentinel)` (3 new entries appended this round).
+
+**Files changed this round.** `docs/loop-engineering/default-path-firing.md` (line 712 only); `.shell-team/todo.md` (line 63 annotation, this rework-round-2 sub-section, the flag flip below); `.shell-team/provenance/T-1085.md` (3 decision entries appended). Nothing under `skills/`, `templates/`, `agents/`, `bin/`, `tests/`, `.github/`, and no other spec/interventions/review file, was touched.
+
+**Flag.** `REWORK` → `READY_FOR_QA` (top of this entry) — QA round 3 re-verifies from here.
 
 ### QA round 1 — T-1084
 
