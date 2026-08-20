@@ -316,6 +316,116 @@ mechanical check の役割ではない。path の allowlist を作れば adopter
 はタスクの bootstrap freeze でのみ適用され、すでに記録済みのハッシュの
 re-freeze では適用されない。
 
+## stacked-branch base-ref discriminator と borrowed-vocabulary sweep の宣言
+
+T-1081 以降に凍結するすべての spec は、凍結された intent block 内の 1 行
+（上記の `- user-visible:` / `- verification-class:` と同じ宣言領域）で
+追加の宣言を持つ: トップレベルの bullet
+`- base-ref-discriminator: <instantiate した two-arm 式>` または
+`- base-ref-discriminator: not-applicable — <reason>`。これは stacked
+branch 上の spec だけでなく、**最初の凍結を行うすべての spec** に必須
+である。2 つの形は自由選択ではない: two-arm 式が値になるのは、いずれかの
+criterion が base-side blob を読み、かつ branch が authoring time に
+open な predecessor を持つ場合**のみ**である（分類は 1 回きりで、
+predecessor が途中で merge されるような era の変化によって再分類される
+ことはない）。それ以外のすべてのケース——base-side blob を一切読まない、
+または open な predecessor が無い——では、branch 自身の実際の base ref
+を名指しする `not-applicable — <reason>` を取る。
+
+spec が 1 つ以上のまだ open な predecessor PR の上に stack され、その
+criteria が base-side blob（stack 上のファイルの以前の状態、変更前の値）
+を読む場合、そこに書く値は 1 つの two-arm 式であり、base-side blob を
+読むすべての criterion で byte 単位で同一に spell される:
+
+```
+B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; elif git show-ref --verify --quiet refs/remotes/<remote>/<predecessor-branch>; then git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
+```
+
+これがそのままコピーすべき canonical な形である——以下の prose が説明して
+いる local-branch-only の簡略形ではない: predecessor が remote-tracking ref
+としてしか存在しない checkout では `elif` arm が取られ、その `merge-base` の
+引数はフルパスの `refs/remotes/<remote>/<predecessor-branch>` である
+（bare の `<predecessor-branch>` はその checkout では一切 resolve しない）。
+
+`<predecessor-branch>` はこの spec 自身の branch が stack されている直近の
+predecessor、`<integration-branch>` は**あなた自身のリポジトリの
+integration branch** を指す parameter である——この repository では
+`develop`、他の多くの repository では `main` であり、この repository の
+convention に矯正されるのではなく自分の convention を代入する。第一の
+arm は、predecessor が local branch として resolve する場合
+`git merge-base "<predecessor-branch>" HEAD` であり、意図的に
+predecessor branch tip の `rev-parse` ではない: この branch を切った後に
+predecessor branch を進める rework round は、そのブランチの tip を動かす
+が共通の祖先は動かさない。ここで "branch point" が意味するのはその共通の
+祖先である。existence test が predecessor を remote-tracking ref として
+しか見つけられなかった場合、同じ arm は
+`git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD` になる
+——bare の predecessor 名ではなく、そのフルパスである。local branch を
+持たない checkout では bare 名は resolve しない（`fatal: Not a valid
+object name`）。fallback arm `git merge-base "<integration-branch>" HEAD`
+は、predecessor が**どちらの namespace にも** resolve せず本当に消えて
+いる時点——merge され削除された era——で取られる。arm の選択は明示的な
+`git show-ref --verify --quiet` による branch-existence test で行う——
+predecessor が local branch として resolve する場合は
+`refs/heads/<predecessor-branch>` に対して、fresh clone や CI checkout
+が fetch しただけで local に checkout していない remote-tracking ref
+としてしか存在しない場合は `refs/remotes/<remote>/<predecessor-branch>`
+に対して行い、この existence test は `refs/heads/` だけを前提にせず、
+この checkout が実際に predecessor を持っている namespace のほうで
+見つけなければならない——そして `2>/dev/null ||` チェーンでは行わない:
+`||` チェーンは「predecessor branch が消えた」（fall back すべき想定
+された era の変化）と「`git merge-base` が別の理由で失敗した」（fail
+closed すべき場合）を区別できないためである。40 桁の commit literal は
+どの criterion にも一切書かれない。
+
+predecessor が**どちらの namespace にも** resolve しない checkout——
+一度も fetch していない: shallow clone、`--single-branch` clone、または
+child branch だけを fetch した CI checkout——は fallback arm が存在する
+ための era ではない。predecessor が open な PR を持つかどうかは
+repository の state of record（そのブランチが乗っている train）の事実
+であり、この checkout がたまたま fetch した範囲の話では決してない。
+したがってこのケースも `not-applicable` の宣言ではない: 凍結する前に
+predecessor を fetch するか、route back すること——existence test の
+不在が黙って選んでしまう arm で凍結してはならない。その不在は
+existence test だけを見る限り genuine な merge と見分けがつかず、
+そこを通り抜けて凍結することは禁じられている。
+
+3 つの残余ケースが、同じ扱いで、回避策を講じるのではなく開示される:
+1 つ目は、merge されずに削除された predecessor branch が fallback arm
+に integration branch の tip を resolve させてしまい、それは branch
+point ではない——それは stack 全体を無効化する route-back であり、
+criterion で覆い隠すべきものではない。2 つ目は、この branch を切った後に
+predecessor branch が rebase、force-push、または squash-merge された
+場合で、これも同じ扱いの route-back であり、どちらの arm もこれを
+生き延びるように再設計されてはいない——rebase と force-push は
+predecessor の tip を動かし、記録済みの共通の祖先がその祖先でなくなる
+可能性があり、squash merge は predecessor の変更を、その元の commit の
+どれとも SHA を共有しない 1 つの commit として integration branch に
+乗せてしまうため、era の変化による fallback が正しく発火した後でも
+`merge-base` は本当の branch point より前の commit を resolve して
+しまう——メカニズムは異なるが結果は同じである。
+
+現時点の強制は上記の adopter-facing documentation の宣言と同じ足場で
+**チェッカーではなく duty** である: タスクの最初の凍結時に coordinating
+session がこの宣言領域を自分で読み、宣言が無い・2 つ以上ある・宣言領域外
+に置かれている spec を refuse する。機械的なチェッカーはまだ出荷されて
+いない。
+
+この宣言と並行して、すべての spec の凍結時 premise sweep は、文字列
+token の出現回数についてのすべての literal count premise——特に `= 0`
+という premise——を `own-coinage`（このタスク自身が導入する literal）か
+`borrowed`（他の document が既に coin した token: invariant-lock id、
+status flag、grammar family name、その他の既存 vocabulary）のいずれかに
+classify する。これは spec author の凍結時 duty である: borrowed な
+token はすべて spec 自身の `## Assumptions` セクションに、それを確認する
+measurement command と共に enumerate され、execution 能力を持つ側が凍結
+前にその command を branch point の committed blob に対して live に実行
+し、測定値を assumption の傍に記録する。「このタスクが導入する新しい
+literal」だけに scope した sweep では不十分である——merged された sibling
+task によって既に stack に持ち込まれた token を見逃してしまう——そして
+測定されなかった borrowed-vocabulary count premise は broken check line
+として扱われる。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。
