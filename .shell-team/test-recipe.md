@@ -1469,3 +1469,21 @@ that file's order.
   all-fail or all-pass result from a bulk probe without first confirming,
   via a single known-good positive control run through the same wrapper,
   that the wrapper itself executes the command at all.
+- T-1082: `rm -rf` on any path (even a `mktemp -d "${TMPDIR:-/tmp}/…"`
+  scratch dir this same command created) is denied outright by this
+  session's sandboxed Bash tool, silently, with no output distinguishing
+  it from a legitimate refusal — a raw ad-hoc probe command ending in
+  `rm -rf "$T"` simply never runs at all. This does **not** affect
+  `bin/check-acs.sh`'s own live `- check:` execution (its own harness runs
+  fixture `rm -rf`s successfully; only this session's own Bash tool calls
+  are affected) — prefer running a spec's `- check:` lines through
+  `bin/check-acs.sh` (dry-run first, per the T-111 entry above, then live)
+  over hand-copying a check body into an ad-hoc Bash call, and when a
+  manual probe is unavoidable, skip the cleanup step (leave the scratch
+  dir under `$TMPDIR`) rather than chaining a trailing `rm -rf`.
+  Separately: this task's own reading-side checker for
+  `bin/aggregate-verdicts.sh`'s `fanout-verdict` block reuses that
+  script's own skeleton (the `die` helper, the `LC_ALL=C` export, the
+  ANSI-C-quoted em dash, boundary-anchored key matching) rather than
+  reinventing it — a real time-saver when a new checker reads a sibling
+  checker's own output format.
