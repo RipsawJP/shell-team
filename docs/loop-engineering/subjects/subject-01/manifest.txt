@@ -1,0 +1,9 @@
+harness-path: README.md
+harness-path: interface.md
+harness-path: manifest.txt
+harness-path: acceptance.sh
+harness-path: regenerate.sh
+candidate-path: lib/csvparse.sh
+candidate-path: lib/colstats.sh
+candidate-path: cli/csvstats
+candidate-extra-dir: check

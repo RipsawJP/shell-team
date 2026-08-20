@@ -247,13 +247,124 @@ Not the usual case for this item — this task adds no norm text to a gate surfa
 
 - reproduce: B=$(if git show-ref --verify --quiet refs/heads/chore/lessons-2026-08-20; then git merge-base 'chore/lessons-2026-08-20' HEAD; else git merge-base 'develop' HEAD; fi); bash bin/derive-populations.sh --label t1086-spec-population --set "base=git ls-tree -r --name-only $B -- .shell-team/specs/" --set "head=git ls-tree -r --name-only HEAD -- .shell-team/specs/"
 
-The emitted `<!-- BEGIN derivation: t1086-spec-population -->` … `<!-- END derivation: t1086-spec-population -->` block is embedded here verbatim by the engineer round that runs it, immediately after the `- reproduce:` line above, and **AC20** requires it to reproduce byte-identically. No count appears in this section except inside that block.
+<!-- BEGIN derivation: t1086-spec-population -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: base — status: 0 — lines: 91 — items: 91 — command: git ls-tree -r --name-only 0a018e8681c1371440e8901201bcaf2d5ddfc042 -- .shell-team/specs/
+- set: head — status: 0 — lines: 92 — items: 92 — command: git ls-tree -r --name-only HEAD -- .shell-team/specs/
+- union: items: 92
+- bucket: base+head — items: 91
+  - .shell-team/specs/.gitkeep
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1020-supersede-adjudication.md
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+  - .shell-team/specs/T-1032-audit-prose-accuracy.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1046-ignored-base-verdict.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1067-context-lifecycle.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
+  - .shell-team/specs/design-note-T-1012.md
+- bucket: head — items: 1
+  - .shell-team/specs/T-1086-subject-harness.md
+<!-- END derivation: t1086-spec-population -->
+
+The block above is the emitted output of the `- reproduce:` command immediately preceding it, embedded verbatim by this engineer round; **AC20** requires it to reproduce byte-identically. No count appears in this section except inside that block.
 
 **Prediction, recorded before the measurement so it can be wrong in public.** Three classes are expected.
 
 - predicted-red: a merged criterion pinning `.github/workflows/check-handoff.yml` byte-identical to its own base ref. This task edits that file's shellcheck line, so any such criterion whose pin is still green goes red. `.shell-team/specs/T-1058-telemetry-binding.md`'s own Blast radius already records this class as pre-existing for at least one criterion ("four tasks on this stack have edited it"), and this task neither deepens nor repairs it; the measurement enumerates which pins are still live.
 - predicted-red: none from the harness paths themselves — `docs/loop-engineering/subjects/` and `docs/loop-engineering/tier2-subject-harness.md` are new paths no merged criterion can name, and the `tests/` exec-bit lock and the `bin/` purity rule are untouched because nothing lands in either tree.
 - predicted-red: the merge-point-scoped class every stacked task in this train produces — a criterion asserting a spec population total or a board-entry count that this task's own new spec and board entry move. These are disclosed, never repaired.
+
+**Measured, run against the full 91-file population above (the 90 shared files plus this task's own spec, run individually).** Every shared file's own `- check:` lines were run twice: once against the base ref's own committed blobs (a `git worktree add --detach` scratch clone pinned at the branch point, `--root`-ed by `bin/check-acs.sh`, over the 91 files the derivation block's `base` set names), and once directly against this checkout (the 92 files the `head` set names, this task's own spec included). Per-criterion `AC<n>: PASS|FAIL|SKIP` lines were extracted from each of the 183 runs' own output and reconciled as base/head key-value pairs.
+
+- Key reconciliation: base carries 1492 distinct `(spec, ACn)` keys, head carries 1513 (`wc -l` after `sort -u` on each side) — the difference is exactly this task's own 21 keys (`AC1`–`AC21`), confirmed by `comm -13`/`comm -23` on the sorted key lists finding zero keys on either side beyond that set. One raw-line duplicate on each side (1493 base lines, 1514 head lines before `sort -u`) is the pre-existing `T-1061-adopter-docs-gate.md` **AC1** duplicate-label artifact named below, present identically at both refs.
+- Value-level join (`join` on the 1492 shared keys) found **11 keys whose verdict differs**, `awk -F'\t' '$2!=$3'` over the joined pairs — every one individually re-verified in isolation (a fresh, single-file, uncontended `bin/check-acs.sh` run at each ref, outside the 8-way fan-out) before being characterised, because the fan-out itself produced at least one confirmed false reading (below).
+  - **Genuine, disclosed-class (3 keys, matching the predicted classes above).** `T-1003-retro-reads-interventions.md` **AC19** and `T-1020-lessons-supersede-sweep.md` **AC14**: both PASS→FAIL, both a criterion asserting `git diff --name-only develop -- <path-list>` is empty over a list that includes `.github` (T-1003's own check names `.github/workflows/check-handoff.yml` directly; T-1020's own check names the directory `.github` alongside `bin tests skills docs ...`) — this task's own shellcheck-line edit trips the first, and the second is additionally tripped by this task's own new files under `docs/loop-engineering/`, so the predicted class is confirmed **wider** than the single named file: any pin over `.github` or `docs` as a whole, not only over the workflow file by name, is now live. `T-1085-default-path-firing.md` **AC16**: PASS→FAIL — its own embedded derivation block's `- reproduce:` command re-derives a population/board-state figure that this task's own new spec file and board entry now move, the merge-point-scoped class the third prediction bullet names.
+  - **Methodology artifacts, not base-vs-head differences (8 keys, all confirmed non-genuine on isolated re-run).** `T-1002-intervention-capture-channel.md` **AC12** read PASS(base)/FAIL(head) under the 8-way fan-out, but an isolated re-run at both refs reads PASS/PASS — the fanned head-side run's own `git status --porcelain` comparison (this criterion's own check body) caught a concurrently-running sibling check's transient write to the same shared checkout; not a real flip. `T-1066-effort-time-telemetry.md` **AC5**/**AC7**, `T-1072-telemetry-span-discriminator.md` **AC6**/**AC7**, `T-1076-log-run-locking.md` **AC15**, `T-1082-telemetry-discriminator.md` **AC6** (6 keys) each read FAIL(base)/PASS(head), confirmed on isolated re-run at both refs — every one resolves `bin/team-paths.sh --get runs` (a path relative to the caller's own cwd) and then reads the corpus at that path. The base-side scratch worktree never carries `.shell-team/runs/` at all — it is `.gitignore`d and therefore never checked out into a fresh `git worktree add --detach` — so every one of these checks fails closed there regardless of content, while the same check against this checkout's own real, populated runs corpus (`.shell-team/runs/shell-team.jsonl`, non-empty) passes. This is a gap in the scratch-worktree-based **method** this task's own base-side reads use, not a property `T-1066`/`T-1072`/`T-1076`/`T-1082`'s own tracked content or this task's own diff changed, and it is disclosed here rather than silently absorbed into either the genuine-flip list or a repair — no criterion of any of those four specs is touched by this task.
+  - **Pre-existing, unrelated (1 key).** `T-1061-adopter-docs-gate.md` **AC1**: the already-disclosed duplicate-`**AC1**`-label defect (both a `PASS` and a separate `FAIL` block print under the same label at every ref this corpus has ever been read from) — present identically at base and head, confirmed by the identical raw-line-duplicate count on both sides noted above; this task neither introduces nor repairs it.
+- The remaining 1481 shared keys (1492 − 11) hold the same verdict at both refs, confirmed by the same join.
 
 ## Assumptions
 
