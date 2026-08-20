@@ -1246,7 +1246,7 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 
 ## 2026-08-20 — A closure declaration over a byte-locked record's own completeness claims is unverified until an independent, differently-worded signature grep accompanies it
 - **Category**: verification-discipline
-- **Applies-to**: engineer, qa-verifier, codex-reviewer
+- **Applies-to**: engineer, qa-verifier
 - **Scope**: loop
 - **Status**: active
 - **Source**: .shell-team/retros/2026-08-20.md
@@ -1255,7 +1255,7 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **How to apply**: The orchestrator's rework instruction for any recurred class names the closure requirement (attach the signature, the hit list, and the per-hit disposition); QA and the cross-provider reviewer re-run the signature themselves plus at least one broadened variant, and treat a closure hand-off without an executed signature as an open finding rather than a judgment call.
 
 ## 2026-08-20 — An executor's self-classification of its own action into a governance vocabulary is structurally weak: run the classifier before the attestation
-- **Category**: oversight-discipline
+- **Category**: verification-discipline
 - **Applies-to**: all
 - **Scope**: loop
 - **Status**: active
@@ -1265,9 +1265,10 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **How to apply**: Before exercising any standing delegation whose boundary is a classification, the orchestrator runs the boundary's mechanical check first and quotes its verdict in the attestation; a verdict naming a human-gated class converts the step into an escalation with the measured ground attached, and an attestation that classifies without quoting a classifier run is itself a finding.
 
 ## 2026-08-20 — A fan-out's per-call timeout sized only from uncontended single-unit cost does not absorb N-way contention inflation
-- **Category**: measurement-discipline
+- **Category**: verification-discipline
 - **Applies-to**: pm-spec, engineer
 - **Scope**: maintainer
+- **Bound-in**: skills/run/SKILL.md
 - **Status**: active
 - **Source**: .shell-team/retros/2026-08-20.md
 - **Rule**: When a fan-out spec freezes a per-call harness timeout for its instances, sizing it above the serial pre-arm cost pass's largest single-unit cost is not sufficient: under N-way contention the same unit's cost inflates past its uncontended ceiling, so the frozen protocol either measures a contended sample before fixing the value or states an explicit contention factor over the uncontended maximum, and records which of the two it did.
