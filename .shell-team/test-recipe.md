@@ -59,6 +59,30 @@ that file's order.
 <!-- Append-only log: when a task (T-NNN) establishes a new environment
      procedure, add it here with the task id so the next task inherits it. -->
 
+- T-1084: an `xargs -P <cores>`-fan-out full-population Blast-radius sweep
+  (see the T-1083 entry above for the base pattern) that exceeds this
+  session's own foreground-Bash-call timeout auto-backgrounds — but that
+  auto-background can itself be silently `killed` by the harness partway
+  through (observed: 63/88 outputs written, then stopped, no error surfaced
+  beyond the background task's own `status: killed` notification). Launch
+  the fan-out **explicitly** with `run_in_background: true` from the start
+  rather than relying on the timeout-triggered auto-background, and after
+  ANY interruption (killed or otherwise), recompute the remaining
+  population as a set difference (`comm -23 <the full population, sorted>
+  <the outputs already written, sorted>`) and re-launch only that
+  remainder — never assume a partial output directory means the population
+  is done, and never re-run the whole population from scratch (wasteful and
+  risks a second timing-out attempt on the same slow specs). Separately,
+  even a completed-count match is not sufficient: verify every single
+  output file's own `tail -1 | grep -q '^check-acs: '` completion marker
+  (per the T-1082 entry above) before trusting any of them — this sweep's
+  first full pass produced 14/88 outputs that reached the 88-file COUNT
+  but were individually truncated mid-run (the shared 90s `CHECK_ACS_TIMEOUT`
+  under 8-way contention was too tight for a handful of the heavier specs,
+  T-1082/T-1083-class full-suite-referencing ones among them); those 14
+  were re-run individually at a smaller parallelism factor (`-P 4`) and a
+  higher `CHECK_ACS_TIMEOUT=300` to let them complete without contention.
+
 - T-111: `bash bin/check-acs.sh --dry-run <spec>` then `bash bin/check-acs.sh
   <spec>` (live) is the mechanical per-AC gate; run both, in that order,
   before trusting a spec's acceptance criteria are green. A `check:` line
@@ -1342,3 +1366,213 @@ that file's order.
   criteria at all (`bin/check-acs.sh` reports
   `no acceptance criteria (- [ ] **ACn** / **AC-N**) found` for both,
   identically on base and head) — expected, not a sweep defect.
+- T-1077: `bash tests/land-worktree/run.sh` measured wall-clock, this host,
+  this session: `elapsed=17s` (own `date +%s` bracket, one live run;
+  `grep -c '^PASS:' <log>` = **34**, `grep -c '^FAIL:' <log>` = **0**) —
+  comfortably inside a `CHECK_ACS_TIMEOUT` of **300**, the value this task's
+  own `bash bin/check-acs.sh` run used (AC2/AC3/AC5/AC10 each run the whole
+  suite, or a whole sibling suite, inside one `- check:` line). Host: macOS,
+  bash 3.2.57, git 2.53.0. Fractional `sleep 0.1` measured to work on this
+  host (used only by the suite's own two test-only rendezvous seams — the
+  `ref-moved` and `lock-released-on-signal` fixtures — never by the shipped
+  coordinator's own lock retry loop, which keeps T-1076's whole-second
+  `sleep 1` for portability toward an unknown adopter host, per this task's
+  own provenance record). Git-config pinning: this suite does not pin an
+  ambient config file the way `tests/rollup-track/run.sh` pins
+  `core.excludesFile`, because none of `bin/land-worktree.sh`'s own git
+  invocations read a config value that could silently change its behavior —
+  every diff/ls-tree call passes `--no-renames`/`-z` explicitly (a CLI flag
+  always overrides its matching config key in git, by git's own documented
+  precedence; there is no "config could silently win" case to guard here
+  the way an unpinned `core.excludesFile` genuinely could for a
+  `check-ignore` call), and `core.quotepath` — the one setting D7 itself
+  names as a real question — is exercised BOTH ways
+  (`overlap-quotepath-independent`, one throwaway repo configured
+  `core.quotepath=true` and a second configured `core.quotepath=false`)
+  and confirmed to make no difference to the tool's own overlap
+  detection, which is this suite's version of the paired-control-proves-
+  the-pinning-has-teeth discipline: proving the ONE ambient setting that
+  could matter here does not, rather than pinning settings that cannot.
+- T-1078: `CHECK_ACS_TIMEOUT=120` is sufficient for
+  `T-1078-tier3-pilot.md` itself (spec preamble's own stated value; no
+  raise beyond that needed). `CHECK_ACS_TIMEOUT=300` was needed for the
+  five older, heavier merged specs this task's own Blast radius exercise
+  re-ran in full at both the branch point and HEAD
+  (`T-1069-phase-multiplexing.md`, `T-1073-harness-agent-concurrency.md`,
+  `T-1074-fanout-orchestration.md`,
+  `T-1075-fanout-adoption-versioning.md`,
+  `T-1077-worktree-reconcile.md`); `T-1077`'s own full suite alone took
+  long enough to need a dedicated single, longer-timeout invocation
+  rather than sharing a 2-minute parallel batch with the other four. A
+  later task doing the same kind of base-vs-head re-run for a merged
+  spec that reads this note should expect the same 300s floor, not
+  120s. **A `git worktree add --detach <path> <ref>` scratch clone does
+  not carry the gitignored runs corpus** (`.shell-team/runs/*.jsonl`):
+  any criterion reading that corpus (e.g. T-1076's own **AC15**) reads
+  `not-met`/FAIL in a scratch worktree even when it is `met`/PASS in the
+  long-lived checkout, which is a measurement artefact of the worktree
+  itself, not a regression — already documented once in
+  `T-1075-fanout-adoption-versioning.md`'s own Blast radius entry above,
+  and reproduced identically here; a later task differencing base vs
+  head via a scratch worktree should expect and disclose this same
+  artefact rather than chase it as a real flip.
+- T-1079: `CHECK_ACS_TIMEOUT=120` is sufficient for
+  `T-1079-tier2-judge.md` itself (spec preamble's own stated value; the
+  heaviest commands are `bin/check-pii-shapes.sh --base` and
+  `bin/check-intent.sh`, no full fixture suite runs, no other spec's own
+  full suite is re-run — this task's declared `- verification-class:
+  no-mechanism` prices the Blast radius at read-set scope, not a
+  full-population re-run). One authoring trap worth recording for a
+  future task adding a new `- judge-*: `/`- cost-input: `-style label
+  family with a literal-text requirement (a `tie-break`, a bounded
+  mechanism name, a phase-position phrase): a bolded Markdown span
+  (`**Tie-break, ...**`) capitalizing the FIRST letter of a literal a
+  `grep -qF` check requires in its exact-case form defeats that check
+  silently — `grep -qF` is case-sensitive under `LC_ALL=C`, and
+  "Tie-break" does not match a check requiring the substring
+  `tie-break`. Confirmed live: writing the section heading as
+  "**Tie-break, stated once...**" left `check-acs.sh`'s AC3 FAILED
+  (`grep -qF -- 'tie-break' "$T/sec"` found nothing); the fix was to
+  keep the literal lowercase token verbatim inside the prose
+  (`` `tie-break` ``) rather than relying on a capitalized natural-language
+  heading to satisfy a case-sensitive literal check.
+- T-1080: `CHECK_ACS_TIMEOUT=120` is sufficient for
+  `T-1080-depth-axis-contract.md` itself (no full fixture suite runs beyond
+  `tests/loop-guard/run.sh`, the one bounded exception this task's own
+  `- verification-class: no-mechanism` licenses; the heaviest commands are
+  `bin/check-pii-shapes.sh --base` and `bin/check-handoff.sh`).
+  `CHECK_ACS_TIMEOUT=100`–`120` was also sufficient for every merged spec
+  this task's `## Blast radius` read-set sweep re-ran (T-1068, T-1069,
+  T-1072 through T-1079, T-1001, T-1041). Two traps worth recording for a
+  future task that adds a lowercase-literal-and-capitalized-heading pair
+  in the same section (e.g. a body heading `**Indirection, ...**` next to a
+  `- check:` that greps a lowercase word from that same heading's own
+  vocabulary): `grep -qF` is case-sensitive, and a heading capitalized for
+  readability does not satisfy a check requiring the lowercase substring —
+  confirmed live, this task's own `## Blast radius`'s `**Indirection, named
+  and discharged.**` paragraph did not itself contain the lowercase
+  substring `indirection` anywhere, only the capitalized word, and
+  `check-acs.sh`'s **AC18** FAILED until a lowercase occurrence was added
+  inline in that same paragraph's prose. Second, this task's own three
+  `git status --porcelain -- bin/ tests/` working-tree-subject clauses in
+  three *other*, already-merged specs (`T-1074-fanout-orchestration.md`
+  **AC9**, `T-1076-log-run-locking.md` **AC10**,
+  `T-1077-worktree-reconcile.md` **AC3**) read `FAIL` at HEAD the moment
+  this task's own edit to `bin/loop-guard.sh` was still uncommitted, and
+  returned to `PASS` once that edit was committed — a base-vs-head
+  Blast-radius measurement taken with an uncommitted diff under `bin/` or
+  `tests/` will misreport any such clause as newly reddened; measure after
+  committing, or disclose the measurement's own uncommitted-diff timing
+  explicitly rather than reporting the flip as caused by the diff's
+  content.
+- T-1081: two environment facts measured on this host, worth knowing
+  before writing a `- check:` line or a verification script here.
+  **(1)** `diff <(cmd1) <(cmd2)` (process substitution) fails with
+  `diff: /dev/fd/NN: Operation not permitted` under this sandbox — `diff`
+  cannot read a `/dev/fd` argument here — while `comm <(cmd1) <(cmd2)`
+  reads the same kind of argument successfully; where a check needs a
+  byte-identity comparison, extract each side to a **regular file** under
+  `"$TMPDIR"` first and `diff -q`/`cmp -s` the two files, and where a
+  check needs a set-difference (e.g. "every line on the left also
+  appears on the right"), `comm`'s own process-substitution form is fine
+  as-is. Do not "normalize" every such check to one spelling — the two
+  forms exist because of this asymmetry, not by inconsistency.
+  **(2)** A bare `/tmp/...` path is denied for writing on this host, while
+  `"${TMPDIR:-/tmp}"/...` (or bare `"$TMPDIR"`) succeeds — always resolve
+  a scratch path through `${TMPDIR:-/tmp}` in a `- check:` line or a
+  verification script, never hardcode `/tmp` directly. Third, an
+  instrumentation trap independent of either fact above: GNU `timeout`
+  is **not installed** on this host's `bash` (`timeout: command not
+  found`, exit 127) — a probe script that wraps each candidate command in
+  `timeout N bash -c "$cmd"` to bound a sweep's runtime will report every
+  single command as failed, uniformly and silently, with no diagnostic
+  distinguishing "the command genuinely failed" from "the wrapper itself
+  doesn't exist" (confirmed live: a 177-line population sweep reported
+  0/177 passing under the `timeout`-wrapped script and a genuine
+  63/72-ish split once the wrapper was removed) — never trust a uniform
+  all-fail or all-pass result from a bulk probe without first confirming,
+  via a single known-good positive control run through the same wrapper,
+  that the wrapper itself executes the command at all.
+- T-1082: `rm -rf` on any path (even a `mktemp -d "${TMPDIR:-/tmp}/…"`
+  scratch dir this same command created) is denied outright by this
+  session's sandboxed Bash tool, silently, with no output distinguishing
+  it from a legitimate refusal — a raw ad-hoc probe command ending in
+  `rm -rf "$T"` simply never runs at all. This does **not** affect
+  `bin/check-acs.sh`'s own live `- check:` execution (its own harness runs
+  fixture `rm -rf`s successfully; only this session's own Bash tool calls
+  are affected) — prefer running a spec's `- check:` lines through
+  `bin/check-acs.sh` (dry-run first, per the T-111 entry above, then live)
+  over hand-copying a check body into an ad-hoc Bash call, and when a
+  manual probe is unavoidable, skip the cleanup step (leave the scratch
+  dir under `$TMPDIR`) rather than chaining a trailing `rm -rf`.
+  Separately: this task's own reading-side checker for
+  `bin/aggregate-verdicts.sh`'s `fanout-verdict` block reuses that
+  script's own skeleton (the `die` helper, the `LC_ALL=C` export, the
+  ANSI-C-quoted em dash, boundary-anchored key matching) rather than
+  reinventing it — a real time-saver when a new checker reads a sibling
+  checker's own output format.
+- T-1083: no new `bin/` script, no new test suite (`- verification-class:
+  mechanism`, but the diff is a documentation/prompt-block surface, not a
+  script). The **probe venue procedure** (orchestrator-only, per the same
+  no-Agent/Task-token measurement T-1073 already established): a throwaway
+  `git clone --no-hardlinks` under `$TMPDIR`, pinned to the branch point,
+  with `TEAM_RUNS_DIR` pointed **inside that clone** for every telemetry
+  write the probe agents make — never into this checkout's own
+  `.shell-team/runs/` corpus. Verify the real checkout stayed clean
+  afterward with `git status --short` and `git ls-files --others
+  --exclude-standard`, both read empty, rather than assumed. `CHECK_ACS_TIMEOUT`
+  needs raising above the 120 s default for this spec's own full sweep
+  (this task used 300, per the spec's Notes for engineer) because **AC19**
+  runs five checkers including `check-handoff.sh` over the real board.
+  Separately, this task's own **AC21** full-population Blast-radius sweep
+  (87 specs at the branch point, run at both refs) is materially different
+  from a single spec's own suite: a `git worktree add --detach <scratch>
+  <branch-point>` gives a real base-side checkout `bin/check-acs.sh --root
+  <scratch> <scratch>/<spec>` can run against, and running the 87-spec
+  population **serially** at even a 90 s per-check cap takes on the order
+  of hours on this host — `xargs -P <cores>` fan-out (one `check-acs.sh`
+  invocation pair per spec, run in parallel, each writing to its own named
+  output file, with a `tail -1 | grep -q '^check-acs: '` completion-marker
+  check before trusting a partial or truncated output file, per the T-1082
+  entry's own killed-mid-sweep lesson above) is what makes this tractable
+  in one sitting; do not attempt the 87-spec population serially.
+  Numeric criteria in this spec compare 19-digit epoch-nanosecond values
+  via `$(( 10#$v ))` bash arithmetic — never `awk`/`sort -n` (a double
+  cannot hold them exactly), the same discipline T-1069/T-1071/T-1072/
+  T-1073 already established.
+
+- T-1085 (recorded in round 1, before the firing itself has run — the
+  procedure is frozen and result-independent, so it does not wait for
+  round 2): the **two-arm firing venue procedure** (orchestrator-only, at
+  the Validate seam, per the same no-Agent/Task-token measurement
+  T-1073/T-1083 already established and re-confirmed for this task — all
+  nine `agents/*.md` `tools:` lines still carry no `Agent`/`Task` token).
+  Each arm (the fanned `t1085fan` arm and the single-instance serial
+  baseline) gets its **own freshly-created** `git clone --no-hardlinks`
+  under `$TMPDIR`, pinned to the same commit — never `git worktree add`
+  for either arm's venue, since a worktree registers under
+  `.git/worktrees` in the real checkout and turns cleanup into a
+  destructive step this task takes no version of. `CHECK_ACS_TIMEOUT` must
+  be **exported identically inside both arms** (a per-check cap that
+  passes serially but fires under N-way contention would change verdicts
+  between arms and void the parity comparison) and **separately** raised
+  to at least 300 when running this spec's own criteria (**AC17** runs
+  five checkers, **AC15**/**AC16** regenerate derivation blocks) — two
+  distinct roles for the same env var, do not conflate them. Both arms
+  write telemetry into the one shared, default-resolved corpus
+  (`TEAM_RUNS_DIR` unset — that corpus, the launch record and the board
+  records all stay in the **real checkout**, unlike the per-unit clones),
+  so they must be separated by a `--attempt` narrower plus disjoint
+  instance-id prefixes (`qa-*` fanned, `serial-*` baseline) or
+  `bin/check-fanout-instances.sh` refuses `missing-instance` on a scope
+  that mixes a serial round with a fanned round of the same phase. Every
+  instance Bash call needs an **explicit per-call timeout** sized above the
+  largest single-unit cost measured in the pre-arm cost pass (T-1083
+  measured `T-1044-test-infra-bundle.md` alone at ≈143 s against this
+  harness's 120 s default foreground-Bash timeout) — an implicit default is
+  not a bound a fan-out orchestration may rely on (T-1083's own
+  agent-autonomy finding). Per-instance liveness checks must be launched
+  harness-tracked-background, never a bare shell `&` (dies with the
+  launching call). 19-digit epoch-nanosecond comparisons use
+  `$(( 10#$v ))` bash arithmetic, never `awk`/`sort -n`, the same
+  discipline as every prior fan-out task above.

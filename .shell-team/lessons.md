@@ -1146,7 +1146,8 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Category**: process
 - **Applies-to**: pm-spec
 - **Scope**: loop
-- **Status**: active
+- **Status**: superseded
+- **Superseded-by**: 2026-08-16 — Review depth is priced by the artifact's consumer and stakes, at freeze and again in every review briefing (supersedes the analysis-note verdict-scope entry)
 - **Source**: .shell-team/retros/2026-08-15.md
 - **Rule**: When freezing a spec for an internal analysis-note deliverable — an investigation that changes no shipped mechanism — the '### Verdict scope' block defines that artifact class's deliverable correctness as computed values plus the direction of conclusions, with prose wording explicitly non-gating (notes), so review depth is priced by the artifact's consumer and stakes once at freeze instead of being re-litigated round by round.
 - **Why**: An analysis-note task reviewed at code-change strictness drew four review rounds and two self-escalations over prose wording until the operator halted it as means-obsession and set the pricing by ruling; the three analysis-note tasks frozen after that ruling inherited the verdict-scope block by citation and converged in one to two rounds each — the cost difference was the presence of the pricing at freeze, not the artifacts' content.
@@ -1171,3 +1172,74 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When a spec or analysis note states a safety premise spanning multiple agent contracts — for example that two roles read the same frozen tree — it quotes the governing lines of every involved agents/*.md file and reconciles them premise by premise, and an unverified symmetry assumption such as 'both should be read-only' is a freeze blocker, not a default.
 - **Why**: A concurrency investigation enumerated five contract surfaces for a parallel-review design and still missed a sixth — one role's test-only edit permission colliding with another role's unpinned working-tree read — which surfaced only in a late review round, because the premise that both readers see the same tree had been assumed symmetric instead of checked against each contract's actual lines; this is the assumption-time counterpart of the existing parallel-surface symmetry-table lesson, which fires when a norm is changed rather than when one is presumed.
 - **How to apply**: When pm-spec freezes a spec whose design or analysis rests on multi-role assumptions (concurrency, shared trees, parallel gates), add a premise table quoting the relevant line of each involved agents/*.md file next to each premise, and refuse to freeze while any premise row lacks its quotation.
+
+## 2026-08-16 — A triage that classifies the requester's own headline example as not-yet re-presents that classification, with the requester's verbatim words, at the next human gate
+- **Category**: process
+- **Applies-to**: tech-lead, pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-16.md
+- **Rule**: When an investigation or triage classifies the requester's own originating ask — the headline example they stated in their own words — as not-yet or out-of-scope, that classification is re-presented at the next human gate together with the requester's verbatim words; the fact that the classification happened, not its correctness, is what must reach the requester, because a locally sound triage that never returns to the origin silently converts the requester's budget into work they did not ask for.
+- **Why**: The requester's originating example — splitting implementation work across multiple engineer instances to halve implementation time — was classified not-yet by a tier triage, and the gap between what was asked and what proceeded (verification-phase fan-out) crossed one planning approval and roughly ninety hours without ever being shown back with the original words; measurement later confirmed the requester's instinct (the implementation phase was the largest single wall-clock share of the cycle). The requester named it a textbook tree-swing failure: the client watching cost spent on something other than what they asked for.
+- **How to apply**: The routing map or spec that consumes a triage result checks whether the originating request's headline example survived into scope; where it did not, the next human-gate presentation (planning approval, batch GO) carries a line quoting the requester's original words and stating which part is deferred and where it is tracked. A planning approval that cannot state the origin trace is incomplete.
+
+## 2026-08-16 — Review depth is priced by the artifact's consumer and stakes, at freeze and again in every review briefing (supersedes the analysis-note verdict-scope entry)
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-16.md
+- **Rule**: Review depth is a priced decision made from the artifact's consumer and stakes — shipped code an adopter executes earns adversarial depth, an internal note or a development-time test scaffold does not — and the pricing is stated twice: once at freeze (the spec's verdict-scope block, for analysis-class deliverables) and again in each round's review briefing, which names the consumer class of what is under review; a briefing that omits the consumer class invites shipped-code depth by default, and an arms race against a static defence mechanism ends by re-scoping its claim, never by one more round of strengthening.
+- **Why**: The freeze-time half of this rule already existed (the analysis-note verdict-scope entry this one supersedes) and worked where it applied; the class then recurred on a different axis — round-by-round review briefings for a tripwire test repeatedly requested full shipped-bin adversarial angles, and each strengthening round produced new count-and-order-preserving defeat mutants until the operator interrupted and the claim was re-scoped to what a static check can honestly promise. The generator was the briefing author's omission, not the reviewer's judgment: the reviewer correctly applied the depth it was asked for.
+- **How to apply**: pm-spec writes the verdict-scope pricing into analysis-class specs at freeze, as before; the orchestrator's review briefing additionally names, every round, whether the artifact under review is adopter-executed shipped code, shipped prose, or development-time scaffolding, and what severity calibration follows; when consecutive rounds against one static defence each produce new adversarially-constructed bypasses, the disposition is to re-scope the defence's stated claim rather than strengthen it again.
+
+## 2026-08-16 — An agent collects its own background children synchronously, because a completion notification is not guaranteed to arrive
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-16.md
+- **Rule**: An agent that launches a background child — a sub-process, a monitored job, a second executor pass — collects that child's result synchronously (reading its output artifact, polling with a bounded loop and an explicit timeout) and never ends its turn waiting for a completion notification, because inside a sub-agent the notification channel is not guaranteed to deliver; this is the launched side's counterpart of the existing launch-side liveness-check rule, which governs whoever starts the agent, not what the agent does about its own children.
+- **Why**: Two roles in one cycle — a cross-provider reviewer and an engineer — independently ended their final message with "waiting for the background task's completion notification" and stalled there; both were recovered only by an external nudge. After the coordinating layer began stating "collect background work synchronously; do not wait for notifications" in every launch briefing, the class did not recur for the rest of the cycle.
+- **How to apply**: A role that starts background work inside its own run schedules its own bounded collection — poll the output file, cap the wait, and on expiry either re-run the work in the foreground or disclose the gap in the hand-off — and treats "no notification yet" as no information; the coordinating layer keeps the synchronous-collection sentence in its standard launch briefing.
+
+## 2026-08-16 — Mechanizing the count does not mechanize the enumeration: whole-set claims recur until the claim inventory itself is command-derived
+- **Category**: verification-discipline
+- **Applies-to**: engineer, qa-verifier
+- **Scope**: maintainer
+- **Bound-in**: bin/derive-populations.sh
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-16.md
+- **Rule**: A helper that derives populations and counts closes only the arithmetic half of the whole-set-claim class; which claims exist to be checked — the inventory of every all/every/none/count assertion in a record — is a second population that recurs as hand-swept prose until it too is command-derived, so a record-heavy task enumerates its own claim sites mechanically (a grep over the record's own sections) and attaches a reproduce command per site, not only per count.
+- **Why**: The cycle after the population-derivation helper shipped, the same defect class recurred four times in one task's reporting — unexecuted matrix rows, a count off by one, an analogy-reasoned cell — and converged only under an operator ruling; the helper had mechanized the computation while the selection of what to compute stayed manual, which is the same generator one level up.
+- **How to apply**: When a task's record states multiple set or count claims, the engineer derives the claim-site inventory itself with a command (grep over the engineer-owned sections), fills a reproduce command per site, and QA re-runs the inventory command before trusting any per-site verdict; mechanizing this as a checklist or checker is a candidate next-task.
+
+## 2026-08-17 — A frozen zero-at-base premise about borrowed vocabulary is measured at the branch point, never inferred from the task's own coinage sweep
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-17.md
+- **Rule**: When a spec frozen on a stacked branch asserts a literal count premise (especially `= 0`) about a string token's occurrences at the branch point, and that token is generic, reusable vocabulary (an invariant-lock id, a status flag, any name coined by another document) rather than a coinage unique to this task, the freeze-time premise sweep measures that count at the branch point independently — a sweep scoped to "the new literals this task introduces" says nothing about tokens already carried onto the stack by merged sibling tasks.
+- **Why**: T-1080's AC5 froze "`both-gates-green` occurs zero times in `skills/run/SKILL.md` at the branch point"; the token was borrowed from another document's vocabulary and two merged tasks (T-1074/T-1077) had already written it there, so the criterion was unsatisfiable by construction — the engineer escalated BLOCKED and a class-B re-freeze converted it to a base-relative delta. The adjacent corpus entry (write accounting criteria as base-relative deltas, never absolute literals) governs how to write the criterion; this entry governs what the freeze sweep must cover, which is where the defect actually entered.
+- **How to apply**: pm-spec's premise sweep classifies every literal count premise as own-coinage or borrowed; borrowed ones get a live measurement command against the branch-point blob quoted in the spec's Assumptions before the freeze, and the orchestrator's freeze attestation treats an unmeasured borrowed-vocabulary count premise as a broken check line.
+
+## 2026-08-17 — A quantitative conclusion's QA PASS is necessary, never sufficient: the conclusion holds when the cross-provider re-derivation reaches it independently
+- **Category**: verification-discipline
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-17.md
+- **Rule**: For an acceptance criterion whose substance is a narrative conclusion derived from numeric substitution — a break-even inequality's direction, a cost comparison's basis, a specific measured figure's provenance — QA's `PASS` gates progression but does not settle the conclusion; the conclusion is treated as settled only when the cross-provider review's independent re-derivation reaches the same direction from the same recorded inputs. This entry retires when script-generated record tables (issue #268) remove the recall-written numeric prose it guards.
+- **Why**: Three times in one cycle (T-1078 rounds 1 and 2, T-1079 round 1), and in earlier cycles before it, the cross-provider reviewer caught a quantitative defect QA had passed — a conclusion contradicting its own inequality, a fabricated substitution of an unobserved value, a units mismatch, a non-reproducing derivation. QA's arithmetic re-checks verify the computation and stay blind to what is being compared; the second model family substituting the numbers itself is the only verification that has repeatedly caught this class.
+- **How to apply**: The orchestrator's QA briefing for any task carrying such criteria names them and states that their PASS is provisional; the review briefing asks the reviewer, by name, to substitute the model's own recorded numbers into its own inequality and check the conclusion's direction; neither gate is skipped because the other already ran.
+
+## 2026-08-17 — CI-equivalence is scoped by mechanically reverse-mapping edited files to the suites that read them, never by a conditional trigger someone remembers
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-17.md (post-retro addendum, ratified 2026-08-17)
+- **Rule**: When a task edits shipped files, the set of CI-wired suites its verification must run is derived mechanically — reverse-map each edited path to the suites that read it (`grep -rl -- '<edited-path>' tests/*/run.sh` plus the workflow's dogfood steps naming it) — and that derived list is the reached-steps scope; a conditional full-suite trigger ("run everything only if X changed") silently under-scopes whenever a suite reads a file for its own reasons the condition never anticipated.
+- **Why**: T-1080 edited `agents/codex-reviewer.md`; `tests/codex-skeleton-hygiene/run.sh` reads that file and contracts marker→command adjacency inside its fenced blocks. The spec's CI-equivalence clause named two reached suites explicitly and gated the full list behind a loop-guard-executable-change condition that never fired, so three QA rounds and three review rounds all passed a diff that CI then failed — the machine gate was the last line of defence for a scoping decision every human-shaped reviewer had accepted.
+- **How to apply**: pm-spec writes the reached-suite list into the spec by running the reverse-map command over the task's declared file set and quoting it; QA re-runs the same command at verification time against the actual diff's file list and treats any suite present in its output but absent from the spec's list as reached, running it rather than arguing scope.

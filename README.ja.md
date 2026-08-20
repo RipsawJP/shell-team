@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.0.3-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.1.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -171,7 +171,9 @@ build sha と uptime を返す /healthz を shell-team で追加して
 - **Loop 契約** — 各ループは TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT を `tasks/loops/*.contract.yaml` に宣言し、`bin/check-contract.sh` で lint。BUDGET ＋ STOP は必須。
 - **実行時ガードレール** — `bin/loop-guard.sh` が契約の BUDGET/STOP を実行時に強制（fail-closed な暴走 / 課金 kill-switch）。
 - **テレメトリ** — `/shell-team:run` が各フェーズで 1 `--span` 行、各ハンドオフで 1 `--event` 行（イベント語彙: `handoff|rework|gate|human|release`）を `bin/log-run.sh` で emit、`bin/check-run.sh` が JSONL を lint、`bin/gen-loop-replay.sh` がどちらの行種別も run-replay ページとして描画し直す（[run のリプレイ](#run-のリプレイ)参照）。run 横断のロールアップが、1 run ずつでは見えない系統的な問題も浮かび上がらせる。各 span 行は、どの役割インスタンスが生成したかを示す nullable な `--instance` discriminator も持ち、per-instance の fan-out でもハンドオフ記録がそれを生成したインスタンスに帰属できるようにする。すべての追記は、決して奪い取らないディレクトリロック（既定 10 秒の有界待機、`TEAM_LOG_LOCK_TIMEOUT` で上書き可能）の背後で直列化され、並行ライタが 1 行を混在させることはない——時間内にロックを獲得できない場合は何も書かずに exit 3 で終了し、行を破損させることはない。`--seq auto` は同じロックの下でファイル自身から `run_id` ごとの次のカウンタ値を導出し、自前のカウンタを持ちたくない呼び出し元に使える。
-- **フェーズ内 fan-out** — 機械的に列挙可能な検証作業を持つフェーズは、1 つの役割の N インスタンスへ分割し、`bin/aggregate-verdicts.sh` で N 個の per-instance 部分検証結果を 1 つの正統な verdict へ還元できる（直列実行の代わりに）。あくまで opt-in — 既定でこの fan-out を使うようフェーズが配線されることはない。この選択は Validate フェーズの中で行う。degree の決定則・liveness の要件・テレメトリ規約は run skill 自身の fan-out ステップを参照。
+- **フェーズ内 fan-out** — 機械的に列挙可能な検証作業を持つフェーズは、1 つの役割の N インスタンスへ分割し、`bin/aggregate-verdicts.sh` で N 個の per-instance 部分検証結果を 1 つの正統な verdict へ還元できる（直列実行の代わりに）。`bin/check-fanout-instances.sh` はその集約結果をこの fan-out 自身のテレメトリ行に結び付けて検証し、選択された各行が discriminator を持つこと・その discriminator が writer 自身の文法に従うこと・同じ id が 2 つ以上の異なる役割に跨って使われていないこと・テレメトリの instance 集合と集約結果が宣言する part 集合が双方向で一致することのいずれかが崩れれば、分類された exit code と空の stdout で refuse する。あくまで opt-in — 既定でこの fan-out を使うようフェーズが配線されることはない。この選択は Validate フェーズの中で行う。degree の決定則・liveness の要件・テレメトリ規約は run skill 自身の fan-out ステップを参照。起動前にオーケストレーターが書く**launch record**は `<runs>/fanout-<label>.launch` に置かれ、population・requested/achieved の N・cap の根拠・per-unit の assign・per-instance の liveness をバージョン付き終端宣言として記録する——ゲートされる各フィールドは上記 2 つのチェッカーの引数そのものなので、第三のチェッカーはこれを読まない。
+- **状況依存ディスパッチ記録** — `tech-lead` の Routing Map が、タスクの implement フェーズと verify フェーズをどの機構で走らせるかを軸ごとに決定し、オーケストレーターがその決定をタスクのボードエントリへクローズド語彙の文法 `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>` のサブ箇条書きとして転記する。`bin/close-out.sh` は存在する各サブ箇条書きを検証し、不整合な記録（別の軸の値、重複した軸、クローズドセット外の軸、不正な modality、priced-line の接頭辞を持たない ground）は refuse する——1 つも無いエントリはそのまま close-out できる。
+- **並行 worktree の reconcile** — 2 つ以上の engineer インスタンスがそれぞれ自分の linked worktree にディスジョイントな作業をコミット済みの時、`bin/land-worktree.sh` が各 worker を 1 つの coordinator ブランチへ、決して奪い取らないロック（既定 10 秒の有界待機、`TEAM_LAND_LOCK_TIMEOUT` で上書き可能）の背後で順に land させ、path レベルの衝突があれば land せず refuse する。あくまで opt-in — いつ使うかは run skill 自身の `reconcile-step` 節が定める。保証は path レベル・テキストレベルのみ：worker 間の意味的・インターフェース的な独立性は保証しない。
 - **オプトイン triage** — `/shell-team:loop-triage`（`bin/discover-work.sh`）は read-only：CI 失敗 / open PR / ラベル付き issue を見つけて todo 候補を*提案*する（ボードは編集しない）。
 - **モデルルーティング** — エージェントの役割はモデル tier（計画 / 実行 / 別プロバイダレビュー）に振り分けられ、コストが各役割の判断負荷に追従する。モデル環境やコスト構造が変わればいつでも再評価する明示トリガ付き。
 

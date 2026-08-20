@@ -314,6 +314,118 @@ path allowlist would coerce every adopter's repository into this one's
 layout. The duty applies at a task's bootstrap freeze only, never at a
 re-freeze of an already-recorded hash.
 
+## Declaring the stacked-branch base-ref discriminator and the borrowed-vocabulary sweep
+
+Every spec frozen from T-1081 onward additionally declares, on one line
+inside its own frozen intent block, in the same declaration region the
+`- user-visible:` and `- verification-class:` keys above already occupy:
+a top-level bullet `- base-ref-discriminator: <the instantiated
+two-arm expression>` or `- base-ref-discriminator: not-applicable —
+<reason>`. This is required of every first-freeze spec, not only one
+frozen on a stacked branch. The two forms are not a free choice: the
+two-arm expression is the value only when some criterion reads a
+base-side blob **and** the branch has an open predecessor at authoring
+time (classified once — a later era change, such as the predecessor
+merging mid-task, never reclassifies it); every other case — no
+base-side blob read at all, or no open predecessor to name — takes
+`not-applicable — <reason>` naming the branch's own actual base ref.
+
+Where a spec is frozen on a branch stacked behind one or more still-open
+predecessor PRs and its criteria read a base-side blob (a stack-delivered
+file's prior state, a pre-change value), the value spelled there is one
+two-arm expression, byte-identical across every criterion that reads a
+base-side blob:
+
+```
+B=$(if git show-ref --verify --quiet refs/heads/<predecessor-branch>; then git merge-base "<predecessor-branch>" HEAD; elif git show-ref --verify --quiet refs/remotes/<remote>/<predecessor-branch>; then git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD; else git merge-base "<integration-branch>" HEAD; fi)
+```
+
+This is the canonical shape to copy verbatim — it is not the local-branch-only
+shortcut that the prose below merely describes: a checkout where the
+predecessor exists only as a remote-tracking ref takes the `elif` arm, whose
+`merge-base` argument is the full `refs/remotes/<remote>/<predecessor-branch>`
+path (a bare `<predecessor-branch>` would not resolve in that checkout at all).
+
+`<predecessor-branch>` is the immediate predecessor this spec's own
+branch is stacked on; `<integration-branch>` is a parameter naming
+**your own repository's integration branch** — `develop` in this
+repository, `main` in many others — substituted for your own convention
+rather than coerced into this one. The first arm is
+`git merge-base "<predecessor-branch>" HEAD` when the predecessor
+resolves as a local branch, deliberately not a `rev-parse` of its tip: a
+rework round that advances the predecessor branch after this branch was
+cut moves that branch's tip but not the common ancestor, and the common
+ancestor is what "branch point" means here. Where the existence test
+instead found the predecessor only as a remote-tracking ref, the same
+arm is `git merge-base "refs/remotes/<remote>/<predecessor-branch>" HEAD`
+— that same full ref path, never the bare predecessor name, which a
+checkout carrying no local branch of that name cannot resolve
+(`fatal: Not a valid object name`). The fallback arm,
+`git merge-base "<integration-branch>" HEAD`, is taken once the
+predecessor resolves in **neither** namespace and is genuinely gone —
+the era in which it has merged and been deleted. The arm is selected by
+an explicit `git show-ref --verify --quiet` branch-existence test —
+checked against `refs/heads/<predecessor-branch>` where the predecessor
+resolves as a local branch, or against
+`refs/remotes/<remote>/<predecessor-branch>` where a fresh clone or a
+CI checkout only fetched it as a remote-tracking ref and never checked
+it out locally; the existence test must find the predecessor in
+whichever namespace your checkout actually carries it in, never
+assumed to be `refs/heads/` alone — and never by a `2>/dev/null ||`
+chain, because a `||` chain cannot distinguish "the predecessor branch
+is gone" (the expected era change, which must fall back) from
+"`git merge-base` failed for another reason" (which must fail closed).
+No 40-hex commit literal is ever written into a criterion.
+
+A checkout where the predecessor resolves in **neither** namespace —
+never fetched at all: a shallow or `--single-branch` clone, or a CI
+checkout that fetched only the child branch — is not the era the
+fallback arm exists for. Whether the predecessor has an open PR is a
+fact of the repository's state of record (the train the branch sits
+in), never of what your checkout happens to have fetched, so this case
+is not a `not-applicable` declaration either: fetch the predecessor
+first, or route back, rather than freeze on the arm the existence
+test's absence silently selects — that absence looks identical, at the
+existence test alone, to a genuine merge, and freezing through it is
+ruled out.
+
+Three residual cases are disclosed rather than engineered around, on
+the same footing: a predecessor branch deleted without being merged
+makes the fallback arm resolve the integration branch's tip, which is
+not the branch point — that invalidates the whole stack and is a
+route-back, not something a criterion should paper over; and a
+predecessor branch rebased, force-pushed, or squash-merged after your
+branch was cut is a route-back on the same footing rather than a case
+either arm is redesigned to survive — rebase and force-push move the
+predecessor's tip so the recorded common ancestor may no longer be an
+ancestor of it, and a squash merge instead lands the predecessor's
+changes on the integration branch as a commit sharing no SHA with any
+of its originals, so `merge-base` resolves a commit earlier than the
+real branch point even once the era-change fallback correctly fires —
+different mechanisms, the same consequence.
+
+Enforcement today is a **duty, not a checker**, on the same footing as
+the adopter-facing-documentation declaration above: at a task's first
+freeze the coordinating session reads the declaration region itself and
+refuses a spec carrying none, more than one, or one placed outside the
+declaration region. No mechanical checker ships for it yet.
+
+Alongside that declaration, every spec's freeze-time premise sweep
+classifies each literal count premise it makes about a string token's
+occurrences — especially a `= 0` premise — as `own-coinage` (a literal
+the task itself introduces) or `borrowed` (a token another document
+already coined: an invariant-lock id, a status flag, a grammar family
+name, or any other pre-existing vocabulary). This is freeze-time duty
+on the spec author: every borrowed token is enumerated in the spec's
+own `## Assumptions` section together with the measurement command
+that confirms it, and the execution-capable side runs that command
+live against the branch point's committed blob before the freeze,
+recording the measured value beside the assumption. A sweep scoped
+only to "the new literals this task introduces" is not sufficient — a
+token already carried onto the stack by a merged sibling task escapes
+it, and an unmeasured borrowed-vocabulary count premise is treated as a
+broken check line.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
