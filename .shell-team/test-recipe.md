@@ -1540,3 +1540,39 @@ that file's order.
   via `$(( 10#$v ))` bash arithmetic — never `awk`/`sort -n` (a double
   cannot hold them exactly), the same discipline T-1069/T-1071/T-1072/
   T-1073 already established.
+
+- T-1085 (recorded in round 1, before the firing itself has run — the
+  procedure is frozen and result-independent, so it does not wait for
+  round 2): the **two-arm firing venue procedure** (orchestrator-only, at
+  the Validate seam, per the same no-Agent/Task-token measurement
+  T-1073/T-1083 already established and re-confirmed for this task — all
+  nine `agents/*.md` `tools:` lines still carry no `Agent`/`Task` token).
+  Each arm (the fanned `t1085fan` arm and the single-instance serial
+  baseline) gets its **own freshly-created** `git clone --no-hardlinks`
+  under `$TMPDIR`, pinned to the same commit — never `git worktree add`
+  for either arm's venue, since a worktree registers under
+  `.git/worktrees` in the real checkout and turns cleanup into a
+  destructive step this task takes no version of. `CHECK_ACS_TIMEOUT` must
+  be **exported identically inside both arms** (a per-check cap that
+  passes serially but fires under N-way contention would change verdicts
+  between arms and void the parity comparison) and **separately** raised
+  to at least 300 when running this spec's own criteria (**AC17** runs
+  five checkers, **AC15**/**AC16** regenerate derivation blocks) — two
+  distinct roles for the same env var, do not conflate them. Both arms
+  write telemetry into the one shared, default-resolved corpus
+  (`TEAM_RUNS_DIR` unset — that corpus, the launch record and the board
+  records all stay in the **real checkout**, unlike the per-unit clones),
+  so they must be separated by a `--attempt` narrower plus disjoint
+  instance-id prefixes (`qa-*` fanned, `serial-*` baseline) or
+  `bin/check-fanout-instances.sh` refuses `missing-instance` on a scope
+  that mixes a serial round with a fanned round of the same phase. Every
+  instance Bash call needs an **explicit per-call timeout** sized above the
+  largest single-unit cost measured in the pre-arm cost pass (T-1083
+  measured `T-1044-test-infra-bundle.md` alone at ≈143 s against this
+  harness's 120 s default foreground-Bash timeout) — an implicit default is
+  not a bound a fan-out orchestration may rely on (T-1083's own
+  agent-autonomy finding). Per-instance liveness checks must be launched
+  harness-tracked-background, never a bare shell `&` (dies with the
+  launching call). 19-digit epoch-nanosecond comparisons use
+  `$(( 10#$v ))` bash arithmetic, never `awk`/`sort -n`, the same
+  discipline as every prior fan-out task above.

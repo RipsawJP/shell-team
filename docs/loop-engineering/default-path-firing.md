@@ -1,0 +1,718 @@
+# Default-path firing of `verify — tier1-fanout` — the release-gate reachability measurement (T-1085)
+
+Two-round history, stated for a reader who opens this note cold. Per `.shell-team/specs/T-1085-default-path-firing.md`'s own Goal, the fan-out mechanics sit in Validate (`skills/run/SKILL.md` step 5), strictly after Implement (step 4). Round 1 (this engineer role) shipped everything that could be written before the firing itself ran: the title, `## Terms and closed vocabularies`, `## Firing protocol (frozen before execution)` and the result-independent parts of `## Limits and what is not computable`, each a single-line placeholder standing in for `## Firing evidence (raw, orchestrator-produced)` onward. The orchestrator then fired the two arms at the Validate seam and committed the raw evidence into `## Firing evidence (raw, orchestrator-produced)` below byte-identically (evidence commit recorded on the board as `- probe-evidence-sha (T-1085):`). This round (engineer round 2, the analysis round) assembles every remaining section — `## Default-path chain and aggregation analysis` through `## Implications for the release decision`, plus the result-dependent parts of `## Supersession and follow-ups` and `## Limits and what is not computable` — strictly from that committed evidence, never from anything outside it. This two-round shape is a planned loop cycle stated in the spec's own Goal ("Why the firing sits in Validate, and the rework cycle that implies"), not a defect.
+
+## Terms and closed vocabularies
+
+**The default path, restated from the Goal.** The shipped, unmodified text of `skills/run/SKILL.md`, `templates/prompt-blocks/fanout-orchestration.md` and `templates/prompt-blocks/dispatch-record.md`, applied as written. Its links, in order: (1) `tech-lead` applies `templates/prompt-blocks/dispatch-record.md`'s precedence rule to the `verify` axis and prints the decision in its Routing Map's `### Dispatch` element; (2) the orchestrator transcribes that decision onto this task's own board entry at the Specify-to-Implement seam; (3) at step 5 the mechanics pointer at `skills/run/SKILL.md` line 85 reads the recorded `dispatch: verify` value and, finding `tier1-fanout`, routes the phase's mechanically-enumerable verification work to the shipped fan-out step; (4) that step's own mechanics run unchanged. No environment variable, CLI flag, configuration file or prompt instruction outside those three files is permitted to select the fan-out; `TEAM_FANOUT_MAX` and `CHECK_ACS_TIMEOUT` may be set and every value actually used is recorded, because the first is named inside the shipped degree rule and the second is a unit-level parameter that selects nothing.
+
+**The reading of `opt-in; no phase is rewired to use it by default`, adopted and frozen in the spec's Goal.** That parenthetical (`skills/run/SKILL.md` line 161, `templates/prompt-blocks/fanout-orchestration.md` line 1) means no phase fires the fan-out automatically, in every task, without a recorded per-task decision — never that reaching the fan-out requires a flag, switch or instruction from outside the shipped text; no such flag exists in any of the three files, and inventing one would be the departure, not the compliance. The explicit choice the sentence demands is the recorded `- dispatch: verify — tier1-fanout` sub-bullet itself. If this reading is wrong, then even a successful firing is `not-met` — the `no-out-of-band-flag` licence condition carries that judgment, and round 2's **AC7** couples it to the verdict in both directions.
+
+**The divergence from T-1084's own board record, stated because the review will attack it first.** T-1084 recorded `dispatch: verify — serial` reading `docs/loop-engineering/phase-multiplexing.md:364`'s "an orchestration step **able to** launch N agent instances and aggregate their verdicts **exist**" as "has never fired on the default path." This task adopts the **existence-capability** reading instead, for three reasons: the rule's own words are a capability test (`able to`, `exist`), and the same note's `- recommendation:` line at `:355` spells the same conjunct as a step that "can actually launch" N agent instances; the stricter reading is self-looping — firing could never be permitted until it has already fired, so the conditional branch would be unreachable by any task; and the capability is measured, not argued — T-1083's `aggregation-live` arm drove `bin/aggregate-verdicts.sh` and `bin/check-fanout-instances.sh` to exit 0 end to end against real plugin-role instances and real telemetry (`docs/loop-engineering/agent-launch-fanout.md` line 186), and precondition 1 shipped as `bin/check-fanout-instances.sh` in T-1082. T-1084's reading was a conservative choice made when nothing had fired, not an error; what this task changes is that the conjunct is now discharged by measurement rather than by argument. Both readings are recorded here, not only the one adopted.
+
+**Closed vocabularies this note's round-2 sections will populate**, borrowed rather than re-coined wherever a source already exists:
+
+- Verdict (closed, two values, exactly one recorded in `## Verdict and licence conditions`): `met` / `not-met`.
+- Chain-link ids (closed, seven, each recorded `evidenced` or `not-evidenced`, in this order): `precedence-rule-applied`, `dispatch-record-transcribed`, `step5-pointer-read`, `population-fixed`, `instances-launched`, `aggregation-reduced`, `attribution-verified`.
+- Licence-condition ids (closed, six, each recorded `met` or `not-met`): `shipped-text-unmodified`, `no-out-of-band-flag`, `real-plugin-role-instances`, `genuine-overlap`, `real-population`, `production-unit`.
+- Arm ids (closed, exactly two): `t1085fan` (the fanned arm, the only one that writes a launch record) and a serial baseline arm (single-instance, same population, same pinned commit, writes no launch record of its own but is reduced under its own label so the two `verdict-region` regions stay comparable).
+- Launch-record grammar (closed, borrowed verbatim from `templates/prompt-blocks/fanout-orchestration.md` and its `skills/run/SKILL.md` mirror, first exercised end to end by T-1083 and quoted in `docs/loop-engineering/agent-launch-fanout.md`): `launch-record 1` / `- population:` / `- requested-n:` / `- achieved-n:` / `- cap-ground:` / `- assign:` / `- liveness:` / `- launched-epoch:` / `- completed-epoch:` / `launch-record-end`.
+- Part-file grammar (closed, three shapes, borrowed verbatim from `bin/aggregate-verdicts.sh`'s own header): `- unit: <unit-id>`, `- verdict: <unit-id> — <payload>`, `- sentinel: <unit-id> — exit=<n> no-verdict-lines`. A `- unit:` line is a claim independent of whether the unit produced output.
+- Derivation-block grammar (closed, borrowed verbatim from `bin/derive-populations.sh`): a `<!-- BEGIN derivation: <label> -->` / `<!-- END derivation: <label> -->` marker pair, each paired with its own `- reproduce:` line that regenerates it byte-identically.
+- Dispatch-record grammar (closed, borrowed verbatim from `templates/prompt-blocks/dispatch-record.md`, already instantiated twice on this task's own board entry before this note existed): `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>`.
+
+## Firing protocol (frozen before execution)
+
+Restated from `.shell-team/specs/T-1085-default-path-firing.md`'s frozen `<!-- BEGIN firing-protocol: T-1085 -->` … `<!-- END firing-protocol: T-1085 -->` region — a faithful restatement, paragraph by paragraph and unmodified, for a reader who has not opened the spec, never a re-derivation of the protocol's own design choices.
+
+**The unit and the population.** The unit is `bash bin/check-acs.sh <spec>` — this repository's own acceptance-criteria gate, unchanged, one run per file. The population is **every `.md` file the resolved specs directory (`bin/team-paths.sh --get specs`) holds** at the pinned commit, with **no name-based filtering**. Non-spec `.md` files are included rather than excluded, on three grounds: the shipped step requires a *mechanically enumerable* population, and a name-based exclusion is an authoring judgment made after seeing the list; the unit is **the run, never its verdict**, so a file with no acceptance criteria is a legitimate unit whose result is an absence; and `bin/aggregate-verdicts.sh`'s own header names `design-note-T-1012.md` by name as the pilot's real instance that recorded `SENTINEL: exit=2 no-verdict-lines` identically across ten arm/rep runs — the `- sentinel:` line exists precisely so that unit is a datum rather than a gap. The population is written to a population file **before any instance is launched** and is never re-selected after a verdict is seen. Its per-file costs are measured singly, before any arm runs, so the largest single-unit cost is known before the per-call timeouts are chosen.
+
+**The subject is this task's own owed work, not a synthetic errand.** The population is the head-side half of this task's own `mechanism`-class full-population blast-radius sweep — work this task owes regardless of how it is executed, which is what makes it the least synthetic subject available. The base-side half of that sweep is ordinary serial blast-radius work, is **not** part of the fan-out, and is run separately.
+
+**Venue, and the boundary the venue does not cross.** Every unit executes inside a throwaway `git clone --no-hardlinks` under `$TMPDIR`, checked out detached at one pinned commit. `git worktree add` is **never** used for a venue, because a worktree registers under `.git/worktrees` in the real checkout and turns cleanup into a destructive step this task takes no version of. Each arm gets its **own freshly-created clone of the same pinned commit**, so neither arm inherits the other's telemetry side effects — the specific artefact class T-1082's, T-1083's and T-1084's own Blast radius sections each disclosed, where a criterion reading the machine-local telemetry corpus flips because an earlier sweep grew it. Each instance runs under its own `TMPDIR` subdirectory, recorded. The shipped fan-out step fixes the population, the degree, the liveness, the assignment and the reduction; it fixes **no execution venue for a unit**, so pinning the unit venue is a choice the shipped text permits rather than a departure from it. What does **not** move into a clone: the decision, the board's dispatch records, the launch record, the telemetry and the aggregation all run in the **real checkout's shipped paths**, with the runs directory resolved by default (`TEAM_RUNS_DIR` unset) — because those are the default path, and redirecting them would be the departure.
+
+**Degree and baseline.** `N = min(<unit count>, cap)`, with `cap` from `TEAM_FANOUT_MAX` when it is set to a positive integer, otherwise the host's own measured core count, otherwise 2 — the shipped rule, unchanged, with N and the cap's ground recorded on the launch record's own `- requested-n:` and `- cap-ground:` lines. The baseline is a **single-instance** run of the **same** population, in the **same session**, in a second clone pinned to the **same** commit, with the **same** `CHECK_ACS_TIMEOUT` value exported in both arms and recorded — a per-check cap that passes serially and fires under N-way contention would otherwise change verdicts between arms and make the parity comparison meaningless. Execution order and cache warmth are recorded. **No repetitions and no inferential statistics**: one execution per arm, spread disclosed descriptively or not at all, no significance test, confidence interval, variance model or regression anywhere in the note. The baseline arm is not itself a fan-out and writes **no launch record**; its single part file is nonetheless reduced by `bin/aggregate-verdicts.sh` under its own label, purely so the two arms produce comparable `verdict-region` regions.
+
+**The aggregation-safety comparison.** `bin/aggregate-verdicts.sh`'s own header states that the nested `verdict-region` "must stay byte-identical under every disjoint, exhaustive partition of the same population … that property is what licenses reducing N partial verdicts to one authoritative verdict at all". The two arms are exactly two such partitions of one population, so the comparison is that byte-identity, recorded on one `- verdict-region-parity: identical|differs — <text>` line. A difference is **enumerated and diagnosed, never glossed**: each differing key gets its own `- parity-exception: <key> — <cause> — <isolation-re-run result>` line, re-run alone and contention-free before its cause is named. A parity difference is a disclosed finding about the measurement, **not** a `not-met` verdict — the verdict answers whether the default path fired, not whether two runs of a timing-sensitive checker agreed.
+
+**Part-file grammar.** Each instance writes one part file in `bin/aggregate-verdicts.sh`'s own three-shape grammar: one `- unit: <spec-path>` claim per assigned unit; one `- verdict: <spec-path> — rc=<n>; <the check-acs summary line>` per unit whose run produced a summary; and one `- sentinel: <spec-path> — exit=<n> no-verdict-lines` for a claimed unit whose run produced none. One verdict line per unit rather than one per acceptance criterion, deliberately: the per-criterion key set is what the blast-radius reconciliation needs and it is preserved in each instance's own raw outputs, whereas the aggregation block is the note's durable quoted evidence and a per-criterion block would run to thousands of lines.
+
+**Hazards, measured rather than assumed.** A sub-agent's default foreground Bash timeout is **120 s** (`skills/run/SKILL.md` line 166) while a single measured unit in this corpus has cost ≈143 s (`docs/loop-engineering/phase-multiplexing.md` line 371, `T-1044-test-infra-bundle.md` alone at 142965525000 ns), so **every Bash call an instance makes carries an explicit per-call timeout**, sized above the largest single-unit cost from the pre-arm cost pass, and the value used is recorded. A watchdog launched with a bare shell `&` inside a foreground Bash call dies with that call, so **every** per-instance liveness check is launched harness-tracked-background, one per instance, started at the moment that instance is launched, with its command recorded verbatim.
+
+**Telemetry scope separation.** Both arms emit orchestrator-written span rows into the same default-resolved telemetry corpus, so the two are separated by the `--attempt` narrower and by disjoint instance-id prefixes (`qa-*` for the fanned arm, `serial-*` for the baseline). `bin/check-fanout-instances.sh` is run for the fanned arm's scope with that narrower, per its own help text's warning that a scope mixing a serial round with a fanned round of the same phase refuses `missing-instance`.
+
+**The verdict.** Exactly one `- default-reachability: met|not-met — <ground>` line in the whole note. It reads `met` when all **seven** chain links read `evidenced` and all **six** licence conditions read `met`, and `not-met` otherwise — both directions, with no third value and no hedge. Chain links, in order: `precedence-rule-applied`, `dispatch-record-transcribed`, `step5-pointer-read`, `population-fixed`, `instances-launched`, `aggregation-reduced`, `attribution-verified`. Licence conditions: `shipped-text-unmodified`, `no-out-of-band-flag`, `real-plugin-role-instances` (N ≥ 2, the `subagent_type` recorded verbatim as a declared label), `genuine-overlap` (a non-empty intersection window re-derivable from the recorded timestamps, with its margin against the maximum single launch latency stated), `real-population`, `production-unit`. A `not-met` verdict carries exactly one `- not-met-ground: chain|licence — <text>` line, and when that reads `chain`, exactly one `- blocked-at: <chain-link-id> — <text>` line naming the first link that failed.
+
+**The claim ceiling, fixed before the measurement.** **43.84%** is `docs/loop-engineering/phase-multiplexing.md`'s pilot figure over a 9-file stride subset at swept degrees on one machine. It is **not** this task's claim and is never restated here as one: every line in the note mentioning it also names `phase-multiplexing.md` at the point of mention. Whatever this task measures is reported honestly, in either direction. **A small saving is still `met`. A negative saving is still `met`. Only a failed firing is `not-met`** — the release gate asks whether the shipped default path can be reached, not whether it was fast. The knee is **not** measured here: one degree is run, so the plateau point stays `undetermined` whatever the population.
+
+**A `not-met` verdict is the approved fallback and is never papered over.** `met` licenses the sprint's planned minor release; `not-met` licenses merge-only, with the note recording which link or condition failed and what would settle it. The note states the consequence of **both** values on its own `- release-consequence: met — <text>` and `- release-consequence: not-met — <text>` lines, written before the result is known, and the `not-met` line names merge-only explicitly. Unlike T-1083, a negative result here does **not** stop the task: the note ships, the criteria are claimed, and the deliverable is the honest record. Every criterion below is written to be satisfiable under both verdicts, and each evidence-heavy criterion is conditioned on **its own chain link's recorded value** rather than on the global verdict, so a `not-met` outcome can never be used to dodge evidence for a link that did in fact complete.
+
+**Subagent type stays a declared label.** `docs/loop-engineering/agent-launch-fanout.md` line 247 records `subagent_type` as the orchestrator's own launch parameter — a declared label, explicitly not harness-originated evidence of the resolved type, with the counterfactual stated. This task records the value verbatim on the same footing and **does not upgrade that claim**; nothing here is evidence that the declaration is true, and the note says so.
+
+**Prose quotes a grammar mid-line, never at line start.** Every criterion in the spec that counts a record prefix — `- default-reachability:`, `- chain-link:`, `- licence-condition:`, `- checker-result:`, `- liveness:`, `- saving:` and the rest — counts real records, and a grammar *restatement* opening a line with the same prefix would be indistinguishable from one. So: wherever this note's own prose wants to name one of these grammars, it quotes it **mid-line**, inside backticks, and never as the first non-space characters of a line. This is the shipped idiom `templates/prompt-blocks/dispatch-record.md` already states for exactly this hazard on the board, reused verbatim in shape with only the governed prefixes changed. The same reason applies to quoting another document's records: a line from `docs/loop-engineering/phase-multiplexing.md` such as its own `saving:` or `recommendation:` line is quoted mid-line here too, never reproduced at line start. Round 1's own text observed the rule by construction, writing no `- chain-link:`, `- licence-condition:`, `- default-reachability:`, `- arm-wall-clock:`, `- saving-direction:`, `- release-consequence:` or `- blocked-at:` line at all, because that evidence did not exist yet. Round 2's own analysis sections below now write those lines as real records — the same closed grammars, populated from the committed evidence rather than restated as prose.
+
+**Pre-commitment (AI self-discipline — self-imposed by this loop at freeze time, never operator-ratified; any report citing it says so).** Factual trigger: two consecutive review rounds landing an independent Blocker or Major against the same component. Contextual trigger: before a third round of rework on that component starts; where the two disagree, the factual trigger governs. **Second, independent trigger**: the serial baseline arm's own wall clock exceeding **90 minutes**. Disposition, decided here rather than when it fires — there is exactly **one** droppable component, and everything else in this task is the firing chain or its evidence: drop **the full-corpus population**, replacing it with a subset selected by a fixed stride, deterministically and **before any verdict is read**, both arms re-run on the shrunk population, and issue #277's full-corpus follow-up (`phase-multiplexing.md` line 370) recorded as still owed. A deviation from the mandate's phrasing, stated rather than glossed: what that drop actually costs is the **full-corpus scale of the saving figure**, not the knee — the knee is `undetermined` in this task either way, because one degree is run. **Never dropped**: the firing chain itself — the dispatch record, the launch record, N real instances, the aggregation, `bin/check-fanout-instances.sh` green, and the same-population serial comparison. Defeated twice on any of those, the task **stops and returns to planning** rather than being patched a third time; there is no carve-out to execute for a never-dropped component. **Invalid-evidence rule**: at most **one** re-firing, recorded with the round and the reason that invalidated the first; a second invalidation stops the task.
+
+**Constants recorded now, independent of the firing's own result** (unlike the sections above, these three lines follow the note's own shipped record grammar rather than restating the spec's prose, because round 2's **AC14** checks them unconditionally on any chain-link value):
+
+- claim-ceiling: 43.84% is `docs/loop-engineering/phase-multiplexing.md`'s own pilot figure over a 9-file stride subset at swept degrees on one machine, cited here only as the ceiling this task's own measurement is checked against — it is never restated as this task's own claim, and every mention of it in this note also names `phase-multiplexing.md` on the same line.
+- agent-type: `subagent_type` and the launched model, now that the firing evidence has landed, are recorded verbatim as a declared label — `## Firing evidence` above states plainly that `subagent_type` was `shell-team:qa-verifier` for all nine launches (the eight fanned instances plus the serial baseline), and every telemetry span row quoted there records `"model":"sonnet"` — the same epistemic footing `docs/loop-engineering/agent-launch-fanout.md:247` already established for T-1083's own instances — never independently-observed evidence of the resolved type; this task does not upgrade that claim.
+
+## Firing evidence (raw, orchestrator-produced)
+
+The firing ran on 2026-08-20, orchestrator-produced, in this order: the fanned arm first, the serial baseline second, on an otherwise warm machine (the pre-arm cost pass had just completed), so the serial arm ran cache-warm relative to a cold start — execution order and warmth are stated here because the protocol requires them recorded, not corrected for. Pinned commit for every venue: `09cdf36d0f9fb10875b4e65a0b0f5e78057c26b5`. Each arm ran in its own freshly-created `git clone --no-hardlinks` under `$TMPDIR`, checked out detached at that commit; `git worktree add` was used for no venue. The decision, the board records, this launch record, the telemetry and both aggregations ran in the real checkout's shipped paths with `TEAM_RUNS_DIR` unset. Clock source: `/bin/date +%s%N`, verified expanding to a 19-digit integer on this host before use. `CHECK_ACS_TIMEOUT=300` was exported identically inside both arms. Every Bash call an instance made carried an explicit 600000 ms timeout, sized above the pre-arm cost pass's largest measured single-unit cost (435.8 s, `T-1050-check-layer-fast-follow.md`; the pass measured all 90 units singly, 53.5 min total).
+
+Five disclosures, stated rather than glossed. (1) The `- launched-epoch:` value below was stamped at the orchestrator's first opportunity after the launch message returned; the instances' own first per-unit timestamps precede it by up to ~49 s, so the per-instance `agent-timestamp` lines below, not that audit-only field, are the overlap derivation's inputs. (2) Two units exceeded the 600 s foreground window under 8-way contention (`T-1040` on qa-2, `T-1050` on qa-3) and were moved by the harness to tracked background continuations that completed and wrote their part lines — a per-call timeout sized above the largest *uncontended* single-unit cost did not absorb contention inflation. (3) On qa-3 the orchestrator, wrongly presuming the backgrounded first attempt had written nothing, ordered one re-run; the first attempt then surfaced as completed, leaving a duplicate claim for `T-1050`. Resolved by deduplication before aggregation: the first attempt's pair was removed and the re-run's kept (both recorded rc=1; the two attempts' timestamps both remain in the raw outputs; the pre-correction part file is preserved unmodified alongside the raw outputs). (4) The removed pair's payload also carried an extraction defect — `grep` classified that unit's log as binary and emitted its match notice instead of the summary line; the kept pair extracted the true summary, the class was swept across all eight part files (exactly one carrier), and the serial arm's runner used text-mode extraction (`grep -a`) from the start. (5) One heartbeat per instance is quoted below, selected as that instance's earliest beat falling strictly inside the re-derived window; the watchers recorded 427 beats in total across the fanned arm, all preserved in the raw outputs.
+
+<!-- BEGIN launch-record: t1085fan -->
+launch-record 1
+- population: .shell-team/runs/fanout-t1085fan.population
+- requested-n: 8
+- achieved-n: 8
+- cap-ground: measured-cores=8
+- assign: qa-1 — .shell-team/specs/T-1000-operating-conventions.md
+- assign: qa-1 — .shell-team/specs/T-1008-lessons-corpus-import.md
+- assign: qa-1 — .shell-team/specs/T-1016-close-out-entry-boundary.md
+- assign: qa-1 — .shell-team/specs/T-1023-block-size-deferral-record.md
+- assign: qa-1 — .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+- assign: qa-1 — .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+- assign: qa-1 — .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+- assign: qa-1 — .shell-team/specs/T-1056-loop-liveness.md
+- assign: qa-1 — .shell-team/specs/T-1064-shipped-docs-accuracy.md
+- assign: qa-1 — .shell-team/specs/T-1072-telemetry-span-discriminator.md
+- assign: qa-1 — .shell-team/specs/T-1080-depth-axis-contract.md
+- assign: qa-1 — .shell-team/specs/T-113-lessons-deidentification.md
+- assign: qa-2 — .shell-team/specs/T-1001-retro-input-acquisition.md
+- assign: qa-2 — .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+- assign: qa-2 — .shell-team/specs/T-1017-close-out-interventions-gate.md
+- assign: qa-2 — .shell-team/specs/T-1024-check-line-mktemp-guard.md
+- assign: qa-2 — .shell-team/specs/T-1032-audit-prose-accuracy.md
+- assign: qa-2 — .shell-team/specs/T-1040-frozen-repair-batch.md
+- assign: qa-2 — .shell-team/specs/T-1048-handoff-durability-barrier.md
+- assign: qa-2 — .shell-team/specs/T-1057-loop-integration.md
+- assign: qa-2 — .shell-team/specs/T-1065-task-class-verification-pricing.md
+- assign: qa-2 — .shell-team/specs/T-1073-harness-agent-concurrency.md
+- assign: qa-2 — .shell-team/specs/T-1081-freeze-sweep-hardening.md
+- assign: qa-2 — .shell-team/specs/design-note-T-1012.md
+- assign: qa-3 — .shell-team/specs/T-1002-intervention-capture-channel.md
+- assign: qa-3 — .shell-team/specs/T-1010-operator-language-boundary.md
+- assign: qa-3 — .shell-team/specs/T-1018-freeze-attestation-gate.md
+- assign: qa-3 — .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+- assign: qa-3 — .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+- assign: qa-3 — .shell-team/specs/T-1041-freeze-ux.md
+- assign: qa-3 — .shell-team/specs/T-1050-check-layer-fast-follow.md
+- assign: qa-3 — .shell-team/specs/T-1058-telemetry-binding.md
+- assign: qa-3 — .shell-team/specs/T-1066-effort-time-telemetry.md
+- assign: qa-3 — .shell-team/specs/T-1074-fanout-orchestration.md
+- assign: qa-3 — .shell-team/specs/T-1082-telemetry-discriminator.md
+- assign: qa-4 — .shell-team/specs/T-1003-retro-reads-interventions.md
+- assign: qa-4 — .shell-team/specs/T-1011-telemetry-event-rows.md
+- assign: qa-4 — .shell-team/specs/T-1019-is-span-row-parity.md
+- assign: qa-4 — .shell-team/specs/T-1026-skill-md-doc-completeness.md
+- assign: qa-4 — .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+- assign: qa-4 — .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+- assign: qa-4 — .shell-team/specs/T-1051-inspection-ux-polish.md
+- assign: qa-4 — .shell-team/specs/T-1059-docs-release-notes.md
+- assign: qa-4 — .shell-team/specs/T-1067-context-lifecycle.md
+- assign: qa-4 — .shell-team/specs/T-1075-fanout-adoption-versioning.md
+- assign: qa-4 — .shell-team/specs/T-1083-agent-launch-fanout.md
+- assign: qa-5 — .shell-team/specs/T-1004-optin-hook-sample.md
+- assign: qa-5 — .shell-team/specs/T-1012-loop-replay-generator.md
+- assign: qa-5 — .shell-team/specs/T-1020-lessons-supersede-sweep.md
+- assign: qa-5 — .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+- assign: qa-5 — .shell-team/specs/T-1035-spec-template-staleness-locks.md
+- assign: qa-5 — .shell-team/specs/T-1043-pm-spec-check-conventions.md
+- assign: qa-5 — .shell-team/specs/T-1052-records-editorial.md
+- assign: qa-5 — .shell-team/specs/T-1060-adopter-binding-docs.md
+- assign: qa-5 — .shell-team/specs/T-1068-agent-concurrency.md
+- assign: qa-5 — .shell-team/specs/T-1076-log-run-locking.md
+- assign: qa-5 — .shell-team/specs/T-1084-dispatch-routing-record.md
+- assign: qa-6 — .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+- assign: qa-6 — .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+- assign: qa-6 — .shell-team/specs/T-1020-supersede-adjudication.md
+- assign: qa-6 — .shell-team/specs/T-1028-class-m-refreeze.md
+- assign: qa-6 — .shell-team/specs/T-1036-wording-batch-141-143-144.md
+- assign: qa-6 — .shell-team/specs/T-1044-test-infra-bundle.md
+- assign: qa-6 — .shell-team/specs/T-1053-retro-mechanization.md
+- assign: qa-6 — .shell-team/specs/T-1061-adopter-docs-gate.md
+- assign: qa-6 — .shell-team/specs/T-1069-phase-multiplexing.md
+- assign: qa-6 — .shell-team/specs/T-1077-worktree-reconcile.md
+- assign: qa-6 — .shell-team/specs/T-1085-default-path-firing.md
+- assign: qa-7 — .shell-team/specs/T-1006-lessons-resolver-key.md
+- assign: qa-7 — .shell-team/specs/T-1014-flag-rail-data-path.md
+- assign: qa-7 — .shell-team/specs/T-1021-arith-base10-audit.md
+- assign: qa-7 — .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+- assign: qa-7 — .shell-team/specs/T-1037-checker-retro-precision.md
+- assign: qa-7 — .shell-team/specs/T-1045-codex-version-provenance.md
+- assign: qa-7 — .shell-team/specs/T-1054-binding-config.md
+- assign: qa-7 — .shell-team/specs/T-1062-release-notes-compare-link.md
+- assign: qa-7 — .shell-team/specs/T-1070-check-handoff-scaling.md
+- assign: qa-7 — .shell-team/specs/T-1078-tier3-pilot.md
+- assign: qa-7 — .shell-team/specs/T-111-pii-shape-checker.md
+- assign: qa-8 — .shell-team/specs/T-1007-scope-typed-ledger.md
+- assign: qa-8 — .shell-team/specs/T-1015-cutting-a-release.md
+- assign: qa-8 — .shell-team/specs/T-1022-close-out-gate-symmetry.md
+- assign: qa-8 — .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+- assign: qa-8 — .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+- assign: qa-8 — .shell-team/specs/T-1046-ignored-base-verdict.md
+- assign: qa-8 — .shell-team/specs/T-1055-adapter-envelope.md
+- assign: qa-8 — .shell-team/specs/T-1063-editorial-batch.md
+- assign: qa-8 — .shell-team/specs/T-1071-record-set-derivation.md
+- assign: qa-8 — .shell-team/specs/T-1079-tier2-judge.md
+- assign: qa-8 — .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+- liveness: qa-1 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-1
+- liveness: qa-2 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-2
+- liveness: qa-3 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-3
+- liveness: qa-4 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-4
+- liveness: qa-5 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-5
+- liveness: qa-6 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-6
+- liveness: qa-7 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-7
+- liveness: qa-8 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-8
+- launched-epoch: 1787185735135713000
+- completed-epoch: 1787187556288212000
+launch-record-end
+<!-- END launch-record: t1085fan -->
+
+<!-- BEGIN fanout-verdict: t1085fan -->
+- aggregated-by: bin/aggregate-verdicts.sh
+- locale: LC_ALL=C
+- part: qa-1 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-1.txt
+- part: qa-2 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-2.txt
+- part: qa-3 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-3.txt
+- part: qa-4 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-4.txt
+- part: qa-5 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-5.txt
+- part: qa-6 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-6.txt
+- part: qa-7 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-7.txt
+- part: qa-8 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-8.txt
+<!-- BEGIN verdict-region: t1085fan -->
+- summary: units: 90 — verdicts: 88 — sentinels: 2
+- sentinel: .shell-team/specs/T-1020-supersede-adjudication.md — exit=2 no-verdict-lines
+- sentinel: .shell-team/specs/design-note-T-1012.md — exit=2 no-verdict-lines
+- verdict: .shell-team/specs/T-1000-operating-conventions.md — rc=1; check-acs: 16 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1000-operating-conventions.md)
+- verdict: .shell-team/specs/T-1001-retro-input-acquisition.md — rc=1; check-acs: 18 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1001-retro-input-acquisition.md)
+- verdict: .shell-team/specs/T-1002-intervention-capture-channel.md — rc=1; check-acs: 23 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1002-intervention-capture-channel.md)
+- verdict: .shell-team/specs/T-1003-retro-reads-interventions.md — rc=1; check-acs: 19 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1003-retro-reads-interventions.md)
+- verdict: .shell-team/specs/T-1004-optin-hook-sample.md — rc=1; check-acs: 15 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1004-optin-hook-sample.md)
+- verdict: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — rc=1; check-acs: 9 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md)
+- verdict: .shell-team/specs/T-1006-lessons-resolver-key.md — rc=1; check-acs: 15 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1006-lessons-resolver-key.md)
+- verdict: .shell-team/specs/T-1007-scope-typed-ledger.md — rc=1; check-acs: 14 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1007-scope-typed-ledger.md)
+- verdict: .shell-team/specs/T-1008-lessons-corpus-import.md — rc=1; check-acs: 18 passed, 7 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1008-lessons-corpus-import.md)
+- verdict: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — rc=1; check-acs: 12 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md)
+- verdict: .shell-team/specs/T-1010-operator-language-boundary.md — rc=1; check-acs: 25 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1010-operator-language-boundary.md)
+- verdict: .shell-team/specs/T-1011-telemetry-event-rows.md — rc=1; check-acs: 30 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1011-telemetry-event-rows.md)
+- verdict: .shell-team/specs/T-1012-loop-replay-generator.md — rc=1; check-acs: 25 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1012-loop-replay-generator.md)
+- verdict: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — rc=1; check-acs: 10 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1013-loop-replay-docs-wiring.md)
+- verdict: .shell-team/specs/T-1014-flag-rail-data-path.md — rc=1; check-acs: 14 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1014-flag-rail-data-path.md)
+- verdict: .shell-team/specs/T-1015-cutting-a-release.md — rc=1; check-acs: 6 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1015-cutting-a-release.md)
+- verdict: .shell-team/specs/T-1016-close-out-entry-boundary.md — rc=1; check-acs: 9 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1016-close-out-entry-boundary.md)
+- verdict: .shell-team/specs/T-1017-close-out-interventions-gate.md — rc=1; check-acs: 15 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1017-close-out-interventions-gate.md)
+- verdict: .shell-team/specs/T-1018-freeze-attestation-gate.md — rc=1; check-acs: 20 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1018-freeze-attestation-gate.md)
+- verdict: .shell-team/specs/T-1019-is-span-row-parity.md — rc=1; check-acs: 11 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1019-is-span-row-parity.md)
+- verdict: .shell-team/specs/T-1020-lessons-supersede-sweep.md — rc=1; check-acs: 5 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1020-lessons-supersede-sweep.md)
+- verdict: .shell-team/specs/T-1021-arith-base10-audit.md — rc=1; check-acs: 17 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1021-arith-base10-audit.md)
+- verdict: .shell-team/specs/T-1022-close-out-gate-symmetry.md — rc=1; check-acs: 15 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1022-close-out-gate-symmetry.md)
+- verdict: .shell-team/specs/T-1023-block-size-deferral-record.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1023-block-size-deferral-record.md)
+- verdict: .shell-team/specs/T-1024-check-line-mktemp-guard.md — rc=1; check-acs: 6 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1024-check-line-mktemp-guard.md)
+- verdict: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — rc=1; check-acs: 5 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1025-assert-parity-dead-comparison.md)
+- verdict: .shell-team/specs/T-1026-skill-md-doc-completeness.md — rc=1; check-acs: 4 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1026-skill-md-doc-completeness.md)
+- verdict: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — rc=1; check-acs: 8 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1027-promote-retro-2026-08-04.md)
+- verdict: .shell-team/specs/T-1028-class-m-refreeze.md — rc=1; check-acs: 12 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1028-class-m-refreeze.md)
+- verdict: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — rc=1; check-acs: 7 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1029-claim-fidelity-qa-step.md)
+- verdict: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — rc=1; check-acs: 8 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1030-reviewer-board-write-boundary.md)
+- verdict: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — rc=1; check-acs: 13 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1031-check-handoff-flag-anchor.md)
+- verdict: .shell-team/specs/T-1032-audit-prose-accuracy.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1032-audit-prose-accuracy.md)
+- verdict: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — rc=1; check-acs: 7 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1033-promote-retro-2026-08-05.md)
+- verdict: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1034-refreeze-hardening-execbit.md)
+- verdict: .shell-team/specs/T-1035-spec-template-staleness-locks.md — rc=1; check-acs: 3 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1035-spec-template-staleness-locks.md)
+- verdict: .shell-team/specs/T-1036-wording-batch-141-143-144.md — rc=1; check-acs: 10 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1036-wording-batch-141-143-144.md)
+- verdict: .shell-team/specs/T-1037-checker-retro-precision.md — rc=1; check-acs: 9 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1037-checker-retro-precision.md)
+- verdict: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — rc=1; check-acs: 12 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1038-errexit-safe-pin-keying.md)
+- verdict: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — rc=1; check-acs: 6 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1039-promote-retro-2026-08-06.md)
+- verdict: .shell-team/specs/T-1040-frozen-repair-batch.md — rc=1; check-acs: 14 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1040-frozen-repair-batch.md)
+- verdict: .shell-team/specs/T-1041-freeze-ux.md — rc=1; check-acs: 18 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1041-freeze-ux.md)
+- verdict: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — rc=1; check-acs: 12 passed, 1 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1042-ignored-base-and-retro-ledger.md)
+- verdict: .shell-team/specs/T-1043-pm-spec-check-conventions.md — rc=1; check-acs: 8 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1043-pm-spec-check-conventions.md)
+- verdict: .shell-team/specs/T-1044-test-infra-bundle.md — rc=1; check-acs: 10 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1044-test-infra-bundle.md)
+- verdict: .shell-team/specs/T-1045-codex-version-provenance.md — rc=1; check-acs: 5 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1045-codex-version-provenance.md)
+- verdict: .shell-team/specs/T-1046-ignored-base-verdict.md — rc=1; check-acs: 9 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1046-ignored-base-verdict.md)
+- verdict: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — rc=1; check-acs: 6 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1047-promote-retro-2026-08-08.md)
+- verdict: .shell-team/specs/T-1048-handoff-durability-barrier.md — rc=1; check-acs: 15 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1048-handoff-durability-barrier.md)
+- verdict: .shell-team/specs/T-1050-check-layer-fast-follow.md — rc=1; check-acs: 9 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1050-check-layer-fast-follow.md)
+- verdict: .shell-team/specs/T-1051-inspection-ux-polish.md — rc=1; check-acs: 12 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1051-inspection-ux-polish.md)
+- verdict: .shell-team/specs/T-1052-records-editorial.md — rc=1; check-acs: 9 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1052-records-editorial.md)
+- verdict: .shell-team/specs/T-1053-retro-mechanization.md — rc=1; check-acs: 0 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1053-retro-mechanization.md)
+- verdict: .shell-team/specs/T-1054-binding-config.md — rc=1; check-acs: 11 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1054-binding-config.md)
+- verdict: .shell-team/specs/T-1055-adapter-envelope.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1055-adapter-envelope.md)
+- verdict: .shell-team/specs/T-1056-loop-liveness.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1056-loop-liveness.md)
+- verdict: .shell-team/specs/T-1057-loop-integration.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1057-loop-integration.md)
+- verdict: .shell-team/specs/T-1058-telemetry-binding.md — rc=1; check-acs: 5 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1058-telemetry-binding.md)
+- verdict: .shell-team/specs/T-1059-docs-release-notes.md — rc=1; check-acs: 3 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1059-docs-release-notes.md)
+- verdict: .shell-team/specs/T-1060-adopter-binding-docs.md — rc=1; check-acs: 5 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1060-adopter-binding-docs.md)
+- verdict: .shell-team/specs/T-1061-adopter-docs-gate.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1061-adopter-docs-gate.md)
+- verdict: .shell-team/specs/T-1062-release-notes-compare-link.md — rc=1; check-acs: 2 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1062-release-notes-compare-link.md)
+- verdict: .shell-team/specs/T-1063-editorial-batch.md — rc=1; check-acs: 0 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1063-editorial-batch.md)
+- verdict: .shell-team/specs/T-1064-shipped-docs-accuracy.md — rc=1; check-acs: 0 passed, 11 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1064-shipped-docs-accuracy.md)
+- verdict: .shell-team/specs/T-1065-task-class-verification-pricing.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1065-task-class-verification-pricing.md)
+- verdict: .shell-team/specs/T-1066-effort-time-telemetry.md — rc=1; check-acs: 5 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1066-effort-time-telemetry.md)
+- verdict: .shell-team/specs/T-1067-context-lifecycle.md — rc=1; check-acs: 6 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1067-context-lifecycle.md)
+- verdict: .shell-team/specs/T-1068-agent-concurrency.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1068-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1069-phase-multiplexing.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1069-phase-multiplexing.md)
+- verdict: .shell-team/specs/T-1070-check-handoff-scaling.md — rc=1; check-acs: 5 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1070-check-handoff-scaling.md)
+- verdict: .shell-team/specs/T-1071-record-set-derivation.md — rc=1; check-acs: 8 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1071-record-set-derivation.md)
+- verdict: .shell-team/specs/T-1072-telemetry-span-discriminator.md — rc=1; check-acs: 8 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1072-telemetry-span-discriminator.md)
+- verdict: .shell-team/specs/T-1073-harness-agent-concurrency.md — rc=1; check-acs: 10 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1073-harness-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1074-fanout-orchestration.md — rc=1; check-acs: 13 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1074-fanout-orchestration.md)
+- verdict: .shell-team/specs/T-1075-fanout-adoption-versioning.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1075-fanout-adoption-versioning.md)
+- verdict: .shell-team/specs/T-1076-log-run-locking.md — rc=1; check-acs: 11 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1076-log-run-locking.md)
+- verdict: .shell-team/specs/T-1077-worktree-reconcile.md — rc=1; check-acs: 8 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1077-worktree-reconcile.md)
+- verdict: .shell-team/specs/T-1078-tier3-pilot.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1078-tier3-pilot.md)
+- verdict: .shell-team/specs/T-1079-tier2-judge.md — rc=1; check-acs: 6 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1079-tier2-judge.md)
+- verdict: .shell-team/specs/T-1080-depth-axis-contract.md — rc=1; check-acs: 3 passed, 15 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1080-depth-axis-contract.md)
+- verdict: .shell-team/specs/T-1081-freeze-sweep-hardening.md — rc=1; check-acs: 11 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1081-freeze-sweep-hardening.md)
+- verdict: .shell-team/specs/T-1082-telemetry-discriminator.md — rc=1; check-acs: 10 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1082-telemetry-discriminator.md)
+- verdict: .shell-team/specs/T-1083-agent-launch-fanout.md — rc=1; check-acs: 13 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1083-agent-launch-fanout.md)
+- verdict: .shell-team/specs/T-1084-dispatch-routing-record.md — rc=1; check-acs: 7 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1084-dispatch-routing-record.md)
+- verdict: .shell-team/specs/T-1085-default-path-firing.md — rc=1; check-acs: 2 passed, 16 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1085-default-path-firing.md)
+- verdict: .shell-team/specs/T-111-pii-shape-checker.md — rc=1; check-acs: 27 passed, 2 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-111-pii-shape-checker.md)
+- verdict: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — rc=1; check-acs: 22 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-112-commit-identity-and-ignore-lock.md)
+- verdict: .shell-team/specs/T-113-lessons-deidentification.md — rc=1; check-acs: 8 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-113-lessons-deidentification.md)
+<!-- END verdict-region: t1085fan -->
+- attribution: .shell-team/specs/T-1000-operating-conventions.md — qa-1
+- attribution: .shell-team/specs/T-1001-retro-input-acquisition.md — qa-2
+- attribution: .shell-team/specs/T-1002-intervention-capture-channel.md — qa-3
+- attribution: .shell-team/specs/T-1003-retro-reads-interventions.md — qa-4
+- attribution: .shell-team/specs/T-1004-optin-hook-sample.md — qa-5
+- attribution: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — qa-6
+- attribution: .shell-team/specs/T-1006-lessons-resolver-key.md — qa-7
+- attribution: .shell-team/specs/T-1007-scope-typed-ledger.md — qa-8
+- attribution: .shell-team/specs/T-1008-lessons-corpus-import.md — qa-1
+- attribution: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — qa-2
+- attribution: .shell-team/specs/T-1010-operator-language-boundary.md — qa-3
+- attribution: .shell-team/specs/T-1011-telemetry-event-rows.md — qa-4
+- attribution: .shell-team/specs/T-1012-loop-replay-generator.md — qa-5
+- attribution: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — qa-6
+- attribution: .shell-team/specs/T-1014-flag-rail-data-path.md — qa-7
+- attribution: .shell-team/specs/T-1015-cutting-a-release.md — qa-8
+- attribution: .shell-team/specs/T-1016-close-out-entry-boundary.md — qa-1
+- attribution: .shell-team/specs/T-1017-close-out-interventions-gate.md — qa-2
+- attribution: .shell-team/specs/T-1018-freeze-attestation-gate.md — qa-3
+- attribution: .shell-team/specs/T-1019-is-span-row-parity.md — qa-4
+- attribution: .shell-team/specs/T-1020-lessons-supersede-sweep.md — qa-5
+- attribution: .shell-team/specs/T-1020-supersede-adjudication.md — qa-6
+- attribution: .shell-team/specs/T-1021-arith-base10-audit.md — qa-7
+- attribution: .shell-team/specs/T-1022-close-out-gate-symmetry.md — qa-8
+- attribution: .shell-team/specs/T-1023-block-size-deferral-record.md — qa-1
+- attribution: .shell-team/specs/T-1024-check-line-mktemp-guard.md — qa-2
+- attribution: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — qa-3
+- attribution: .shell-team/specs/T-1026-skill-md-doc-completeness.md — qa-4
+- attribution: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — qa-5
+- attribution: .shell-team/specs/T-1028-class-m-refreeze.md — qa-6
+- attribution: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — qa-7
+- attribution: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — qa-8
+- attribution: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — qa-1
+- attribution: .shell-team/specs/T-1032-audit-prose-accuracy.md — qa-2
+- attribution: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — qa-3
+- attribution: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — qa-4
+- attribution: .shell-team/specs/T-1035-spec-template-staleness-locks.md — qa-5
+- attribution: .shell-team/specs/T-1036-wording-batch-141-143-144.md — qa-6
+- attribution: .shell-team/specs/T-1037-checker-retro-precision.md — qa-7
+- attribution: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — qa-8
+- attribution: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — qa-1
+- attribution: .shell-team/specs/T-1040-frozen-repair-batch.md — qa-2
+- attribution: .shell-team/specs/T-1041-freeze-ux.md — qa-3
+- attribution: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — qa-4
+- attribution: .shell-team/specs/T-1043-pm-spec-check-conventions.md — qa-5
+- attribution: .shell-team/specs/T-1044-test-infra-bundle.md — qa-6
+- attribution: .shell-team/specs/T-1045-codex-version-provenance.md — qa-7
+- attribution: .shell-team/specs/T-1046-ignored-base-verdict.md — qa-8
+- attribution: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — qa-1
+- attribution: .shell-team/specs/T-1048-handoff-durability-barrier.md — qa-2
+- attribution: .shell-team/specs/T-1050-check-layer-fast-follow.md — qa-3
+- attribution: .shell-team/specs/T-1051-inspection-ux-polish.md — qa-4
+- attribution: .shell-team/specs/T-1052-records-editorial.md — qa-5
+- attribution: .shell-team/specs/T-1053-retro-mechanization.md — qa-6
+- attribution: .shell-team/specs/T-1054-binding-config.md — qa-7
+- attribution: .shell-team/specs/T-1055-adapter-envelope.md — qa-8
+- attribution: .shell-team/specs/T-1056-loop-liveness.md — qa-1
+- attribution: .shell-team/specs/T-1057-loop-integration.md — qa-2
+- attribution: .shell-team/specs/T-1058-telemetry-binding.md — qa-3
+- attribution: .shell-team/specs/T-1059-docs-release-notes.md — qa-4
+- attribution: .shell-team/specs/T-1060-adopter-binding-docs.md — qa-5
+- attribution: .shell-team/specs/T-1061-adopter-docs-gate.md — qa-6
+- attribution: .shell-team/specs/T-1062-release-notes-compare-link.md — qa-7
+- attribution: .shell-team/specs/T-1063-editorial-batch.md — qa-8
+- attribution: .shell-team/specs/T-1064-shipped-docs-accuracy.md — qa-1
+- attribution: .shell-team/specs/T-1065-task-class-verification-pricing.md — qa-2
+- attribution: .shell-team/specs/T-1066-effort-time-telemetry.md — qa-3
+- attribution: .shell-team/specs/T-1067-context-lifecycle.md — qa-4
+- attribution: .shell-team/specs/T-1068-agent-concurrency.md — qa-5
+- attribution: .shell-team/specs/T-1069-phase-multiplexing.md — qa-6
+- attribution: .shell-team/specs/T-1070-check-handoff-scaling.md — qa-7
+- attribution: .shell-team/specs/T-1071-record-set-derivation.md — qa-8
+- attribution: .shell-team/specs/T-1072-telemetry-span-discriminator.md — qa-1
+- attribution: .shell-team/specs/T-1073-harness-agent-concurrency.md — qa-2
+- attribution: .shell-team/specs/T-1074-fanout-orchestration.md — qa-3
+- attribution: .shell-team/specs/T-1075-fanout-adoption-versioning.md — qa-4
+- attribution: .shell-team/specs/T-1076-log-run-locking.md — qa-5
+- attribution: .shell-team/specs/T-1077-worktree-reconcile.md — qa-6
+- attribution: .shell-team/specs/T-1078-tier3-pilot.md — qa-7
+- attribution: .shell-team/specs/T-1079-tier2-judge.md — qa-8
+- attribution: .shell-team/specs/T-1080-depth-axis-contract.md — qa-1
+- attribution: .shell-team/specs/T-1081-freeze-sweep-hardening.md — qa-2
+- attribution: .shell-team/specs/T-1082-telemetry-discriminator.md — qa-3
+- attribution: .shell-team/specs/T-1083-agent-launch-fanout.md — qa-4
+- attribution: .shell-team/specs/T-1084-dispatch-routing-record.md — qa-5
+- attribution: .shell-team/specs/T-1085-default-path-firing.md — qa-6
+- attribution: .shell-team/specs/T-111-pii-shape-checker.md — qa-7
+- attribution: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — qa-8
+- attribution: .shell-team/specs/T-113-lessons-deidentification.md — qa-1
+- attribution: .shell-team/specs/design-note-T-1012.md — qa-2
+<!-- END fanout-verdict: t1085fan -->
+
+<!-- BEGIN fanout-verdict: t1085serial -->
+- aggregated-by: bin/aggregate-verdicts.sh
+- locale: LC_ALL=C
+- part: serial-1 — /tmp/claude-502/t1085-ser.06OEfZ/part-serial-1.txt
+<!-- BEGIN verdict-region: t1085serial -->
+- summary: units: 90 — verdicts: 88 — sentinels: 2
+- sentinel: .shell-team/specs/T-1020-supersede-adjudication.md — exit=2 no-verdict-lines
+- sentinel: .shell-team/specs/design-note-T-1012.md — exit=2 no-verdict-lines
+- verdict: .shell-team/specs/T-1000-operating-conventions.md — rc=1; check-acs: 16 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1000-operating-conventions.md)
+- verdict: .shell-team/specs/T-1001-retro-input-acquisition.md — rc=1; check-acs: 18 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1001-retro-input-acquisition.md)
+- verdict: .shell-team/specs/T-1002-intervention-capture-channel.md — rc=1; check-acs: 23 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1002-intervention-capture-channel.md)
+- verdict: .shell-team/specs/T-1003-retro-reads-interventions.md — rc=1; check-acs: 19 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1003-retro-reads-interventions.md)
+- verdict: .shell-team/specs/T-1004-optin-hook-sample.md — rc=1; check-acs: 15 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1004-optin-hook-sample.md)
+- verdict: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — rc=1; check-acs: 9 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md)
+- verdict: .shell-team/specs/T-1006-lessons-resolver-key.md — rc=1; check-acs: 15 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1006-lessons-resolver-key.md)
+- verdict: .shell-team/specs/T-1007-scope-typed-ledger.md — rc=1; check-acs: 14 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1007-scope-typed-ledger.md)
+- verdict: .shell-team/specs/T-1008-lessons-corpus-import.md — rc=1; check-acs: 18 passed, 7 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1008-lessons-corpus-import.md)
+- verdict: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — rc=1; check-acs: 12 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md)
+- verdict: .shell-team/specs/T-1010-operator-language-boundary.md — rc=1; check-acs: 25 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1010-operator-language-boundary.md)
+- verdict: .shell-team/specs/T-1011-telemetry-event-rows.md — rc=1; check-acs: 30 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1011-telemetry-event-rows.md)
+- verdict: .shell-team/specs/T-1012-loop-replay-generator.md — rc=1; check-acs: 25 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1012-loop-replay-generator.md)
+- verdict: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — rc=1; check-acs: 10 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1013-loop-replay-docs-wiring.md)
+- verdict: .shell-team/specs/T-1014-flag-rail-data-path.md — rc=1; check-acs: 14 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1014-flag-rail-data-path.md)
+- verdict: .shell-team/specs/T-1015-cutting-a-release.md — rc=1; check-acs: 6 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1015-cutting-a-release.md)
+- verdict: .shell-team/specs/T-1016-close-out-entry-boundary.md — rc=1; check-acs: 9 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1016-close-out-entry-boundary.md)
+- verdict: .shell-team/specs/T-1017-close-out-interventions-gate.md — rc=1; check-acs: 15 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1017-close-out-interventions-gate.md)
+- verdict: .shell-team/specs/T-1018-freeze-attestation-gate.md — rc=1; check-acs: 20 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1018-freeze-attestation-gate.md)
+- verdict: .shell-team/specs/T-1019-is-span-row-parity.md — rc=1; check-acs: 11 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1019-is-span-row-parity.md)
+- verdict: .shell-team/specs/T-1020-lessons-supersede-sweep.md — rc=1; check-acs: 5 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1020-lessons-supersede-sweep.md)
+- verdict: .shell-team/specs/T-1021-arith-base10-audit.md — rc=1; check-acs: 17 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1021-arith-base10-audit.md)
+- verdict: .shell-team/specs/T-1022-close-out-gate-symmetry.md — rc=1; check-acs: 15 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1022-close-out-gate-symmetry.md)
+- verdict: .shell-team/specs/T-1023-block-size-deferral-record.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1023-block-size-deferral-record.md)
+- verdict: .shell-team/specs/T-1024-check-line-mktemp-guard.md — rc=1; check-acs: 6 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1024-check-line-mktemp-guard.md)
+- verdict: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — rc=1; check-acs: 5 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1025-assert-parity-dead-comparison.md)
+- verdict: .shell-team/specs/T-1026-skill-md-doc-completeness.md — rc=1; check-acs: 4 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1026-skill-md-doc-completeness.md)
+- verdict: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — rc=1; check-acs: 8 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1027-promote-retro-2026-08-04.md)
+- verdict: .shell-team/specs/T-1028-class-m-refreeze.md — rc=1; check-acs: 12 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1028-class-m-refreeze.md)
+- verdict: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — rc=1; check-acs: 7 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1029-claim-fidelity-qa-step.md)
+- verdict: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — rc=1; check-acs: 8 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1030-reviewer-board-write-boundary.md)
+- verdict: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — rc=1; check-acs: 13 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1031-check-handoff-flag-anchor.md)
+- verdict: .shell-team/specs/T-1032-audit-prose-accuracy.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1032-audit-prose-accuracy.md)
+- verdict: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — rc=1; check-acs: 7 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1033-promote-retro-2026-08-05.md)
+- verdict: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1034-refreeze-hardening-execbit.md)
+- verdict: .shell-team/specs/T-1035-spec-template-staleness-locks.md — rc=1; check-acs: 3 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1035-spec-template-staleness-locks.md)
+- verdict: .shell-team/specs/T-1036-wording-batch-141-143-144.md — rc=1; check-acs: 10 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1036-wording-batch-141-143-144.md)
+- verdict: .shell-team/specs/T-1037-checker-retro-precision.md — rc=1; check-acs: 9 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1037-checker-retro-precision.md)
+- verdict: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — rc=1; check-acs: 12 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1038-errexit-safe-pin-keying.md)
+- verdict: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — rc=1; check-acs: 6 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1039-promote-retro-2026-08-06.md)
+- verdict: .shell-team/specs/T-1040-frozen-repair-batch.md — rc=1; check-acs: 14 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1040-frozen-repair-batch.md)
+- verdict: .shell-team/specs/T-1041-freeze-ux.md — rc=1; check-acs: 18 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1041-freeze-ux.md)
+- verdict: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — rc=1; check-acs: 12 passed, 1 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1042-ignored-base-and-retro-ledger.md)
+- verdict: .shell-team/specs/T-1043-pm-spec-check-conventions.md — rc=1; check-acs: 8 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1043-pm-spec-check-conventions.md)
+- verdict: .shell-team/specs/T-1044-test-infra-bundle.md — rc=1; check-acs: 10 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1044-test-infra-bundle.md)
+- verdict: .shell-team/specs/T-1045-codex-version-provenance.md — rc=1; check-acs: 5 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1045-codex-version-provenance.md)
+- verdict: .shell-team/specs/T-1046-ignored-base-verdict.md — rc=1; check-acs: 9 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1046-ignored-base-verdict.md)
+- verdict: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — rc=1; check-acs: 6 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1047-promote-retro-2026-08-08.md)
+- verdict: .shell-team/specs/T-1048-handoff-durability-barrier.md — rc=1; check-acs: 15 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1048-handoff-durability-barrier.md)
+- verdict: .shell-team/specs/T-1050-check-layer-fast-follow.md — rc=1; check-acs: 9 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1050-check-layer-fast-follow.md)
+- verdict: .shell-team/specs/T-1051-inspection-ux-polish.md — rc=1; check-acs: 12 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1051-inspection-ux-polish.md)
+- verdict: .shell-team/specs/T-1052-records-editorial.md — rc=1; check-acs: 9 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1052-records-editorial.md)
+- verdict: .shell-team/specs/T-1053-retro-mechanization.md — rc=1; check-acs: 0 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1053-retro-mechanization.md)
+- verdict: .shell-team/specs/T-1054-binding-config.md — rc=1; check-acs: 11 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1054-binding-config.md)
+- verdict: .shell-team/specs/T-1055-adapter-envelope.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1055-adapter-envelope.md)
+- verdict: .shell-team/specs/T-1056-loop-liveness.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1056-loop-liveness.md)
+- verdict: .shell-team/specs/T-1057-loop-integration.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1057-loop-integration.md)
+- verdict: .shell-team/specs/T-1058-telemetry-binding.md — rc=1; check-acs: 5 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1058-telemetry-binding.md)
+- verdict: .shell-team/specs/T-1059-docs-release-notes.md — rc=1; check-acs: 3 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1059-docs-release-notes.md)
+- verdict: .shell-team/specs/T-1060-adopter-binding-docs.md — rc=1; check-acs: 5 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1060-adopter-binding-docs.md)
+- verdict: .shell-team/specs/T-1061-adopter-docs-gate.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1061-adopter-docs-gate.md)
+- verdict: .shell-team/specs/T-1062-release-notes-compare-link.md — rc=1; check-acs: 2 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1062-release-notes-compare-link.md)
+- verdict: .shell-team/specs/T-1063-editorial-batch.md — rc=1; check-acs: 0 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1063-editorial-batch.md)
+- verdict: .shell-team/specs/T-1064-shipped-docs-accuracy.md — rc=1; check-acs: 0 passed, 11 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1064-shipped-docs-accuracy.md)
+- verdict: .shell-team/specs/T-1065-task-class-verification-pricing.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1065-task-class-verification-pricing.md)
+- verdict: .shell-team/specs/T-1066-effort-time-telemetry.md — rc=1; check-acs: 5 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1066-effort-time-telemetry.md)
+- verdict: .shell-team/specs/T-1067-context-lifecycle.md — rc=1; check-acs: 6 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1067-context-lifecycle.md)
+- verdict: .shell-team/specs/T-1068-agent-concurrency.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1068-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1069-phase-multiplexing.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1069-phase-multiplexing.md)
+- verdict: .shell-team/specs/T-1070-check-handoff-scaling.md — rc=1; check-acs: 5 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1070-check-handoff-scaling.md)
+- verdict: .shell-team/specs/T-1071-record-set-derivation.md — rc=1; check-acs: 8 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1071-record-set-derivation.md)
+- verdict: .shell-team/specs/T-1072-telemetry-span-discriminator.md — rc=1; check-acs: 8 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1072-telemetry-span-discriminator.md)
+- verdict: .shell-team/specs/T-1073-harness-agent-concurrency.md — rc=1; check-acs: 10 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1073-harness-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1074-fanout-orchestration.md — rc=1; check-acs: 13 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1074-fanout-orchestration.md)
+- verdict: .shell-team/specs/T-1075-fanout-adoption-versioning.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1075-fanout-adoption-versioning.md)
+- verdict: .shell-team/specs/T-1076-log-run-locking.md — rc=1; check-acs: 11 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1076-log-run-locking.md)
+- verdict: .shell-team/specs/T-1077-worktree-reconcile.md — rc=1; check-acs: 8 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1077-worktree-reconcile.md)
+- verdict: .shell-team/specs/T-1078-tier3-pilot.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1078-tier3-pilot.md)
+- verdict: .shell-team/specs/T-1079-tier2-judge.md — rc=1; check-acs: 6 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1079-tier2-judge.md)
+- verdict: .shell-team/specs/T-1080-depth-axis-contract.md — rc=1; check-acs: 3 passed, 15 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1080-depth-axis-contract.md)
+- verdict: .shell-team/specs/T-1081-freeze-sweep-hardening.md — rc=1; check-acs: 11 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1081-freeze-sweep-hardening.md)
+- verdict: .shell-team/specs/T-1082-telemetry-discriminator.md — rc=1; check-acs: 10 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1082-telemetry-discriminator.md)
+- verdict: .shell-team/specs/T-1083-agent-launch-fanout.md — rc=1; check-acs: 13 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1083-agent-launch-fanout.md)
+- verdict: .shell-team/specs/T-1084-dispatch-routing-record.md — rc=1; check-acs: 7 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1084-dispatch-routing-record.md)
+- verdict: .shell-team/specs/T-1085-default-path-firing.md — rc=1; check-acs: 2 passed, 16 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1085-default-path-firing.md)
+- verdict: .shell-team/specs/T-111-pii-shape-checker.md — rc=1; check-acs: 27 passed, 2 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-111-pii-shape-checker.md)
+- verdict: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — rc=1; check-acs: 22 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-112-commit-identity-and-ignore-lock.md)
+- verdict: .shell-team/specs/T-113-lessons-deidentification.md — rc=1; check-acs: 8 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-113-lessons-deidentification.md)
+<!-- END verdict-region: t1085serial -->
+- attribution: .shell-team/specs/T-1000-operating-conventions.md — serial-1
+- attribution: .shell-team/specs/T-1001-retro-input-acquisition.md — serial-1
+- attribution: .shell-team/specs/T-1002-intervention-capture-channel.md — serial-1
+- attribution: .shell-team/specs/T-1003-retro-reads-interventions.md — serial-1
+- attribution: .shell-team/specs/T-1004-optin-hook-sample.md — serial-1
+- attribution: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — serial-1
+- attribution: .shell-team/specs/T-1006-lessons-resolver-key.md — serial-1
+- attribution: .shell-team/specs/T-1007-scope-typed-ledger.md — serial-1
+- attribution: .shell-team/specs/T-1008-lessons-corpus-import.md — serial-1
+- attribution: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — serial-1
+- attribution: .shell-team/specs/T-1010-operator-language-boundary.md — serial-1
+- attribution: .shell-team/specs/T-1011-telemetry-event-rows.md — serial-1
+- attribution: .shell-team/specs/T-1012-loop-replay-generator.md — serial-1
+- attribution: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — serial-1
+- attribution: .shell-team/specs/T-1014-flag-rail-data-path.md — serial-1
+- attribution: .shell-team/specs/T-1015-cutting-a-release.md — serial-1
+- attribution: .shell-team/specs/T-1016-close-out-entry-boundary.md — serial-1
+- attribution: .shell-team/specs/T-1017-close-out-interventions-gate.md — serial-1
+- attribution: .shell-team/specs/T-1018-freeze-attestation-gate.md — serial-1
+- attribution: .shell-team/specs/T-1019-is-span-row-parity.md — serial-1
+- attribution: .shell-team/specs/T-1020-lessons-supersede-sweep.md — serial-1
+- attribution: .shell-team/specs/T-1020-supersede-adjudication.md — serial-1
+- attribution: .shell-team/specs/T-1021-arith-base10-audit.md — serial-1
+- attribution: .shell-team/specs/T-1022-close-out-gate-symmetry.md — serial-1
+- attribution: .shell-team/specs/T-1023-block-size-deferral-record.md — serial-1
+- attribution: .shell-team/specs/T-1024-check-line-mktemp-guard.md — serial-1
+- attribution: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — serial-1
+- attribution: .shell-team/specs/T-1026-skill-md-doc-completeness.md — serial-1
+- attribution: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — serial-1
+- attribution: .shell-team/specs/T-1028-class-m-refreeze.md — serial-1
+- attribution: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — serial-1
+- attribution: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — serial-1
+- attribution: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — serial-1
+- attribution: .shell-team/specs/T-1032-audit-prose-accuracy.md — serial-1
+- attribution: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — serial-1
+- attribution: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — serial-1
+- attribution: .shell-team/specs/T-1035-spec-template-staleness-locks.md — serial-1
+- attribution: .shell-team/specs/T-1036-wording-batch-141-143-144.md — serial-1
+- attribution: .shell-team/specs/T-1037-checker-retro-precision.md — serial-1
+- attribution: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — serial-1
+- attribution: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — serial-1
+- attribution: .shell-team/specs/T-1040-frozen-repair-batch.md — serial-1
+- attribution: .shell-team/specs/T-1041-freeze-ux.md — serial-1
+- attribution: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — serial-1
+- attribution: .shell-team/specs/T-1043-pm-spec-check-conventions.md — serial-1
+- attribution: .shell-team/specs/T-1044-test-infra-bundle.md — serial-1
+- attribution: .shell-team/specs/T-1045-codex-version-provenance.md — serial-1
+- attribution: .shell-team/specs/T-1046-ignored-base-verdict.md — serial-1
+- attribution: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — serial-1
+- attribution: .shell-team/specs/T-1048-handoff-durability-barrier.md — serial-1
+- attribution: .shell-team/specs/T-1050-check-layer-fast-follow.md — serial-1
+- attribution: .shell-team/specs/T-1051-inspection-ux-polish.md — serial-1
+- attribution: .shell-team/specs/T-1052-records-editorial.md — serial-1
+- attribution: .shell-team/specs/T-1053-retro-mechanization.md — serial-1
+- attribution: .shell-team/specs/T-1054-binding-config.md — serial-1
+- attribution: .shell-team/specs/T-1055-adapter-envelope.md — serial-1
+- attribution: .shell-team/specs/T-1056-loop-liveness.md — serial-1
+- attribution: .shell-team/specs/T-1057-loop-integration.md — serial-1
+- attribution: .shell-team/specs/T-1058-telemetry-binding.md — serial-1
+- attribution: .shell-team/specs/T-1059-docs-release-notes.md — serial-1
+- attribution: .shell-team/specs/T-1060-adopter-binding-docs.md — serial-1
+- attribution: .shell-team/specs/T-1061-adopter-docs-gate.md — serial-1
+- attribution: .shell-team/specs/T-1062-release-notes-compare-link.md — serial-1
+- attribution: .shell-team/specs/T-1063-editorial-batch.md — serial-1
+- attribution: .shell-team/specs/T-1064-shipped-docs-accuracy.md — serial-1
+- attribution: .shell-team/specs/T-1065-task-class-verification-pricing.md — serial-1
+- attribution: .shell-team/specs/T-1066-effort-time-telemetry.md — serial-1
+- attribution: .shell-team/specs/T-1067-context-lifecycle.md — serial-1
+- attribution: .shell-team/specs/T-1068-agent-concurrency.md — serial-1
+- attribution: .shell-team/specs/T-1069-phase-multiplexing.md — serial-1
+- attribution: .shell-team/specs/T-1070-check-handoff-scaling.md — serial-1
+- attribution: .shell-team/specs/T-1071-record-set-derivation.md — serial-1
+- attribution: .shell-team/specs/T-1072-telemetry-span-discriminator.md — serial-1
+- attribution: .shell-team/specs/T-1073-harness-agent-concurrency.md — serial-1
+- attribution: .shell-team/specs/T-1074-fanout-orchestration.md — serial-1
+- attribution: .shell-team/specs/T-1075-fanout-adoption-versioning.md — serial-1
+- attribution: .shell-team/specs/T-1076-log-run-locking.md — serial-1
+- attribution: .shell-team/specs/T-1077-worktree-reconcile.md — serial-1
+- attribution: .shell-team/specs/T-1078-tier3-pilot.md — serial-1
+- attribution: .shell-team/specs/T-1079-tier2-judge.md — serial-1
+- attribution: .shell-team/specs/T-1080-depth-axis-contract.md — serial-1
+- attribution: .shell-team/specs/T-1081-freeze-sweep-hardening.md — serial-1
+- attribution: .shell-team/specs/T-1082-telemetry-discriminator.md — serial-1
+- attribution: .shell-team/specs/T-1083-agent-launch-fanout.md — serial-1
+- attribution: .shell-team/specs/T-1084-dispatch-routing-record.md — serial-1
+- attribution: .shell-team/specs/T-1085-default-path-firing.md — serial-1
+- attribution: .shell-team/specs/T-111-pii-shape-checker.md — serial-1
+- attribution: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — serial-1
+- attribution: .shell-team/specs/T-113-lessons-deidentification.md — serial-1
+- attribution: .shell-team/specs/design-note-T-1012.md — serial-1
+<!-- END fanout-verdict: t1085serial -->
+
+- checker-result: aggregate-verdicts — exit=0 — both arms reduced: label t1085fan from 8 part files and label t1085serial from 1 part file, each block emitted on stdout and captured verbatim above
+- checker-result: check-fanout-instances — exit=0 — check-fanout-instances: ok: run-id=t1085-20260819T123030Z phase=validate label=t1085fan rows=8 parts=8
+
+- agent-timestamp: t1085fan — qa-1 — first=1787185686759442000 — last=1787186738566042000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-2 — first=1787185691664587000 — last=1787186706839890000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-3 — first=1787185696352769000 — last=1787187466653181000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-4 — first=1787185701633042000 — last=1787186713371219000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-5 — first=1787185706655453000 — last=1787186637016768000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-6 — first=1787185711904211000 — last=1787186847255783000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-7 — first=1787185716607817000 — last=1787186959444940000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-8 — first=1787185721254292000 — last=1787186599452998000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085serial — serial-1 — first=1787196593684218000 — last=1787199945017994000 — same runner mechanism as the fanned arm, single instance over the same 90-unit population
+
+- heartbeat: t1085fan — 1787185736270272000 — recorded by qa-1's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185736706153000 — recorded by qa-2's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185737443016000 — recorded by qa-3's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185738317891000 — recorded by qa-4's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185738631370000 — recorded by qa-5's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185739588688000 — recorded by qa-6's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185740881802000 — recorded by qa-7's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185741318548000 — recorded by qa-8's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+
+Orchestrator-written telemetry span rows for every instance, quoted verbatim from `.shell-team/runs/shell-team.jsonl` (the fanned arm under attempt 1 with `qa-*` ids, the serial baseline under attempt 2 with its `serial-*` id; `subagent_type` was `shell-team:qa-verifier` for all nine launches, recorded as a declared label):
+
+```
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":8,"ts":"2026-08-20T01:00:07Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58708,"tool_uses":13,"duration_ms":1058682,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-1"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":9,"ts":"2026-08-20T01:00:07Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":60026,"tool_uses":14,"duration_ms":1023802,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-2"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":10,"ts":"2026-08-20T01:00:07Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":62152,"tool_uses":14,"duration_ms":1799128,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-3"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":11,"ts":"2026-08-20T01:00:08Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58489,"tool_uses":12,"duration_ms":1019570,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-4"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":12,"ts":"2026-08-20T01:00:08Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58490,"tool_uses":12,"duration_ms":937965,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-5"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":13,"ts":"2026-08-20T01:00:08Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58517,"tool_uses":12,"duration_ms":1143463,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-6"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":14,"ts":"2026-08-20T01:00:09Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58440,"tool_uses":12,"duration_ms":1253444,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-7"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":15,"ts":"2026-08-20T01:00:09Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58555,"tool_uses":12,"duration_ms":887628,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-8"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":16,"ts":"2026-08-20T04:26:15Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":2,"status":"success","model":"sonnet","tokens":78319,"tool_uses":91,"duration_ms":3359955,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"serial-1"}
+```
+
+
+## Default-path chain and aggregation analysis
+
+Each of the seven chain-link ids, in the frozen order, evidenced or not-evidenced against the raw evidence quoted above — never against a restatement of it.
+
+- chain-link: precedence-rule-applied — evidenced — the board resolved through `bin/team-paths.sh --get todo` carries this task's own `verify`-axis sub-bullet reading `- dispatch: verify — tier1-fanout — conditional — saving: tier1-verification-fanout (...)`, whose ground opens with a priced-line id (`saving:`) resolving as a real `- recommendation: tier1-verification-fanout` line in `docs/loop-engineering/phase-multiplexing.md` — the only record `templates/prompt-blocks/dispatch-record.md`'s own precedence rule ("apply the most specific conditional trigger whose stated trigger text the task actually satisfies") can produce for this task's own mechanically-enumerable population, since exactly one conditional trigger on the `verify` axis (`dispatch-rule: verify — tier1-fanout`) matched.
+- chain-link: dispatch-record-transcribed — evidenced — that same sub-bullet sits inside this task's own board entry extent, transcribed at the Specify-to-Implement seam per `skills/run/SKILL.md` lines 42 and 207, alongside the entry's own `- dispatch: implement — serial — unconditional — <ground>` record — two axes, two records, neither duplicated.
+- chain-link: step5-pointer-read — evidenced — the fan-out actually ran: a real launch record naming `- requested-n: 8`/`- achieved-n: 8`, a real reduction and real attribution below. That outcome is reachable only if the step-5 mechanics pointer at `skills/run/SKILL.md` line 85 read the board's recorded `dispatch: verify` value, found `tier1-fanout`, and routed to the shipped fan-out step — no other mechanism in this loop launches a `qa-verifier` population fan-out.
+- chain-link: population-fixed — evidenced — the launch record's `- population: .shell-team/runs/fanout-t1085fan.population` line, its 90 `- assign:` lines partitioning that one population across instances `qa-1`..`qa-8` before any verdict existed, and both arms' verdict-regions independently reporting `units: 90 — verdicts: 88 — sentinels: 2` confirm one fixed population swept unchanged by both arms.
+- chain-link: instances-launched — evidenced — eight `- agent-timestamp: t1085fan —` lines (`qa-1`..`qa-8`), every one with `last` strictly greater than `first`; a non-empty intersection window re-derived below; eight in-window `- heartbeat:` samples; and eight orchestrator-written telemetry span rows (`"status":"success"`, `"span":"qa-verifier"`) — a real eight-instance launch, not a simulated one.
+- chain-link: aggregation-reduced — evidenced — `- checker-result: aggregate-verdicts — exit=0 —` (both arms reduced, per the evidence above) and the quoted `<!-- BEGIN fanout-verdict: t1085fan -->` block itself carrying `- aggregated-by: bin/aggregate-verdicts.sh` and a `- summary:` line — the shipped reducer ran to completion against eight real part files.
+- chain-link: attribution-verified — evidenced — `- checker-result: check-fanout-instances — exit=0 —` carrying the tool's own success line (`check-fanout-instances: ok: run-id=t1085-20260819T123030Z phase=validate label=t1085fan rows=8 parts=8`), and the derivation immediately below confirms the launch record's own assigned-instance-id set equals the aggregation's own part-name set in both directions, over a real, re-derivable population rather than an assertion.
+
+No `- blocked-at:` line follows, because every chain link above reads `evidenced`.
+
+<!-- BEGIN derivation: t1085-assign-vs-part -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: ASSIGN — status: 0 — lines: 8 — items: 8 — command: awk '/^<!-- BEGIN launch-record: t1085fan -->$/{f=1;next} /^<!-- END launch-record: t1085fan -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sed -nE 's/^- assign: ([a-z][a-z0-9-]*) — .*$/\1/p' | sort -u
+- set: PART — status: 0 — lines: 8 — items: 8 — command: awk '/^<!-- BEGIN fanout-verdict: t1085fan -->$/{f=1;next} /^<!-- END fanout-verdict: t1085fan -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sed -nE 's/^- part: ([a-z][a-z0-9-]*) — .*$/\1/p' | sort -u
+- union: items: 8
+- bucket: ASSIGN+PART — items: 8
+  - qa-1
+  - qa-2
+  - qa-3
+  - qa-4
+  - qa-5
+  - qa-6
+  - qa-7
+  - qa-8
+<!-- END derivation: t1085-assign-vs-part -->
+- reproduce: bash bin/derive-populations.sh --label t1085-assign-vs-part --set ASSIGN="awk '/^<!-- BEGIN launch-record: t1085fan -->$/{f=1;next} /^<!-- END launch-record: t1085fan -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sed -nE 's/^- assign: ([a-z][a-z0-9-]*) — .*$/\1/p' | sort -u" --set PART="awk '/^<!-- BEGIN fanout-verdict: t1085fan -->$/{f=1;next} /^<!-- END fanout-verdict: t1085fan -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sed -nE 's/^- part: ([a-z][a-z0-9-]*) — .*$/\1/p' | sort -u"
+
+A single bucket, `ASSIGN+PART`, holding all eight ids: no id was assigned but never reduced, and no id was reduced without having been assigned — the no-new-checker identity **AC14** of the sibling T-1083 note made measurable, made measurable here too rather than asserted.
+
+**Genuine overlap, re-derived from the eight `agent-timestamp` lines above (bash `10#` integer arithmetic, never `awk`/`sort -n`).**
+
+Re-derivation command (not a `- reproduce:` derivation-block line — a one-off arithmetic check over the `agent-timestamp` values already quoted above, not a re-runnable population extraction, so it is not counted by **AC15**'s paired-block closure): `f1=1787185686759442000; f2=1787185691664587000; f3=1787185696352769000; f4=1787185701633042000; f5=1787185706655453000; f6=1787185711904211000; f7=1787185716607817000; f8=1787185721254292000; l1=1787186738566042000; l2=1787186706839890000; l3=1787187466653181000; l4=1787186713371219000; l5=1787186637016768000; l6=1787186847255783000; l7=1787186959444940000; l8=1787186599452998000; maxf=$(( 10#$f1 )); for v in $f2 $f3 $f4 $f5 $f6 $f7 $f8; do vv=$(( 10#$v )); [ "$vv" -gt "$maxf" ] && maxf=$vv; done; minl=$(( 10#$l1 )); for v in $l2 $l3 $l4 $l5 $l6 $l7 $l8; do vv=$(( 10#$v )); [ "$vv" -lt "$minl" ] && minl=$vv; done; minf=$(( 10#$f1 )); for v in $f2 $f3 $f4 $f5 $f6 $f7 $f8; do vv=$(( 10#$v )); [ "$vv" -lt "$minf" ] && minf=$vv; done; echo "maxf=$maxf minl=$minl margin=$(( minl - maxf )) spread=$(( maxf - minf ))"` → `maxf=1787185721254292000 minl=1787186599452998000 margin=878198706000 spread=34494850000`
+- overlap: t1085fan — overlapping — margin_ns=878198706000 — `max(first)=1787185721254292000` (qa-8), `min(last)=1787186599452998000` (qa-8), a non-empty window of ≈878.199 s during which all eight instances were simultaneously executing.
+- The frozen protocol's own metric, computed rather than substituted (round-3 rework — the round-2 text stated the margin against the instances' own launch dispersion instead, which the cross-provider review's round-1 Major correctly identified as a different indicator from the one the frozen wording (spec line 71, "with its margin against **the maximum single launch latency** stated") names). The maximum single launch latency is `first − launched-epoch`, maximized over the eight instances — T-1083's own idiom for this quantity, ported here rather than re-invented: `launched-epoch=1787185735135713000`; `d_i = first_i − launched-epoch` gives `qa-1=-48376271000`, `qa-2=-43471126000`, `qa-3=-38782944000`, `qa-4=-33502671000`, `qa-5=-28480260000`, `qa-6=-23231502000`, `qa-7=-18527896000`, `qa-8=-13881421000` (bash `10#` integer arithmetic on the note's own recorded integers, every value computed and shown, none dropped). Every one of the eight is **negative**, so the maximum (the value closest to zero) is `qa-8`'s `-13881421000` ns (≈−13.881 s). This is negative because this launch record's own `- launched-epoch:` field is disclosed above (evidence disclosure 1) to be an audit-only stamp that **postdates** every one of the eight instances' own `first` timestamps by design — the precondition T-1083's own idiom assumed (`launched-epoch` precedes every instance's own first stamp) does not hold at this destination, and a negative "latency" (a unit's first recorded action preceding the moment its own launch was even audited) is not a usable bound. That limitation is disclosed here rather than papered over by reaching for a different, unrelated metric. The instances' own launch dispersion — the spread between the earliest and latest `first` stamp across all eight instances, ≈34.495 s, giving a ratio of `878198706000 / 34494850000 ≈ 25.5×` against the overlap margin — is retained below purely as a secondary, informational cross-check; it is **not** the frozen wording's own metric and carries no weight in the licence condition's `met` determination.
+
+## Verdict and licence conditions
+
+Each of the six licence-condition ids, evidenced against the raw evidence above and the re-derivation immediately above this section.
+
+- licence-condition: shipped-text-unmodified — met — **AC1**'s own zero-shipped-diff measurement (the union of the tracked-half commit-range diff and the untracked-half stray-file listing against the branch point) holds no path beginning `skills/`, `templates/`, `agents/`, `bin/`, `tests/` or `.github/`, and each of `skills/run/SKILL.md`, `templates/prompt-blocks/fanout-orchestration.md`, `templates/prompt-blocks/dispatch-record.md` and `docs/loop-engineering/phase-multiplexing.md` is byte-identical to its branch-point blob (see **AC19(b)**/hand-off for the live run of that check).
+- licence-condition: no-out-of-band-flag — met — the fan-out was selected by exactly one mechanism: the board's own transcribed `- dispatch: verify — tier1-fanout` sub-bullet, read by the shipped step-5 pointer. No CLI flag, environment variable or configuration file outside the three named files' own grammar was in play. The launch record's own `- cap-ground: measured-cores=8` shows even the fan-out's *degree* came from the shipped host-core fallback rather than an operator-set `TEAM_FANOUT_MAX` override — reinforcing that no external switch, of any kind, drove this firing. This is the condition the Goal's adopted reading of `opt-in; no phase is rewired to use it by default` lives or dies on; nothing above contradicts that reading.
+- licence-condition: real-plugin-role-instances — met — `- requested-n: 8` / `- achieved-n: 8` (N ≥ 2), and `## Firing evidence` above states `subagent_type` was `shell-team:qa-verifier` for all nine launches (eight fanned plus the serial baseline) — recorded verbatim as a declared label per `docs/loop-engineering/agent-launch-fanout.md` line 247's own epistemic boundary, never upgraded here to independently-observed evidence of the resolved type.
+- licence-condition: genuine-overlap — met — re-derived above: a non-empty window of `878198706000` ns (≈878.199 s) during which all eight fanned instances were simultaneously executing, with its margin stated against the frozen protocol's own metric (spec line 71) — the maximum single launch latency, `first − launched-epoch` maximized over the eight instances, which computes to `-13881421000` ns (≈−13.881 s, `qa-8`), negative because this launch record's own `- launched-epoch:` field (evidence disclosure 1) postdates every instance's own `first` stamp. `met` rests on the non-empty window itself, together with this frozen metric having actually been computed on the note's own recorded integers and disclosed — which is what the frozen wording's "with its margin ... stated" requires — not on that metric functioning as a meaningful latency bound, a function the disclosed audit-field limitation precludes. The launch-dispersion figure (≈34.495 s spread, a margin ratio of ≈25.5×) is carried alongside purely as a secondary, informational cross-check and is not what this `met` value rests on.
+- licence-condition: real-population — met — 90 units enumerated from the resolved specs directory before any instance launched, with no name-based filtering, confirmed by both arms' own `summary: units: 90 — verdicts: 88 — sentinels: 2` lines; the two sentinel units (`T-1020-supersede-adjudication.md`, `design-note-T-1012.md`) confirm the population genuinely includes non-AC-bearing `.md` files exactly as the protocol requires — `design-note-T-1012.md` is the very file `bin/aggregate-verdicts.sh`'s own header names as its pilot example.
+- licence-condition: production-unit — met — every `- verdict:` line in both verdict-regions quotes the real, unmodified `bash bin/check-acs.sh <spec>` summary line (`check-acs: N passed, M failed, ...`) verbatim — never a stub, a simulated result or a hand-typed imitation.
+
+No condition above reads `not-met`, and no chain link above read `not-evidenced` (`## Default-path chain and aggregation analysis`); the coupling this note's own grammar requires is therefore in its `met`-with-no-ground-line branch.
+
+- default-reachability: met — all seven chain links read `evidenced` and all six licence conditions read `met`: the shipped default path — `tech-lead`'s precedence-rule application, the board's transcribed `- dispatch: verify — tier1-fanout` record, the step-5 mechanics pointer, and the shipped fan-out step's own population/degree/liveness/aggregation mechanics — fired end to end on this task's own real, full-population, 90-unit blast-radius sweep, with N=8 real `qa-verifier` instances, reduced and attributed by the shipped, unmodified checkers.
+
+No `- not-met-ground:` line follows, since the verdict reads `met`.
+
+- release-consequence: met — licenses the sprint's planned minor release, recorded on the board's own freeze-attestation (v1) as planned version `v2.1.0`; this task's verdict is the last gate this sprint's train needs before the batch GO (spec `## Notes for engineer`; the actual GO and the release mechanics themselves stay the orchestrator's and the operator's, per this task's own Non-goals).
+- release-consequence: not-met — recorded here regardless of the measured result, per the protocol's own requirement that both consequences be written before the result is known: had any chain link or licence condition read the negative value, this task would license **merge-only** — the note would still ship, `- blocked-at:`/`- not-met-ground:` would name the failing link or condition, and the sprint's planned minor release would wait for a future re-attempt to settle it. That branch was not reached this round.
+
+## Saving and baseline comparison
+
+- baseline: serial — a single-instance run (`serial-1`) of the identical 90-unit population, in the same orchestrator session as the fanned arm, in a second `git clone --no-hardlinks` pinned to the same commit `09cdf36d0f9fb10875b4e65a0b0f5e78057c26b5`; it writes no launch record of its own (per the protocol), and its one part file is reduced by `bin/aggregate-verdicts.sh` under the `t1085serial` label so the two `verdict-region` regions stay comparable. Recorded on the telemetry corpus as `attempt=2`, `instance="serial-1"`, distinct from the fanned arm's `attempt=1`, `qa-*` ids.
+- execution-order: the fanned arm ran first, the serial baseline second, in one continuous orchestrator session (`## Firing evidence` above, opening paragraph) — recorded because the protocol requires it, not corrected for.
+- cache-warmth: the machine was already warm when the firing began (the pre-arm per-unit cost pass had just completed measuring all 90 units singly), so the serial arm — running second — was cache-warm relative to a cold start, while the fanned arm ran first, closer to the cold-start condition. This asymmetry favours the serial arm's own wall clock, not the fanned arm's; the measured saving below is therefore, if anything, a conservative reading in the fanned arm's favour.
+- unit-timeout: `CHECK_ACS_TIMEOUT=300` was exported identically inside both arms (`## Firing evidence` above) — the arm-identical per-check cap the protocol requires so contention under N-way fan-out cannot flip a verdict relative to the serial arm.
+- verdict-region-parity: identical — the two arms' nested `verdict-region` blocks (`t1085fan`, `t1085serial`) collate to the exact same sorted line set, re-derived below by checksum rather than eyeballed; no `- parity-exception:` line follows, because none is needed.
+
+<!-- BEGIN derivation: t1085-verdict-region-parity -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: FAN — status: 0 — lines: 1 — items: 1 — command: awk '/^<!-- BEGIN verdict-region: t1085fan -->$/{f=1;next} /^<!-- END verdict-region: t1085fan -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sort -u | cksum
+- set: SERIAL — status: 0 — lines: 1 — items: 1 — command: awk '/^<!-- BEGIN verdict-region: t1085serial -->$/{f=1;next} /^<!-- END verdict-region: t1085serial -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sort -u | cksum
+- union: items: 1
+- bucket: FAN+SERIAL — items: 1
+  - 3227498628 16205
+<!-- END derivation: t1085-verdict-region-parity -->
+- reproduce: bash bin/derive-populations.sh --label t1085-verdict-region-parity --set FAN="awk '/^<!-- BEGIN verdict-region: t1085fan -->$/{f=1;next} /^<!-- END verdict-region: t1085fan -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sort -u | cksum" --set SERIAL="awk '/^<!-- BEGIN verdict-region: t1085serial -->$/{f=1;next} /^<!-- END verdict-region: t1085serial -->$/{f=0} f' docs/loop-engineering/default-path-firing.md | sort -u | cksum"
+
+A single bucket, `FAN+SERIAL`, holding one item — the identical `cksum` digest of both arms' sorted verdict-region content — is what "byte-identical under every disjoint, exhaustive partition of the same population" (`bin/aggregate-verdicts.sh`'s own header) looks like when actually measured rather than merely claimed.
+
+- saving: default-path-tier1-fanout — measured — recomputed on a **symmetric** basis (round-3 rework — the round-2 figure below is disclosed and superseded, not deleted): both arms' own durations are taken from the **same** grammar, the instances' own inner `- agent-timestamp:` lines, never a mix of an orchestrator-launch epoch on one side and an instance timestamp on the other, which is the asymmetry the cross-provider review's round-1 Major flagged. Fanned arm: `min(first)=1787185686759442000` (`qa-1`) to `max(last)=1787187466653181000` (`qa-3`, the instance whose one unit was moved to a tracked background continuation under 8-way contention — evidence disclosure 2), duration `1779893739000` ns ≈ 1779.894 s. Serial arm: `- agent-timestamp: t1085serial — serial-1 —` gives `first=1787196593684218000` and `last=1787199945017994000`, duration `3351333776000` ns ≈ 3351.334 s (unchanged — this arm's basis was already the instance's own inner timestamp). `(3351333776000 − 1779893739000) / 3351333776000 ≈ 46.89%` wall-clock reduction on this task's own full 90-unit population at N=8, measured on this one machine in this one session — **not** `docs/loop-engineering/phase-multiplexing.md`'s own **43.84%** pilot figure (`docs/loop-engineering/phase-multiplexing.md` line 355), which stays the claim ceiling this measurement is checked against, never restated as this task's own result. **Disclosed prior basis (round 2, now superseded):** the fanned arm's duration was first computed from the launch record's own `- launched-epoch: 1787185735135713000` to `- completed-epoch: 1787187556288212000` (`1821152499000` ns ≈ 1821.152 s) — an **orchestrator-launch-epoch basis** — against the serial arm's own **instance-inner-timestamp basis**, an asymmetry not disclosed at the time it was written. That mixed-basis figure was `(3351333776000 − 1821152499000) / 3351333776000 ≈ 45.66%`. The symmetric figure above (≈46.89%) is this note's own recorded saving from this round forward; the direction (`faster`) and sign are unchanged between the two bases, and the symmetric figure is, if anything, slightly larger than the superseded one.
+- arm-wall-clock: fanned — start=1787185686759442000 — end=1787187466653181000
+- arm-wall-clock: serial — start=1787196593684218000 — end=1787199945017994000
+- saving-direction: faster — the serial arm's own duration (`3351333776000` ns) exceeds the fanned arm's own duration (`1779893739000` ns, symmetric inner-timestamp basis), so the fanned arm finished faster — the sign the `- saving:` line above reports, re-derived here independently by bash `10#` integer arithmetic rather than accepted from the narrative: `serial_dur=3351333776000; fanned_dur=1779893739000; if [ "$serial_dur" -gt "$fanned_dur" ]; then echo faster; elif [ "$serial_dur" -lt "$fanned_dur" ]; then echo slower; else echo equal; fi` → `faster`.
+
+Pre-commitment's second, independent trigger (the serial baseline arm's own wall clock exceeding 90 minutes) did **not** fire: the serial arm's own measured duration is ≈3351.334 s ≈ 55.86 minutes, under the 90-minute threshold, so the full-corpus population was never dropped and the swept population stayed the full 90 units in both arms.
+
+## Implications for the release decision
+
+- The measured `- default-reachability: met` licenses the sprint's planned minor release (`## Verdict and licence conditions` above), subject to the batch GO the sprint's own operating rules reserve for the operator — this task neither performs nor pre-empts that decision (Non-goals).
+- Issue #277's remaining live-firing half — recorded as owed to this task by `docs/loop-engineering/agent-launch-fanout.md` line 242 — reads, as a statement about this task's own evidence, **discharged**: the shipped default path fired `verify — tier1-fanout` once, end to end, on a real situation, with no shipped byte changed. No issue is closed by this task; the close decision belongs to the sprint's batch close-out (spec `## Notes for engineer`), which can now cite this note's verdict as its own evidence rather than re-deriving it.
+- The divergence from T-1084's own board record (`## Terms and closed vocabularies` above; the Goal's own "divergence" paragraph) is resolved by measurement rather than left as a standing disagreement between two readings: the existence-capability reading this task adopted is the one under which a `- dispatch: verify — tier1-fanout` record could ever be transcribed and fired at all, and every one of that reading's own preconditions — a real orchestration step that can launch N agent instances and aggregate their verdicts — is now evidenced end to end on the default path itself, not merely in an out-of-loop probe. T-1084's own board entry is not edited by this task (Non-goals; that entry's own record stays `serial — unconditional`, a conservative choice made before this evidence existed, not an error); this note is the record of what changed.
+- The saving figure this task measured (≈46.89% wall-clock reduction on this task's own full 90-unit population, symmetric inner-timestamp basis, `## Saving and baseline comparison` above) is a second, independent data point beyond `docs/loop-engineering/phase-multiplexing.md`'s own 9-file pilot figure (43.84%, `phase-multiplexing.md` line 355) — both positive, on different populations, at different degrees (N=8 here versus the pilot's own swept degrees), on the same one-machine, single-session, no-inferential-statistics footing (Non-goals). Neither figure is evidence for a portable constant; `docs/loop-engineering/phase-multiplexing.md` line 375 already states why (a property of this machine's core count and this population's own cost distribution), and this task does not contest or extend that limit.
+- Two follow-ups already recorded in `docs/loop-engineering/phase-multiplexing.md` (line 370, the full-73-file-corpus re-run; line 371, AC-level fan-out granularity) stay owed regardless of this task's own measured verdict — this task's own population (a full-corpus, single-pinned-commit sweep, run once) is a different claim from either of those, and satisfying this task's own criteria does not discharge them (`## Supersession and follow-ups` below).
+- Nothing here supersedes any sibling note's own text (`## Supersession and follow-ups` below; Non-goals) — the divergence and the saving figure are declared as this task's own findings, never applied as edits to `docs/loop-engineering/phase-multiplexing.md`, `docs/loop-engineering/agent-launch-fanout.md`, `docs/loop-engineering/agent-concurrency.md` or `docs/loop-engineering/harness-agent-concurrency.md`.
+
+## Supersession and follow-ups
+
+- supersedes: nothing — `docs/loop-engineering/phase-multiplexing.md`, `docs/loop-engineering/agent-launch-fanout.md`, `docs/loop-engineering/agent-concurrency.md` and `docs/loop-engineering/harness-agent-concurrency.md` all stay byte-identical (Non-goals; **AC1** measures the first two of them as an outcome) — this task never edits any of the four. This task's own findings (the divergence resolution and the second saving figure, `## Implications for the release decision` above) are declared here rather than applied against those files; any future edit those findings license is a maintainer's own follow-up round, not this task's.
+- follow-up: issue #277's remaining live-firing half — `docs/loop-engineering/agent-launch-fanout.md:242` records it as owed to T-1085 — reads **discharged** as a statement about this task's own evidence (`## Implications for the release decision` above): the default-reachability verdict is `met`. No issue is closed by this task — the close decision belongs to the sprint's batch close-out (spec `## Notes for engineer`).
+- follow-up: `docs/loop-engineering/phase-multiplexing.md:370`'s full-73-file-corpus re-run (or a larger deterministically-selected subset) stays owed regardless of this task's own measured verdict — this task's own population (the full corpus at one pinned commit, run once) is a different claim from re-running a knee-sweep once a larger wall-clock budget exists, and this task's own full-population sweep does not discharge it.
+- follow-up: `docs/loop-engineering/phase-multiplexing.md:371`'s AC-level fan-out granularity split (dividing the single largest unit into per-criterion units) stays owed and untouched here (Non-goals).
+- The pre-commitment's droppable component (the full-corpus population, replaced by a fixed-stride subset) did **not** fire this round: the serial baseline arm's own wall clock (≈3351.334 s ≈ 55.86 minutes, `## Saving and baseline comparison` above) stayed under the pre-commitment's own 90-minute trigger, and no two consecutive review rounds landed an independent Blocker or Major against the same component (the two `assumption-contradicted` interventions recorded on the board were caught by the orchestrator's own freeze/firing process, not by a review round). The full-corpus population was therefore swept in both arms, unshrunk, and the follow-up above states the full-corpus re-run as still owed on its own terms rather than as this pre-commitment's own restated requirement list.
+
+## Limits and what is not computable
+
+Round 2 (above) reported the per-arm, per-instance results; the limits below were structural before the firing ran and stay structural now that it has — true regardless of what was measured, not narrowed by a favourable result.
+
+- Machine-local, single-host, single-session: every timing figure this note reports (launch record epochs, `agent-timestamp`/`heartbeat` values, the telemetry span rows, the arm wall clocks) is a property of one operator machine at one point in time and carries no git-ref label (Non-goals). Which host, which clock source and whether `TEAM_FANOUT_MAX` was set are recorded in `## Firing evidence` above (clock source `/bin/date +%s%N`; `- cap-ground: measured-cores=8`, so `TEAM_FANOUT_MAX` was unset); a fuller restatement of the firing's own execution conditions for the record is the orchestrator's own **AC19(g)**, not re-derived here.
+- No second repetition of either arm and no inferential-statistics treatment anywhere in this note: no significance test, confidence interval, variance model or regression (Non-goals; Protocol, "Degree and baseline," restated above) — one execution per arm is exactly what ran.
+- knee: undetermined — one degree is run in this task's own protocol (no degree sweep), so the plateau point stays undetermined at this task's own full 90-unit population, exactly as anticipated before the firing ran — the same limit `docs/loop-engineering/phase-multiplexing.md:375` already states as a property of that pilot's own machine and population, never a portable constant.
+- Fan-out degrees beyond `N = min(<unit count>, cap)`, and any knee-finding: out of this task's own input space (Input space, "Out-of-scope synthetic extremes") — N=8 (the host's own measured core count) is what ran, and no other degree was tried.
+- AC-level fan-out granularity: splitting the single largest unit into per-criterion units is `phase-multiplexing.md`'s own separate follow-up and is out of this task's own input space (Input space).
+- Sub-second overlap discrimination: the overlap claim this note makes (`## Default-path chain and aggregation analysis` above) is a non-empty intersection window with its margin stated against the frozen protocol's own metric — the maximum single launch latency, `first − launched-epoch`, disclosed negative at `qa-8`'s `-13881421000` ns (`## Verdict and licence conditions` above) — never a claim at finer timing resolution and never a claim resting on the demoted launch-dispersion cross-check (Input space; spec's own `## Input space`, "Sub-second overlap discrimination," states the same metric).
+- Model, harness-version or machine generalization: the launched model (`sonnet`) and `subagent_type` (`shell-team:qa-verifier`) are recorded verbatim as declared labels; whether this result generalizes to a different model, harness version or machine is `unobserved` (Input space; `agent-launch-fanout.md`'s own `## Agent-type boundary`).
+- An upgrade of the `subagent_type` claim from declared to harness-confirmed is explicitly out of this task's own input space (Input space; `docs/loop-engineering/agent-launch-fanout.md:247`) — nothing in this task's own evidence is cited as proof the declaration is true.
+- Instance death by forced termination (a `TaskStop`, a `kill`, a stopped process or an induced infinite loop) is out of this task's own input space; every instance this firing produced ended its own turn naturally, including the two units the harness moved to a tracked background continuation under contention (`## Firing evidence` above, disclosure 2) (Input space, Non-goals).
+- A synthetic population and a shipped-text change to make the firing work are both out of this task's own input space (Input space, Non-goals) — no shipped-text change was needed or applied; had one been needed, it would have been filed as an issue and the verdict would have read `not-met`.
+- Parallel writes of the whole spec corpus's own `- check:` commands against the real checkout are unmeasured, which is why every unit ran inside a throwaway clone rather than the real checkout (Input space) — this is a boundary the venue decision bought, not a result the firing itself measured.
+- The extraction defect disclosed in `## Firing evidence` above (disclosure 4 — `grep`'s binary-file misclassification on one unit's log) was a measurement artefact of the fanned arm's own runner script, swept and confirmed to have exactly one carrier across all eight part files; it is disclosed rather than smoothed over, and it changed no unit's own recorded verdict (the corrected pair carries the same `rc=1` as the removed one).
