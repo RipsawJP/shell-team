@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1085** Default-path firing of the verify-axis tier1-fanout dispatch: the shipped precedence rule, the transcribed board record and the shipped fan-out mechanics run once end to end on this task's own full-population blast-radius sweep, against a same-population serial baseline, producing one release-citable reachability verdict — `READY_FOR_QA` — spec: .shell-team/specs/T-1085-default-path-firing.md
+- [ ] **T-1085** Default-path firing of the verify-axis tier1-fanout dispatch: the shipped precedence rule, the transcribed board record and the shipped fan-out mechanics run once end to end on this task's own full-population blast-radius sweep, against a same-population serial baseline, producing one release-citable reachability verdict — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1085-default-path-firing.md
   - source: the approved sprint-dispatcher backlog's **step 5** and GitHub issue **#277**'s remaining live-firing half, which `docs/loop-engineering/agent-launch-fanout.md:242` records as "owed to T-1085" (read first-hand by `pm-spec`; the issue body itself is **relayed** — this role holds no GitHub-reading tool — so the freeze run measures and reports it). This is the sprint's **final** task and its **release gate**: the measured verdict decides the planned minor release (`met`) against merge-only (`not-met`, the approved fallback). No issue is closed here; #277's close decision belongs to the batch close-out.
   - branch: `feature/1085-default-path-firing` — stacked on `feature/1084-dispatcher` (PR #325) at tip `9c950d7`; PR base stays `develop`, merges at the sprint batch GO.
   - dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge (not-yet: no judge role exists to run, so no second candidate is available to discard; the deliverable is one note plus this task's records, a non-partitionable edit set; tier3's conditional trigger is also unsatisfied — reconcile has not been re-verified at a scale larger and more balanced than the pilot, and `saving: tier3-work-splitting` is measured negative at exactly this scale)
@@ -239,6 +239,10 @@ Every remaining occurrence is accounted for in the inventory table above as not-
 **Files changed this round.** `docs/loop-engineering/default-path-firing.md` (line 712 only); `.shell-team/todo.md` (line 63 annotation, this rework-round-2 sub-section, the flag flip below); `.shell-team/provenance/T-1085.md` (3 decision entries appended). Nothing under `skills/`, `templates/`, `agents/`, `bin/`, `tests/`, `.github/`, and no other spec/interventions/review file, was touched.
 
 **Flag.** `REWORK` → `READY_FOR_QA` (top of this entry) — QA round 3 re-verifies from here.
+
+### QA round 3 — T-1085
+
+**Verdict: PASS → READY_FOR_REVIEW.** Full write-up in `.shell-team/reviews/T-1085.md` (`## QA round 3`). Own live re-run of the full `dispersion` signature enumeration across the note, board, provenance, interventions and spec confirms every hit matches rework 2's own inventory-table disposition (historical/QA-record framing or the two fixed sites) — no live, unqualified assertion of dispersion as the overlap margin's basis remains anywhere. Line 712 now states the same metric, same disclosed-negative value and same demotion of dispersion as lines 636/645. The byte-locked `## Firing evidence` section independently re-diffed against evidence commit `6937e19` — byte-identical (536/536 lines, `cmp` clean) — and confirmed to carry zero `dispersion` occurrences. All mechanical gates green live this round: `check-acs` 18/0/1, `check-intent` aligned v2 (unchanged hash), `check-handoff`/`check-provenance` (13 entries)/`check-interventions` (7 entries)/`check-pii-shapes` all green. Round-1 PASS and round-2 item-level PASSes stand unchanged; this round closed the class-sweep-coverage gap only.
 
 ### QA round 1 — T-1084
 
