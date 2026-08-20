@@ -60,7 +60,540 @@ Restated from `.shell-team/specs/T-1085-default-path-firing.md`'s frozen `<!-- B
 
 ## Firing evidence (raw, orchestrator-produced)
 
-Completed after the firing; see round 2.
+The firing ran on 2026-08-20, orchestrator-produced, in this order: the fanned arm first, the serial baseline second, on an otherwise warm machine (the pre-arm cost pass had just completed), so the serial arm ran cache-warm relative to a cold start — execution order and warmth are stated here because the protocol requires them recorded, not corrected for. Pinned commit for every venue: `09cdf36d0f9fb10875b4e65a0b0f5e78057c26b5`. Each arm ran in its own freshly-created `git clone --no-hardlinks` under `$TMPDIR`, checked out detached at that commit; `git worktree add` was used for no venue. The decision, the board records, this launch record, the telemetry and both aggregations ran in the real checkout's shipped paths with `TEAM_RUNS_DIR` unset. Clock source: `/bin/date +%s%N`, verified expanding to a 19-digit integer on this host before use. `CHECK_ACS_TIMEOUT=300` was exported identically inside both arms. Every Bash call an instance made carried an explicit 600000 ms timeout, sized above the pre-arm cost pass's largest measured single-unit cost (435.8 s, `T-1050-check-layer-fast-follow.md`; the pass measured all 90 units singly, 53.5 min total).
+
+Five disclosures, stated rather than glossed. (1) The `- launched-epoch:` value below was stamped at the orchestrator's first opportunity after the launch message returned; the instances' own first per-unit timestamps precede it by up to ~49 s, so the per-instance `agent-timestamp` lines below, not that audit-only field, are the overlap derivation's inputs. (2) Two units exceeded the 600 s foreground window under 8-way contention (`T-1040` on qa-2, `T-1050` on qa-3) and were moved by the harness to tracked background continuations that completed and wrote their part lines — a per-call timeout sized above the largest *uncontended* single-unit cost did not absorb contention inflation. (3) On qa-3 the orchestrator, wrongly presuming the backgrounded first attempt had written nothing, ordered one re-run; the first attempt then surfaced as completed, leaving a duplicate claim for `T-1050`. Resolved by deduplication before aggregation: the first attempt's pair was removed and the re-run's kept (both recorded rc=1; the two attempts' timestamps both remain in the raw outputs; the pre-correction part file is preserved unmodified alongside the raw outputs). (4) The removed pair's payload also carried an extraction defect — `grep` classified that unit's log as binary and emitted its match notice instead of the summary line; the kept pair extracted the true summary, the class was swept across all eight part files (exactly one carrier), and the serial arm's runner used text-mode extraction (`grep -a`) from the start. (5) One heartbeat per instance is quoted below, selected as that instance's earliest beat falling strictly inside the re-derived window; the watchers recorded 427 beats in total across the fanned arm, all preserved in the raw outputs.
+
+<!-- BEGIN launch-record: t1085fan -->
+launch-record 1
+- population: .shell-team/runs/fanout-t1085fan.population
+- requested-n: 8
+- achieved-n: 8
+- cap-ground: measured-cores=8
+- assign: qa-1 — .shell-team/specs/T-1000-operating-conventions.md
+- assign: qa-1 — .shell-team/specs/T-1008-lessons-corpus-import.md
+- assign: qa-1 — .shell-team/specs/T-1016-close-out-entry-boundary.md
+- assign: qa-1 — .shell-team/specs/T-1023-block-size-deferral-record.md
+- assign: qa-1 — .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+- assign: qa-1 — .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+- assign: qa-1 — .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+- assign: qa-1 — .shell-team/specs/T-1056-loop-liveness.md
+- assign: qa-1 — .shell-team/specs/T-1064-shipped-docs-accuracy.md
+- assign: qa-1 — .shell-team/specs/T-1072-telemetry-span-discriminator.md
+- assign: qa-1 — .shell-team/specs/T-1080-depth-axis-contract.md
+- assign: qa-1 — .shell-team/specs/T-113-lessons-deidentification.md
+- assign: qa-2 — .shell-team/specs/T-1001-retro-input-acquisition.md
+- assign: qa-2 — .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+- assign: qa-2 — .shell-team/specs/T-1017-close-out-interventions-gate.md
+- assign: qa-2 — .shell-team/specs/T-1024-check-line-mktemp-guard.md
+- assign: qa-2 — .shell-team/specs/T-1032-audit-prose-accuracy.md
+- assign: qa-2 — .shell-team/specs/T-1040-frozen-repair-batch.md
+- assign: qa-2 — .shell-team/specs/T-1048-handoff-durability-barrier.md
+- assign: qa-2 — .shell-team/specs/T-1057-loop-integration.md
+- assign: qa-2 — .shell-team/specs/T-1065-task-class-verification-pricing.md
+- assign: qa-2 — .shell-team/specs/T-1073-harness-agent-concurrency.md
+- assign: qa-2 — .shell-team/specs/T-1081-freeze-sweep-hardening.md
+- assign: qa-2 — .shell-team/specs/design-note-T-1012.md
+- assign: qa-3 — .shell-team/specs/T-1002-intervention-capture-channel.md
+- assign: qa-3 — .shell-team/specs/T-1010-operator-language-boundary.md
+- assign: qa-3 — .shell-team/specs/T-1018-freeze-attestation-gate.md
+- assign: qa-3 — .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+- assign: qa-3 — .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+- assign: qa-3 — .shell-team/specs/T-1041-freeze-ux.md
+- assign: qa-3 — .shell-team/specs/T-1050-check-layer-fast-follow.md
+- assign: qa-3 — .shell-team/specs/T-1058-telemetry-binding.md
+- assign: qa-3 — .shell-team/specs/T-1066-effort-time-telemetry.md
+- assign: qa-3 — .shell-team/specs/T-1074-fanout-orchestration.md
+- assign: qa-3 — .shell-team/specs/T-1082-telemetry-discriminator.md
+- assign: qa-4 — .shell-team/specs/T-1003-retro-reads-interventions.md
+- assign: qa-4 — .shell-team/specs/T-1011-telemetry-event-rows.md
+- assign: qa-4 — .shell-team/specs/T-1019-is-span-row-parity.md
+- assign: qa-4 — .shell-team/specs/T-1026-skill-md-doc-completeness.md
+- assign: qa-4 — .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+- assign: qa-4 — .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+- assign: qa-4 — .shell-team/specs/T-1051-inspection-ux-polish.md
+- assign: qa-4 — .shell-team/specs/T-1059-docs-release-notes.md
+- assign: qa-4 — .shell-team/specs/T-1067-context-lifecycle.md
+- assign: qa-4 — .shell-team/specs/T-1075-fanout-adoption-versioning.md
+- assign: qa-4 — .shell-team/specs/T-1083-agent-launch-fanout.md
+- assign: qa-5 — .shell-team/specs/T-1004-optin-hook-sample.md
+- assign: qa-5 — .shell-team/specs/T-1012-loop-replay-generator.md
+- assign: qa-5 — .shell-team/specs/T-1020-lessons-supersede-sweep.md
+- assign: qa-5 — .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+- assign: qa-5 — .shell-team/specs/T-1035-spec-template-staleness-locks.md
+- assign: qa-5 — .shell-team/specs/T-1043-pm-spec-check-conventions.md
+- assign: qa-5 — .shell-team/specs/T-1052-records-editorial.md
+- assign: qa-5 — .shell-team/specs/T-1060-adopter-binding-docs.md
+- assign: qa-5 — .shell-team/specs/T-1068-agent-concurrency.md
+- assign: qa-5 — .shell-team/specs/T-1076-log-run-locking.md
+- assign: qa-5 — .shell-team/specs/T-1084-dispatch-routing-record.md
+- assign: qa-6 — .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+- assign: qa-6 — .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+- assign: qa-6 — .shell-team/specs/T-1020-supersede-adjudication.md
+- assign: qa-6 — .shell-team/specs/T-1028-class-m-refreeze.md
+- assign: qa-6 — .shell-team/specs/T-1036-wording-batch-141-143-144.md
+- assign: qa-6 — .shell-team/specs/T-1044-test-infra-bundle.md
+- assign: qa-6 — .shell-team/specs/T-1053-retro-mechanization.md
+- assign: qa-6 — .shell-team/specs/T-1061-adopter-docs-gate.md
+- assign: qa-6 — .shell-team/specs/T-1069-phase-multiplexing.md
+- assign: qa-6 — .shell-team/specs/T-1077-worktree-reconcile.md
+- assign: qa-6 — .shell-team/specs/T-1085-default-path-firing.md
+- assign: qa-7 — .shell-team/specs/T-1006-lessons-resolver-key.md
+- assign: qa-7 — .shell-team/specs/T-1014-flag-rail-data-path.md
+- assign: qa-7 — .shell-team/specs/T-1021-arith-base10-audit.md
+- assign: qa-7 — .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+- assign: qa-7 — .shell-team/specs/T-1037-checker-retro-precision.md
+- assign: qa-7 — .shell-team/specs/T-1045-codex-version-provenance.md
+- assign: qa-7 — .shell-team/specs/T-1054-binding-config.md
+- assign: qa-7 — .shell-team/specs/T-1062-release-notes-compare-link.md
+- assign: qa-7 — .shell-team/specs/T-1070-check-handoff-scaling.md
+- assign: qa-7 — .shell-team/specs/T-1078-tier3-pilot.md
+- assign: qa-7 — .shell-team/specs/T-111-pii-shape-checker.md
+- assign: qa-8 — .shell-team/specs/T-1007-scope-typed-ledger.md
+- assign: qa-8 — .shell-team/specs/T-1015-cutting-a-release.md
+- assign: qa-8 — .shell-team/specs/T-1022-close-out-gate-symmetry.md
+- assign: qa-8 — .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+- assign: qa-8 — .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+- assign: qa-8 — .shell-team/specs/T-1046-ignored-base-verdict.md
+- assign: qa-8 — .shell-team/specs/T-1055-adapter-envelope.md
+- assign: qa-8 — .shell-team/specs/T-1063-editorial-batch.md
+- assign: qa-8 — .shell-team/specs/T-1071-record-set-derivation.md
+- assign: qa-8 — .shell-team/specs/T-1079-tier2-judge.md
+- assign: qa-8 — .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+- liveness: qa-1 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-1
+- liveness: qa-2 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-2
+- liveness: qa-3 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-3
+- liveness: qa-4 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-4
+- liveness: qa-5 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-5
+- liveness: qa-6 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-6
+- liveness: qa-7 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-7
+- liveness: qa-8 — harness-tracked-background — bash /tmp/claude-502/t1085-fan.0ou4Ao/liveness.sh qa-8
+- launched-epoch: 1787185735135713000
+- completed-epoch: 1787187556288212000
+launch-record-end
+<!-- END launch-record: t1085fan -->
+
+<!-- BEGIN fanout-verdict: t1085fan -->
+- aggregated-by: bin/aggregate-verdicts.sh
+- locale: LC_ALL=C
+- part: qa-1 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-1.txt
+- part: qa-2 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-2.txt
+- part: qa-3 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-3.txt
+- part: qa-4 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-4.txt
+- part: qa-5 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-5.txt
+- part: qa-6 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-6.txt
+- part: qa-7 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-7.txt
+- part: qa-8 — /tmp/claude-502/t1085-fan.0ou4Ao/part-qa-8.txt
+<!-- BEGIN verdict-region: t1085fan -->
+- summary: units: 90 — verdicts: 88 — sentinels: 2
+- sentinel: .shell-team/specs/T-1020-supersede-adjudication.md — exit=2 no-verdict-lines
+- sentinel: .shell-team/specs/design-note-T-1012.md — exit=2 no-verdict-lines
+- verdict: .shell-team/specs/T-1000-operating-conventions.md — rc=1; check-acs: 16 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1000-operating-conventions.md)
+- verdict: .shell-team/specs/T-1001-retro-input-acquisition.md — rc=1; check-acs: 18 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1001-retro-input-acquisition.md)
+- verdict: .shell-team/specs/T-1002-intervention-capture-channel.md — rc=1; check-acs: 23 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1002-intervention-capture-channel.md)
+- verdict: .shell-team/specs/T-1003-retro-reads-interventions.md — rc=1; check-acs: 19 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1003-retro-reads-interventions.md)
+- verdict: .shell-team/specs/T-1004-optin-hook-sample.md — rc=1; check-acs: 15 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1004-optin-hook-sample.md)
+- verdict: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — rc=1; check-acs: 9 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md)
+- verdict: .shell-team/specs/T-1006-lessons-resolver-key.md — rc=1; check-acs: 15 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1006-lessons-resolver-key.md)
+- verdict: .shell-team/specs/T-1007-scope-typed-ledger.md — rc=1; check-acs: 14 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1007-scope-typed-ledger.md)
+- verdict: .shell-team/specs/T-1008-lessons-corpus-import.md — rc=1; check-acs: 18 passed, 7 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1008-lessons-corpus-import.md)
+- verdict: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — rc=1; check-acs: 12 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md)
+- verdict: .shell-team/specs/T-1010-operator-language-boundary.md — rc=1; check-acs: 25 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1010-operator-language-boundary.md)
+- verdict: .shell-team/specs/T-1011-telemetry-event-rows.md — rc=1; check-acs: 30 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1011-telemetry-event-rows.md)
+- verdict: .shell-team/specs/T-1012-loop-replay-generator.md — rc=1; check-acs: 25 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1012-loop-replay-generator.md)
+- verdict: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — rc=1; check-acs: 10 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1013-loop-replay-docs-wiring.md)
+- verdict: .shell-team/specs/T-1014-flag-rail-data-path.md — rc=1; check-acs: 14 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1014-flag-rail-data-path.md)
+- verdict: .shell-team/specs/T-1015-cutting-a-release.md — rc=1; check-acs: 6 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1015-cutting-a-release.md)
+- verdict: .shell-team/specs/T-1016-close-out-entry-boundary.md — rc=1; check-acs: 9 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1016-close-out-entry-boundary.md)
+- verdict: .shell-team/specs/T-1017-close-out-interventions-gate.md — rc=1; check-acs: 15 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1017-close-out-interventions-gate.md)
+- verdict: .shell-team/specs/T-1018-freeze-attestation-gate.md — rc=1; check-acs: 20 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1018-freeze-attestation-gate.md)
+- verdict: .shell-team/specs/T-1019-is-span-row-parity.md — rc=1; check-acs: 11 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1019-is-span-row-parity.md)
+- verdict: .shell-team/specs/T-1020-lessons-supersede-sweep.md — rc=1; check-acs: 5 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1020-lessons-supersede-sweep.md)
+- verdict: .shell-team/specs/T-1021-arith-base10-audit.md — rc=1; check-acs: 17 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1021-arith-base10-audit.md)
+- verdict: .shell-team/specs/T-1022-close-out-gate-symmetry.md — rc=1; check-acs: 15 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1022-close-out-gate-symmetry.md)
+- verdict: .shell-team/specs/T-1023-block-size-deferral-record.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1023-block-size-deferral-record.md)
+- verdict: .shell-team/specs/T-1024-check-line-mktemp-guard.md — rc=1; check-acs: 6 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1024-check-line-mktemp-guard.md)
+- verdict: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — rc=1; check-acs: 5 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1025-assert-parity-dead-comparison.md)
+- verdict: .shell-team/specs/T-1026-skill-md-doc-completeness.md — rc=1; check-acs: 4 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1026-skill-md-doc-completeness.md)
+- verdict: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — rc=1; check-acs: 8 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1027-promote-retro-2026-08-04.md)
+- verdict: .shell-team/specs/T-1028-class-m-refreeze.md — rc=1; check-acs: 12 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1028-class-m-refreeze.md)
+- verdict: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — rc=1; check-acs: 7 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1029-claim-fidelity-qa-step.md)
+- verdict: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — rc=1; check-acs: 8 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1030-reviewer-board-write-boundary.md)
+- verdict: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — rc=1; check-acs: 13 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1031-check-handoff-flag-anchor.md)
+- verdict: .shell-team/specs/T-1032-audit-prose-accuracy.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1032-audit-prose-accuracy.md)
+- verdict: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — rc=1; check-acs: 7 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1033-promote-retro-2026-08-05.md)
+- verdict: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1034-refreeze-hardening-execbit.md)
+- verdict: .shell-team/specs/T-1035-spec-template-staleness-locks.md — rc=1; check-acs: 3 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1035-spec-template-staleness-locks.md)
+- verdict: .shell-team/specs/T-1036-wording-batch-141-143-144.md — rc=1; check-acs: 10 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1036-wording-batch-141-143-144.md)
+- verdict: .shell-team/specs/T-1037-checker-retro-precision.md — rc=1; check-acs: 9 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1037-checker-retro-precision.md)
+- verdict: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — rc=1; check-acs: 12 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1038-errexit-safe-pin-keying.md)
+- verdict: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — rc=1; check-acs: 6 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1039-promote-retro-2026-08-06.md)
+- verdict: .shell-team/specs/T-1040-frozen-repair-batch.md — rc=1; check-acs: 14 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1040-frozen-repair-batch.md)
+- verdict: .shell-team/specs/T-1041-freeze-ux.md — rc=1; check-acs: 18 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1041-freeze-ux.md)
+- verdict: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — rc=1; check-acs: 12 passed, 1 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1042-ignored-base-and-retro-ledger.md)
+- verdict: .shell-team/specs/T-1043-pm-spec-check-conventions.md — rc=1; check-acs: 8 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1043-pm-spec-check-conventions.md)
+- verdict: .shell-team/specs/T-1044-test-infra-bundle.md — rc=1; check-acs: 10 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1044-test-infra-bundle.md)
+- verdict: .shell-team/specs/T-1045-codex-version-provenance.md — rc=1; check-acs: 5 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1045-codex-version-provenance.md)
+- verdict: .shell-team/specs/T-1046-ignored-base-verdict.md — rc=1; check-acs: 9 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1046-ignored-base-verdict.md)
+- verdict: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — rc=1; check-acs: 6 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1047-promote-retro-2026-08-08.md)
+- verdict: .shell-team/specs/T-1048-handoff-durability-barrier.md — rc=1; check-acs: 15 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1048-handoff-durability-barrier.md)
+- verdict: .shell-team/specs/T-1050-check-layer-fast-follow.md — rc=1; check-acs: 9 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1050-check-layer-fast-follow.md)
+- verdict: .shell-team/specs/T-1051-inspection-ux-polish.md — rc=1; check-acs: 12 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1051-inspection-ux-polish.md)
+- verdict: .shell-team/specs/T-1052-records-editorial.md — rc=1; check-acs: 9 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1052-records-editorial.md)
+- verdict: .shell-team/specs/T-1053-retro-mechanization.md — rc=1; check-acs: 0 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1053-retro-mechanization.md)
+- verdict: .shell-team/specs/T-1054-binding-config.md — rc=1; check-acs: 11 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1054-binding-config.md)
+- verdict: .shell-team/specs/T-1055-adapter-envelope.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1055-adapter-envelope.md)
+- verdict: .shell-team/specs/T-1056-loop-liveness.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1056-loop-liveness.md)
+- verdict: .shell-team/specs/T-1057-loop-integration.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1057-loop-integration.md)
+- verdict: .shell-team/specs/T-1058-telemetry-binding.md — rc=1; check-acs: 5 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1058-telemetry-binding.md)
+- verdict: .shell-team/specs/T-1059-docs-release-notes.md — rc=1; check-acs: 3 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1059-docs-release-notes.md)
+- verdict: .shell-team/specs/T-1060-adopter-binding-docs.md — rc=1; check-acs: 5 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1060-adopter-binding-docs.md)
+- verdict: .shell-team/specs/T-1061-adopter-docs-gate.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1061-adopter-docs-gate.md)
+- verdict: .shell-team/specs/T-1062-release-notes-compare-link.md — rc=1; check-acs: 2 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1062-release-notes-compare-link.md)
+- verdict: .shell-team/specs/T-1063-editorial-batch.md — rc=1; check-acs: 0 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1063-editorial-batch.md)
+- verdict: .shell-team/specs/T-1064-shipped-docs-accuracy.md — rc=1; check-acs: 0 passed, 11 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1064-shipped-docs-accuracy.md)
+- verdict: .shell-team/specs/T-1065-task-class-verification-pricing.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1065-task-class-verification-pricing.md)
+- verdict: .shell-team/specs/T-1066-effort-time-telemetry.md — rc=1; check-acs: 5 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1066-effort-time-telemetry.md)
+- verdict: .shell-team/specs/T-1067-context-lifecycle.md — rc=1; check-acs: 6 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1067-context-lifecycle.md)
+- verdict: .shell-team/specs/T-1068-agent-concurrency.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1068-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1069-phase-multiplexing.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1069-phase-multiplexing.md)
+- verdict: .shell-team/specs/T-1070-check-handoff-scaling.md — rc=1; check-acs: 5 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1070-check-handoff-scaling.md)
+- verdict: .shell-team/specs/T-1071-record-set-derivation.md — rc=1; check-acs: 8 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1071-record-set-derivation.md)
+- verdict: .shell-team/specs/T-1072-telemetry-span-discriminator.md — rc=1; check-acs: 8 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1072-telemetry-span-discriminator.md)
+- verdict: .shell-team/specs/T-1073-harness-agent-concurrency.md — rc=1; check-acs: 10 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1073-harness-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1074-fanout-orchestration.md — rc=1; check-acs: 13 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1074-fanout-orchestration.md)
+- verdict: .shell-team/specs/T-1075-fanout-adoption-versioning.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1075-fanout-adoption-versioning.md)
+- verdict: .shell-team/specs/T-1076-log-run-locking.md — rc=1; check-acs: 11 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1076-log-run-locking.md)
+- verdict: .shell-team/specs/T-1077-worktree-reconcile.md — rc=1; check-acs: 8 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1077-worktree-reconcile.md)
+- verdict: .shell-team/specs/T-1078-tier3-pilot.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1078-tier3-pilot.md)
+- verdict: .shell-team/specs/T-1079-tier2-judge.md — rc=1; check-acs: 6 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1079-tier2-judge.md)
+- verdict: .shell-team/specs/T-1080-depth-axis-contract.md — rc=1; check-acs: 3 passed, 15 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1080-depth-axis-contract.md)
+- verdict: .shell-team/specs/T-1081-freeze-sweep-hardening.md — rc=1; check-acs: 11 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1081-freeze-sweep-hardening.md)
+- verdict: .shell-team/specs/T-1082-telemetry-discriminator.md — rc=1; check-acs: 10 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1082-telemetry-discriminator.md)
+- verdict: .shell-team/specs/T-1083-agent-launch-fanout.md — rc=1; check-acs: 13 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1083-agent-launch-fanout.md)
+- verdict: .shell-team/specs/T-1084-dispatch-routing-record.md — rc=1; check-acs: 7 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1084-dispatch-routing-record.md)
+- verdict: .shell-team/specs/T-1085-default-path-firing.md — rc=1; check-acs: 2 passed, 16 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1085-default-path-firing.md)
+- verdict: .shell-team/specs/T-111-pii-shape-checker.md — rc=1; check-acs: 27 passed, 2 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-111-pii-shape-checker.md)
+- verdict: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — rc=1; check-acs: 22 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-112-commit-identity-and-ignore-lock.md)
+- verdict: .shell-team/specs/T-113-lessons-deidentification.md — rc=1; check-acs: 8 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-113-lessons-deidentification.md)
+<!-- END verdict-region: t1085fan -->
+- attribution: .shell-team/specs/T-1000-operating-conventions.md — qa-1
+- attribution: .shell-team/specs/T-1001-retro-input-acquisition.md — qa-2
+- attribution: .shell-team/specs/T-1002-intervention-capture-channel.md — qa-3
+- attribution: .shell-team/specs/T-1003-retro-reads-interventions.md — qa-4
+- attribution: .shell-team/specs/T-1004-optin-hook-sample.md — qa-5
+- attribution: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — qa-6
+- attribution: .shell-team/specs/T-1006-lessons-resolver-key.md — qa-7
+- attribution: .shell-team/specs/T-1007-scope-typed-ledger.md — qa-8
+- attribution: .shell-team/specs/T-1008-lessons-corpus-import.md — qa-1
+- attribution: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — qa-2
+- attribution: .shell-team/specs/T-1010-operator-language-boundary.md — qa-3
+- attribution: .shell-team/specs/T-1011-telemetry-event-rows.md — qa-4
+- attribution: .shell-team/specs/T-1012-loop-replay-generator.md — qa-5
+- attribution: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — qa-6
+- attribution: .shell-team/specs/T-1014-flag-rail-data-path.md — qa-7
+- attribution: .shell-team/specs/T-1015-cutting-a-release.md — qa-8
+- attribution: .shell-team/specs/T-1016-close-out-entry-boundary.md — qa-1
+- attribution: .shell-team/specs/T-1017-close-out-interventions-gate.md — qa-2
+- attribution: .shell-team/specs/T-1018-freeze-attestation-gate.md — qa-3
+- attribution: .shell-team/specs/T-1019-is-span-row-parity.md — qa-4
+- attribution: .shell-team/specs/T-1020-lessons-supersede-sweep.md — qa-5
+- attribution: .shell-team/specs/T-1020-supersede-adjudication.md — qa-6
+- attribution: .shell-team/specs/T-1021-arith-base10-audit.md — qa-7
+- attribution: .shell-team/specs/T-1022-close-out-gate-symmetry.md — qa-8
+- attribution: .shell-team/specs/T-1023-block-size-deferral-record.md — qa-1
+- attribution: .shell-team/specs/T-1024-check-line-mktemp-guard.md — qa-2
+- attribution: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — qa-3
+- attribution: .shell-team/specs/T-1026-skill-md-doc-completeness.md — qa-4
+- attribution: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — qa-5
+- attribution: .shell-team/specs/T-1028-class-m-refreeze.md — qa-6
+- attribution: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — qa-7
+- attribution: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — qa-8
+- attribution: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — qa-1
+- attribution: .shell-team/specs/T-1032-audit-prose-accuracy.md — qa-2
+- attribution: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — qa-3
+- attribution: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — qa-4
+- attribution: .shell-team/specs/T-1035-spec-template-staleness-locks.md — qa-5
+- attribution: .shell-team/specs/T-1036-wording-batch-141-143-144.md — qa-6
+- attribution: .shell-team/specs/T-1037-checker-retro-precision.md — qa-7
+- attribution: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — qa-8
+- attribution: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — qa-1
+- attribution: .shell-team/specs/T-1040-frozen-repair-batch.md — qa-2
+- attribution: .shell-team/specs/T-1041-freeze-ux.md — qa-3
+- attribution: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — qa-4
+- attribution: .shell-team/specs/T-1043-pm-spec-check-conventions.md — qa-5
+- attribution: .shell-team/specs/T-1044-test-infra-bundle.md — qa-6
+- attribution: .shell-team/specs/T-1045-codex-version-provenance.md — qa-7
+- attribution: .shell-team/specs/T-1046-ignored-base-verdict.md — qa-8
+- attribution: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — qa-1
+- attribution: .shell-team/specs/T-1048-handoff-durability-barrier.md — qa-2
+- attribution: .shell-team/specs/T-1050-check-layer-fast-follow.md — qa-3
+- attribution: .shell-team/specs/T-1051-inspection-ux-polish.md — qa-4
+- attribution: .shell-team/specs/T-1052-records-editorial.md — qa-5
+- attribution: .shell-team/specs/T-1053-retro-mechanization.md — qa-6
+- attribution: .shell-team/specs/T-1054-binding-config.md — qa-7
+- attribution: .shell-team/specs/T-1055-adapter-envelope.md — qa-8
+- attribution: .shell-team/specs/T-1056-loop-liveness.md — qa-1
+- attribution: .shell-team/specs/T-1057-loop-integration.md — qa-2
+- attribution: .shell-team/specs/T-1058-telemetry-binding.md — qa-3
+- attribution: .shell-team/specs/T-1059-docs-release-notes.md — qa-4
+- attribution: .shell-team/specs/T-1060-adopter-binding-docs.md — qa-5
+- attribution: .shell-team/specs/T-1061-adopter-docs-gate.md — qa-6
+- attribution: .shell-team/specs/T-1062-release-notes-compare-link.md — qa-7
+- attribution: .shell-team/specs/T-1063-editorial-batch.md — qa-8
+- attribution: .shell-team/specs/T-1064-shipped-docs-accuracy.md — qa-1
+- attribution: .shell-team/specs/T-1065-task-class-verification-pricing.md — qa-2
+- attribution: .shell-team/specs/T-1066-effort-time-telemetry.md — qa-3
+- attribution: .shell-team/specs/T-1067-context-lifecycle.md — qa-4
+- attribution: .shell-team/specs/T-1068-agent-concurrency.md — qa-5
+- attribution: .shell-team/specs/T-1069-phase-multiplexing.md — qa-6
+- attribution: .shell-team/specs/T-1070-check-handoff-scaling.md — qa-7
+- attribution: .shell-team/specs/T-1071-record-set-derivation.md — qa-8
+- attribution: .shell-team/specs/T-1072-telemetry-span-discriminator.md — qa-1
+- attribution: .shell-team/specs/T-1073-harness-agent-concurrency.md — qa-2
+- attribution: .shell-team/specs/T-1074-fanout-orchestration.md — qa-3
+- attribution: .shell-team/specs/T-1075-fanout-adoption-versioning.md — qa-4
+- attribution: .shell-team/specs/T-1076-log-run-locking.md — qa-5
+- attribution: .shell-team/specs/T-1077-worktree-reconcile.md — qa-6
+- attribution: .shell-team/specs/T-1078-tier3-pilot.md — qa-7
+- attribution: .shell-team/specs/T-1079-tier2-judge.md — qa-8
+- attribution: .shell-team/specs/T-1080-depth-axis-contract.md — qa-1
+- attribution: .shell-team/specs/T-1081-freeze-sweep-hardening.md — qa-2
+- attribution: .shell-team/specs/T-1082-telemetry-discriminator.md — qa-3
+- attribution: .shell-team/specs/T-1083-agent-launch-fanout.md — qa-4
+- attribution: .shell-team/specs/T-1084-dispatch-routing-record.md — qa-5
+- attribution: .shell-team/specs/T-1085-default-path-firing.md — qa-6
+- attribution: .shell-team/specs/T-111-pii-shape-checker.md — qa-7
+- attribution: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — qa-8
+- attribution: .shell-team/specs/T-113-lessons-deidentification.md — qa-1
+- attribution: .shell-team/specs/design-note-T-1012.md — qa-2
+<!-- END fanout-verdict: t1085fan -->
+
+<!-- BEGIN fanout-verdict: t1085serial -->
+- aggregated-by: bin/aggregate-verdicts.sh
+- locale: LC_ALL=C
+- part: serial-1 — /tmp/claude-502/t1085-ser.06OEfZ/part-serial-1.txt
+<!-- BEGIN verdict-region: t1085serial -->
+- summary: units: 90 — verdicts: 88 — sentinels: 2
+- sentinel: .shell-team/specs/T-1020-supersede-adjudication.md — exit=2 no-verdict-lines
+- sentinel: .shell-team/specs/design-note-T-1012.md — exit=2 no-verdict-lines
+- verdict: .shell-team/specs/T-1000-operating-conventions.md — rc=1; check-acs: 16 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1000-operating-conventions.md)
+- verdict: .shell-team/specs/T-1001-retro-input-acquisition.md — rc=1; check-acs: 18 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1001-retro-input-acquisition.md)
+- verdict: .shell-team/specs/T-1002-intervention-capture-channel.md — rc=1; check-acs: 23 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1002-intervention-capture-channel.md)
+- verdict: .shell-team/specs/T-1003-retro-reads-interventions.md — rc=1; check-acs: 19 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1003-retro-reads-interventions.md)
+- verdict: .shell-team/specs/T-1004-optin-hook-sample.md — rc=1; check-acs: 15 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1004-optin-hook-sample.md)
+- verdict: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — rc=1; check-acs: 9 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md)
+- verdict: .shell-team/specs/T-1006-lessons-resolver-key.md — rc=1; check-acs: 15 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1006-lessons-resolver-key.md)
+- verdict: .shell-team/specs/T-1007-scope-typed-ledger.md — rc=1; check-acs: 14 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1007-scope-typed-ledger.md)
+- verdict: .shell-team/specs/T-1008-lessons-corpus-import.md — rc=1; check-acs: 18 passed, 7 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1008-lessons-corpus-import.md)
+- verdict: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — rc=1; check-acs: 12 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md)
+- verdict: .shell-team/specs/T-1010-operator-language-boundary.md — rc=1; check-acs: 25 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1010-operator-language-boundary.md)
+- verdict: .shell-team/specs/T-1011-telemetry-event-rows.md — rc=1; check-acs: 30 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1011-telemetry-event-rows.md)
+- verdict: .shell-team/specs/T-1012-loop-replay-generator.md — rc=1; check-acs: 25 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1012-loop-replay-generator.md)
+- verdict: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — rc=1; check-acs: 10 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1013-loop-replay-docs-wiring.md)
+- verdict: .shell-team/specs/T-1014-flag-rail-data-path.md — rc=1; check-acs: 14 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1014-flag-rail-data-path.md)
+- verdict: .shell-team/specs/T-1015-cutting-a-release.md — rc=1; check-acs: 6 passed, 5 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1015-cutting-a-release.md)
+- verdict: .shell-team/specs/T-1016-close-out-entry-boundary.md — rc=1; check-acs: 9 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1016-close-out-entry-boundary.md)
+- verdict: .shell-team/specs/T-1017-close-out-interventions-gate.md — rc=1; check-acs: 15 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1017-close-out-interventions-gate.md)
+- verdict: .shell-team/specs/T-1018-freeze-attestation-gate.md — rc=1; check-acs: 20 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1018-freeze-attestation-gate.md)
+- verdict: .shell-team/specs/T-1019-is-span-row-parity.md — rc=1; check-acs: 11 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1019-is-span-row-parity.md)
+- verdict: .shell-team/specs/T-1020-lessons-supersede-sweep.md — rc=1; check-acs: 5 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1020-lessons-supersede-sweep.md)
+- verdict: .shell-team/specs/T-1021-arith-base10-audit.md — rc=1; check-acs: 17 passed, 7 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1021-arith-base10-audit.md)
+- verdict: .shell-team/specs/T-1022-close-out-gate-symmetry.md — rc=1; check-acs: 15 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1022-close-out-gate-symmetry.md)
+- verdict: .shell-team/specs/T-1023-block-size-deferral-record.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1023-block-size-deferral-record.md)
+- verdict: .shell-team/specs/T-1024-check-line-mktemp-guard.md — rc=1; check-acs: 6 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1024-check-line-mktemp-guard.md)
+- verdict: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — rc=1; check-acs: 5 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1025-assert-parity-dead-comparison.md)
+- verdict: .shell-team/specs/T-1026-skill-md-doc-completeness.md — rc=1; check-acs: 4 passed, 4 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1026-skill-md-doc-completeness.md)
+- verdict: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — rc=1; check-acs: 8 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1027-promote-retro-2026-08-04.md)
+- verdict: .shell-team/specs/T-1028-class-m-refreeze.md — rc=1; check-acs: 12 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1028-class-m-refreeze.md)
+- verdict: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — rc=1; check-acs: 7 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1029-claim-fidelity-qa-step.md)
+- verdict: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — rc=1; check-acs: 8 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1030-reviewer-board-write-boundary.md)
+- verdict: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — rc=1; check-acs: 13 passed, 3 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1031-check-handoff-flag-anchor.md)
+- verdict: .shell-team/specs/T-1032-audit-prose-accuracy.md — rc=1; check-acs: 8 passed, 6 failed, 2 skipped, 0 unrecognized (.shell-team/specs/T-1032-audit-prose-accuracy.md)
+- verdict: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — rc=1; check-acs: 7 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1033-promote-retro-2026-08-05.md)
+- verdict: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1034-refreeze-hardening-execbit.md)
+- verdict: .shell-team/specs/T-1035-spec-template-staleness-locks.md — rc=1; check-acs: 3 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1035-spec-template-staleness-locks.md)
+- verdict: .shell-team/specs/T-1036-wording-batch-141-143-144.md — rc=1; check-acs: 10 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1036-wording-batch-141-143-144.md)
+- verdict: .shell-team/specs/T-1037-checker-retro-precision.md — rc=1; check-acs: 9 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1037-checker-retro-precision.md)
+- verdict: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — rc=1; check-acs: 12 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1038-errexit-safe-pin-keying.md)
+- verdict: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — rc=1; check-acs: 6 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1039-promote-retro-2026-08-06.md)
+- verdict: .shell-team/specs/T-1040-frozen-repair-batch.md — rc=1; check-acs: 14 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1040-frozen-repair-batch.md)
+- verdict: .shell-team/specs/T-1041-freeze-ux.md — rc=1; check-acs: 18 passed, 5 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1041-freeze-ux.md)
+- verdict: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — rc=1; check-acs: 12 passed, 1 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1042-ignored-base-and-retro-ledger.md)
+- verdict: .shell-team/specs/T-1043-pm-spec-check-conventions.md — rc=1; check-acs: 8 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1043-pm-spec-check-conventions.md)
+- verdict: .shell-team/specs/T-1044-test-infra-bundle.md — rc=1; check-acs: 10 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1044-test-infra-bundle.md)
+- verdict: .shell-team/specs/T-1045-codex-version-provenance.md — rc=1; check-acs: 5 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1045-codex-version-provenance.md)
+- verdict: .shell-team/specs/T-1046-ignored-base-verdict.md — rc=1; check-acs: 9 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1046-ignored-base-verdict.md)
+- verdict: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — rc=1; check-acs: 6 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1047-promote-retro-2026-08-08.md)
+- verdict: .shell-team/specs/T-1048-handoff-durability-barrier.md — rc=1; check-acs: 15 passed, 2 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1048-handoff-durability-barrier.md)
+- verdict: .shell-team/specs/T-1050-check-layer-fast-follow.md — rc=1; check-acs: 9 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1050-check-layer-fast-follow.md)
+- verdict: .shell-team/specs/T-1051-inspection-ux-polish.md — rc=1; check-acs: 12 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1051-inspection-ux-polish.md)
+- verdict: .shell-team/specs/T-1052-records-editorial.md — rc=1; check-acs: 9 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1052-records-editorial.md)
+- verdict: .shell-team/specs/T-1053-retro-mechanization.md — rc=1; check-acs: 0 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1053-retro-mechanization.md)
+- verdict: .shell-team/specs/T-1054-binding-config.md — rc=1; check-acs: 11 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1054-binding-config.md)
+- verdict: .shell-team/specs/T-1055-adapter-envelope.md — rc=1; check-acs: 14 passed, 3 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1055-adapter-envelope.md)
+- verdict: .shell-team/specs/T-1056-loop-liveness.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1056-loop-liveness.md)
+- verdict: .shell-team/specs/T-1057-loop-integration.md — rc=1; check-acs: 13 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1057-loop-integration.md)
+- verdict: .shell-team/specs/T-1058-telemetry-binding.md — rc=1; check-acs: 5 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1058-telemetry-binding.md)
+- verdict: .shell-team/specs/T-1059-docs-release-notes.md — rc=1; check-acs: 3 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1059-docs-release-notes.md)
+- verdict: .shell-team/specs/T-1060-adopter-binding-docs.md — rc=1; check-acs: 5 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1060-adopter-binding-docs.md)
+- verdict: .shell-team/specs/T-1061-adopter-docs-gate.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1061-adopter-docs-gate.md)
+- verdict: .shell-team/specs/T-1062-release-notes-compare-link.md — rc=1; check-acs: 2 passed, 4 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1062-release-notes-compare-link.md)
+- verdict: .shell-team/specs/T-1063-editorial-batch.md — rc=1; check-acs: 0 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1063-editorial-batch.md)
+- verdict: .shell-team/specs/T-1064-shipped-docs-accuracy.md — rc=1; check-acs: 0 passed, 11 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1064-shipped-docs-accuracy.md)
+- verdict: .shell-team/specs/T-1065-task-class-verification-pricing.md — rc=1; check-acs: 1 passed, 10 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1065-task-class-verification-pricing.md)
+- verdict: .shell-team/specs/T-1066-effort-time-telemetry.md — rc=1; check-acs: 5 passed, 8 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1066-effort-time-telemetry.md)
+- verdict: .shell-team/specs/T-1067-context-lifecycle.md — rc=1; check-acs: 6 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1067-context-lifecycle.md)
+- verdict: .shell-team/specs/T-1068-agent-concurrency.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1068-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1069-phase-multiplexing.md — rc=1; check-acs: 4 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1069-phase-multiplexing.md)
+- verdict: .shell-team/specs/T-1070-check-handoff-scaling.md — rc=1; check-acs: 5 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1070-check-handoff-scaling.md)
+- verdict: .shell-team/specs/T-1071-record-set-derivation.md — rc=1; check-acs: 8 passed, 6 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1071-record-set-derivation.md)
+- verdict: .shell-team/specs/T-1072-telemetry-span-discriminator.md — rc=1; check-acs: 8 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1072-telemetry-span-discriminator.md)
+- verdict: .shell-team/specs/T-1073-harness-agent-concurrency.md — rc=1; check-acs: 10 passed, 5 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1073-harness-agent-concurrency.md)
+- verdict: .shell-team/specs/T-1074-fanout-orchestration.md — rc=1; check-acs: 13 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1074-fanout-orchestration.md)
+- verdict: .shell-team/specs/T-1075-fanout-adoption-versioning.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1075-fanout-adoption-versioning.md)
+- verdict: .shell-team/specs/T-1076-log-run-locking.md — rc=1; check-acs: 11 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1076-log-run-locking.md)
+- verdict: .shell-team/specs/T-1077-worktree-reconcile.md — rc=1; check-acs: 8 passed, 6 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1077-worktree-reconcile.md)
+- verdict: .shell-team/specs/T-1078-tier3-pilot.md — rc=1; check-acs: 6 passed, 11 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1078-tier3-pilot.md)
+- verdict: .shell-team/specs/T-1079-tier2-judge.md — rc=1; check-acs: 6 passed, 12 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1079-tier2-judge.md)
+- verdict: .shell-team/specs/T-1080-depth-axis-contract.md — rc=1; check-acs: 3 passed, 15 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1080-depth-axis-contract.md)
+- verdict: .shell-team/specs/T-1081-freeze-sweep-hardening.md — rc=1; check-acs: 11 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1081-freeze-sweep-hardening.md)
+- verdict: .shell-team/specs/T-1082-telemetry-discriminator.md — rc=1; check-acs: 10 passed, 7 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1082-telemetry-discriminator.md)
+- verdict: .shell-team/specs/T-1083-agent-launch-fanout.md — rc=1; check-acs: 13 passed, 8 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1083-agent-launch-fanout.md)
+- verdict: .shell-team/specs/T-1084-dispatch-routing-record.md — rc=1; check-acs: 7 passed, 9 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1084-dispatch-routing-record.md)
+- verdict: .shell-team/specs/T-1085-default-path-firing.md — rc=1; check-acs: 2 passed, 16 failed, 1 skipped, 0 unrecognized (.shell-team/specs/T-1085-default-path-firing.md)
+- verdict: .shell-team/specs/T-111-pii-shape-checker.md — rc=1; check-acs: 27 passed, 2 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-111-pii-shape-checker.md)
+- verdict: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — rc=1; check-acs: 22 passed, 3 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-112-commit-identity-and-ignore-lock.md)
+- verdict: .shell-team/specs/T-113-lessons-deidentification.md — rc=1; check-acs: 8 passed, 4 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-113-lessons-deidentification.md)
+<!-- END verdict-region: t1085serial -->
+- attribution: .shell-team/specs/T-1000-operating-conventions.md — serial-1
+- attribution: .shell-team/specs/T-1001-retro-input-acquisition.md — serial-1
+- attribution: .shell-team/specs/T-1002-intervention-capture-channel.md — serial-1
+- attribution: .shell-team/specs/T-1003-retro-reads-interventions.md — serial-1
+- attribution: .shell-team/specs/T-1004-optin-hook-sample.md — serial-1
+- attribution: .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md — serial-1
+- attribution: .shell-team/specs/T-1006-lessons-resolver-key.md — serial-1
+- attribution: .shell-team/specs/T-1007-scope-typed-ledger.md — serial-1
+- attribution: .shell-team/specs/T-1008-lessons-corpus-import.md — serial-1
+- attribution: .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md — serial-1
+- attribution: .shell-team/specs/T-1010-operator-language-boundary.md — serial-1
+- attribution: .shell-team/specs/T-1011-telemetry-event-rows.md — serial-1
+- attribution: .shell-team/specs/T-1012-loop-replay-generator.md — serial-1
+- attribution: .shell-team/specs/T-1013-loop-replay-docs-wiring.md — serial-1
+- attribution: .shell-team/specs/T-1014-flag-rail-data-path.md — serial-1
+- attribution: .shell-team/specs/T-1015-cutting-a-release.md — serial-1
+- attribution: .shell-team/specs/T-1016-close-out-entry-boundary.md — serial-1
+- attribution: .shell-team/specs/T-1017-close-out-interventions-gate.md — serial-1
+- attribution: .shell-team/specs/T-1018-freeze-attestation-gate.md — serial-1
+- attribution: .shell-team/specs/T-1019-is-span-row-parity.md — serial-1
+- attribution: .shell-team/specs/T-1020-lessons-supersede-sweep.md — serial-1
+- attribution: .shell-team/specs/T-1020-supersede-adjudication.md — serial-1
+- attribution: .shell-team/specs/T-1021-arith-base10-audit.md — serial-1
+- attribution: .shell-team/specs/T-1022-close-out-gate-symmetry.md — serial-1
+- attribution: .shell-team/specs/T-1023-block-size-deferral-record.md — serial-1
+- attribution: .shell-team/specs/T-1024-check-line-mktemp-guard.md — serial-1
+- attribution: .shell-team/specs/T-1025-assert-parity-dead-comparison.md — serial-1
+- attribution: .shell-team/specs/T-1026-skill-md-doc-completeness.md — serial-1
+- attribution: .shell-team/specs/T-1027-promote-retro-2026-08-04.md — serial-1
+- attribution: .shell-team/specs/T-1028-class-m-refreeze.md — serial-1
+- attribution: .shell-team/specs/T-1029-claim-fidelity-qa-step.md — serial-1
+- attribution: .shell-team/specs/T-1030-reviewer-board-write-boundary.md — serial-1
+- attribution: .shell-team/specs/T-1031-check-handoff-flag-anchor.md — serial-1
+- attribution: .shell-team/specs/T-1032-audit-prose-accuracy.md — serial-1
+- attribution: .shell-team/specs/T-1033-promote-retro-2026-08-05.md — serial-1
+- attribution: .shell-team/specs/T-1034-refreeze-hardening-execbit.md — serial-1
+- attribution: .shell-team/specs/T-1035-spec-template-staleness-locks.md — serial-1
+- attribution: .shell-team/specs/T-1036-wording-batch-141-143-144.md — serial-1
+- attribution: .shell-team/specs/T-1037-checker-retro-precision.md — serial-1
+- attribution: .shell-team/specs/T-1038-errexit-safe-pin-keying.md — serial-1
+- attribution: .shell-team/specs/T-1039-promote-retro-2026-08-06.md — serial-1
+- attribution: .shell-team/specs/T-1040-frozen-repair-batch.md — serial-1
+- attribution: .shell-team/specs/T-1041-freeze-ux.md — serial-1
+- attribution: .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md — serial-1
+- attribution: .shell-team/specs/T-1043-pm-spec-check-conventions.md — serial-1
+- attribution: .shell-team/specs/T-1044-test-infra-bundle.md — serial-1
+- attribution: .shell-team/specs/T-1045-codex-version-provenance.md — serial-1
+- attribution: .shell-team/specs/T-1046-ignored-base-verdict.md — serial-1
+- attribution: .shell-team/specs/T-1047-promote-retro-2026-08-08.md — serial-1
+- attribution: .shell-team/specs/T-1048-handoff-durability-barrier.md — serial-1
+- attribution: .shell-team/specs/T-1050-check-layer-fast-follow.md — serial-1
+- attribution: .shell-team/specs/T-1051-inspection-ux-polish.md — serial-1
+- attribution: .shell-team/specs/T-1052-records-editorial.md — serial-1
+- attribution: .shell-team/specs/T-1053-retro-mechanization.md — serial-1
+- attribution: .shell-team/specs/T-1054-binding-config.md — serial-1
+- attribution: .shell-team/specs/T-1055-adapter-envelope.md — serial-1
+- attribution: .shell-team/specs/T-1056-loop-liveness.md — serial-1
+- attribution: .shell-team/specs/T-1057-loop-integration.md — serial-1
+- attribution: .shell-team/specs/T-1058-telemetry-binding.md — serial-1
+- attribution: .shell-team/specs/T-1059-docs-release-notes.md — serial-1
+- attribution: .shell-team/specs/T-1060-adopter-binding-docs.md — serial-1
+- attribution: .shell-team/specs/T-1061-adopter-docs-gate.md — serial-1
+- attribution: .shell-team/specs/T-1062-release-notes-compare-link.md — serial-1
+- attribution: .shell-team/specs/T-1063-editorial-batch.md — serial-1
+- attribution: .shell-team/specs/T-1064-shipped-docs-accuracy.md — serial-1
+- attribution: .shell-team/specs/T-1065-task-class-verification-pricing.md — serial-1
+- attribution: .shell-team/specs/T-1066-effort-time-telemetry.md — serial-1
+- attribution: .shell-team/specs/T-1067-context-lifecycle.md — serial-1
+- attribution: .shell-team/specs/T-1068-agent-concurrency.md — serial-1
+- attribution: .shell-team/specs/T-1069-phase-multiplexing.md — serial-1
+- attribution: .shell-team/specs/T-1070-check-handoff-scaling.md — serial-1
+- attribution: .shell-team/specs/T-1071-record-set-derivation.md — serial-1
+- attribution: .shell-team/specs/T-1072-telemetry-span-discriminator.md — serial-1
+- attribution: .shell-team/specs/T-1073-harness-agent-concurrency.md — serial-1
+- attribution: .shell-team/specs/T-1074-fanout-orchestration.md — serial-1
+- attribution: .shell-team/specs/T-1075-fanout-adoption-versioning.md — serial-1
+- attribution: .shell-team/specs/T-1076-log-run-locking.md — serial-1
+- attribution: .shell-team/specs/T-1077-worktree-reconcile.md — serial-1
+- attribution: .shell-team/specs/T-1078-tier3-pilot.md — serial-1
+- attribution: .shell-team/specs/T-1079-tier2-judge.md — serial-1
+- attribution: .shell-team/specs/T-1080-depth-axis-contract.md — serial-1
+- attribution: .shell-team/specs/T-1081-freeze-sweep-hardening.md — serial-1
+- attribution: .shell-team/specs/T-1082-telemetry-discriminator.md — serial-1
+- attribution: .shell-team/specs/T-1083-agent-launch-fanout.md — serial-1
+- attribution: .shell-team/specs/T-1084-dispatch-routing-record.md — serial-1
+- attribution: .shell-team/specs/T-1085-default-path-firing.md — serial-1
+- attribution: .shell-team/specs/T-111-pii-shape-checker.md — serial-1
+- attribution: .shell-team/specs/T-112-commit-identity-and-ignore-lock.md — serial-1
+- attribution: .shell-team/specs/T-113-lessons-deidentification.md — serial-1
+- attribution: .shell-team/specs/design-note-T-1012.md — serial-1
+<!-- END fanout-verdict: t1085serial -->
+
+- checker-result: aggregate-verdicts — exit=0 — both arms reduced: label t1085fan from 8 part files and label t1085serial from 1 part file, each block emitted on stdout and captured verbatim above
+- checker-result: check-fanout-instances — exit=0 — check-fanout-instances: ok: run-id=t1085-20260819T123030Z phase=validate label=t1085fan rows=8 parts=8
+
+- agent-timestamp: t1085fan — qa-1 — first=1787185686759442000 — last=1787186738566042000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-2 — first=1787185691664587000 — last=1787186706839890000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-3 — first=1787185696352769000 — last=1787187466653181000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-4 — first=1787185701633042000 — last=1787186713371219000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-5 — first=1787185706655453000 — last=1787186637016768000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-6 — first=1787185711904211000 — last=1787186847255783000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-7 — first=1787185716607817000 — last=1787186959444940000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085fan — qa-8 — first=1787185721254292000 — last=1787186599452998000 — per-unit runner stamps, min start and max end across this instance's assigned units, `/bin/date +%s%N`
+- agent-timestamp: t1085serial — serial-1 — first=1787196593684218000 — last=1787199945017994000 — same runner mechanism as the fanned arm, single instance over the same 90-unit population
+
+- heartbeat: t1085fan — 1787185736270272000 — recorded by qa-1's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185736706153000 — recorded by qa-2's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185737443016000 — recorded by qa-3's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185738317891000 — recorded by qa-4's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185738631370000 — recorded by qa-5's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185739588688000 — recorded by qa-6's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185740881802000 — recorded by qa-7's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+- heartbeat: t1085fan — 1787185741318548000 — recorded by qa-8's liveness watcher; earliest of its beats falling strictly inside the re-derived window, quoted one per instance
+
+Orchestrator-written telemetry span rows for every instance, quoted verbatim from `.shell-team/runs/shell-team.jsonl` (the fanned arm under attempt 1 with `qa-*` ids, the serial baseline under attempt 2 with its `serial-*` id; `subagent_type` was `shell-team:qa-verifier` for all nine launches, recorded as a declared label):
+
+```
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":8,"ts":"2026-08-20T01:00:07Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58708,"tool_uses":13,"duration_ms":1058682,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-1"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":9,"ts":"2026-08-20T01:00:07Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":60026,"tool_uses":14,"duration_ms":1023802,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-2"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":10,"ts":"2026-08-20T01:00:07Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":62152,"tool_uses":14,"duration_ms":1799128,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-3"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":11,"ts":"2026-08-20T01:00:08Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58489,"tool_uses":12,"duration_ms":1019570,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-4"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":12,"ts":"2026-08-20T01:00:08Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58490,"tool_uses":12,"duration_ms":937965,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-5"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":13,"ts":"2026-08-20T01:00:08Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58517,"tool_uses":12,"duration_ms":1143463,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-6"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":14,"ts":"2026-08-20T01:00:09Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58440,"tool_uses":12,"duration_ms":1253444,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-7"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":15,"ts":"2026-08-20T01:00:09Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":1,"status":"success","model":"sonnet","tokens":58555,"tool_uses":12,"duration_ms":887628,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"qa-8"}
+{"loop_id":"shell-team","run_id":"t1085-20260819T123030Z","seq":16,"ts":"2026-08-20T04:26:15Z","span":"qa-verifier","phase":"validate","iteration":0,"attempt":2,"status":"success","model":"sonnet","tokens":78319,"tool_uses":91,"duration_ms":3359955,"verdict":null,"usd":null,"error":null,"parent_span_id":null,"provider":null,"effort":null,"adapter":null,"instance":"serial-1"}
+```
+
 
 ## Default-path chain and aggregation analysis
 
