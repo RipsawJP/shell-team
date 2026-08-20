@@ -121,6 +121,53 @@ Reported item by item per the frozen criterion's own text; these three items are
 
 **Risk notes for reviewer (see review file for full detail).** (1) Per the spec's own `## Verdict scope`, my PASS on the `opt-in`/existence-capability readings (Goal) and on **AC13**'s saving-direction conclusion gates progression only — the cross-provider review is the settling read for both. (2) AC19(a)'s full 18-mutation self-check and AC19(c)'s full 74-step CI-equivalence run were audited by shape and spot-checked, not fully independently re-executed end to end this round (per the task brief's own scoping of "the arms" out of QA re-verification). (3) The three genuine new reds against `T-1084`'s own AC14/AC15/AC16 are real, permanent until T-1084's owners re-freeze, and correctly attributed to stacking rather than to this task's own diff.
 
+### Engineer rework — T-1085 (round 3, closing the cross-provider review's two Major findings)
+
+**Scope.** The round-1 Blocker (the class-B re-freeze governance question) was already resolved before this round started — the operator ratified v1→v2, recorded above at `7cd7d99`; freeze stays v2, hash `249b76b2a6aa19f4135807ff80bb2b7179859e67`. This round closes only the review's two Major findings, each as a class, in `docs/loop-engineering/default-path-firing.md` (the only file touched). No shipped file, spec text or board flag other than this sub-section was edited; the flag stays `READY_FOR_REVIEW` for QA round 2 and Codex round 2 to re-verify from.
+
+**Finding 1 — `genuine-overlap` licence condition (Major).** The frozen protocol (spec line 71) requires the overlap margin stated against "the maximum single launch latency," but the shipped text recorded `met` against a substitute — launch dispersion (≈34.495 s) — because the launch record's own `- launched-epoch:` field postdates every instance's own `first` stamp, making the literal `first − launched-epoch` formula negative. Fix: computed the frozen formula literally on the note's own recorded integers — `d_i = first_i − launched-epoch` for all eight instances (`launched-epoch=1787185735135713000`), every value negative, maximum (closest to zero) = `qa-8`'s `-13881421000` ns (≈−13.881 s) — disclosed why it is negative (the same audit-stamp-precedence limitation already named), and rewrote the `## Default-path chain and aggregation analysis` "Genuine overlap" paragraph and the `## Verdict and licence conditions` `genuine-overlap` line so `met` rests on the non-empty window (`878198706000` ns) plus this frozen metric having actually been computed and disclosed, never on the dispersion ratio. Dispersion is retained as a disclosed, non-load-bearing secondary cross-check per the task's own "keep or drop" latitude.
+- Class-sweep table (all six licence-condition lines, all seven chain-link lines, read against the frozen protocol's own wording):
+
+| # | line | frozen numeric formula named? | substitute-metric risk | disposition |
+|---|---|---|---|---|
+| 1 | licence-condition: shipped-text-unmodified | no (AC1's zero-diff outcome) | none | not-apply |
+| 2 | licence-condition: no-out-of-band-flag | no (mechanism-absence claim) | none | not-apply |
+| 3 | licence-condition: real-plugin-role-instances | yes — "N ≥ 2" | none — note's own `requested-n: 8`/`achieved-n: 8` is that literal metric | not-apply |
+| 4 | licence-condition: genuine-overlap | yes — "maximum single launch latency" | **yes — was dispersion, now fixed** | **apply — fixed this round** |
+| 5 | licence-condition: real-population | no (90-unit count, no formula) | none | not-apply |
+| 6 | licence-condition: production-unit | no (verbatim-summary claim) | none | not-apply |
+| 7 | chain-link: precedence-rule-applied | no | none | not-apply |
+| 8 | chain-link: dispatch-record-transcribed | no | none | not-apply |
+| 9 | chain-link: step5-pointer-read | no | none | not-apply |
+| 10 | chain-link: population-fixed | no | none | not-apply |
+| 11 | chain-link: instances-launched | no (references the window value itself, unchanged, not the disputed comparator) | none | not-apply |
+| 12 | chain-link: aggregation-reduced | no | none | not-apply |
+| 13 | chain-link: attribution-verified | no | none | not-apply |
+
+**Finding 2 — asymmetric arm-clock bases (Major).** The `- arm-wall-clock:` lines mixed bases: fanned used the orchestrator's own `launched-epoch`→`completed-epoch`; serial used the instance's own inner `agent-timestamp` first/last. Fix: recomputed both arms from the **same** grammar — the instances' own inner `- agent-timestamp:` stamps. Fanned: `min(first)=1787185686759442000` (`qa-1`) to `max(last)=1787187466653181000` (`qa-3`), duration `1779893739000` ns. Serial: unchanged (`first=1787196593684218000`, `last=1787199945017994000`, duration `3351333776000` ns — this arm's basis was already inner-instance). New saving: `(3351333776000 − 1779893739000) / 3351333776000 ≈ 46.89%` — own derivation, computed independently of the review's own ≈46.90% figure per the task brief's instruction (`python3` verification: `1571440037000/3351333776000*100 = 46.88998894271879`, rounds to 46.89%). Direction (`faster`) and sign unchanged. The superseded round-2 figure (≈45.66%, mixed-basis) is disclosed inline in the `- saving:` line and in `## Implications for the release decision`, not silently overwritten. Updated four lines: `- saving:`, both `- arm-wall-clock:` lines, `- saving-direction:`.
+- Class-sweep table (every cross-arm comparison in the note, for basis symmetry):
+
+| # | comparison | basis on each side | symmetric? | disposition |
+|---|---|---|---|---|
+| 1 | `- saving:` / `- arm-wall-clock:` / `- saving-direction:` | was: orchestrator epoch (fanned) vs instance timestamp (serial) | **no** | **apply — fixed this round** |
+| 2 | chain-link population-fixed's `90/88/2` summary-count cross-check | both arms' own `bin/aggregate-verdicts.sh` `- summary:` line | yes (same tool, same command, per-arm) | not-apply |
+| 3 | `t1085-verdict-region-parity` derivation (cksum of sorted verdict-region content) | both arms' own aggregation output, same extraction command | yes | not-apply |
+| 4 | `t1085-assign-vs-part` derivation | not cross-arm — both sets (`ASSIGN`, `PART`) come from the fanned arm's own launch record and aggregation block only | n/a | not-apply |
+| 5 | pre-commitment's 90-minute trigger check | serial arm's own single duration only, no fanned-arm value compared | n/a (single-arm) | not-apply |
+| 6 | execution-order / cache-warmth disclosure | qualitative narrative, not a numeric comparison | n/a | not-apply |
+
+**Verification, live this round.**
+- 18-check sweep: `export CHECK_ACS_TIMEOUT=300; bash bin/check-acs.sh .shell-team/specs/T-1085-default-path-firing.md 2>&1 | tail -1` → **`check-acs: 18 passed, 0 failed, 1 skipped, 0 unrecognized`** (AC1–AC18 individually confirmed PASS in the full run; AC19 SKIP by design). AC13 in particular re-derives the new `- saving-direction:` token from the new `- arm-wall-clock:` integers with bash `10#` arithmetic and passed.
+- `check-intent.sh`, before and after this round's edits (the spec itself was never touched, so both reads are against the same frozen v2): `bash bin/check-intent.sh .shell-team/specs/T-1085-default-path-firing.md .shell-team/todo.md` → `check-intent: aligned: T-1085 v2 (249b76b2a6aa19f4135807ff80bb2b7179859e67) matches .shell-team/specs/T-1085-default-path-firing.md`, both times, byte-identical output.
+- AC3's own evidence-section byte-lock re-confirmed directly (not only via AC3's PASS): `git show 6937e19c203a7323b89862d0fa2bcbd4cf4b5d21:docs/loop-engineering/default-path-firing.md`, extracted the `## Firing evidence (raw, orchestrator-produced)` section from that blob and from the working tree with the same `awk` extraction AC3 uses, `cmp` → identical. The byte-locked evidence section (spec's own instruction: read-only, not one byte) was not edited.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1085.md` → `check-provenance: conformant: .shell-team/provenance/T-1085.md (10 decision entries, 0 sentinel)` (4 new entries appended this round: the genuine-overlap fix, its class-sweep, the arm-clock-basis fix, its class-sweep).
+- `bash bin/check-pii-shapes.sh --base $(git merge-base feature/1084-dispatcher HEAD)` → `check-pii-shapes: clean (no PII-shaped bytes found)`.
+- `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0.
+
+**Files changed this round.** `docs/loop-engineering/default-path-firing.md` (the two Major-finding paragraphs/lines rewritten as above; nothing else touched — `git status --short` shows only this one path modified before this board edit and the provenance append); `.shell-team/provenance/T-1085.md` (4 decision entries appended); this board sub-section. `.shell-team/specs/T-1085-default-path-firing.md`, `.shell-team/interventions/T-1085.md`, `.shell-team/reviews/T-1085.md`, and everything under `skills/`, `templates/`, `agents/`, `bin/`, `tests/`, `.github/` are untouched.
+
+**Flag.** Stays `READY_FOR_REVIEW` — QA round 2 and Codex round 2 re-verify from here.
+
 ### QA round 1 — T-1084
 
 **Verdict: PASS → READY_FOR_REVIEW.** Mechanical sweep re-run live this round (own numbers, nothing accepted from the hand-off unverified), plus own empirical fixtures distinct from both the spec's `- check:` bodies and the engineer's own `tests/close-out/run.sh` cases.
