@@ -96,12 +96,17 @@ against them exactly as written here.
 - subject-ac: 7 — Given at least one usable data row, the tool exits `0`,
   even when zero columns turn out to be numeric — in that case stdout is
   simply empty and the exit code is still `0`, never an error path.
-- subject-ac: 8 — A value matching subject-ac 5's pattern is read as a `10#`-normalized **decimal** integer, never as an octal or other non-decimal base.
-  A leading zero (e.g. `010`, `-010`) never changes the value's magnitude or
-  sign, and `00` denotes zero. This closure exists because bash's own
-  `$(( ))` arithmetic would otherwise silently reinterpret a leading-zero
-  decimal spelling as octal, or error outright on an invalid octal digit —
-  a class named in `docs/loop-engineering/tier2-subject-harness.md`'s own
+- subject-ac: 8 — A value matching subject-ac 5's pattern is read as a **decimal** integer: separate a leading `-` sign first, `10#`-normalize the remaining digits as the magnitude, and have the sign reapplied to that magnitude afterward — never evaluate the signed spelling directly as a single `10#`-prefixed token.
+  Doing the naive thing instead is the trap: evaluating `10#-010` directly
+  silently yields the wrong magnitude `-8` where the correct decimal reading
+  is `-10`, and the sibling spelling `10#-08` fails outright with
+  `value too great for base` — the sign-then-magnitude split above avoids
+  both failures. A leading zero (e.g. `010`, `-010`) never changes the
+  value's magnitude or sign, and `00` denotes zero. This closure exists
+  because bash's own `$(( ))` arithmetic would otherwise silently
+  reinterpret a leading-zero decimal spelling as octal, or error outright
+  on an invalid octal digit — a class named in
+  `docs/loop-engineering/tier2-subject-harness.md`'s own
   `- claim-limit: zero-padded-arithmetic-class` line (T-1089).
 
 **What you receive in your venue and what you produce.** Your venue holds a
