@@ -22,6 +22,15 @@ format, the exact stderr messages, and the exact exit codes. Everything else
 functions you name, how `cli/csvstats` is structured internally — is your
 own decision.
 
+**What the oracle claims, and what it does not.** `acceptance.sh` is an
+enumerated-case instrument: it verifies that your implementation reproduces
+the exact stdout bytes, stderr bytes and exit code its eleven cases specify,
+for the inputs those cases construct, and nothing beyond them. Passing every
+case is not proof that every byte of `interface.md`'s frozen contract is
+satisfied on every input — see `docs/loop-engineering/tier2-subject-harness.md`'s
+own `- oracle-claim:` and `- claim-limit:` lines for the named boundary
+(T-1089).
+
 **The CSV grammar this subject uses, stated once so nothing is left to
 guess.** Fields are separated by a single comma; there is no quoted-field
 escaping to implement and no fixture will ever need one — a value never
@@ -87,6 +96,13 @@ against them exactly as written here.
 - subject-ac: 7 — Given at least one usable data row, the tool exits `0`,
   even when zero columns turn out to be numeric — in that case stdout is
   simply empty and the exit code is still `0`, never an error path.
+- subject-ac: 8 — A value matching subject-ac 5's pattern is read as a `10#`-normalized **decimal** integer, never as an octal or other non-decimal base.
+  A leading zero (e.g. `010`, `-010`) never changes the value's magnitude or
+  sign, and `00` denotes zero. This closure exists because bash's own
+  `$(( ))` arithmetic would otherwise silently reinterpret a leading-zero
+  decimal spelling as octal, or error outright on an invalid octal digit —
+  a class named in `docs/loop-engineering/tier2-subject-harness.md`'s own
+  `- claim-limit: zero-padded-arithmetic-class` line (T-1089).
 
 **What you receive in your venue and what you produce.** Your venue holds a
 copy of this brief, `interface.md`, `manifest.txt` and `acceptance.sh` —

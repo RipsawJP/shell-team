@@ -21,6 +21,15 @@
 # (`interface.md`'s `interface-frozen` line: "must reproduce every declared
 # stdout byte, stderr byte and exit code exactly"), enforced here rather
 # than merely stated.
+#
+# What this script claims, and what it does not. This is an enumerated-case instrument:
+# it verifies that a candidate reproduces the exact stdout bytes, stderr
+# bytes and exit code the eleven cases below specify, for the inputs those
+# cases construct, and nothing beyond them. It is NOT a decision procedure
+# for conformance to interface.md's frozen contract — a candidate can pass
+# every case here and still violate that contract on an input no case
+# constructs. This boundary, and the named limits it hands off, are recorded
+# in this harness's own measurement note (T-1089).
 set -uo pipefail
 
 usage() {
