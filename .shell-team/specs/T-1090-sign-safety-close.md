@@ -167,6 +167,24 @@ Mutable, and a **prediction**, not a measurement: it is reasoned from each crite
 
 **No population figure is stated in this section at authoring**, because this role holds no shell and a hand-counted total is exactly the defect the derivation tool exists to prevent. Any total, set delta or bucket split the hand-off adds here is produced by `bin/derive-populations.sh` and embedded verbatim as its emitted `<!-- BEGIN derivation: … -->` / `<!-- END derivation: … -->` block, each preceded by its own `- reproduce:` line carrying the exact command that regenerates it.
 
+**Measured (engineer, hand-off).** The read set named in the Method paragraph above, derived mechanically rather than guessed:
+
+- reproduce: bin/derive-populations.sh --label t1090-read-set --set 'specs-readme=git grep -l -- docs/loop-engineering/subjects/subject-01/README.md -- .shell-team/specs/' --set 'specs-note=git grep -l -- docs/loop-engineering/tier2-subject-harness.md -- .shell-team/specs/'
+<!-- BEGIN derivation: t1090-read-set -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: specs-readme — status: 0 — lines: 2 — items: 2 — command: git grep -l -- docs/loop-engineering/subjects/subject-01/README.md -- .shell-team/specs/
+- set: specs-note — status: 0 — lines: 3 — items: 3 — command: git grep -l -- docs/loop-engineering/tier2-subject-harness.md -- .shell-team/specs/
+- union: items: 3
+- bucket: specs-note — items: 1
+  - .shell-team/specs/T-1086-subject-harness.md
+- bucket: specs-readme+specs-note — items: 2
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1090-sign-safety-close.md
+<!-- END derivation: t1090-read-set -->
+
+Excluding this task's own spec (a self-reference, not a downstream reader), the read set is exactly `{T-1086-subject-harness, T-1089-harness-recut}` — the two specs the Non-indirection paragraph above already names by hand as run in full regardless. The mechanical derivation and the reasoned indirection-discharge list agree; neither widens nor narrows the other. Full per-criterion verdicts at both refs (branch point via a scratch `git worktree add --detach`, and HEAD) are reported in the engineer hand-off below (AC7 item (b)), differenced against `## Predicted inherited-criterion profile`.
+
 ## Assumptions
 
 **Relayed premises** — this role holds no shell and no GitHub-reading tool. Each is labelled at the point it appears; the side holding primary confirmation is named; the freeze run measures it and records the value beside this line.
