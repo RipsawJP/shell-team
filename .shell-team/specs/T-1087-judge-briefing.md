@@ -195,7 +195,46 @@ Mutable, and a **prediction**, not a measurement: it is reasoned from each crite
 
 **No population figure is stated in this section at authoring**, because this role holds no shell and a hand-counted total is exactly the defect the derivation tool exists to prevent. Any total, set delta or bucket split the hand-off adds here is produced by `bin/derive-populations.sh` and embedded verbatim as its emitted `<!-- BEGIN derivation: … -->` / `<!-- END derivation: … -->` block, each preceded by its own `- reproduce:` line carrying the exact command that regenerates it.
 
-**Measured (engineer, hand-off).** The read set named in the Method paragraph above, derived mechanically rather than guessed — the derivation block and its `- reproduce:` line land here, and the reasoned four-spec discharge list above is reconciled against it, with any spec the derivation adds run in full too.
+**Measured (engineer, hand-off).** The read set named in the Method paragraph above, derived mechanically rather than guessed:
+
+- reproduce: bin/derive-populations.sh --label t1087-read-set --set 'specs-phase-multiplexing=git grep -l -- docs/loop-engineering/phase-multiplexing.md -- .shell-team/specs/' --set 'specs-harness-note=git grep -l -- docs/loop-engineering/tier2-subject-harness.md -- .shell-team/specs/' --set 'specs-subject-readme=git grep -l -- docs/loop-engineering/subjects/subject-01/README.md -- .shell-team/specs/' --set 'specs-manifest=git grep -l -- docs/loop-engineering/subjects/subject-01/manifest.txt -- .shell-team/specs/' --set 'specs-acceptance=git grep -l -- docs/loop-engineering/subjects/subject-01/acceptance.sh -- .shell-team/specs/' --set 'specs-interface=git grep -l -- docs/loop-engineering/subjects/subject-01/interface.md -- .shell-team/specs/' --set 'specs-regenerate=git grep -l -- docs/loop-engineering/subjects/subject-01/regenerate.sh -- .shell-team/specs/' --set 'specs-briefing=git grep -l -- docs/loop-engineering/tier2-judge-briefing.md -- .shell-team/specs/' --accept-status 'specs-briefing=1'
+<!-- BEGIN derivation: t1087-read-set -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: specs-phase-multiplexing — status: 0 — lines: 16 — items: 16 — command: git grep -l -- docs/loop-engineering/phase-multiplexing.md -- .shell-team/specs/
+- set: specs-harness-note — status: 0 — lines: 4 — items: 4 — command: git grep -l -- docs/loop-engineering/tier2-subject-harness.md -- .shell-team/specs/
+- set: specs-subject-readme — status: 0 — lines: 3 — items: 3 — command: git grep -l -- docs/loop-engineering/subjects/subject-01/README.md -- .shell-team/specs/
+- set: specs-manifest — status: 0 — lines: 3 — items: 3 — command: git grep -l -- docs/loop-engineering/subjects/subject-01/manifest.txt -- .shell-team/specs/
+- set: specs-acceptance — status: 0 — lines: 4 — items: 4 — command: git grep -l -- docs/loop-engineering/subjects/subject-01/acceptance.sh -- .shell-team/specs/
+- set: specs-interface — status: 0 — lines: 3 — items: 3 — command: git grep -l -- docs/loop-engineering/subjects/subject-01/interface.md -- .shell-team/specs/
+- set: specs-regenerate — status: 0 — lines: 4 — items: 4 — command: git grep -l -- docs/loop-engineering/subjects/subject-01/regenerate.sh -- .shell-team/specs/
+- set: specs-briefing — status: 0 — lines: 1 — items: 1 — command: git grep -l -- docs/loop-engineering/tier2-judge-briefing.md -- .shell-team/specs/
+- union: items: 17
+- bucket: specs-harness-note+specs-subject-readme+specs-manifest+specs-acceptance+specs-interface+specs-regenerate — items: 1
+  - .shell-team/specs/T-1090-sign-safety-close.md
+- bucket: specs-phase-multiplexing — items: 13
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+- bucket: specs-phase-multiplexing+specs-harness-note+specs-acceptance+specs-regenerate — items: 1
+  - .shell-team/specs/T-1086-subject-harness.md
+- bucket: specs-phase-multiplexing+specs-harness-note+specs-subject-readme+specs-manifest+specs-acceptance+specs-interface+specs-regenerate — items: 1
+  - .shell-team/specs/T-1089-harness-recut.md
+- bucket: specs-phase-multiplexing+specs-harness-note+specs-subject-readme+specs-manifest+specs-acceptance+specs-interface+specs-regenerate+specs-briefing — items: 1
+  - .shell-team/specs/T-1087-judge-briefing.md
+<!-- END derivation: t1087-read-set -->
+
+Excluding this task's own spec (a self-reference, not a downstream reader), the real, mechanically-derived read set is **sixteen** merged specs, not the four the reasoned discharge list above named: `T-1069`, `T-1072`, `T-1073`, `T-1074`, `T-1075`, `T-1077`, `T-1078`, `T-1079`, `T-1080`, `T-1082`, `T-1083`, `T-1084`, `T-1085` (all thirteen via `specs-phase-multiplexing` alone), plus `T-1086`, `T-1089` and `T-1090`. This is a finding, not a silent correction: the reasoned four-spec list undershot because a dozen older specs — several of them predating `phase-multiplexing.md`'s own Tier-2 section — still name that file's path in their own text (an authoring-time citation, a byte-lock criterion against it, or both), and the mechanical derivation the Method paragraph itself prescribes has no way to distinguish "the criterion this task could break" from "any occurrence of the path." Per this section's own instruction, **all sixteen specs' full criterion sets were run at both refs, not only the reasoned four** — reported in the engineer hand-off below (**AC9** item (b)), differenced against `## Predicted inherited-criterion profile` where a prediction exists and reported directly where it does not. Recorded as an intervention (`.shell-team/interventions/T-1087.md`) per the standing discipline for a measurement that contradicts a stated assumption.
 
 ## Assumptions
 
