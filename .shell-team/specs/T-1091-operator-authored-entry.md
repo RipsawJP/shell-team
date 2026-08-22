@@ -330,8 +330,8 @@ Mutable, and a **prediction**, not a measurement: reasoned from each criterion's
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
 - set: at-branch-point — status: 0 — lines: 95 — items: 95 — command: git ls-tree -r --name-only 1fca08c313b634d03c4e88e1bf06b6ca4d7a19c6 -- .shell-team/specs | grep '\.md$'
-- set: at-now — status: 0 — lines: 95 — items: 95 — command: git ls-files -- .shell-team/specs/*.md
-- union: items: 95
+- set: at-now — status: 0 — lines: 96 — items: 96 — command: git ls-files -- .shell-team/specs/*.md
+- union: items: 96
 - bucket: at-branch-point+at-now — items: 95
   - .shell-team/specs/T-1000-operating-conventions.md
   - .shell-team/specs/T-1001-retro-input-acquisition.md
@@ -428,6 +428,8 @@ Mutable, and a **prediction**, not a measurement: reasoned from each criterion's
   - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
   - .shell-team/specs/T-113-lessons-deidentification.md
   - .shell-team/specs/design-note-T-1012.md
+- bucket: at-now — items: 1
+  - .shell-team/specs/T-1091-operator-authored-entry.md
 <!-- END derivation: t1091-spec-population -->
 
 **Measured (engineer, hand-off).** The per-criterion verdict difference over the population above, one row per criterion whose verdict changes, each with its ground. Until it is filled, this section carries no `- predicted-red:` line and **AC17** is correctly red.
