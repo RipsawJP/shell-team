@@ -39,6 +39,7 @@
 | Reviewing someone else's PR | Use `/review` — only `codex-reviewer` runs |
 | Responding to review feedback already on your PR | Use `/review-response` — Codex-evaluates the received findings, risk-gates them (a deterministic floor forces risky ones to a human), then hands the adopted set to `shell-team` |
 | Spec only (no code yet) | Stop after `pm-spec`; task is at `READY_FOR_ARCH` (spec written) and pauses |
+| Spec already authored (`specify — operator-authored`, not the shipped `pm-authored` default) | `pm-spec` does not skip — it runs as a conformance formatter instead of an author; see [Choosing who authors the spec](adopting.md#choosing-who-authors-the-spec-t-1091) |
 
 `/review` vs `/review-response`: `review` generates a *fresh* Codex review of the current branch diff; `review-response` triages review findings that **already came back** on a PR — it evaluates and risk-gates them, then (on your GO for any risky ones) drives `shell-team` to implement the adopted set. Neither replaces the other.
 

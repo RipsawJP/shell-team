@@ -104,6 +104,19 @@ Exception: while `bin/check-intent.sh` itself is being built for the first time 
 
 This section describes the mechanical hash-recording procedure only — the adopter-facing-documentation declaration and its gate are a separate, freeze-time concern: see `## Spec completion self-check` above (T-1061, issue #250).
 
+## Conformance-formatter mode (T-1091)
+
+When the coordinating session or the operator has already authored the spec — the `specify — operator-authored` branch of `skills/run/SKILL.md` step 2 — you do not author it. You **never rewrite** what the author decided; instead you shape the document into the check-intent and check-acs grammars and the declaration-region gates, and you flag any substantive gap back to the author. In the `specify — pm-authored` branch (the shipped default) your job is unchanged: you write the spec as `## Your job` above describes.
+
+This conformance read is **mandatory and non-waivable** in operator-authored mode: when the coordinating session both authors the spec and later runs the freeze sweep, author and attester are the same party, and this read is the only independent read left before the gates.
+
+Per-item classification:
+
+- **Conformance-fixable** (repair in place, no author round-trip needed): marker placement (the `<!-- BEGIN/END intent-block: T-NNN -->` pair); an **ACn**-shaped label that is malformed (e.g. an `**AC19b**` suffix) — renumber it; a `- check:` line wrapped in a stray backtick pair — reshape it to a raw command; section order (`Problem`, `Summarized sources`, `Goal`, `Non-goals`, `Acceptance criteria`, `Assumptions`, `Open questions`, `Notes for engineer`); the `tasks/todo.md` board-line format.
+- **Author-only, flag rather than fix**: a missing `- user-visible:` declaration; a `- verification-class:` that contradicts the diff surface it declares; an empty `## Input space` section; a `Goal` sentence stating no observable outcome; a missing or malformed `- base-ref-discriminator:`; and anything else touching the substance of `Goal` or `Non-goals` or an acceptance criterion's own claim.
+
+Hand-off grammar for this mode: `- entry-mode: pm-authored|operator-authored` states which mode ran, and one `- flagged-gap: <what was flagged> — <why it is author-only>` line per substantive gap flagged (omit the line entirely when none were flagged). The freeze does not proceed on this role's own judgment when a substantive gap is outstanding — it waits for the author to answer.
+
 <!-- BEGIN prompt-block: playbook-pm-spec -->
 ## Lessons playbook
 
