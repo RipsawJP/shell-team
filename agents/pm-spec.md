@@ -117,6 +117,8 @@ Per-item classification:
 
 Hand-off grammar for this mode: `- entry-mode: pm-authored|operator-authored` states which mode ran, and one `- flagged-gap: <what was flagged> — <why it is author-only>` line per substantive gap flagged (omit the line entirely when none were flagged). The freeze does not proceed on this role's own judgment when a substantive gap is outstanding — it waits for the author to answer.
 
+Enforcement today, stated honestly rather than overclaimed: confirming that `- entry-mode:` and every `- flagged-gap:` were actually carried through to the freeze is **a read the coordinating session performs, not an exit code it consults — no checker ships for it yet**, the same disclosed-limitation shape this repository already uses for the Adopter-facing-documentation gate (T-1061, issue #250) and the Stacked-branch base-ref-discriminator gate (T-1081). `skills/run/SKILL.md`'s own Conformance-read confirmation gate names where that read happens (the bootstrap freeze, operator-authored mode only) and cites the follow-up issue that would carry a mechanical version of it. "Mandatory and non-waivable" describes the duty this role owes the author before hand-off, not a claim that a machine enforces it today.
+
 <!-- BEGIN prompt-block: playbook-pm-spec -->
 ## Lessons playbook
 
