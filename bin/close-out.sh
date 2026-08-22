@@ -243,7 +243,8 @@ fi
 # #274's depth axis) is added; nothing below hardcodes a count of axes.
 DISPATCH_AXIS_TABLE="implement:serial|tier2|tier3
 verify:serial|tier1-fanout
-specify:pm-authored|operator-authored"
+specify:pm-authored|operator-authored
+spec-review:none|cross-provider"
 
 DISPATCH_LINES="$(sed -n "${A_START},${A_END}p" "$BOARD" \
      | grep -E -- '^[[:space:]]*- dispatch:' || true)"
@@ -285,6 +286,13 @@ if [ -n "$DISPATCH_LINES" ]; then
       fail "$TASK has a malformed dispatch record (value '$d_value' is not in axis '$d_axis''s closed set '${d_valueset}'): $d_line"
     fi
 
+    # Captured here (T-1092), not re-scanned below: the spec-review teeth
+    # gate needs only the elected value, and the record has already been
+    # validated conformant by the checks above and below in this same pass.
+    if [ "$d_axis" = "spec-review" ]; then
+      SPEC_REVIEW_ELECTED="$d_value"
+    fi
+
     if ! printf '%s\n' "$d_modality" | grep -qE -- '^(unconditional|conditional)$'; then
       fail "$TASK has a malformed dispatch record (modality '$d_modality' is not unconditional or conditional): $d_line"
     fi
@@ -299,6 +307,36 @@ if [ -n "$DISPATCH_LINES" ]; then
       fail "$TASK has a malformed dispatch record (ground does not open with a non-empty id after saving:/recommendation:/break-even:/cost-input:): $d_line"
     fi
   done <<< "$DISPATCH_LINES"
+fi
+
+# --- fail-closed gate: elected spec-review teeth (T-1092) ---------------------
+# A second, independent refusal class beside the dispatch-grammar gate above,
+# in the exact validate-if-present shape of the `pending:` gate: it says
+# NOTHING when the task's entry carries no `spec-review` election at all, or
+# elects `spec-review — none` — every task recorded under the three-axis
+# dispatcher, and every task that declines the extra round, closes out
+# exactly as before this gate existed. It fires ONLY when the entry recorded
+# `- dispatch: spec-review — cross-provider — …` (SPEC_REVIEW_ELECTED, set by
+# the dispatch-grammar loop above, which has already validated the record
+# conformant): the resolved reviews directory must carry a `<task>.md` file
+# containing at least one `### Codex Spec-Review verdict: APPROVE` line, or
+# close-out refuses. This is a backstop over the board's own durable audit
+# trail, never a second firing condition — the firing condition is
+# `pm-spec`'s hand-off, cross-checked against the Routing Map, at the
+# Specify-seam gate in `skills/run/SKILL.md`, which runs long before any
+# board transcription exists to read here.
+if [ "${SPEC_REVIEW_ELECTED:-}" = "cross-provider" ]; then
+  if [ -n "${TEAM_REVIEWS_DIR:-}" ]; then
+    REVIEWS_DIR="$TEAM_REVIEWS_DIR"
+  else
+    REVIEWS_DIR="$(bash "$SCRIPT_DIR/team-paths.sh" --get reviews 2>/dev/null)" \
+      || die "cannot resolve the reviews directory (team-paths.sh unavailable) — set \$TEAM_REVIEWS_DIR or fix the install"
+  fi
+  REVIEW_RECORD="$REVIEWS_DIR/$TASK.md"
+  if [ ! -f "$REVIEW_RECORD" ] || [ ! -r "$REVIEW_RECORD" ] \
+     || ! grep -qE '^### Codex Spec-Review verdict: APPROVE' "$REVIEW_RECORD"; then
+    fail "$TASK: elected spec review has no APPROVE verdict (reviews directory: $REVIEWS_DIR)"
+  fi
 fi
 
 # --- fail-closed gate: the task's interventions record exists and conforms ----

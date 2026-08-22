@@ -461,6 +461,41 @@ still runs the full loop, unchanged from the freeze sweep onward. Choosing
 `operator-authored` chooses who writes the spec, never whether the rest of
 the machinery runs.
 
+## Electing a spec review at the Specify seam (T-1092)
+
+Alongside `specify`, a fourth dispatch axis elects whether an extra
+cross-provider `codex-reviewer` pass reads a spec's **domain** premises
+before implementation begins: `spec-review`, closed over `none` and
+`cross-provider`, defined and priced in
+`docs/loop-engineering/specify-seam-review.md`.
+
+**`none` is the shipped default.** No extra pass runs, and nothing about
+the task changes; a routine mechanism task does not pay for the extra
+round.
+
+**Elect `cross-provider` when the spec's correctness rests on a domain
+premise this repository cannot itself measure** — a deployment or ordering
+assumption, a rollback precondition that may not hold in production, a
+blast-radius claim about a system outside this repository's reach. The
+extra round reads the spec document itself — the frozen intent block plus
+its declaration region, never a branch diff — after the freeze sweep and
+before the `- intent-hash (v1)` is recorded, and returns `APPROVE` or
+`REQUEST_CHANGES` in a `## Spec review` section of the task's review
+record. A `REQUEST_CHANGES` routes back to the spec's own author
+(`pm-spec` in `pm-authored` mode, the operator in `operator-authored`
+mode); the freeze sweep does not proceed until it is answered.
+
+**What it does and does not guarantee.** An elected spec review is never
+one of the loop's **both gates** — `qa-verifier`'s PASS and
+`codex-reviewer`'s APPROVE on the delivered change both remain required
+regardless of this axis's value, and a spec-review APPROVE never
+substitutes for either. It also does not authenticate its own inputs (both
+condition texts it is cross-checked against are agent-produced), does not
+verify that the read actually happened, and does not turn "the domain
+premises are sound" into anything more than a reading judgment. No arm of
+this axis has run end to end yet, so how often it prevents a
+wrong-about-the-world spec from being implemented is `undetermined`.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.

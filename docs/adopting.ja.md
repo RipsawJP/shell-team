@@ -459,6 +459,38 @@ freeze sweep 以降は full loop がそのまま走る。`operator-authored` を
 のは spec を誰が書くかだけであり、machinery の残りが走るかどうかを選ぶ
 ことでは決してない。
 
+## Specify seam で spec review を elect する（T-1092）
+
+`specify` と並んで、実装着手前に spec の **domain**（ドメイン）前提を
+cross-provider の `codex-reviewer` に追加で 1 回読ませるかどうかを決める
+第四の軸がある: `spec-review`——`none` と `cross-provider` の 2 値に閉じ、
+`docs/loop-engineering/specify-seam-review.md` で定義・値付けされている。
+
+**`none` が出荷時デフォルト。** 追加の pass は走らず、task には何の変化も
+ない——通常の mechanism task は追加ラウンドの代償を払わない。
+
+**この repo が自ら測定できない domain 前提に spec の正しさが依存する時、
+`cross-provider` を elect する**——デプロイ順序の前提、本番で成立するとは
+限らない rollback precondition、この repo の外にあるシステムについての
+blast-radius claim 等。追加ラウンドは spec document 自体を読む——凍結
+intent block とその declaration region であり、branch diff は決して読まない
+——freeze sweep の後・`- intent-hash (v1)` を記録する前に走り、task の
+review record 内の `## Spec review` セクションに `APPROVE` か
+`REQUEST_CHANGES` を返す。`REQUEST_CHANGES` は spec 自身の author
+（`pm-authored` モードでは `pm-spec`、`operator-authored` モードでは
+operator）へ差し戻され、答えが返るまで freeze sweep は先へ進まない。
+
+**保証すること・しないこと。** elect された spec review は loop の
+**both gates**（`qa-verifier` の PASS と、実際に届いた変更に対する
+`codex-reviewer` の APPROVE）のどちらでもなく、この軸の値に関わらず
+両方とも引き続き必須であり、spec-review の APPROVE がどちらの代わりにも
+なることはない。またこの読みは自身の入力を認証しない（cross-check する
+2 つの条件テキストはどちらも agent が生成したものである)、読みが実際に
+行われたことも検証しない、そして「domain 前提が健全である」ことを
+reading judgment 以上の何かにすることもない。この軸はまだ一度も
+end-to-end で発火していないため、間違って world について誤った spec の
+実装をどれだけ防げるかは `undetermined`（未測定）である。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。

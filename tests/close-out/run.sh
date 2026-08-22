@@ -1114,14 +1114,18 @@ mkdir -p "$DISPATCH_ROOT"
 dispatch_case() {
   local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5" label="${6:-T-1084}"
   local root="$DISPATCH_ROOT/$task"
-  mkdir -p "$root"
+  # T-1092: every call site is redirected to a scratch reviews directory too
+  # (harmless for every pre-existing case, none of which elects
+  # `spec-review — cross-provider`), so no fixture here can ever read or
+  # write this repository's own `.shell-team/reviews/`.
+  mkdir -p "$root/.shell-team/reviews"
   write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
   # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
   printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
     "$task" "$body" > "$root/todo.md"
   cp "$root/todo.md" "$root/todo.orig"
   local rc=0
-  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" \
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_REVIEWS_DIR="$root/.shell-team/reviews" \
       bash "$CLOSEOUT" --task "$task" --date 2026-08-19 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
   [ "$rc" -eq "$expect_rc" ] || fail "$label $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
   if [ "$mode" = silent ]; then
@@ -1217,5 +1221,66 @@ dispatch_case T-991 "$OKV\n  - dispatch: implement — pm-authored — unconditi
 dispatch_case T-992 "$OKI\n$OKS\n$OKS" 1 "'specify' appears more than once" "duplicated specify axis refuses" T-1091
 dispatch_case T-993 "$OKI\n  - dispatch:${TAB}specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density" 1 "does not match the grammar" "tab-after-dispatch-colon on specify refuses (seen and refused, not silently invisible)" T-1091
 dispatch_case T-994 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density" 0 silent "tab-indented conformant specify record still passes (positive control on the widened anchor)" T-1091
+
+# ============================================================================
+# T-1092: the `spec-review` axis — one more data row on the same
+# DISPATCH_AXIS_TABLE (grammar cases, exercised via dispatch_case exactly as
+# T-1091's own cases above are) plus a second, independent fail-closed
+# refusal class — the teeth gate, which reads a redirected reviews directory
+# rather than the dispatch grammar (exercised via the dedicated
+# spec_review_case helper below, because its own refusal sentinel differs
+# from 'malformed dispatch record').
+# ============================================================================
+OKR='  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default'
+ELECT='  - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count'
+
+dispatch_case T-99510 "$OKI\n$OKV\n$OKS\n$OKR" 0 silent "conformant four-axis record (implement/verify/specify/spec-review) passes the gate" T-1092
+dispatch_case T-99511 "$OKI\n$OKV\n$OKS" 0 silent "three-axis record with no spec-review sub-bullet still passes (every in-flight task under the three-axis dispatcher, never refused retroactively)" T-1092
+dispatch_case T-99512 "$OKI\n  - dispatch: spec-review — serial — unconditional — recommendation: spec-review-none-default" 1 "'serial' is not in axis 'spec-review'" "cross-axis value 'spec-review — serial' refuses (all four axes share one editing surface)" T-1092
+dispatch_case T-99513 "$OKV\n  - dispatch: implement — cross-provider — unconditional — recommendation: tier2-parallel-implementations-judge" 1 "'cross-provider' is not in axis 'implement'" "cross-axis value 'implement — cross-provider' refuses (the transposition in the other direction)" T-1092
+dispatch_case T-99514 "$OKI\n$OKR\n$OKR" 1 "'spec-review' appears more than once" "duplicated spec-review axis refuses" T-1092
+dispatch_case T-99515 "$OKI\n  - dispatch:${TAB}spec-review — none — unconditional — recommendation: spec-review-none-default" 1 "does not match the grammar" "tab-after-dispatch-colon on spec-review refuses (seen and refused, not silently invisible)" T-1092
+dispatch_case T-99516 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default" 0 silent "tab-indented conformant spec-review record still passes (positive control on the widened anchor)" T-1092
+
+# --- the teeth gate (AC6): a redirected reviews directory, a different ------
+# --- refusal sentinel, and no dependence on the dispatch grammar's own -----
+# --- literal — a dedicated helper rather than overloading dispatch_case ----
+SPEC_REVIEW_SENTINEL='elected spec review has no APPROVE verdict'
+spec_review_case() {
+  local task="$1" body="$2" review_body="$3" expect_rc="$4" mode="$5" name="$6"
+  local root="$DISPATCH_ROOT/$task"
+  mkdir -p "$root/.shell-team/reviews"
+  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
+  if [ -n "$review_body" ]; then
+    printf -- '%b\n' "$review_body" > "$root/.shell-team/reviews/$task.md"
+    test -s "$root/.shell-team/reviews/$task.md" || fail "T-1092 $name: could not write the synthesized review record"
+  fi
+  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
+    "$task" "$body" > "$root/todo.md"
+  cp "$root/todo.md" "$root/todo.orig"
+  local rc=0
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_REVIEWS_DIR="$root/.shell-team/reviews" \
+      bash "$CLOSEOUT" --task "$task" --date 2026-08-19 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
+  [ "$rc" -eq "$expect_rc" ] || fail "T-1092 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  if [ "$mode" = silent ]; then
+    grep -qF -- "$SPEC_REVIEW_SENTINEL" "$root/err" \
+      && fail "T-1092 $name: the gate must say NOTHING here — found the refusal sentinel in stderr"
+    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
+      || fail "T-1092 $name: close-out should have moved the entry to Done"
+  else
+    cmp -s "$root/todo.orig" "$root/todo.md" \
+      || fail "T-1092 $name: a refused close-out must leave the board byte-untouched"
+    grep -qF -- "$SPEC_REVIEW_SENTINEL" "$root/err" \
+      || fail "T-1092 $name: refusal stderr must carry the sentinel '$SPEC_REVIEW_SENTINEL'"
+  fi
+  pass "T-1092 $name"
+}
+
+spec_review_case T-99501 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE' 0 silent "elected + APPROVE record passes (also the positive control on the \$TEAM_REVIEWS_DIR override itself: the record exists only inside the scratch directory)"
+spec_review_case T-99502 "$OKI\n$ELECT" '' 1 refuse "elected + no record refuses"
+spec_review_case T-99503 "$OKI\n$ELECT" '### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + REQUEST_CHANGES-only record refuses"
+spec_review_case T-99504 "$OKI\n$ELECT" '## Spec review\n\nnothing was recorded here' 1 refuse "elected + non-empty record with no spec-review verdict heading at all refuses"
+spec_review_case T-99505 "$OKI\n$OKR" '' 0 silent "none + no record passes (every task that declines the extra round)"
 
 printf '\nAll close-out assertions passed.\n'

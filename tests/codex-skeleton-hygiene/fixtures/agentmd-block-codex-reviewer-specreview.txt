@@ -1,0 +1,6 @@
+# T-107-step: codex
+codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
+"Review the spec document at <spec path> for its DOMAIN premises, not its prose polish. \
+Read the file yourself — do not expect its text in this prompt. \
+Judge (1) whether its correctness rests on a fact this repository can verify rather than an unverifiable assumption about deployment order, a rollback precondition, or a system outside this repository's reach, and (2) whether its acceptance criteria test the right thing rather than merely testable things. \
+Return findings as a JSON array of {severity, criterion, issue, suggestion}." > "<RAW_JSONL>" 2>&1

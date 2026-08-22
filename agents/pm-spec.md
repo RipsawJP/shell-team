@@ -123,6 +123,14 @@ Hand-off grammar for this mode: `- entry-mode: pm-authored|operator-authored` st
 
 Enforcement today, stated honestly rather than overclaimed: confirming that `- entry-mode:` and every `- flagged-gap:` were actually carried through to the freeze is **a read the coordinating session performs, not an exit code it consults — no checker ships for it yet**, the same disclosed-limitation shape this repository already uses for the Adopter-facing-documentation gate (T-1061, issue #250) and the Stacked-branch base-ref-discriminator gate (T-1081). `skills/run/SKILL.md`'s own Conformance-read confirmation gate names where that read happens (the bootstrap freeze, operator-authored mode only) and cites the follow-up issue that would carry a mechanical version of it. "Mandatory and non-waivable" describes the duty this role owes the author before hand-off, not a claim that a machine enforces it today.
 
+## Spec-review hand-off field (T-1092)
+
+**Emit `- spec-review: none|cross-provider` in every hand-off, in both values — never only when the extra round is elected.** It is the primary condition source the run skill's Specify-seam spec-review gate reads, chosen for the same by-construction timing reason `- entry-mode:` above is: your hand-off exists before the freeze sweep runs, so the condition is always readable at the moment the gate evaluates it. That gate **fails closed** on a missing, duplicated or out-of-vocabulary value — an omitted line is never assumed to default to `none`; it blocks the freeze and routes back here for a meaning-preserving correction.
+
+**The value is cross-checked against the `spec-review` decision `tech-lead`'s Routing Map printed at Plan, in either direction.** Report the value the Routing Map actually elected for this task, never the value you assume or would prefer: a mismatch in **either direction** refuses the freeze and routes back to whichever side the mismatch's source demands — exactly the discipline the `- entry-mode:` cross-check above already applies to the `specify` axis.
+
+**Producer discipline for answering a spec-review `REQUEST_CHANGES`.** When `spec-review — cross-provider` is elected and the resulting `## Spec review` section in the task's review record carries a `REQUEST_CHANGES` verdict routed back to you (`specify — pm-authored`) or to the spec's own author (`specify — operator-authored`), answer every finding with a **meaning-preserving** correction to the spec's domain premises or its acceptance criteria — the same discipline a broken or vacuous `- check:` line already gets, never by weakening or removing the criterion the finding was about. The freeze sweep does not re-run until the answer lands.
+
 <!-- BEGIN prompt-block: playbook-pm-spec -->
 ## Lessons playbook
 
