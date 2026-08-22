@@ -333,8 +333,42 @@ if [ "${SPEC_REVIEW_ELECTED:-}" = "cross-provider" ]; then
       || die "cannot resolve the reviews directory (team-paths.sh unavailable) — set \$TEAM_REVIEWS_DIR or fix the install"
   fi
   REVIEW_RECORD="$REVIEWS_DIR/$TASK.md"
-  if [ ! -f "$REVIEW_RECORD" ] || [ ! -r "$REVIEW_RECORD" ] \
-     || ! grep -qE '^### Codex Spec-Review verdict: APPROVE' "$REVIEW_RECORD"; then
+  SPEC_REVIEW_APPROVED=0
+  if [ -f "$REVIEW_RECORD" ] && [ -r "$REVIEW_RECORD" ]; then
+    # Round-2 rework (Codex review, Majors 2+3): the previous match
+    # (`grep -qE '^### Codex Spec-Review verdict: APPROVE'`) was (a)
+    # unanchored — a prefix-matching near-miss verdict heading
+    # (`APPROVE_WITH_CAVEATS`, or the mode's own unfilled output template
+    # `APPROVE | REQUEST_CHANGES`) satisfied this fail-closed refusal gate —
+    # and (b) unscoped — it read the WHOLE file rather than the record's
+    # latest `## Spec review` round, so a stale APPROVE from an earlier
+    # round could survive alongside a later REQUEST_CHANGES. Fixed by (1)
+    # requiring end-of-line immediately after the literal `APPROVE` token
+    # (`[[:space:]]*$` — no partial-word or trailing-template survivor can
+    # satisfy it) and (2) scanning only the text from the LAST `## Spec
+    # review` heading in the file to the next `^## ` heading or EOF, so an
+    # earlier round's APPROVE can never be read once a later round exists.
+    # A record synthesized with no `## Spec review` heading at all (a bare
+    # verdict line, exercised by AC6's own fixtures) has no round boundary
+    # to scope to, so the scan correctly degrades to the whole file in that
+    # one case — this is a widening back to the pre-fix behavior only when
+    # there is nothing to scope by, never a silent narrowing that could
+    # hide a genuine APPROVE.
+    LAST_SECTION_LINE="$(grep -n '^## Spec review$' "$REVIEW_RECORD" | tail -n1 | cut -d: -f1 || true)"
+    if [ -n "$LAST_SECTION_LINE" ]; then
+      LATEST_SECTION="$(awk -v start="$LAST_SECTION_LINE" '
+        p && NR>start && /^## / { exit }
+        NR==start { p=1 }
+        p { print }
+      ' "$REVIEW_RECORD")"
+    else
+      LATEST_SECTION="$(cat "$REVIEW_RECORD")"
+    fi
+    if printf '%s\n' "$LATEST_SECTION" | grep -qE '^### Codex Spec-Review verdict: APPROVE[[:space:]]*$'; then
+      SPEC_REVIEW_APPROVED=1
+    fi
+  fi
+  if [ "$SPEC_REVIEW_APPROVED" != 1 ]; then
     fail "$TASK: elected spec review has no APPROVE verdict (reviews directory: $REVIEWS_DIR)"
   fi
 fi

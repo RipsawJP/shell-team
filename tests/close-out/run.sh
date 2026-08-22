@@ -1283,4 +1283,16 @@ spec_review_case T-99503 "$OKI\n$ELECT" '### Codex Spec-Review verdict: REQUEST_
 spec_review_case T-99504 "$OKI\n$ELECT" '## Spec review\n\nnothing was recorded here' 1 refuse "elected + non-empty record with no spec-review verdict heading at all refuses"
 spec_review_case T-99505 "$OKI\n$OKR" '' 0 silent "none + no record passes (every task that declines the extra round)"
 
+# --- review round 1, Majors 2+3: the verdict match was (a) unanchored — any -
+# --- heading with `APPROVE` as a literal PREFIX satisfied the gate — and (b) -
+# --- unscoped — it read the WHOLE file rather than the record's LATEST
+# --- `## Spec review` round. Fixtures below reproduce both defeat classes
+# --- against the real, fixed script, plus a positive control confirming the
+# --- section-scoping fix doesn't over-narrow the ordinary fixed-then-approved
+# --- multi-round case.
+spec_review_case T-99506 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE_WITH_CAVEATS' 1 refuse "elected + a prefix-matching near-miss verdict value (APPROVE_WITH_CAVEATS) refuses (Major 2's exact reproduction)"
+spec_review_case T-99507 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE | REQUEST_CHANGES' 1 refuse "elected + the mode's own unfilled output template text (a literal 'APPROVE | REQUEST_CHANGES' copy) refuses (the adversarial pass's own reproduction)"
+spec_review_case T-99508 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a stale earlier-round APPROVE surviving alongside a later REQUEST_CHANGES round refuses (Major 3's exact reproduction — the LATEST round is what gates, not any round)"
+spec_review_case T-99509 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n## Spec review\n\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + an earlier REQUEST_CHANGES followed by a later, fixed APPROVE round passes (positive control: section-scoping to the latest round does not over-narrow the ordinary answered-then-approved flow)"
+
 printf '\nAll close-out assertions passed.\n'
