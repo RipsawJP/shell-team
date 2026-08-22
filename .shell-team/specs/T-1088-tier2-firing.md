@@ -243,6 +243,38 @@ Mutable, and a **prediction**, not a measurement: it is transcribed from the rou
 
 **No population figure is stated in this section at authoring**, because this role holds no shell and a hand-counted total is exactly the defect the derivation tool exists to prevent. Any total, set delta or bucket split the hand-off adds here is produced by `bin/derive-populations.sh` and embedded verbatim as its emitted `<!-- BEGIN derivation: … -->` / `<!-- END derivation: … -->` block, each preceded by its own `- reproduce:` line carrying the exact command that regenerates it.
 
+**Measured, at hand-off.** The mechanical derivation — one `git grep -F -l` call carrying one `-e <path>` per path this task edits or names, over `.shell-team/specs/` — surfaces **eighteen** items total, of which one is this task's own spec (self-reference, excluded) and **seventeen** are other merged specs' read set: `T-1069`, `T-1072`, `T-1073`, `T-1074`, `T-1075`, `T-1077`, `T-1078`, `T-1079`, `T-1080`, `T-1082`, `T-1083`, `T-1084`, `T-1085`, `T-1086`, `T-1087`, `T-1089`, `T-1090` — a superset of the five the `no-mechanism` class's own indirection-discharge instruction names by id (`T-1090`, `T-1089`, `T-1087`, `T-1086`, `T-1079`), consistent with T-1087's own hand-off finding that this mechanical sweep routinely surfaces more specs than a reasoned list names. Per this section's own instruction, every spec the derivation surfaces is run in full, not only the five named — the results are reported under **AC7** item (d).
+
+- reproduce: `bash bin/derive-populations.sh --label t1088-read-set --set ALL="git grep -F -l -e docs/loop-engineering/phase-multiplexing.md -e docs/loop-engineering/tier2-subject-harness.md -e docs/loop-engineering/tier2-judge-briefing.md -e docs/loop-engineering/subjects/subject-01/README.md -e docs/loop-engineering/subjects/subject-01/interface.md -e docs/loop-engineering/subjects/subject-01/manifest.txt -e docs/loop-engineering/subjects/subject-01/acceptance.sh -e docs/loop-engineering/subjects/subject-01/regenerate.sh -e docs/loop-engineering/tier2-firing.md -- .shell-team/specs/ | LC_ALL=C sort -u" --set SELF="printf '%s\n' .shell-team/specs/T-1088-tier2-firing.md"`
+
+<!-- BEGIN derivation: t1088-read-set -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: ALL — status: 0 — lines: 18 — items: 18 — command: git grep -F -l -e docs/loop-engineering/phase-multiplexing.md -e docs/loop-engineering/tier2-subject-harness.md -e docs/loop-engineering/tier2-judge-briefing.md -e docs/loop-engineering/subjects/subject-01/README.md -e docs/loop-engineering/subjects/subject-01/interface.md -e docs/loop-engineering/subjects/subject-01/manifest.txt -e docs/loop-engineering/subjects/subject-01/acceptance.sh -e docs/loop-engineering/subjects/subject-01/regenerate.sh -e docs/loop-engineering/tier2-firing.md -- .shell-team/specs/ | LC_ALL=C sort -u
+- set: SELF — status: 0 — lines: 1 — items: 1 — command: printf '%s\n' .shell-team/specs/T-1088-tier2-firing.md
+- union: items: 18
+- bucket: ALL — items: 17
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-1086-subject-harness.md
+  - .shell-team/specs/T-1087-judge-briefing.md
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1090-sign-safety-close.md
+- bucket: ALL+SELF — items: 1
+  - .shell-team/specs/T-1088-tier2-firing.md
+<!-- END derivation: t1088-read-set -->
+
 ## Assumptions
 
 **Relayed premises** — this role holds no shell and no GitHub-reading tool. Each is labelled at the point it appears; the side holding primary confirmation is named; the freeze run measures it and records the value beside this line.
