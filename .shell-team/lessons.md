@@ -1274,3 +1274,43 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When a fan-out spec freezes a per-call harness timeout for its instances, sizing it above the serial pre-arm cost pass's largest single-unit cost is not sufficient: under N-way contention the same unit's cost inflates past its uncontended ceiling, so the frozen protocol either measures a contended sample before fixing the value or states an explicit contention factor over the uncontended maximum, and records which of the two it did.
 - **Why**: A live 8-way firing sized its per-call timeout at 600 s over a measured uncontended maximum of 435.8 s; two units exceeded the window under contention and survived only because the harness moved the calls to tracked background continuations — an accident of harness behavior, not a property the protocol had provided — and the recovery path itself then produced a duplicate-claim incident via a false orchestrator premise about what the backgrounded call had written.
 - **How to apply**: A spec freezing fan-out mechanics carries either a contended-sample measurement beside its uncontended cost pass or an explicit multiplier with its ground stated; the freeze sweep treats a per-call timeout justified only by the uncontended maximum as an unsatisfiable-under-load clause and routes it back before the freeze.
+
+## 2026-08-22 — Two consecutive review rounds of hypothetical-defeat Majors against a dev-scaffold's own inline guards signal a mispriced gate, not a third patch round
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-22.md
+- **Rule**: When a spec's own inline check lines draw Major findings for hypothetical defeats — rather than for a wrong computed value, a wrong conclusion direction, or a real instrument defect — for two consecutive review rounds, the orchestrator re-examines whether the review's Major bar for that artifact class is priced at product-surface adversarial depth before authorizing a third patch round: a hand-written finite guard reviewed adversarially never converges, because each repair grows the attack surface it exposes.
+- **Why**: One sprint spent two full tasks and five adversarial review rounds on the same guard-weaker-than-prose class (Majors growing 2 to 4 to 6) across two structurally different remedies — a full-population check-line sweep under a class-M re-freeze, then an operator-ratified claim re-scope under class-B — while QA passed every round and the shipped, tested bin/ checkers were never defeated; the loop closed only when the operator re-priced the review scope for dev-only scaffolding (inline check lines reviewed for computed values, conclusion direction and real instrument defects; guard-completeness not a Major class), after which three tasks closed in one to three substance-only rounds each.
+- **How to apply**: The orchestrator classifies each round's Majors as computed-value, conclusion-direction or instrument defects versus guard-completeness before writing the rework instruction; two consecutive guard-completeness rounds convert the next step into a pricing question for the operator (or the standing re-pricing rule where one exists) instead of another rework round, and the mechanism alternative (a tested shared checker replacing inline one-liners) is filed as its own tracked issue rather than patched per round.
+
+## 2026-08-22 — A stale completion notification that resumes an agent revives its write access; the resumed agent verifies the checkout's branch matches its own task before writing
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-22.md
+- **Rule**: An agent resumed by a background-task notification after its task's board flag has already advanced past the state the notification was for treats its write access as revoked: it verifies the shared checkout's current branch matches its own task before writing anything, reports instead of acting when the branch does not match, and never self-corrects a cross-branch write with checkout, cherry-pick or reset on its own authority.
+- **Why**: A reviewer agent resumed by stale notifications after its verdict was already processed committed an addendum onto another task's branch in the shared checkout; the recovery was lossless precisely because the agent then held its write boundary — it stopped and reported rather than attempting git surgery — and the coordinating session cherry-picked the commit to its correct branch and reset the polluted one inside a clean-tree window before the other task's engineer had committed.
+- **How to apply**: Every write-capable role's briefing carries the branch-check-before-commit obligation (git branch --show-current compared against the task's own branch immediately before any commit, with the output quoted in the hand-off); an agent resumed after its own hand-off treats any further write as requiring that check plus a statement of why the write is still its task's to make.
+
+## 2026-08-22 — A stacked cycle whose chain contains a BLOCKED, unmerged predecessor still reconstructs its retro window from the stacked-on lines, never from merge history
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-22.md
+- **Rule**: Adjacent to the existing stacked-batch-cycle entry, extending it to chains where a link went BLOCKED and returned to planning — and applies-to reads all because the retro writer (scrum-master) sits outside the playbook role enum: the chain does not rebase onto the default branch when a link stops, so the retro's cycle window is reconstructed from each in-scope task's own stacked-on board line, each adjacent link verified with git merge-base --is-ancestor, and merge-commit history — which returns zero or foreign commits for such a cycle — is never used as the window.
+- **Why**: A retro over a five-task cycle whose chain held two BLOCKED, unmerged predecessors found the merge-history window reporting 139 foreign merges from the default branch; the retro was accurate only because the window was rebuilt from the board's stacked-on lines with per-link ancestry checks, and the foreign merge window was pasted verbatim but explicitly flagged as foreign rather than silently adopted.
+- **How to apply**: When any in-scope task reads BLOCKED, or the board names unmerged stacked-on predecessors, the retro writer rebuilds the cycle window from those lines plus adjacent ancestry checks before reading any input, and any tool-reported merge window is quoted as flagged-foreign rather than used.
+
+## 2026-08-22 — A hand-off's self-reported tally that required counting is independently recounted by the receiving gate before the round closes
+- **Category**: verification-discipline
+- **Applies-to**: qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-22.md
+- **Rule**: Narrowing the existing do-not-take-self-reports-at-face-value entry to numeric tallies, for QA and equally for the cross-provider review round it hands off to: any count in a hand-off that required actual counting — rather than verbatim transcription from a command's own output — is recounted by the receiving gate with its own command before the report is accepted, and once one tally in a hand-off is caught wrong, the same hand-off's other counted tallies are recounted too rather than only the flagged one.
+- **Why**: One sprint reproduced the pattern twice, at two different gates on two different tasks: a QA round failed on a sweep tally whose own sentence contradicted it (twelve-passed-zero-failed written beside two named failures), and a cross-provider round caught a named-steps count off by one — both consistent with the earlier operator-memory finding that self-report error tracks how much of the number required counting versus copying.
+- **How to apply**: The receiving gate identifies the counted-not-transcribed values in a hand-off and recounts each with a command of its own; after any one wrong tally, the orchestrator's kickback instruction names the recount-the-rest obligation for that hand-off explicitly.
