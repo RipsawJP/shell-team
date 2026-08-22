@@ -1243,3 +1243,34 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When a task edits shipped files, the set of CI-wired suites its verification must run is derived mechanically — reverse-map each edited path to the suites that read it (`grep -rl -- '<edited-path>' tests/*/run.sh` plus the workflow's dogfood steps naming it) — and that derived list is the reached-steps scope; a conditional full-suite trigger ("run everything only if X changed") silently under-scopes whenever a suite reads a file for its own reasons the condition never anticipated.
 - **Why**: T-1080 edited `agents/codex-reviewer.md`; `tests/codex-skeleton-hygiene/run.sh` reads that file and contracts marker→command adjacency inside its fenced blocks. The spec's CI-equivalence clause named two reached suites explicitly and gated the full list behind a loop-guard-executable-change condition that never fired, so three QA rounds and three review rounds all passed a diff that CI then failed — the machine gate was the last line of defence for a scoping decision every human-shaped reviewer had accepted.
 - **How to apply**: pm-spec writes the reached-suite list into the spec by running the reverse-map command over the task's declared file set and quoting it; QA re-runs the same command at verification time against the actual diff's file list and treats any suite present in its output but absent from the spec's list as reached, running it rather than arguing scope.
+
+## 2026-08-20 — A closure declaration over a byte-locked record's own completeness claims is unverified until an independent, differently-worded signature grep accompanies it
+- **Category**: verification-discipline
+- **Applies-to**: engineer, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-20.md
+- **Rule**: Once a defect class has recurred even once against a record's self-referential provenance or completeness claims ("resolved", "verbatim", "every X", "swept everywhere"), the next round that declares the class closed attaches the executed grep signature and its hit counts to the hand-off — including a broadened re-grep that searches for the same claim in vocabulary the earlier rounds did not use — or the declaration is treated as unverified and the round does not close.
+- **Why**: One sprint enacted this twice: a four-recurrence evidence-claim class closed only when a mechanical signature enumeration replaced prose sweeps that had missed four times, and two tasks later a class-sweep declared complete over "every sibling line" missed a restatement of the disputed comparator sitting in a section the sweep's tables never scoped — caught only by a verifier's own whole-file grep for the signature word. The adjacent corpus entry on command-derived claim inventories governs the author's side; this entry governs the verifier's side — how the next round re-verifies a closure declaration, and specifically that it must re-grep with different wording than the closing round used.
+- **How to apply**: The orchestrator's rework instruction for any recurred class names the closure requirement (attach the signature, the hit list, and the per-hit disposition); QA and the cross-provider reviewer re-run the signature themselves plus at least one broadened variant, and treat a closure hand-off without an executed signature as an open finding rather than a judgment call.
+
+## 2026-08-20 — An executor's self-classification of its own action into a governance vocabulary is structurally weak: run the classifier before the attestation
+- **Category**: verification-discipline
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-20.md
+- **Rule**: When the party about to take an action also classifies that action into a closed governance vocabulary that decides who may approve it (class-M's standing delegation versus class-B's mandatory human GO, or any successor scheme), that self-classification carries a structural bias its own process cannot detect; the mechanical classifier runs and its verdict is read before any self-attested authority is exercised, and where the classifier's verdict lands the action in a human-gated class, the escalation happens before the action, not after a reviewer catches it.
+- **Why**: An orchestrator planned a re-freeze as class-M under the standing grant, wrote the plan into its own records, then ran the classifier — which measured class-B — and proceeded on self-attested ratification anyway, reading an adjacent precedent as license; only the cross-provider review's Blocker surfaced that the shipped rule reserves class-B for a human GO, and the operator had to ratify retroactively. Every artifact of the miss was self-produced and self-consistent, which is exactly why the executor's own process could not catch it.
+- **How to apply**: Before exercising any standing delegation whose boundary is a classification, the orchestrator runs the boundary's mechanical check first and quotes its verdict in the attestation; a verdict naming a human-gated class converts the step into an escalation with the measured ground attached, and an attestation that classifies without quoting a classifier run is itself a finding.
+
+## 2026-08-20 — A fan-out's per-call timeout sized only from uncontended single-unit cost does not absorb N-way contention inflation
+- **Category**: verification-discipline
+- **Applies-to**: pm-spec, engineer
+- **Scope**: maintainer
+- **Bound-in**: skills/run/SKILL.md
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-20.md
+- **Rule**: When a fan-out spec freezes a per-call harness timeout for its instances, sizing it above the serial pre-arm cost pass's largest single-unit cost is not sufficient: under N-way contention the same unit's cost inflates past its uncontended ceiling, so the frozen protocol either measures a contended sample before fixing the value or states an explicit contention factor over the uncontended maximum, and records which of the two it did.
+- **Why**: A live 8-way firing sized its per-call timeout at 600 s over a measured uncontended maximum of 435.8 s; two units exceeded the window under contention and survived only because the harness moved the calls to tracked background continuations — an accident of harness behavior, not a property the protocol had provided — and the recovery path itself then produced a duplicate-claim incident via a false orchestrator premise about what the backgrounded call had written.
+- **How to apply**: A spec freezing fan-out mechanics carries either a contended-sample measurement beside its uncontended cost pass or an explicit multiplier with its ground stated; the freeze sweep treats a per-call timeout justified only by the uncontended maximum as an unsatisfiable-under-load clause and routes it back before the freeze.
