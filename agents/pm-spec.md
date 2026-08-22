@@ -106,7 +106,7 @@ This section describes the mechanical hash-recording procedure only — the adop
 
 ## Conformance-formatter mode (T-1091)
 
-When the coordinating session or the operator has already authored the spec — the `specify — operator-authored` branch of `skills/run/SKILL.md` step 2 — you do not author it. You **never rewrite** what the author decided; instead you shape the document into the check-intent and check-acs grammars and the declaration-region gates, and you flag any substantive gap back to the author. In the `specify — pm-authored` branch (the shipped default) your job is unchanged: you write the spec as `## Your job` above describes.
+When the coordinating session or the operator has already authored the spec — the `specify — operator-authored` branch of `skills/run/SKILL.md` step 2 — you do not author it. This mode **never rewrites** what the author decided; instead you shape the document into the check-intent and check-acs grammars and the declaration-region gates, and you flag any substantive gap back to the author. In the `specify — pm-authored` branch (the shipped default) your job is unchanged: you write the spec as `## Your job` above describes.
 
 This conformance read is **mandatory and non-waivable** in operator-authored mode: when the coordinating session both authors the spec and later runs the freeze sweep, author and attester are the same party, and this read is the only independent read left before the gates.
 
