@@ -1106,9 +1106,13 @@ mkdir -p "$DISPATCH_ROOT"
 # so a two-line body is passed as one string), $3 = expected exit code,
 # $4 = "silent" (the gate must say nothing) or a substring the refusal's
 # stderr must carry beyond the shared "malformed dispatch record" literal,
-# $5 = the assertion name (reported as "T-1084 <name>").
+# $5 = the assertion name, $6 = optional label (defaults to "T-1084" — T-1091
+# fixtures below pass "T-1091" so `grep -c '^PASS: T-1091'` counts them
+# separately from T-1084's own floor, per that task's own frozen AC8's
+# hard-coded label — a sibling helper was rejected in favor of one parameter
+# with a back-compat default so every pre-existing call site is untouched).
 dispatch_case() {
-  local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5"
+  local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5" label="${6:-T-1084}"
   local root="$DISPATCH_ROOT/$task"
   mkdir -p "$root"
   write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
@@ -1119,21 +1123,21 @@ dispatch_case() {
   local rc=0
   ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" \
       bash "$CLOSEOUT" --task "$task" --date 2026-08-19 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
-  [ "$rc" -eq "$expect_rc" ] || fail "T-1084 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  [ "$rc" -eq "$expect_rc" ] || fail "$label $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
   if [ "$mode" = silent ]; then
     grep -qF -- 'malformed dispatch record' "$root/err" \
-      && fail "T-1084 $name: the gate must say NOTHING here — found the refusal literal in stderr"
+      && fail "$label $name: the gate must say NOTHING here — found the refusal literal in stderr"
     grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
-      || fail "T-1084 $name: close-out should have moved the entry to Done"
+      || fail "$label $name: close-out should have moved the entry to Done"
   else
     cmp -s "$root/todo.orig" "$root/todo.md" \
-      || fail "T-1084 $name: a refused close-out must leave the board byte-untouched"
+      || fail "$label $name: a refused close-out must leave the board byte-untouched"
     grep -qF -- 'malformed dispatch record' "$root/err" \
-      || fail "T-1084 $name: refusal stderr must carry the literal 'malformed dispatch record'"
+      || fail "$label $name: refusal stderr must carry the literal 'malformed dispatch record'"
     grep -qF -- "$mode" "$root/err" \
-      || fail "T-1084 $name: refusal stderr must carry the offending detail '$mode' (stderr: $(cat "$root/err"))"
+      || fail "$label $name: refusal stderr must carry the offending detail '$mode' (stderr: $(cat "$root/err"))"
   fi
-  pass "T-1084 $name"
+  pass "$label $name"
 }
 
 OKI='  - dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge'
@@ -1196,5 +1200,22 @@ dispatch_case T-986 "$OKI\n  - dispatch: verify—serial — unconditional — r
 # --- record correctly once the candidate anchor is widened — the widening
 # --- must not turn a real record invisible or falsely reject it -----------
 dispatch_case T-987 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout" 0 silent "tab-indented conformant record still passes (positive control on the widened anchor)"
+
+# ============================================================================
+# T-1091: the `specify` axis — one data row on the same DISPATCH_AXIS_TABLE,
+# no logic change. Seven cases labelled "T-1091" (see dispatch_case's own
+# label parameter above): the axis's own conformant/back-compat/refusal
+# shapes, exercised against the real script exactly as T-1084's own cases
+# above are.
+# ============================================================================
+OKS='  - dispatch: specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density'
+
+dispatch_case T-988 "$OKI\n$OKV\n$OKS" 0 silent "conformant three-axis record (implement/verify/specify) passes the gate" T-1091
+dispatch_case T-989 "$OKI\n$OKV" 0 silent "two-axis record with no specify sub-bullet still passes (every in-flight task under the two-axis dispatcher, never refused retroactively)" T-1091
+dispatch_case T-990 "$OKI\n  - dispatch: specify — serial — unconditional — cost-input: spec-authorship-judgment-density" 1 "'serial' is not in axis 'specify'" "cross-axis value 'specify — serial' refuses (all three axes share one editing surface)" T-1091
+dispatch_case T-991 "$OKV\n  - dispatch: implement — pm-authored — unconditional — recommendation: tier2-parallel-implementations-judge" 1 "'pm-authored' is not in axis 'implement'" "cross-axis value 'implement — pm-authored' refuses (the transposition in the other direction)" T-1091
+dispatch_case T-992 "$OKI\n$OKS\n$OKS" 1 "'specify' appears more than once" "duplicated specify axis refuses" T-1091
+dispatch_case T-993 "$OKI\n  - dispatch:${TAB}specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density" 1 "does not match the grammar" "tab-after-dispatch-colon on specify refuses (seen and refused, not silently invisible)" T-1091
+dispatch_case T-994 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density" 0 silent "tab-indented conformant specify record still passes (positive control on the widened anchor)" T-1091
 
 printf '\nAll close-out assertions passed.\n'
