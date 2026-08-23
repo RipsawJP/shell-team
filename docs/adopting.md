@@ -331,14 +331,14 @@ git commit -m "chore: scaffold shell-team for a one-ticket trial"
 
 `team-init.sh` runs no git command of its own and does not care which branch you are on, so this is the whole setup. Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
 
-If your machine's global excludes (`core.excludesFile`) hide the base dir, that plain `git add` refuses outright the moment you run it. Force the scaffolded files onto this one branch with `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`, or add a repo-level `!.shell-team/` re-include as described in [Where the operating files live](#where-the-operating-files-live) so the ordinary form works for good.
+If your machine's global excludes (`core.excludesFile`) hide the base dir, that plain `git add` refuses outright the moment you run it. Force the scaffolded files onto this one branch with `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`, or add a repo-level re-include to your root `.gitignore` for whatever `team-paths.sh --get base` resolves to in your repo — `!.shell-team/` in the default layout, `!tasks/` in the legacy layout — as described in [Where the operating files live](#where-the-operating-files-live), so the ordinary form works for good.
 
 Now run `/shell-team:run <what you want built>` as usual, on the trial branch.
 
-**Teardown.**
+**Teardown.** Substitute your own repository's integration branch for `<integration-branch>` — `develop` in this repository, `main` in many others.
 
 ```bash
-git switch develop
+git switch <integration-branch>
 git branch -D trial/one-ticket
 ```
 

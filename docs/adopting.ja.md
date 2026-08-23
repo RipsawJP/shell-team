@@ -51,7 +51,7 @@ base dir を git に載せない場合、その方法 2 つは効く範囲が違
 base dir は追跡されたままになります。
 
 稼働ファイルを追跡せずに残した場合にループの **gates** が実際にどうなるかは、下記の
-[1 チケットでチームを試す](#trying-the-team-on-one-ticket) を参照してください——
+[1 チケットでチームを試す](#1-チケットでチームを試す) を参照してください——
 このパラグラフは scope（範囲）についてのものであり、追跡そのものを丸ごとスキップし
 た場合に何が起きるかについてではありません。
 
@@ -336,14 +336,14 @@ git commit -m "chore: scaffold shell-team for a one-ticket trial"
 
 `team-init.sh` は自身では git コマンドを一切実行せず、どのブランチにいるかも気にしません。したがってこれで完全なセットアップです。`--get` 引数は両方とも重要です: デフォルトレイアウトでは同じディレクトリに解決されますが、レガシーな `tasks/` + `docs/specs/` レイアウトでは `docs/specs/` がベースディレクトリの外にあるため、2 つめの引数を落とすと specs ディレクトリが永久に未追跡のままになります——両方を使ってコミットしてください（単一ディレクトリをハードコードした形は使わないでください）。
 
-マシンの global excludes（`core.excludesFile`）がベースディレクトリを隠している場合、この普通の `git add` はその場で拒否されます。このお試し用ブランチに限って `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"` で強制するか、[稼働ファイルの置き場所](#稼働ファイルの置き場所) にある repo レベルの `!.shell-team/` 再追加を行って、通常の形が恒久的に効くようにしてください。
+マシンの global excludes（`core.excludesFile`）がベースディレクトリを隠している場合、この普通の `git add` はその場で拒否されます。このお試し用ブランチに限って `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"` で強制するか、[稼働ファイルの置き場所](#稼働ファイルの置き場所) にあるとおり、`team-paths.sh --get base` があなたの repo で解決するパスを root `.gitignore` に repo レベルで re-include してください（デフォルトレイアウトでは `!.shell-team/`、レガシーレイアウトでは `!tasks/`）——そうすれば通常の形が恒久的に効くようになります。
 
 あとはいつも通り、このお試し用ブランチ上で `/shell-team:run <作りたいもの>` を実行します。
 
-**後始末。**
+**後始末。** `<integration-branch>` にはあなた自身のリポジトリの integration branch を代入してください——この repository では `develop`、他の多くの repository では `main` です。
 
 ```bash
-git switch develop
+git switch <integration-branch>
 git branch -D trial/one-ticket
 ```
 
