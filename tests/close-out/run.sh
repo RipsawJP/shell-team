@@ -1333,4 +1333,23 @@ spec_review_case T-99519 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review
 # --- silent PASS, not merely an over-eager refusal).
 spec_review_case T-99520 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n  ## Some Other Section\n\n### Codex Spec-Review verdict: APPROVE' 1 refuse "elected + a later, unrelated heading with LEADING whitespace does not let a stray APPROVE hiding after it leak into the latest round — the record's true latest round (REQUEST_CHANGES) still refuses (QA round 4's exact false-PASS reproduction)"
 
+# --- design fix A2 (QA round 5's own probe, operator-ruled, fourth ------
+# --- ruling on this component): a CRLF-terminated record defeated heading
+# --- detection entirely (awk's default RS is `\n` only, so a trailing
+# --- `\r` survived and no heading ever normalized to the exact target),
+# --- so the OLD fallback ("nothing extracted -> use the whole file") fired
+# --- and a stale APPROVE from an earlier round survived a later, genuine
+# --- REQUEST_CHANGES — false PASS. QA's own exact repro (every line
+# --- `\r\n`-terminated).
+spec_review_case T-99521 "$OKI\n$ELECT" '## Spec review\r\n\r\n### Codex Spec-Review verdict: APPROVE\r\n\r\n## Spec review\r\n\r\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a CRLF-terminated multi-round record (round 1 APPROVE, round 2 REQUEST_CHANGES) still refuses on its own latest round (QA round 5's exact CRLF false-PASS reproduction)"
+# --- Positive control: CR tolerance must not become a new false-refusal --
+# --- surface — a CRLF-terminated record whose latest round is a genuine
+# --- APPROVE must still pass, mirroring T-99509's own reversed-order shape.
+spec_review_case T-99522 "$OKI\n$ELECT" '## Spec review\r\n\r\n### Codex Spec-Review verdict: REQUEST_CHANGES\r\n\r\n## Spec review\r\n\r\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + a CRLF-terminated multi-round record whose LATEST round is a genuine APPROVE still passes (CR-tolerance positive control — the frozen Input-space declaration must hold in both directions)"
+# --- Fallback disambiguation's own case: headings exist (so this is NOT --
+# --- the genuinely-headerless T-99501 shape) but none is `## Spec review`
+# --- — refuses rather than falling back to a whole-file scan that would
+# --- otherwise pick up the stray APPROVE sitting in unrelated body text.
+spec_review_case T-99523 "$OKI\n$ELECT" '## Notes\n\n### Codex Spec-Review verdict: APPROVE\n\nsome unrelated body text' 1 refuse "elected + a record with section headings but NO Spec review section refuses even though a stray APPROVE-shaped line sits in the unrelated body (the fallback disambiguation's own case — headings-but-no-target is not the same as no-headings-at-all)"
+
 printf '\nAll close-out assertions passed.\n'

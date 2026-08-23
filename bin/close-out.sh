@@ -377,26 +377,85 @@ if [ "${SPEC_REVIEW_ELECTED:-}" = "cross-provider" ]; then
     # bare verdict line, exercised by AC6's own fixtures) still makes awk
     # exit 1, and the scan still correctly degrades to the whole file
     # exactly as round-1's fix already did for that case.
-    LATEST_SECTION="$(awk '
+    #
+    # Design fix A2 (operator-ruled, fourth ruling on this component — QA
+    # round 5's own probe): a CRLF-terminated record defeated heading
+    # detection ENTIRELY — `awk`'s default record separator is `\n` only,
+    # so a CRLF line's trailing `\r` survived as the LAST character of
+    # `$0`, and no heading line could ever normalize to exactly `## Spec
+    # review` (the trailing `\r` is not `[ \t]` and the normalization never
+    # stripped it). With `last` never set, the OLD fallback rule ("if
+    # nothing was extracted, use the whole file") fired — but the fallback
+    # was written for the genuinely-headerless case (a bare verdict line,
+    # AC6's own fixtures) and could not tell that apart from "heading
+    # detection itself failed": a stale round-1 APPROVE and a later,
+    # genuine REQUEST_CHANGES both sat in that same whole-file scan, and
+    # the APPROVE matched first — a false PASS, and one contradicting this
+    # spec's own frozen Input-space declaration that a CR-tolerant record
+    # is a handled input, not a Non-input synthetic extreme.
+    #
+    # Two changes close both halves of that one root cause:
+    # (1) **Per-line CR strip, first thing**: `sub(/\r$/, "", $0)` runs
+    # before ANY other processing, on the line stored into `raw[]` too —
+    # so a CRLF file's heading lines normalize identically to an LF file's,
+    # and the CONTENT later handed to the verdict grep is already CR-free
+    # (a trailing `\r` right before the verdict grep's own `$` anchor could
+    # otherwise defeat that anchor exactly as it defeated the heading match
+    # — reasoned through, not just the heading side of this bug).
+    # (2) **Fallback disambiguation, structural rather than a byte check**:
+    # the scan now tracks whether ANY line normalizes to a heading at all
+    # (`any_heading`), independent of whether one of them is THE Spec
+    # review heading (`last`). Three dispositions, mutually exclusive and
+    # exhaustive: (a) **has-target-section** (`last != 0`) — extract the
+    # latest round exactly as before; (b) **no-headings-at-all**
+    # (`last == 0 && any_heading == 0`, awk exit 1) — the record genuinely
+    # has no heading structure (a bare verdict line), so the whole-file
+    # scan this fallback exists for is exactly right, and stays; (c)
+    # **headings-but-no-target** (`last == 0 && any_heading != 0`, awk exit
+    # 2) — the record has section structure but none of it is a Spec
+    # review round, so an elected task's teeth REFUSE rather than fall
+    # back to a whole-file scan that could pick up an unrelated stray
+    # verdict-shaped line sitting in ordinary body text (this is the
+    # fail-closed reading: no APPROVE in an actual Spec review section
+    # means no APPROVE, full stop). The two non-zero awk exit codes are
+    # captured with bash's own `if VAR=$(cmd); then …; else RC=$?; fi`
+    # idiom (never `|| true`, which would erase the distinction the whole
+    # fix exists to draw) and branched on explicitly below.
+    if LATEST_SECTION="$(awk '
       {
+        sub(/\r$/, "", $0)
         raw[NR] = $0
         norm = $0
         gsub(/[ \t]+/, " ", norm)
         sub(/^ /, "", norm)
         sub(/ $/, "", norm)
         normv[NR] = norm
+        if (norm ~ /^## /) { any_heading = 1 }
         if (norm == "## Spec review") { last = NR }
       }
       END {
-        if (last == 0) { exit 1 }
+        if (last == 0) {
+          if (any_heading == 0) { exit 1 } else { exit 2 }
+        }
         for (i = last; i <= NR; i++) {
           if (i > last && normv[i] ~ /^## /) { break }
           print raw[i]
         }
       }
-    ' "$REVIEW_RECORD" || true)"
-    if [ -z "$LATEST_SECTION" ]; then
-      LATEST_SECTION="$(cat "$REVIEW_RECORD")"
+    ' "$REVIEW_RECORD")"; then
+      AWK_RC=0
+    else
+      AWK_RC=$?
+    fi
+    if [ "$AWK_RC" -eq 1 ]; then
+      # No heading at all — genuinely the bare-verdict shape (AC6's own
+      # fixtures). CR-stripped for the same reason the awk pass strips it:
+      # the verdict grep below must not be defeated by a trailing `\r`.
+      LATEST_SECTION="$(tr -d '\r' < "$REVIEW_RECORD")"
+    elif [ "$AWK_RC" -eq 2 ]; then
+      # Headings exist but none is `## Spec review` — refuse, never fall
+      # back to a whole-file scan.
+      LATEST_SECTION=""
     fi
     # Round-3 rework (Codex review round 2, Blocker 2): the previous match
     # (`printf '%s\n' "$LATEST_SECTION" | grep -qE '...'`) is racy under
