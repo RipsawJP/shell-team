@@ -1314,4 +1314,12 @@ LARGE_FILLER="$(head -c 100000 /dev/zero | tr '\0' 'x')"
 LARGE_BODY="## Spec review\n\n${LARGE_FILLER}\n\n### Codex Spec-Review verdict: APPROVE\n\n${LARGE_FILLER}"
 spec_review_case T-99518 "$OKI\n$ELECT" "$LARGE_BODY" 0 silent "elected + a ~200KB Spec review section with a genuinely valid, exactly-matching APPROVE still passes (Blocker 2's exact reproduction — the verdict match must not be racy under pipefail on a large section)"
 
+# --- one-item scope extension (QA round 3's own probe, operator-approved) -
+# --- round-3's first fix trimmed TRAILING whitespace only, so an INTERNAL
+# --- whitespace variant of the later heading (a double space between `##`
+# --- and `Spec`) was still invisible to the selector while the loose
+# --- boundary still recognized it as a heading — the same defect shape as
+# --- T-99517, one whitespace position over. QA's own exact repro.
+spec_review_case T-99519 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n##  Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a LATER round whose heading carries an internal double space (## then two spaces then Spec review) still refuses on its own REQUEST_CHANGES (the one-item scope extension's exact reproduction)"
+
 printf '\nAll close-out assertions passed.\n'
