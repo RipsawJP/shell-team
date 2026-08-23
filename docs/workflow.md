@@ -54,6 +54,14 @@ Each agent's hand-off block in the main session must include:
 
 This block is the *only* reliable channel between agents — they don't share memory.
 
+When a spec carries a `- verification-ceiling:` declaration (T-1093), a
+`READY_FOR_REVIEW` hand-off additionally carries the declared value —
+transcribed verbatim from the spec, never invented — so the flag reads
+"green up to" this level rather than bare green; the same line rides onto
+the board's own record of that hand-off. See
+[Declaring the verification ceiling](adopting.md#declaring-the-verification-ceiling)
+for the grammar and what it does and does not guarantee.
+
 ## Language — mirror the conversation
 
 Team output **mirrors the user's conversation language**: when `/shell-team:run` or

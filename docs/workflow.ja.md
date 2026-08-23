@@ -54,6 +54,15 @@
 
 このブロックがエージェント間の*唯一*信頼できるチャネルです — メモリは共有されません。
 
+spec が `- verification-ceiling:` 宣言（T-1093）を持つ場合、
+`READY_FOR_REVIEW` の hand-off には宣言された値——spec から verbatim に
+transcribe されたものであり、決して invent されない——が追加で載る。
+これにより flag は bare な green ではなく「このレベルまでは green」と
+読める。同じ行は board 自身のその hand-off の記録にも乗る。文法と、それが
+何を保証し何を保証しないかは
+[verification ceiling を宣言する](adopting.ja.md#verification-ceiling-を宣言する)
+を参照。
+
 ## 言語 — 会話をミラーする
 
 チームの出力は**ユーザーの会話言語をミラーします**: `/shell-team:run` や `/goal` が
