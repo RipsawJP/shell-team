@@ -1225,14 +1225,14 @@ dispatch_case T-994 "${TAB}- dispatch: implement — serial — unconditional �
 # ============================================================================
 # T-1092: the `spec-review` axis — one more data row on the same
 # DISPATCH_AXIS_TABLE (grammar cases, exercised via dispatch_case exactly as
-# T-1091's own cases above are) plus a second, independent fail-closed
-# refusal class — the teeth gate, which reads a redirected reviews directory
-# rather than the dispatch grammar (exercised via the dedicated
-# spec_review_case helper below, because its own refusal sentinel differs
-# from 'malformed dispatch record').
+# T-1091's own cases above are). The close-out backstop that used to sit
+# beside this grammar gate (a second, independent refusal class reading a
+# redirected reviews directory for an APPROVE verdict) was carved out under
+# this spec's own pre-commitment (operator-ruled 2026-08-23, six enumerated
+# defeat classes) — issue #344 owns it, and no reviews-dir redirection or
+# verdict-matching fixture ships here any more.
 # ============================================================================
 OKR='  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default'
-ELECT='  - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count'
 
 dispatch_case T-99510 "$OKI\n$OKV\n$OKS\n$OKR" 0 silent "conformant four-axis record (implement/verify/specify/spec-review) passes the gate" T-1092
 dispatch_case T-99511 "$OKI\n$OKV\n$OKS" 0 silent "three-axis record with no spec-review sub-bullet still passes (every in-flight task under the three-axis dispatcher, never refused retroactively)" T-1092
@@ -1241,115 +1241,5 @@ dispatch_case T-99513 "$OKV\n  - dispatch: implement — cross-provider — unco
 dispatch_case T-99514 "$OKI\n$OKR\n$OKR" 1 "'spec-review' appears more than once" "duplicated spec-review axis refuses" T-1092
 dispatch_case T-99515 "$OKI\n  - dispatch:${TAB}spec-review — none — unconditional — recommendation: spec-review-none-default" 1 "does not match the grammar" "tab-after-dispatch-colon on spec-review refuses (seen and refused, not silently invisible)" T-1092
 dispatch_case T-99516 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default" 0 silent "tab-indented conformant spec-review record still passes (positive control on the widened anchor)" T-1092
-
-# --- the teeth gate (AC6): a redirected reviews directory, a different ------
-# --- refusal sentinel, and no dependence on the dispatch grammar's own -----
-# --- literal — a dedicated helper rather than overloading dispatch_case ----
-SPEC_REVIEW_SENTINEL='elected spec review has no APPROVE verdict'
-spec_review_case() {
-  local task="$1" body="$2" review_body="$3" expect_rc="$4" mode="$5" name="$6"
-  local root="$DISPATCH_ROOT/$task"
-  mkdir -p "$root/.shell-team/reviews"
-  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
-  if [ -n "$review_body" ]; then
-    printf -- '%b\n' "$review_body" > "$root/.shell-team/reviews/$task.md"
-    test -s "$root/.shell-team/reviews/$task.md" || fail "T-1092 $name: could not write the synthesized review record"
-  fi
-  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
-    "$task" "$body" > "$root/todo.md"
-  cp "$root/todo.md" "$root/todo.orig"
-  local rc=0
-  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_REVIEWS_DIR="$root/.shell-team/reviews" \
-      bash "$CLOSEOUT" --task "$task" --date 2026-08-19 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
-  [ "$rc" -eq "$expect_rc" ] || fail "T-1092 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
-  if [ "$mode" = silent ]; then
-    grep -qF -- "$SPEC_REVIEW_SENTINEL" "$root/err" \
-      && fail "T-1092 $name: the gate must say NOTHING here — found the refusal sentinel in stderr"
-    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
-      || fail "T-1092 $name: close-out should have moved the entry to Done"
-  else
-    cmp -s "$root/todo.orig" "$root/todo.md" \
-      || fail "T-1092 $name: a refused close-out must leave the board byte-untouched"
-    grep -qF -- "$SPEC_REVIEW_SENTINEL" "$root/err" \
-      || fail "T-1092 $name: refusal stderr must carry the sentinel '$SPEC_REVIEW_SENTINEL'"
-  fi
-  pass "T-1092 $name"
-}
-
-spec_review_case T-99501 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE' 0 silent "elected + APPROVE record passes (also the positive control on the \$TEAM_REVIEWS_DIR override itself: the record exists only inside the scratch directory)"
-spec_review_case T-99502 "$OKI\n$ELECT" '' 1 refuse "elected + no record refuses"
-spec_review_case T-99503 "$OKI\n$ELECT" '### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + REQUEST_CHANGES-only record refuses"
-spec_review_case T-99504 "$OKI\n$ELECT" '## Spec review\n\nnothing was recorded here' 1 refuse "elected + non-empty record with no spec-review verdict heading at all refuses"
-spec_review_case T-99505 "$OKI\n$OKR" '' 0 silent "none + no record passes (every task that declines the extra round)"
-
-# --- review round 1, Majors 2+3: the verdict match was (a) unanchored — any -
-# --- heading with `APPROVE` as a literal PREFIX satisfied the gate — and (b) -
-# --- unscoped — it read the WHOLE file rather than the record's LATEST
-# --- `## Spec review` round. Fixtures below reproduce both defeat classes
-# --- against the real, fixed script, plus a positive control confirming the
-# --- section-scoping fix doesn't over-narrow the ordinary fixed-then-approved
-# --- multi-round case.
-spec_review_case T-99506 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE_WITH_CAVEATS' 1 refuse "elected + a prefix-matching near-miss verdict value (APPROVE_WITH_CAVEATS) refuses (Major 2's exact reproduction)"
-spec_review_case T-99507 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE | REQUEST_CHANGES' 1 refuse "elected + the mode's own unfilled output template text (a literal 'APPROVE | REQUEST_CHANGES' copy) refuses (the adversarial pass's own reproduction)"
-spec_review_case T-99508 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a stale earlier-round APPROVE surviving alongside a later REQUEST_CHANGES round refuses (Major 3's exact reproduction — the LATEST round is what gates, not any round)"
-spec_review_case T-99509 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n## Spec review\n\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + an earlier REQUEST_CHANGES followed by a later, fixed APPROVE round passes (positive control: section-scoping to the latest round does not over-narrow the ordinary answered-then-approved flow)"
-
-# --- review round 2, Blocker 1: the round-2 fix paired an EXACT heading ---
-# --- search with a LOOSE boundary check, so a later `## Spec review`
-# --- heading carrying a trailing-whitespace deviation was invisible to the
-# --- search but visible to the boundary — the scan anchored to an EARLIER
-# --- round and stopped right before the malformed LATER one, hiding its
-# --- REQUEST_CHANGES entirely. Reproduces the reviewer's own repro exactly
-# --- (round 2's heading carries one trailing space after "review").
-spec_review_case T-99517 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n## Spec review \n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a LATER round whose heading carries a trailing space still refuses on its own REQUEST_CHANGES (Blocker 1's exact reproduction — the heading-search and boundary checks must agree, not just the boundary check)"
-
-# --- review round 2, Blocker 2: `printf | grep -q` is racy under pipefail
-# --- for a large section — grep can match and still report a SIGPIPE'd
-# --- printf's failure as the pipeline's own exit status, falsely refusing
-# --- a genuinely valid APPROVE. Reproduces with a ~200KB section (well
-# --- past any plausible pipe-buffer size), matching the reviewer's own
-# --- repro; this is a POSITIVE case (a real refusal here would BE the bug).
-LARGE_FILLER="$(head -c 100000 /dev/zero | tr '\0' 'x')"
-LARGE_BODY="## Spec review\n\n${LARGE_FILLER}\n\n### Codex Spec-Review verdict: APPROVE\n\n${LARGE_FILLER}"
-spec_review_case T-99518 "$OKI\n$ELECT" "$LARGE_BODY" 0 silent "elected + a ~200KB Spec review section with a genuinely valid, exactly-matching APPROVE still passes (Blocker 2's exact reproduction — the verdict match must not be racy under pipefail on a large section)"
-
-# --- one-item scope extension (QA round 3's own probe, operator-approved) -
-# --- round-3's first fix trimmed TRAILING whitespace only, so an INTERNAL
-# --- whitespace variant of the later heading (a double space between `##`
-# --- and `Spec`) was still invisible to the selector while the loose
-# --- boundary still recognized it as a heading — the same defect shape as
-# --- T-99517, one whitespace position over. QA's own exact repro.
-spec_review_case T-99519 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n##  Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a LATER round whose heading carries an internal double space (## then two spaces then Spec review) still refuses on its own REQUEST_CHANGES (the one-item scope extension's exact reproduction)"
-
-# --- design fix (QA round 4's own probe, operator-ruled option A, third --
-# --- ruling on this component): the boundary check read the RAW line
-# --- while the selector read a NORMALIZED line, so a later, genuinely
-# --- unrelated heading indented with LEADING whitespace was invisible to
-# --- the boundary's raw `/^## /` test — the extraction leaked past it,
-# --- and a stray APPROVE line hiding in the leaked content produced a
-# --- FALSE PASS on a record whose true latest round was REQUEST_CHANGES.
-# --- QA's own exact repro; this is the dangerous direction (a false
-# --- silent PASS, not merely an over-eager refusal).
-spec_review_case T-99520 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n  ## Some Other Section\n\n### Codex Spec-Review verdict: APPROVE' 1 refuse "elected + a later, unrelated heading with LEADING whitespace does not let a stray APPROVE hiding after it leak into the latest round — the record's true latest round (REQUEST_CHANGES) still refuses (QA round 4's exact false-PASS reproduction)"
-
-# --- design fix A2 (QA round 5's own probe, operator-ruled, fourth ------
-# --- ruling on this component): a CRLF-terminated record defeated heading
-# --- detection entirely (awk's default RS is `\n` only, so a trailing
-# --- `\r` survived and no heading ever normalized to the exact target),
-# --- so the OLD fallback ("nothing extracted -> use the whole file") fired
-# --- and a stale APPROVE from an earlier round survived a later, genuine
-# --- REQUEST_CHANGES — false PASS. QA's own exact repro (every line
-# --- `\r\n`-terminated).
-spec_review_case T-99521 "$OKI\n$ELECT" '## Spec review\r\n\r\n### Codex Spec-Review verdict: APPROVE\r\n\r\n## Spec review\r\n\r\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a CRLF-terminated multi-round record (round 1 APPROVE, round 2 REQUEST_CHANGES) still refuses on its own latest round (QA round 5's exact CRLF false-PASS reproduction)"
-# --- Positive control: CR tolerance must not become a new false-refusal --
-# --- surface — a CRLF-terminated record whose latest round is a genuine
-# --- APPROVE must still pass, mirroring T-99509's own reversed-order shape.
-spec_review_case T-99522 "$OKI\n$ELECT" '## Spec review\r\n\r\n### Codex Spec-Review verdict: REQUEST_CHANGES\r\n\r\n## Spec review\r\n\r\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + a CRLF-terminated multi-round record whose LATEST round is a genuine APPROVE still passes (CR-tolerance positive control — the frozen Input-space declaration must hold in both directions)"
-# --- Fallback disambiguation's own case: headings exist (so this is NOT --
-# --- the genuinely-headerless T-99501 shape) but none is `## Spec review`
-# --- — refuses rather than falling back to a whole-file scan that would
-# --- otherwise pick up the stray APPROVE sitting in unrelated body text.
-spec_review_case T-99523 "$OKI\n$ELECT" '## Notes\n\n### Codex Spec-Review verdict: APPROVE\n\nsome unrelated body text' 1 refuse "elected + a record with section headings but NO Spec review section refuses even though a stray APPROVE-shaped line sits in the unrelated body (the fallback disambiguation's own case — headings-but-no-target is not the same as no-headings-at-all)"
 
 printf '\nAll close-out assertions passed.\n'
