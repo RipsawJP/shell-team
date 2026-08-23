@@ -1114,18 +1114,13 @@ mkdir -p "$DISPATCH_ROOT"
 dispatch_case() {
   local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5" label="${6:-T-1084}"
   local root="$DISPATCH_ROOT/$task"
-  # T-1092: every call site is redirected to a scratch reviews directory too
-  # (harmless for every pre-existing case, none of which elects
-  # `spec-review — cross-provider`), so no fixture here can ever read or
-  # write this repository's own `.shell-team/reviews/`.
-  mkdir -p "$root/.shell-team/reviews"
   write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
   # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
   printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
     "$task" "$body" > "$root/todo.md"
   cp "$root/todo.md" "$root/todo.orig"
   local rc=0
-  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_REVIEWS_DIR="$root/.shell-team/reviews" \
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" \
       bash "$CLOSEOUT" --task "$task" --date 2026-08-19 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
   [ "$rc" -eq "$expect_rc" ] || fail "$label $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
   if [ "$mode" = silent ]; then
