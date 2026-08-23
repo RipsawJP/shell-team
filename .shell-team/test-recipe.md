@@ -1673,3 +1673,30 @@ that file's order.
   that a scope-lock criterion (this spec's own AC9) correctly flags as a
   stray, producing a false unrelated failure that has nothing to do with
   the mutation under test.
+- T-1094 (rework round): a delta on this same task's own entry above, not
+  a restatement — the missing-sibling-branch gap is not limited to a named
+  **feature** branch resolved by name; it recurs identically for `develop`
+  itself whenever a merged spec's own `- base-ref-discriminator:` (or an
+  older spec's equivalent inline expression) is a bare `git merge-base
+  develop HEAD`. A plain `git clone --no-hardlinks -q . <dest>` carries
+  `develop` only as `remotes/origin/develop`, never as a local `refs/heads/
+  develop` ref, so `git rev-parse --verify --quiet 'develop^{commit}'`
+  fails inside the clone and every criterion resolving its base through
+  `develop` reads a false `FAIL` — indistinguishable, from the check's own
+  exit code alone, from a genuine content regression, which is exactly the
+  trap: a same-shaped previous fix (recreating one named sibling feature
+  branch) does not automatically cover this second, differently-named ref
+  the same convention depends on. Confirmed empirically: `T-1060-adopter-
+  binding-docs.md`'s AC5/AC6/AC8/AC9/AC11 all read `$B=$(git merge-base
+  develop HEAD)`, and every one of them false-failed with `$B` empty until
+  `git branch develop origin/develop` was run in the scratch clone
+  immediately after cloning — after which AC6 (the one this round's own
+  rework actually needed a trustworthy base-side reading for) resolved
+  correctly on both sides of the base/HEAD comparison. Before trusting ANY
+  `- check:` line's `FAIL` inside a fresh scratch clone, grep the spec
+  under test (and every spec the same sweep touches) for every distinct
+  branch-name literal its base-ref-discriminator expressions actually name
+  — `develop` included, not just a stacked feature branch — and recreate
+  each one as a local branch at the correct SHA (`origin/<name>` for
+  `develop`, an explicit known SHA for a stacked sibling not reachable from
+  any remote-tracking ref) before running a single check line.

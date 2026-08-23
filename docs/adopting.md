@@ -127,46 +127,6 @@ The loop runs Plan → Specify → Implement → Validate → Review, advancing 
 flag in the board (`<base>/todo.md`) at each phase gate, and pauses for a human
 before merge/push.
 
-## Trying the team on one ticket
-
-If you just want to run the loop once, on one real ticket, without deciding anything about how your whole team adopts it: create a **trial branch**, scaffold onto it with shipped mechanics, commit the operating files there, run the loop, and delete the branch afterward. The loop's gates assume the operating files are **tracked**, and this route honors that assumption instead of working around it — no new flag and no new mechanism, just `git switch -c` followed by `team-init`.
-
-**Setup.**
-
-```bash
-git switch -c trial/one-ticket
-team-init.sh .
-git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
-git commit -m "chore: scaffold shell-team for a one-ticket trial"
-```
-
-`team-init.sh` runs no git command of its own and does not care which branch you are on, so this is the whole setup. Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
-
-If your machine's global excludes (`core.excludesFile`) hide the base dir, that plain `git add` refuses outright the moment you run it. Force the scaffolded files onto this one branch with `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`, or add a repo-level `!.shell-team/` re-include as described in [Where the operating files live](#where-the-operating-files-live) so the ordinary form works for good.
-
-Now run `/shell-team:run <what you want built>` as usual, on the trial branch.
-
-**Teardown.**
-
-```bash
-git switch develop
-git branch -D trial/one-ticket
-```
-
-Deleting an **unmerged** branch destroys every commit **reachable only from** it — the scaffolded base dir, the board, the spec and the task's own records — and nothing else: no other branch's tip moves, no mainline history changes, and no file you never committed to the trial branch is touched. Because the branch is unmerged by design, `git branch -d` declines the deletion and you need the force form, `git branch -D`; that is the expected, non-anomalous outcome here, not a sign something went wrong. Those commits stay recoverable from `git reflog` until they are eventually garbage-collected.
-
-"Unmerged" is not the same as "never propagated." A commit made on the trial branch can still reach your mainline without the branch ever merging — someone can `cherry-pick` it, or you can `push` the branch to a shared remote where automation or another person picks it up. Keep the trial branch **local**, and if you did push it, delete the remote copy too when you delete the local one — the isolation rests on that discipline, not on the branch being unmerged alone.
-
-Running the loop with the operating files never committed — git-ignored, or simply never added — is **not supported**. The reason differs per gate, stated in the failure mode each one actually has and in the scenario that actually reaches it, rather than as one blanket claim that they all stop working.
-
-`bin/check-durability.sh` **refuses**, and which refusal you meet depends on what you did. With no `<base>/durability-mode` file at all the default mode is `tracked`, and every record the loop needs resolves to no blob in the recorded commit: `not-in-recorded-commit`, or `missing-working-file` when the working file itself is gone too. `untracked-opt-out` is the narrower case — it fires only when a **mode file** declaring `working-tree-only` is itself not committed. Either way the trial reaches no green hand-off.
-
-`bin/check-pii-shapes.sh` reports clean **without having read** the loop's own records at all. Its diff-scoped mode only sees committed changes, and its `--all` mode reaches untracked-but-not-ignored files only — a **gitignored** base dir is read by **neither mode**, which is exactly how you keep the base dir out of git in the first place.
-
-`bin/check-intent.sh` keeps answering from a ledger with no durable existence of its own: the frozen-intent hash and its attestation live on the board, so a **fresh** clone or checkout, or `git clean -fdx` (its `-x` flag is what reaches a gitignored path), simply never has them. `git reset --hard` **leaves an untracked** board alone, so that is not the operation that removes it.
-
-And relocating the base dir outside the repository is not an escape hatch either: `bin/team-paths.sh` refuses an absolute `TEAM_RUN_BASE` outright, so the base dir stays **repo-relative** by the resolver's own decision.
-
 ## Binding roles to executors
 
 `team-init` scaffolds an inert `<base>/binding.conf.example`
@@ -355,6 +315,46 @@ the reviewing gates and the human, never for a mechanical check, and a
 path allowlist would coerce every adopter's repository into this one's
 layout. The duty applies at a task's bootstrap freeze only, never at a
 re-freeze of an already-recorded hash.
+
+## Trying the team on one ticket
+
+If you just want to run the loop once, on one real ticket, without deciding anything about how your whole team adopts it: create a **trial branch**, scaffold onto it with shipped mechanics, commit the operating files there, run the loop, and delete the branch afterward. The loop's gates assume the operating files are **tracked**, and this route honors that assumption instead of working around it — no new flag and no new mechanism, just `git switch -c` followed by `team-init`.
+
+**Setup.**
+
+```bash
+git switch -c trial/one-ticket
+team-init.sh .
+git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
+git commit -m "chore: scaffold shell-team for a one-ticket trial"
+```
+
+`team-init.sh` runs no git command of its own and does not care which branch you are on, so this is the whole setup. Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
+
+If your machine's global excludes (`core.excludesFile`) hide the base dir, that plain `git add` refuses outright the moment you run it. Force the scaffolded files onto this one branch with `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`, or add a repo-level `!.shell-team/` re-include as described in [Where the operating files live](#where-the-operating-files-live) so the ordinary form works for good.
+
+Now run `/shell-team:run <what you want built>` as usual, on the trial branch.
+
+**Teardown.**
+
+```bash
+git switch develop
+git branch -D trial/one-ticket
+```
+
+Deleting an **unmerged** branch destroys every commit **reachable only from** it — the scaffolded base dir, the board, the spec and the task's own records — and nothing else: no other branch's tip moves, no mainline history changes, and no file you never committed to the trial branch is touched. Because the branch is unmerged by design, `git branch -d` declines the deletion and you need the force form, `git branch -D`; that is the expected, non-anomalous outcome here, not a sign something went wrong. Those commits stay recoverable from `git reflog` until they are eventually garbage-collected.
+
+"Unmerged" is not the same as "never propagated." A commit made on the trial branch can still reach your mainline without the branch ever merging — someone can `cherry-pick` it, or you can `push` the branch to a shared remote where automation or another person picks it up. Keep the trial branch **local**, and if you did push it, delete the remote copy too when you delete the local one — the isolation rests on that discipline, not on the branch being unmerged alone.
+
+Running the loop with the operating files never committed — git-ignored, or simply never added — is **not supported**. The reason differs per gate, stated in the failure mode each one actually has and in the scenario that actually reaches it, rather than as one blanket claim that they all stop working.
+
+`bin/check-durability.sh` **refuses**, and which refusal you meet depends on what you did. With no `<base>/durability-mode` file at all the default mode is `tracked`, and every record the loop needs resolves to no blob in the recorded commit: `not-in-recorded-commit`, or `missing-working-file` when the working file itself is gone too. `untracked-opt-out` is the narrower case — it fires only when a **mode file** declaring `working-tree-only` is itself not committed. Either way the trial reaches no green hand-off.
+
+`bin/check-pii-shapes.sh` reports clean **without having read** the loop's own records at all. Its diff-scoped mode only sees committed changes, and its `--all` mode reaches untracked-but-not-ignored files only — a **gitignored** base dir is read by **neither mode**, which is exactly how you keep the base dir out of git in the first place.
+
+`bin/check-intent.sh` keeps answering from a ledger with no durable existence of its own: the frozen-intent hash and its attestation live on the board, so a **fresh** clone or checkout, or `git clean -fdx` (its `-x` flag is what reaches a gitignored path), simply never has them. `git reset --hard` **leaves an untracked** board alone, so that is not the operation that removes it.
+
+And relocating the base dir outside the repository is not an escape hatch either: `bin/team-paths.sh` refuses an absolute `TEAM_RUN_BASE` outright, so the base dir stays **repo-relative** by the resolver's own decision.
 
 ## Declaring the stacked-branch base-ref discriminator and the borrowed-vocabulary sweep
 
