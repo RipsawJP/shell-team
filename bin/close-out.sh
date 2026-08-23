@@ -335,36 +335,65 @@ if [ "${SPEC_REVIEW_ELECTED:-}" = "cross-provider" ]; then
   REVIEW_RECORD="$REVIEWS_DIR/$TASK.md"
   SPEC_REVIEW_APPROVED=0
   if [ -f "$REVIEW_RECORD" ] && [ -r "$REVIEW_RECORD" ]; then
-    # Round-2 rework (Codex review, Majors 2+3): the previous match
-    # (`grep -qE '^### Codex Spec-Review verdict: APPROVE'`) was (a)
-    # unanchored — a prefix-matching near-miss verdict heading
-    # (`APPROVE_WITH_CAVEATS`, or the mode's own unfilled output template
-    # `APPROVE | REQUEST_CHANGES`) satisfied this fail-closed refusal gate —
-    # and (b) unscoped — it read the WHOLE file rather than the record's
-    # latest `## Spec review` round, so a stale APPROVE from an earlier
-    # round could survive alongside a later REQUEST_CHANGES. Fixed by (1)
-    # requiring end-of-line immediately after the literal `APPROVE` token
-    # (`[[:space:]]*$` — no partial-word or trailing-template survivor can
-    # satisfy it) and (2) scanning only the text from the LAST `## Spec
-    # review` heading in the file to the next `^## ` heading or EOF, so an
-    # earlier round's APPROVE can never be read once a later round exists.
-    # A record synthesized with no `## Spec review` heading at all (a bare
-    # verdict line, exercised by AC6's own fixtures) has no round boundary
-    # to scope to, so the scan correctly degrades to the whole file in that
-    # one case — this is a widening back to the pre-fix behavior only when
-    # there is nothing to scope by, never a silent narrowing that could
-    # hide a genuine APPROVE.
-    LAST_SECTION_LINE="$(grep -n '^## Spec review$' "$REVIEW_RECORD" | tail -n1 | cut -d: -f1 || true)"
-    if [ -n "$LAST_SECTION_LINE" ]; then
-      LATEST_SECTION="$(awk -v start="$LAST_SECTION_LINE" '
-        p && NR>start && /^## / { exit }
-        NR==start { p=1 }
-        p { print }
-      ' "$REVIEW_RECORD")"
-    else
+    # Round-3 rework (Codex review round 2, Blocker 1): the round-2 fix
+    # found the LATEST `## Spec review` heading with an EXACT match
+    # (`grep -n '^## Spec review$'`) but found the section's END with a
+    # LOOSE match (`awk`'s `/^## /`) — two different strictnesses. A later
+    # round's heading carrying ANY trailing deviation the exact grep does
+    # not recognize (a trailing space is the reproduced case; a trailing
+    # tab or extra trailing space are the same class) is INVISIBLE to the
+    # heading search but IS recognized by the loose boundary check — so the
+    # scan anchored to an EARLIER, well-formed heading and stopped right
+    # before the malformed LATER one, never reading anything after it
+    # (reintroducing the exact stale-APPROVE-survives defect this gate
+    # exists to close). Fixed with ONE awk pass using ONE discipline
+    # throughout: the heading SEARCH now tolerates trailing whitespace by
+    # trimming it before the equality test (so "## Spec review " and
+    # "## Spec review<TAB>" both still count as a genuine spec-review
+    # round heading, not just a byte-exact "## Spec review"), while the
+    # boundary check stays the original LOOSE `/^## /` match against the
+    # UNTRIMMED line — the same test as before, just no longer paired with
+    # a stricter search. A heading that is genuinely a DIFFERENT section
+    # (e.g. a later `## Round N` from the default review mode, appended
+    # after implementation completes) still does not trim-equal
+    # "## Spec review" and is correctly excluded from the search, so this
+    # fix does not make the gate start matching unrelated sections — only
+    # trailing-whitespace variants of the canonical heading it already
+    # matched. A record with no matching heading at all (a bare verdict
+    # line, exercised by AC6's own fixtures) makes awk exit 1, and the
+    # scan correctly degrades to the whole file exactly as round-1's fix
+    # already did for that case.
+    LATEST_SECTION="$(awk '
+      {
+        raw[NR] = $0
+        trimmed = $0
+        sub(/[ \t]+$/, "", trimmed)
+        if (trimmed == "## Spec review") { last = NR }
+      }
+      END {
+        if (last == 0) { exit 1 }
+        for (i = last; i <= NR; i++) {
+          if (i > last && raw[i] ~ /^## /) { break }
+          print raw[i]
+        }
+      }
+    ' "$REVIEW_RECORD" || true)"
+    if [ -z "$LATEST_SECTION" ]; then
       LATEST_SECTION="$(cat "$REVIEW_RECORD")"
     fi
-    if printf '%s\n' "$LATEST_SECTION" | grep -qE '^### Codex Spec-Review verdict: APPROVE[[:space:]]*$'; then
+    # Round-3 rework (Codex review round 2, Blocker 2): the previous match
+    # (`printf '%s\n' "$LATEST_SECTION" | grep -qE '...'`) is racy under
+    # `set -o pipefail` for a large section — `grep -q` exits as soon as it
+    # finds its first match, without necessarily draining the rest of its
+    # input; if `LATEST_SECTION` is large enough that the upstream `printf`
+    # is still writing when `grep` closes the read end, `printf` receives
+    # SIGPIPE (exit 141), and under `pipefail` the PIPELINE's own reported
+    # exit status goes non-zero even though `grep` itself matched — falsely
+    # REFUSING a genuinely valid, exactly-matching APPROVE once a review
+    # write-up is large enough (confirmed with a ~200KB section). A
+    # here-string performs the identical read with no separate writer
+    # process and therefore no pipe for a SIGPIPE to travel across.
+    if grep -qE '^### Codex Spec-Review verdict: APPROVE[[:space:]]*$' <<< "$LATEST_SECTION"; then
       SPEC_REVIEW_APPROVED=1
     fi
   fi

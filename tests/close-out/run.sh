@@ -1295,4 +1295,23 @@ spec_review_case T-99507 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE 
 spec_review_case T-99508 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a stale earlier-round APPROVE surviving alongside a later REQUEST_CHANGES round refuses (Major 3's exact reproduction — the LATEST round is what gates, not any round)"
 spec_review_case T-99509 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n## Spec review\n\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + an earlier REQUEST_CHANGES followed by a later, fixed APPROVE round passes (positive control: section-scoping to the latest round does not over-narrow the ordinary answered-then-approved flow)"
 
+# --- review round 2, Blocker 1: the round-2 fix paired an EXACT heading ---
+# --- search with a LOOSE boundary check, so a later `## Spec review`
+# --- heading carrying a trailing-whitespace deviation was invisible to the
+# --- search but visible to the boundary — the scan anchored to an EARLIER
+# --- round and stopped right before the malformed LATER one, hiding its
+# --- REQUEST_CHANGES entirely. Reproduces the reviewer's own repro exactly
+# --- (round 2's heading carries one trailing space after "review").
+spec_review_case T-99517 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n## Spec review \n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a LATER round whose heading carries a trailing space still refuses on its own REQUEST_CHANGES (Blocker 1's exact reproduction — the heading-search and boundary checks must agree, not just the boundary check)"
+
+# --- review round 2, Blocker 2: `printf | grep -q` is racy under pipefail
+# --- for a large section — grep can match and still report a SIGPIPE'd
+# --- printf's failure as the pipeline's own exit status, falsely refusing
+# --- a genuinely valid APPROVE. Reproduces with a ~200KB section (well
+# --- past any plausible pipe-buffer size), matching the reviewer's own
+# --- repro; this is a POSITIVE case (a real refusal here would BE the bug).
+LARGE_FILLER="$(head -c 100000 /dev/zero | tr '\0' 'x')"
+LARGE_BODY="## Spec review\n\n${LARGE_FILLER}\n\n### Codex Spec-Review verdict: APPROVE\n\n${LARGE_FILLER}"
+spec_review_case T-99518 "$OKI\n$ELECT" "$LARGE_BODY" 0 silent "elected + a ~200KB Spec review section with a genuinely valid, exactly-matching APPROVE still passes (Blocker 2's exact reproduction — the verdict match must not be racy under pipefail on a large section)"
+
 printf '\nAll close-out assertions passed.\n'
