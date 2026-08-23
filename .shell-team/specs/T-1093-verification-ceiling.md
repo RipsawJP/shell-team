@@ -223,7 +223,7 @@ The plural corpus instance read against this wording: this spec's own criteria c
 
 **Method, and the floor its pricing keeps.** This task's `- verification-class:` declaration is `no-mechanism`, so the owed inventory is **read-set-scoped** rather than a full-population diff: mechanically derive the set of merged specs whose criteria read any path this task edits, run each of that set's criteria at the branch point's committed blobs (through a scratch worktree pinned to that ref, never the working tree) and again at HEAD, and difference the two verdict sets criterion by criterion. Two things are stated rather than assumed. First, **the added obligation this task carries whatever its class**: because it edits the verification norms themselves, the read set includes every merged criterion asserting the edited norm files' bytes — `agents/pm-spec.md`, `agents/qa-verifier.md` and `skills/run/SKILL.md` above all — and the shipped norm text is read against this spec's own criteria. Second, **the indirection class a byte-literal derivation cannot see**: a criterion reaching the board, the specs directory or a records directory through a path built at run time (`bin/team-paths.sh --get todo`, `--get specs`, `--get reviews`, or a file named only through a variable) matches no search for a literal path and is invisible to the derivation below in principle. That class is discharged in **both** permitted ways rather than one: the criteria in it are **run too** — enumerated by searching the merged corpus for the run-time path-resolution forms themselves rather than for the paths they resolve to — and whatever remains unmeasured after that is **disclosed here by name** rather than left implied. An analysis doing neither does not satisfy this section.
 
-**Population.** Derived at run time, never counted by eye. `pm-spec` holds no shell, so the block below is a placeholder: the freeze run or the engineer runs the `- reproduce:` line at final state and embeds the emitted block here verbatim. **AC10** stays red until it does.
+**Population.** Derived at run time, never counted by eye. The block below was embedded by the engineer at final state, by running the `- reproduce:` line below and pasting its emitted output verbatim; **AC10** compares that embedded block byte-for-byte against a fresh run of the same line and fails should the two ever diverge.
 
 - reproduce: bin/derive-populations.sh --label t1093-read-set --set "readers=git grep -l -E -- '(agents/pm-spec[.]md|agents/qa-verifier[.]md|skills/run/SKILL[.]md|docs/adopting([.]ja)?[.]md|docs/workflow([.]ja)?[.]md|README([.]ja)?[.]md)' -- '.shell-team/specs/*.md'" --set "population=git ls-files -- .shell-team/specs/*.md"
 
@@ -335,7 +335,114 @@ The plural corpus instance read against this wording: this spec's own criteria c
   - .shell-team/specs/T-113-lessons-deidentification.md
 <!-- END derivation: t1093-read-set -->
 
-**The indirection class, run rather than merely disclosed (review round 1, Major 1).** The derivation above is a literal-path search and cannot in principle see a criterion that reaches an edited path only through run-time resolution (`bin/team-paths.sh --get todo`, a file named through a variable) rather than through the literal file name — this is the indirection class the frozen Goal names and requires either run or disclosed by name. The coordinating session enumerated it live and separately: `git grep -l -E -- 'team-paths\.sh --get|TEAM_(TODO|SPECS|REVIEWS|RUNS|RUN_BASE)' -- '.shell-team/specs/*.md'` matches **88** specs, of which **81** already sit inside the `readers+population` bucket above (reached by the literal-path search too, for an unrelated reason — most of these specs also name one of the six literal file paths directly). The remaining **7** do not: `.shell-team/specs/T-1003-retro-reads-interventions.md`, `.shell-team/specs/T-1006-lessons-resolver-key.md`, `.shell-team/specs/T-1019-is-span-row-parity.md`, `.shell-team/specs/T-1025-assert-parity-dead-comparison.md`, `.shell-team/specs/T-1038-errexit-safe-pin-keying.md`, `.shell-team/specs/T-1070-check-handoff-scaling.md` and `.shell-team/specs/T-1073-harness-agent-concurrency.md`. Each of these 7 was run with `bin/check-acs.sh`, in full, at both the branch point (a pinned detached worktree at `d0cd624`, with this branch's stacked predecessors already present as local branches) and at HEAD, on 2026-08-23, and each side produced byte-identical pass/fail/skip counts with zero flips: `T-1003` 20p/2f, `T-1006` 15p/6f, `T-1019` 11p/2f+1skip, `T-1025` 5p/2f+1skip, `T-1038` 12p/2f+1skip, `T-1070` 11p/2f+1skip, `T-1073` 13p/2f+1skip. This discharges the "run too" half of the frozen sentence for the whole indirection class this task's diff could reach — every criterion the literal-path derivation cannot see has now itself been run at both ends of this task's range, and nothing in that class remains unmeasured or undisclosed.
+**The indirection class, run rather than merely disclosed (review round 1, Major 1; mechanized per review round 2).** The derivation above is a literal-path search and cannot in principle see a criterion that reaches an edited path only through run-time resolution (`bin/team-paths.sh --get todo`, a file named through a variable) rather than through the literal file name — this is the indirection class the frozen Goal names and requires either run or disclosed by name. The enumeration and the coverage split are themselves tool output, never a hand-written figure: the `t1093-indirection` derivation embedded below, beneath its own `- reproduce:` line, enumerates every spec matching a run-time path-resolution form. Its `bucket: indirection+readers` section is the portion already inside the `readers+population` bucket above (reached by the literal-path search too, for an unrelated reason — most of these specs also name one of the six literal file paths directly); its `bucket: indirection` section is the portion that is not, and is the whole of what remained to be run. Every spec named in that `bucket: indirection` section was run with `bin/check-acs.sh`, in full, at both the branch point (a pinned detached worktree at `d0cd624`, with this branch's stacked predecessors already present as local branches) and at HEAD, on 2026-08-23; these are measured verdict values from named runs, not population figures, and are recorded as exactly that: `T-1003` 20p/2f, `T-1006` 15p/6f, `T-1019` 11p/2f+1skip, `T-1025` 5p/2f+1skip, `T-1038` 12p/2f+1skip, `T-1070` 11p/2f+1skip, `T-1073` 13p/2f+1skip — byte-identical pass/fail/skip counts on both sides, zero flips. This discharges the "run too" half of the frozen sentence for the whole indirection class this task's diff could reach — every criterion the literal-path derivation cannot see has now itself been run at both ends of this task's range, and nothing in that class remains unmeasured or undisclosed. Note on staleness: this embedded block is `git grep` output over the live spec corpus and will go stale the moment that corpus changes, on the same accepted merge-point-scoped semantics **AC9** and **AC10** already carry for the block above — no additional machinery is added to keep it evergreen.
+
+  - reproduce: bin/derive-populations.sh --label t1093-indirection --set "indirection=git grep -l -E -- 'team-paths[.]sh --get|TEAM_(TODO|SPECS|REVIEWS|RUNS|RUN_BASE)' -- '.shell-team/specs/*.md'" --set "readers=git grep -l -E -- '(agents/pm-spec[.]md|agents/qa-verifier[.]md|skills/run/SKILL[.]md|docs/adopting([.]ja)?[.]md|docs/workflow([.]ja)?[.]md|README([.]ja)?[.]md)' -- '.shell-team/specs/*.md'"
+
+<!-- BEGIN derivation: t1093-indirection -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: indirection — status: 0 — lines: 88 — items: 88 — command: git grep -l -E -- 'team-paths[.]sh --get|TEAM_(TODO|SPECS|REVIEWS|RUNS|RUN_BASE)' -- '.shell-team/specs/*.md'
+- set: readers — status: 0 — lines: 87 — items: 87 — command: git grep -l -E -- '(agents/pm-spec[.]md|agents/qa-verifier[.]md|skills/run/SKILL[.]md|docs/adopting([.]ja)?[.]md|docs/workflow([.]ja)?[.]md|README([.]ja)?[.]md)' -- '.shell-team/specs/*.md'
+- union: items: 94
+- bucket: indirection — items: 7
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+- bucket: indirection+readers — items: 81
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1067-context-lifecycle.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-1086-subject-harness.md
+  - .shell-team/specs/T-1087-judge-briefing.md
+  - .shell-team/specs/T-1088-tier2-firing.md
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1090-sign-safety-close.md
+  - .shell-team/specs/T-1091-operator-authored-entry.md
+  - .shell-team/specs/T-1092-specify-seam-review.md
+  - .shell-team/specs/T-1093-verification-ceiling.md
+- bucket: readers — items: 6
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1046-ignored-base-verdict.md
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
+<!-- END derivation: t1093-indirection -->
 
 **Predicted profile, to be confirmed or corrected against the run above.** Recorded as predictions with their grounds, so an unpredicted flip is a finding rather than a surprise:
 
