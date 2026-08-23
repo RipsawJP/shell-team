@@ -36,7 +36,7 @@ Always end with one of these two blocks:
 - Task: T-XXX → READY_FOR_REVIEW
 - Tests: <N passed, 0 failed>
 - Acceptance criteria: <X/X checked off>
-- Verification ceiling: <the spec's declared value, transcribed verbatim, including the floor-case token if the declaration carries one> — verifies every criterion at or below that level; <each criterion staying human-owned after this gate, or the literal phrase "none above this ceiling">
+- Verification ceiling: <the spec's declared value, transcribed verbatim, including the floor-case token if the declaration carries one> — verifies every criterion at or below that level; <each criterion staying human-owned after this gate, or the literal phrase "none above this ceiling"> (this line is present only when the spec carries a `- verification-ceiling:` declaration; omit it entirely — do not emit a placeholder or an empty value — for a spec with no such declaration)
 - Edge cases tried: <list>
 - Risk notes for reviewer: <anything subtle>
 ```
