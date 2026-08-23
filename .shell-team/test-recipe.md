@@ -1638,3 +1638,38 @@ that file's order.
   empirically run both check bodies against the same constructed line and
   show one flips green while the other flips red, in both orderings,
   rather than trusting a read-through of the regex text.
+- T-1094: when mutation-probing a spec whose `- base-ref-discriminator:`
+  resolves via a stacked sibling branch's own name (e.g.
+  `git show-ref --verify --quiet refs/heads/feature/1093-verification-ceiling`,
+  falling back to `develop`'s merge-base only when that ref does not
+  resolve), a plain `git clone --no-hardlinks -q . "$TMPDIR/scratch/repo"`
+  does **not** carry that sibling branch as a local ref in the clone — only
+  as a `remotes/origin/<name>` tracking ref — so the discriminator silently
+  takes its fallback arm inside the scratch clone and resolves a different,
+  earlier base commit than the real checkout uses. Confirmed by checking
+  `git show-ref --verify --quiet refs/heads/<sibling>` right after the
+  clone (reports missing) before trusting any AC that reads a base-side
+  blob. Fix: `git branch <sibling-branch-name> <known-sha>` inside the
+  scratch clone immediately after cloning, pointing it at the exact SHA the
+  real checkout's own branch resolves to, so the discriminator's first arm
+  fires identically in both places. Separately, two mutation-methodology
+  traps this task's own probes hit and fixed: **(1)** `grep -F` substring
+  semantics bite a same-token append mutation the same way T-1093's lesson
+  already documents for a different token — replacing `git branch -D` with
+  `git branch -DELETE` still contains the substring `git branch -D`, so the
+  criterion stays green; alter bytes inside the token instead (`-D`→`-X`).
+  **(2)** a one-line `perl -i -pe 's/OLD/NEW/'`-style mutation applied to a
+  whole file can accidentally also mutate a `- check:` line's own embedded
+  literal pattern text if that pattern shares the same substring as the
+  target prose (e.g. mutating `- user-visible: yes` also rewrote the
+  embedded `for k in '^- user-visible: yes — .'` grep pattern inside the
+  same spec file, and the check passed against its own now-matching
+  pattern) — scope a declaration-region mutation to its own line number
+  with `awk 'NR==N{gsub(...)}1'` rather than a file-wide substitution.
+  **(3)** restore mutated files from a backup kept **outside** the
+  scratch repo's own working tree (a separate `mktemp -d` directory), never
+  a sibling `<file>.bak` inside the tracked tree — a stray `.bak` file left
+  behind between mutation and restoration is itself a new untracked path
+  that a scope-lock criterion (this spec's own AC9) correctly flags as a
+  stray, producing a false unrelated failure that has nothing to do with
+  the mutation under test.
