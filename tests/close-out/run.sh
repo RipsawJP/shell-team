@@ -1322,4 +1322,15 @@ spec_review_case T-99518 "$OKI\n$ELECT" "$LARGE_BODY" 0 silent "elected + a ~200
 # --- T-99517, one whitespace position over. QA's own exact repro.
 spec_review_case T-99519 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: APPROVE\n\n##  Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a LATER round whose heading carries an internal double space (## then two spaces then Spec review) still refuses on its own REQUEST_CHANGES (the one-item scope extension's exact reproduction)"
 
+# --- design fix (QA round 4's own probe, operator-ruled option A, third --
+# --- ruling on this component): the boundary check read the RAW line
+# --- while the selector read a NORMALIZED line, so a later, genuinely
+# --- unrelated heading indented with LEADING whitespace was invisible to
+# --- the boundary's raw `/^## /` test — the extraction leaked past it,
+# --- and a stray APPROVE line hiding in the leaked content produced a
+# --- FALSE PASS on a record whose true latest round was REQUEST_CHANGES.
+# --- QA's own exact repro; this is the dangerous direction (a false
+# --- silent PASS, not merely an over-eager refusal).
+spec_review_case T-99520 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n  ## Some Other Section\n\n### Codex Spec-Review verdict: APPROVE' 1 refuse "elected + a later, unrelated heading with LEADING whitespace does not let a stray APPROVE hiding after it leak into the latest round — the record's true latest round (REQUEST_CHANGES) still refuses (QA round 4's exact false-PASS reproduction)"
+
 printf '\nAll close-out assertions passed.\n'

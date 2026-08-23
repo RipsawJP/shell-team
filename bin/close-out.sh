@@ -335,51 +335,47 @@ if [ "${SPEC_REVIEW_ELECTED:-}" = "cross-provider" ]; then
   REVIEW_RECORD="$REVIEWS_DIR/$TASK.md"
   SPEC_REVIEW_APPROVED=0
   if [ -f "$REVIEW_RECORD" ] && [ -r "$REVIEW_RECORD" ]; then
-    # Round-3 rework (Codex review round 2, Blocker 1): the round-2 fix
-    # found the LATEST `## Spec review` heading with an EXACT match
-    # (`grep -n '^## Spec review$'`) but found the section's END with a
-    # LOOSE match (`awk`'s `/^## /`) — two different strictnesses. A later
-    # round's heading carrying ANY deviation the exact grep does not
-    # recognize is INVISIBLE to the heading search but IS recognized by the
-    # loose boundary check — so the scan anchored to an EARLIER, well-formed
-    # heading and stopped right before the malformed LATER one, never
-    # reading anything after it (reintroducing the exact
-    # stale-APPROVE-survives defect this gate exists to close). Fixed with
-    # ONE awk pass using ONE discipline throughout: the heading SEARCH
-    # normalizes whitespace before the equality test — every run of one or
-    # more spaces/tabs anywhere in the line is collapsed to a single space,
-    # then any resulting single leading or trailing space is stripped —
-    # before comparing to the literal `## Spec review`.
+    # Design fix (operator-ruled, third ruling on this component — QA round
+    # 4's own probe): rounds 3 and 3.1 kept patching this extraction's
+    # heading-recognition rules (exact-vs-loose, then trailing-only, then
+    # internal-run whitespace) while leaving the BOUNDARY check reading the
+    # RAW, unnormalized line the whole time (`raw[i] ~ /^## /`). That is
+    # what kept leaking: a later, genuinely unrelated heading indented with
+    # LEADING whitespace (`  ## Some Other Section`) does not match the raw
+    # boundary pattern `/^## /` at all (it starts with spaces, not `#`), so
+    # it was invisible to the SCAN'S OWN stopping rule even though a human
+    # reading the file would call it a heading — the extraction leaked past
+    # it, and a stray `### Codex Spec-Review verdict: APPROVE` line sitting
+    # in that leaked, unrelated content satisfied the verdict match on a
+    # record whose true latest round was `REQUEST_CHANGES`. Every prior
+    # round's fix narrowed the SELECTOR's own matching rule but never
+    # touched what the BOUNDARY reads from, so the two judgments could
+    # still disagree on some byte pattern — three different byte patterns
+    # across three rounds, all sharing that one root shape.
     #
-    # Round-3.1 rework (QA round 3's own probe, operator-approved one-item
-    # extension): the FIRST version of this normalization only trimmed
-    # TRAILING whitespace ("## Spec review " / "## Spec review<TAB>"), which
-    # left an INTERNAL whitespace variant ("##  Spec review", a double space
-    # between `##` and `Spec`) unrecognized by the search while the boundary
-    # still treated it as a heading — the identical defect shape, one
-    # whitespace position over. Widened to collapse-then-trim (above) so
-    # this closes the WHOLE whitespace-variance class in one normalization
-    # rather than patching one more position at a time.
-    #
-    # Selector/boundary alignment argument (why no byte pattern can now
-    # satisfy one check and not the other, within this class): the boundary
-    # accepts any line matching `/^## /` — literally, "starts with two
-    # hashes then at least one space" — and says nothing about what
-    # whitespace follows after that. The selector's normalization collapses
-    # every whitespace run (leading, internal, or trailing) to a single
-    # space and trims the ends, so ANY line that is `## Spec review` with
-    # its whitespace merely stretched, doubled, or tabbed anywhere reduces
-    # to the exact same normalized string and is accepted by the selector.
-    # Conversely, a line the boundary treats as "some other heading, not a
-    # spec-review round" (its normalized form differs from `## Spec review`
-    # by more than whitespace — different words, extra trailing text, wrong
-    # case) still fails the selector's equality test after normalization,
-    # exactly as it should. The two checks read the same normalized-versus-
-    # raw view of the same line, so no whitespace-only variant can pass the
-    # boundary's "is this a heading" test while failing the selector's own
-    # "is this THE heading" test, or vice versa. A record with no matching
-    # heading at all (a bare verdict line, exercised by AC6's own fixtures)
-    # makes awk exit 1, and the scan correctly degrades to the whole file
+    # The design invariant this rewrite establishes, structurally rather
+    # than per byte pattern: every line is normalized EXACTLY ONCE, into
+    # ONE value (`normv[i]` — collapse every whitespace run to a single
+    # space, then trim both ends), and BOTH judgments read that SAME
+    # normalized value and nothing else. "Is a heading at ALL" (the
+    # boundary, what ends the latest section) is `normv[i] ~ /^## /`. "Is
+    # THE Spec review heading" (the selector, what starts the latest
+    # section) is `normv[i] == "## Spec review"`. Because both questions
+    # are now asked of the identical value, one judgment cannot disagree
+    # with the other on any input — there is no longer a "boundary sees
+    # it, selector doesn't" or "selector sees it, boundary doesn't" byte
+    # pattern to discover, because there is only one view of each line
+    # left to check against. The only place a residual gap COULD hide now
+    # is the normalization's own completeness — and that is bounded to
+    # whitespace BY CONSTRUCTION: a heading that differs from `## Spec
+    # review` by anything other than the amount or position of whitespace
+    # (different words, extra trailing text, wrong case) still fails BOTH
+    # the selector's equality test and would still legitimately need to
+    # fail the "is this the same round" question — normalizing case or
+    # wording is a different, unclaimed problem this task's own reviewed
+    # scope never asked for. A record with no matching heading at all (a
+    # bare verdict line, exercised by AC6's own fixtures) still makes awk
+    # exit 1, and the scan still correctly degrades to the whole file
     # exactly as round-1's fix already did for that case.
     LATEST_SECTION="$(awk '
       {
@@ -388,12 +384,13 @@ if [ "${SPEC_REVIEW_ELECTED:-}" = "cross-provider" ]; then
         gsub(/[ \t]+/, " ", norm)
         sub(/^ /, "", norm)
         sub(/ $/, "", norm)
+        normv[NR] = norm
         if (norm == "## Spec review") { last = NR }
       }
       END {
         if (last == 0) { exit 1 }
         for (i = last; i <= NR; i++) {
-          if (i > last && raw[i] ~ /^## /) { break }
+          if (i > last && normv[i] ~ /^## /) { break }
           print raw[i]
         }
       }
