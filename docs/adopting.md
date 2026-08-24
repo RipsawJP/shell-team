@@ -566,6 +566,23 @@ still runs the full loop, unchanged from the freeze sweep onward. Choosing
 `operator-authored` chooses who writes the spec, never whether the rest of
 the machinery runs.
 
+**A mechanical backstop now exists for the conformance read itself
+(T-1096, issue #341).** `bin/check-entry-mode.sh` refuses a task's freeze
+unless the board carries both `pm-spec`'s own `- entry-mode:` sub-bullet
+and the coordinating session's `- dispatch: specify — …` sub-bullet,
+agreeing in both directions, with every flagged gap answered by a
+matching `- flagged-gap-resolution:` sub-bullet — a missing source refuses
+rather than passing silently, so the verdict does not depend on which
+sub-bullet was transcribed first. This checker's `operator-authored` arm
+is shipped **fixture-exercised only**, deliberately **not exercised by a
+live run** in this repository yet: the task that built this checker
+elected `pm-authored` for itself, since becoming the first live
+`operator-authored` case would have made the coordinating session the
+author of the very check auditing author/attester separation. The
+checker still does not verify that the conformance read itself
+happened — only that a conformant record of it exists and agrees with
+what Plan decided.
+
 ## Electing a spec review at the Specify seam (T-1092)
 
 Alongside `specify`, a fourth dispatch axis elects whether an extra
@@ -597,9 +614,20 @@ regardless of this axis's value, and a spec-review APPROVE never
 substitutes for either. It also does not authenticate its own inputs (both
 condition texts it is cross-checked against are agent-produced), does not
 verify that the read actually happened, and does not turn "the domain
-premises are sound" into anything more than a reading judgment. No arm of
-this axis has run end to end yet, so how often it prevents a
-wrong-about-the-world spec from being implemented is `undetermined`.
+premises are sound" into anything more than a reading judgment.
+
+**A close-out backstop now exists for the elected review's own verdict
+(T-1096, issue #344).** `bin/check-spec-review.sh` **refuses at
+close-out** — inside `bin/close-out.sh` — a `spec-review — cross-provider`
+task whose review record's last anchored spec-review verdict line is not
+an approval, consulting no heading at all and refusing any unrecognised
+tail rather than skipping past it. This axis's `cross-provider` arm
+**has** now run end to end, measured directly against this repository's
+own **review records**: three of its own tasks reached an APPROVE past
+round 1, and this task's own review record is the first one the shipped
+close-out backstop reads for real. How often the round changes an
+otherwise-implemented, wrong-about-the-world spec remains `undetermined` —
+that claim is about the axis's *effect*, which neither checker measures.
 
 ## Operating rules
 
