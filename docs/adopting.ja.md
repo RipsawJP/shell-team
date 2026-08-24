@@ -426,6 +426,70 @@ task によって既に stack に持ち込まれた token を見逃してしま�
 測定されなかった borrowed-vocabulary count premise は broken check line
 として扱われる。
 
+## verification ceiling を宣言する
+
+T-1093 以降、すべての spec は自分の凍結 intent block 内、上記の
+`- user-visible:`・`- verification-class:`・`- base-ref-discriminator:` の
+各 key が既に占めている宣言領域に、もう 1 行——top-level bullet
+`- verification-ceiling: unit-and-static | real-environment — <rationale>`
+——を追加で宣言する。これが **verification ceiling**（検証の天井）——この
+spec に対して QA が実際に到達できる検証レベル——であり、green flag が
+bare な green ではなく「このレベルまでは green」と読めるようにするために
+存在する: `unit-and-static` は loop 自身の gate が unit test と static /
+textual verification までしか届かず checkout の外には出られないことを、
+`real-environment` は criterion が名指す実 runtime（storage put が queue
+に流れ worker に届く経路・手動 deploy・cloud credential の裏でしか届かない
+作業）を追加で exercise できることを意味する。
+
+**どちらの値も all-or-nothing ではない。** 宣言された値は、個別に印が
+付いていないすべての criterion について gate が何に到達したかを述べる。
+宣言された ceiling より上に位置する criterion は、自分自身の indented
+`- above-ceiling: <gate 通過後にこの criterion を所有する human>` サブ
+箇条を持つ——ゲート通過後にそれを所有する human を名指しし、出荷済みの
+`- adopter-surface:` idiom を再利用するのであって新しい free-text list
+ではなく、1 つのサブ箇条が複数の criterion を代表することも決してない。
+このサブ箇条は **どちらの宣言値の下でも** 利用可能であり、これが正直な
+mixed case を可能にする: spec の criteria が複数の real-environment
+capability class に、それぞれ異なる到達度でまたがる場合——例えば ある
+criterion については gate が実際に exercise した staging の
+storage-to-queue-to-worker path があり、別の criterion については gate が
+届かない production deploy や credentialed な作業がある場合——は
+`real-environment` を宣言して gate が到達した部分を表し、届かなかった方を
+`- above-ceiling:` として印を付ける。どちらか一方の criterion を誤って
+記述する値へ押し込まれることはない。
+
+**exception set には floor があり、この対称性は「何も言わない」ために
+使うことはできない。** 宣言された値は **少なくとも 1 つの criterion が
+その値で verify されている** ことを attest しなければならない:
+すべての criterion が `- above-ceiling:` と印付けられた
+`real-environment` 宣言は refuse される——それは `unit-and-static` と
+区別が付かず、読者に何も伝えないからである——その spec の正直な宣言は、
+少なくとも 1 つの criterion が実際に verify されている最高の値である。
+`unit-and-static` は floor であり、これ以上下げることはできないため、
+残る唯一の degenerate case——floor でさえすべての criterion がその上に
+ある場合——は refuse ではなく documented される: 宣言行は、宣言された値の
+直後に固定 token `no criterion verified at this ceiling` を carry しなけ
+ればならない。この token はその後 **そのまま verbatim で** QA の PASS
+block の field と board の `READY_FOR_REVIEW` append の両方へ carry
+forward される——spec を開かない読者にも、baseline coverage のように
+見える bare な値ではなく、実際にその disclosure が読める行に届くように
+するためである。
+
+現時点の強制は、上記の宣言と同じ足場で **チェッカーではなく duty** で
+ある: タスクの最初の凍結時に coordinating session がこの宣言領域を自分で
+読み、ちょうど 1 つの conformant な `- verification-ceiling:` 行を要求し、
+無い・重複している・closed vocabulary 外・vacuous な宣言——あるいは
+宣言された ceiling を超える capability を明らかに要求している criterion
+に `- above-ceiling:` サブ箇条でその所有者が名指しされていない場合——を
+refuse して spec を author へ差し戻す。**機械的なチェッカーはまだ出荷され
+ていない**——mismatch case は grep が決められる state ではなく human が
+行う reading judgment であり、これはこのリポジトリの他の宣言領域 gate が
+既に持つのと同じ disclosed-limitation pattern（issue #250）に乗る。この
+duty はタスクの bootstrap freeze にのみ適用され、既に記録済みの hash の
+re-freeze には適用されない。そして、宣言された ceiling が何を防ぐかに
+ついての主張は一切していない——それは QA が到達したレベルを、後で
+hand-off や board line を読む誰にとっても legible にするだけである。
+
 ## spec を誰が書くかを選ぶ（T-1091）
 
 T-1091 以降、spec の著者を誰にするか自体が dispatch decision になった——

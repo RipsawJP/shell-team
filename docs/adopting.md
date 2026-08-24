@@ -426,6 +426,69 @@ token already carried onto the stack by a merged sibling task escapes
 it, and an unmeasured borrowed-vocabulary count premise is treated as a
 broken check line.
 
+## Declaring the verification ceiling
+
+Every spec frozen from T-1093 onward additionally declares, on one line
+inside its own frozen intent block, in the same declaration region the
+`- user-visible:`, `- verification-class:` and `- base-ref-discriminator:`
+keys above already occupy: a top-level bullet
+`- verification-ceiling: unit-and-static | real-environment — <rationale>`.
+This is the **verification ceiling** — the level QA can actually reach for
+this spec — and it exists so a green flag reads "green *up to* this level"
+rather than bare green: `unit-and-static` means the loop's own gate can
+reach unit tests plus static and textual verification and nothing beyond
+the checkout, and `real-environment` means it can additionally exercise the
+real runtime a criterion names (a storage put feeding a queue feeding a
+worker, a manual deploy, work reachable only behind cloud credentials).
+
+**Neither value is all-or-nothing.** The declared value states what the
+gate reached for every criterion *not* individually marked otherwise; a
+criterion that sits above the declared ceiling carries its own indented
+`- above-ceiling: <who owns this criterion after the gate>` sub-bullet,
+naming the human who owns it once the gate has passed — reusing the
+shipped `- adopter-surface:` idiom rather than a new free-text list, and
+never one sub-bullet standing in for several criteria. This sub-bullet is
+available under **either declared value**, which is what makes the honest
+mixed case possible: a spec whose criteria span more than one
+real-environment capability class at different reach — say a staging
+storage-to-queue-to-worker path the gate genuinely exercises for one
+criterion, alongside a production deploy or credentialed work it cannot
+reach for another — declares `real-environment` for what the gate reached
+and marks the rest `- above-ceiling:`, rather than being forced into a
+value that misdescribes one criterion or the other.
+
+**The exception set has a floor, so the symmetry cannot be used to say
+nothing.** A declared value must attest **at least one criterion at it**:
+a `real-environment` declaration under which every criterion is marked
+`- above-ceiling:` is refused, because it would be interchangeable with
+`unit-and-static` and tell a reader nothing — the honest declaration for
+that spec is the highest value at which at least one criterion is actually
+verified. `unit-and-static` is the floor and cannot be lowered further, so
+the one remaining degenerate case — every criterion sitting above even the
+floor — is documented rather than refused: the declaration line must carry
+the fixed token `no criterion verified at this ceiling` immediately after
+the declared value. That token is then **carried forward, verbatim**, onto
+both QA's PASS-block field and the board's `READY_FOR_REVIEW` append, so
+the reader who never opens the spec still sees the disclosure on the line
+they actually read, rather than a bare value that looks like baseline
+coverage.
+
+Enforcement today is a **duty, not a checker**, on the same footing as the
+declarations above: at a task's first freeze the coordinating session
+reads the declaration region itself, requires exactly one conformant
+`- verification-ceiling:` line, and refuses a missing, duplicated,
+out-of-vocabulary or vacuous declaration — or a criterion plainly
+demanding capabilities above the declared ceiling with no
+`- above-ceiling:` sub-bullet naming its owner — routing the spec back to
+its author. **No mechanical checker ships for it yet**; the mismatch case
+is a reading judgment a human performs, not a state a grep can decide, and
+it rides on the same disclosed-limitation pattern issue #250 already
+carries for this repository's other declaration-region gates. The duty
+applies at a task's bootstrap freeze only, never at a re-freeze of an
+already-recorded hash, and it makes no claim about what a declared ceiling
+prevents — it only makes the level QA reached legible to whoever reads the
+hand-off or the board line afterward.
+
 ## Choosing who authors the spec (T-1091)
 
 From T-1091 onward, spec authorship is itself a dispatch decision — a
