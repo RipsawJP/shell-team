@@ -1319,6 +1319,7 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Category**: process
 - **Applies-to**: all
 - **Scope**: maintainer
+- **Bound-in**: CONTRIBUTING.md
 - **Status**: active
 - **Source**: .shell-team/retros/2026-08-24.md
 - **Rule**: When a mechanical gate classifies free-form markdown headings or verdict strings through ad-hoc normalization, and a third independent defeat class appears after the component has already absorbed two full design-level rewrites, the orchestrator does not authorize another patch round: the next step is the pre-priced removal disposition, and the follow-up issue's acceptance criteria are seeded with the accumulated defeat list verbatim rather than a summary of it.
