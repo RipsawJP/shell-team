@@ -39,6 +39,7 @@
 | 他人の PR をレビューする | `/review` を使う — `codex-reviewer` のみが走る |
 | 自分の PR に返ってきたレビュー指摘に対応する | `/review-response` を使う — 受領した指摘を Codex で評価し、リスクゲート（決定論フロアがリスクの高い指摘を人間確認へ強制）を通してから、採用分を `shell-team` に渡す |
 | 仕様のみ（コードはまだ無し） | `pm-spec` の後で停止。タスクは `READY_FOR_ARCH`（仕様記述済）で一時停止 |
+| すでに spec が書かれている（`specify — operator-authored`。出荷時デフォルトの `pm-authored` ではない） | `pm-spec` はスキップしない——author ではなく conformance formatter として走る。[spec を誰が書くかを選ぶ](adopting.ja.md#spec-を誰が書くかを選ぶt-1091)を参照 |
 
 `/review` と `/review-response` の違い: `review` は現ブランチ diff の *新規* Codex レビューを生成する。`review-response` は PR に**すでに返ってきた**レビュー指摘をトリアージする — 指摘を評価しリスクゲートに通し、（リスクの高い指摘への GO を得たら）採用分を `shell-team` で実装させる。互いを置き換えるものではない。
 

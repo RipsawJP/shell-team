@@ -426,6 +426,39 @@ task によって既に stack に持ち込まれた token を見逃してしま�
 測定されなかった borrowed-vocabulary count premise は broken check line
 として扱われる。
 
+## spec を誰が書くかを選ぶ（T-1091）
+
+T-1091 以降、spec の著者を誰にするか自体が dispatch decision になった——
+既存の `implement`/`verify` 軸と並ぶ第三の軸 `specify` で、`pm-authored` と
+`operator-authored` の 2 値に閉じており、Plan で決め、同じ座で task の
+board entry に記録する。
+
+**`pm-authored` が出荷時デフォルト。** `pm-spec` が今まで通り spec を書く。
+task の decision input が 1 つの session の context に集中していない、
+ほとんどの task がこの形に当てはまる場合はこちらを選ぶ——formalization
+（依頼をテスト可能な spec に変える作業）は `pm-spec` の比較優位である。
+
+**`operator-authored` は judgment-density のボトルネックのため。** その
+task の decision input——複数 repo にまたがる測定済みの事実、live 環境での
+確認、インシデント履歴——が既に coordinating session 自身の context に
+存在している場合はこちらへ routing する: `pm-spec` へ委譲する価値は算術的
+にゼロになる——完全な hand-off package を書くこと自体が spec を書くこと
+そのものであり、委譲は検証済みの一次情報を relayed な情報に変えるだけに
+なる。このモードでは coordinating session（operator）が直接 spec を書き、
+`pm-spec` は author ではなく **conformance formatter** として参加する——
+check-intent と check-acs の grammar に整形するだけで、author が決めた
+ことを書き換えることは決してなく、substantive な gap は自分の判断で
+閉じずに author へ差し戻す。
+
+**このガイドが防ぎたい anti-pattern。** `pm-spec` による authorship を
+断ることは、loop の machinery まで置き去りにする理由にはならない。
+凍結された intent block、board record、freeze sweep、2 つの review gate、
+interventions ledger——これらは `pm-spec` が犯す間違いと同じくらい
+operator が犯す間違いも捉える仕組みである。operator-authored な spec も
+freeze sweep 以降は full loop がそのまま走る。`operator-authored` を選ぶ
+のは spec を誰が書くかだけであり、machinery の残りが走るかどうかを選ぶ
+ことでは決してない。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。

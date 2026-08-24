@@ -426,6 +426,41 @@ token already carried onto the stack by a merged sibling task escapes
 it, and an unmeasured borrowed-vocabulary count premise is treated as a
 broken check line.
 
+## Choosing who authors the spec (T-1091)
+
+From T-1091 onward, spec authorship is itself a dispatch decision — a
+third axis, `specify`, closed over `pm-authored` and `operator-authored` —
+alongside the existing `implement`/`verify` axes, decided at Plan and
+recorded on the task's board entry at the same seam.
+
+**`pm-authored` is the shipped default.** `pm-spec` authors the spec, exactly
+as it does today. Pick this whenever a task's decision inputs are not
+concentrated in one session's own context — most tasks fit this shape, and
+formalization (turning a request into a testable spec) is `pm-spec`'s
+comparative advantage.
+
+**`operator-authored` is for a judgment-density bottleneck.** Route here when
+the decision inputs for the task — measured facts across repositories,
+live-environment confirmations, incident history — already live in the
+coordinating session's own context, so delegating authorship to `pm-spec`
+would have arithmetically zero value: writing a complete hand-off package
+already **is** writing the spec, and the delegation would only convert
+verified first-hand facts into relayed ones. In this mode the coordinating
+session (the operator) writes the spec directly; `pm-spec` then participates
+as a **conformance formatter**, not an author — it shapes the document into
+the check-intent and check-acs grammars, never rewrites what the author
+decided, and flags any substantive gap back to the author rather than
+closing it on its own judgment.
+
+**The anti-pattern this guide exists to prevent.** Refusing `pm-spec`
+authorship is not a reason to leave the loop's machinery behind. The
+frozen intent block, the board records, the freeze sweep, both review
+gates, and the interventions ledger are what catch mistakes an operator
+makes just as readily as ones `pm-spec` makes — an operator-authored spec
+still runs the full loop, unchanged from the freeze sweep onward. Choosing
+`operator-authored` chooses who writes the spec, never whether the rest of
+the machinery runs.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
