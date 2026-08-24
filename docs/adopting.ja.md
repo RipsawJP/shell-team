@@ -50,6 +50,11 @@ base dir を git に載せない場合、その方法 2 つは効く範囲が違
 その行を持っており、`.shell-team/` を global に無視している操作者の環境でも自分の
 base dir は追跡されたままになります。
 
+稼働ファイルを追跡せずに残した場合にループの **gates** が実際にどうなるかは、下記の
+[1 チケットでチームを試す](#1-チケットでチームを試す) を参照してください——
+このパラグラフは scope（範囲）についてのものであり、追跡そのものを丸ごとスキップし
+た場合に何が起きるかについてではありません。
+
 global ファイルにはもう 1 つ影響があります。あるパスが無視されるかを git に
 問い合わせるもの——`git check-ignore` や、それを土台にしたチェック——もその
 ファイルを読みます。したがってそうしたチェックは、global excludes の無い CI では
@@ -315,6 +320,46 @@ mechanical check の役割ではない。path の allowlist を作れば adopter
 リポジトリをこの repository のレイアウトに強制することになる。この duty
 はタスクの bootstrap freeze でのみ適用され、すでに記録済みのハッシュの
 re-freeze では適用されない。
+
+## 1 チケットでチームを試す
+
+チーム全体でどう導入するかを決める前に、実際のチケット 1 件でループを一度だけ試したいなら: **trial branch（お試し用ブランチ）** を作り、そこへ shell-team 本来の仕組みでスキャフォールドし、稼働ファイルをそのブランチ上でコミットし、ループを実行し、終わったらブランチを削除します。ループの gate は稼働ファイルが **tracked（追跡済み）** であることを前提にしており、このルートはその前提を回避せず尊重します——新しいフラグも新しい仕組みも要らず、`git switch -c` に続けて `team-init` を実行するだけです。
+
+**セットアップ。**
+
+```bash
+git switch -c trial/one-ticket
+team-init.sh .
+git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
+git commit -m "chore: scaffold shell-team for a one-ticket trial"
+```
+
+`team-init.sh` は自身では git コマンドを一切実行せず、どのブランチにいるかも気にしません。したがってこれで完全なセットアップです。`--get` 引数は両方とも重要です: デフォルトレイアウトでは同じディレクトリに解決されますが、レガシーな `tasks/` + `docs/specs/` レイアウトでは `docs/specs/` がベースディレクトリの外にあるため、2 つめの引数を落とすと specs ディレクトリが永久に未追跡のままになります——両方を使ってコミットしてください（単一ディレクトリをハードコードした形は使わないでください）。
+
+マシンの global excludes（`core.excludesFile`）がベースディレクトリを隠している場合、この普通の `git add` はその場で拒否されます。このお試し用ブランチに限って `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"` で強制するか、[稼働ファイルの置き場所](#稼働ファイルの置き場所) にあるとおり、`team-paths.sh --get base` があなたの repo で解決するパスを root `.gitignore` に repo レベルで re-include してください（デフォルトレイアウトでは `!.shell-team/`、レガシーレイアウトでは `!tasks/`）——そうすれば通常の形が恒久的に効くようになります。
+
+あとはいつも通り、このお試し用ブランチ上で `/shell-team:run <作りたいもの>` を実行します。
+
+**後始末。** `<integration-branch>` にはあなた自身のリポジトリの integration branch を代入してください——この repository では `develop`、他の多くの repository では `main` です。
+
+```bash
+git switch <integration-branch>
+git branch -D trial/one-ticket
+```
+
+**未マージ (unmerged)** のブランチを削除すると、そのブランチからしか到達できないコミット——スキャフォールドされたベースディレクトリ、ボード、spec、そのタスク自身の記録——がすべて失われ、それ以外は何も変わりません: 他のブランチの tip は動かず、本流の履歴も変わらず、お試し用ブランチにコミットしなかったファイルにも触れません。ブランチは設計上未マージのままなので `git branch -d` は拒否し、強制形の `git branch -D` が必要になります——これは何かが間違っている兆候ではなく、ここでは期待される通常の結果です。それらのコミットは、いずれガベージコレクションされるまで `git reflog` から復元可能なままです。
+
+「未マージ」は「決して伝播しない」ことを意味しません。お試し用ブランチ上のコミットは、ブランチが一度もマージされなくても本流に届くことがあります——誰かがそれを `cherry-pick` するかもしれませんし、共有リモートへ `push` すれば自動化や別の人がそれを拾うかもしれません。お試し用ブランチは **ローカル (local)** に留め、もし push していたなら、ローカルのものを消すときに **remote copy（リモート側のコピー）** も一緒に削除してください——分離を支えているのはその discipline であり、未マージであることだけではありません。
+
+稼働ファイルを一度もコミットしないまま——git 無視されているか、単に一度も追加していない状態で——ループを走らせることは**サポートされていません (not supported)**。理由は gate ごとに異なり、それぞれが実際に持つ失敗の形と、実際にそこへ到達するシナリオで述べます。1 つの一括した主張として述べるのではありません。
+
+`bin/check-durability.sh` は**拒否 (refuses)** します。どちらの拒否に出会うかは、あなたが何をしたかによります。`<base>/durability-mode` ファイルが一切無い場合、デフォルトのモードは `tracked` であり、ループが必要とするすべての記録が、記録されたコミット内のどの blob にも解決しません: `not-in-recorded-commit`、あるいは作業ファイル自体も無ければ `missing-working-file` です。`untracked-opt-out` はより狭いケースです——`working-tree-only` を宣言する **mode file（モードファイル）** 自体がコミットされていない場合にのみ発火します。どちらにせよ、お試しは green な hand-off に到達しません。
+
+`bin/check-pii-shapes.sh` は、ループ自身の記録を**一度も読まないまま (without having read)** clean を報告します。diff スコープのモードはコミット済みの変更しか見ず、`--all` モードは untracked だが ignore されていないファイルにしか届きません——**gitignored（git 無視された）** ベースディレクトリは **どちらのモードでも (neither mode)** 読まれません。これはまさに、base dir を git から外しておく方法そのものです。
+
+`bin/check-intent.sh` は、それ自身に恒久的な存在を持たない台帳から答え続けます: frozen-intent のハッシュとその attestation はボード上に生きているので、**fresh（新規）** な clone やチェックアウト、あるいは `git clean -fdx`（その `-x` フラグが gitignore されたパスにまで届きます）は、それらを一度も持ちません。`git reset --hard` は **追跡されていないボードをそのまま残します (leaves an untracked)**——つまりそれらを取り除く操作ではありません。
+
+そして、ベースディレクトリをリポジトリの外へ移すことも抜け道にはなりません: `bin/team-paths.sh` は絶対パスの `TEAM_RUN_BASE` をそのまま拒否するため、ベースディレクトリはリゾルバ自身の判断により **repo-relative（リポジトリ相対）** であり続けます。
 
 ## stacked-branch base-ref discriminator と borrowed-vocabulary sweep の宣言
 
