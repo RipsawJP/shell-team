@@ -1224,8 +1224,9 @@ dispatch_case T-994 "${TAB}- dispatch: implement — serial — unconditional �
 # beside this grammar gate (a second, independent refusal class reading a
 # redirected reviews directory for an APPROVE verdict) was carved out under
 # this spec's own pre-commitment (operator-ruled 2026-08-23, six enumerated
-# defeat classes) — issue #344 owns it, and no reviews-dir redirection or
-# verdict-matching fixture ships here any more.
+# defeat classes) as issue #344, then RE-ADDED under T-1096 with a redesigned
+# reader (bin/check-spec-review.sh) that consults no heading at all and has
+# no fallback — see the resurrected `spec_review_case` block below.
 # ============================================================================
 OKR='  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default'
 
@@ -1236,5 +1237,65 @@ dispatch_case T-99513 "$OKV\n  - dispatch: implement — cross-provider — unco
 dispatch_case T-99514 "$OKI\n$OKR\n$OKR" 1 "'spec-review' appears more than once" "duplicated spec-review axis refuses" T-1092
 dispatch_case T-99515 "$OKI\n  - dispatch:${TAB}spec-review — none — unconditional — recommendation: spec-review-none-default" 1 "does not match the grammar" "tab-after-dispatch-colon on spec-review refuses (seen and refused, not silently invisible)" T-1092
 dispatch_case T-99516 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default" 0 silent "tab-indented conformant spec-review record still passes (positive control on the widened anchor)" T-1092
+
+# ============================================================================
+# T-1096 (#344): the backstop itself, resurrected end-to-end through
+# bin/close-out.sh — the six defeat classes are exhaustively exercised
+# against the real bin/check-spec-review.sh directly in
+# tests/check-spec-review/run.sh and in this spec's own AC4-AC7 check
+# lines; this block's job is narrower and complementary: prove the WIRING
+# (TEAM_REVIEWS_DIR resolution, the invocation, the refusal sentinel, the
+# board staying byte-untouched on refusal) through the real close-out.sh
+# entry point, plus a representative sample of the defeat-class shapes run
+# through that same wiring rather than only against the standalone script.
+# ============================================================================
+SPEC_REVIEW_SENTINEL='elected spec review has no APPROVE verdict'
+ELECT='  - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count'
+spec_review_case() {
+  local task="$1" body="$2" review_body="$3" expect_rc="$4" mode="$5" name="$6"
+  local root="$DISPATCH_ROOT/$task"
+  mkdir -p "$root/.shell-team/reviews"
+  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
+  if [ -n "$review_body" ]; then
+    printf -- '%b\n' "$review_body" > "$root/.shell-team/reviews/$task.md"
+    test -s "$root/.shell-team/reviews/$task.md" || fail "T-1096 $name: could not write the synthesized review record"
+  fi
+  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
+    "$task" "$body" > "$root/todo.md"
+  cp "$root/todo.md" "$root/todo.orig"
+  local rc=0
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_REVIEWS_DIR="$root/.shell-team/reviews" \
+      bash "$CLOSEOUT" --task "$task" --date 2026-08-24 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
+  [ "$rc" -eq "$expect_rc" ] || fail "T-1096 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  if [ "$mode" = silent ]; then
+    grep -qF -- "$SPEC_REVIEW_SENTINEL" "$root/err" \
+      && fail "T-1096 $name: the gate must say NOTHING here — found the refusal sentinel in stderr"
+    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
+      || fail "T-1096 $name: close-out should have moved the entry to Done"
+  else
+    cmp -s "$root/todo.orig" "$root/todo.md" \
+      || fail "T-1096 $name: a refused close-out must leave the board byte-untouched"
+    grep -qF -- "$SPEC_REVIEW_SENTINEL" "$root/err" \
+      || fail "T-1096 $name: refusal stderr must carry the sentinel '$SPEC_REVIEW_SENTINEL'"
+  fi
+  pass "T-1096 $name"
+}
+
+spec_review_case T-99601 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE' 0 silent "elected + APPROVE record passes through the real close-out.sh wiring (also the positive control on the \$TEAM_REVIEWS_DIR resolution itself: the record exists only inside the scratch directory)"
+spec_review_case T-99602 "$OKI\n$ELECT" '' 1 refuse "elected + no record refuses through close-out.sh"
+spec_review_case T-99603 "$OKI\n$ELECT" '### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + REQUEST_CHANGES-only record refuses through close-out.sh"
+spec_review_case T-99604 "$OKI\n$ELECT" '## Spec review\n\nnothing was recorded here' 1 refuse "elected + a non-empty record with no spec-review verdict line at all refuses through close-out.sh"
+spec_review_case T-99605 "$OKI\n$OKR" '' 0 silent "none + no record passes through close-out.sh (every task that declines the extra round)"
+spec_review_case T-99606 "$OKI" '' 0 silent "no spec-review dispatch record at all passes through close-out.sh without ever resolving a reviews directory (validate-if-present, at the close-out.sh level too)"
+
+# --- a representative sample of the six #344 defeat classes, run through
+# --- the real close-out.sh wiring (the exhaustive matrix lives in
+# --- tests/check-spec-review/run.sh and this spec's own AC5 check line) ---
+spec_review_case T-99607 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE_WITH_CAVEATS' 1 refuse "elected + an unanchored prefix-matching near-miss (class 1) refuses through close-out.sh"
+spec_review_case T-99608 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE\n\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + an earlier APPROVE beside a later REQUEST_CHANGES (class 2) refuses on the latest round through close-out.sh"
+spec_review_case T-99609 "$OKI\n$ELECT" '## Spec review\r\n\r\n### Codex Spec-Review verdict: APPROVE\r\n\r\n## Spec review\r\n\r\n### Codex Spec-Review verdict: REQUEST_CHANGES' 1 refuse "elected + a CRLF-terminated record (class 5) still refuses on its own latest round through close-out.sh, no stale-approval fallback"
+spec_review_case T-99610 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE\n\n### Codex Spec-Review verdict:\302\240REQUEST_CHANGES' 1 refuse "elected + a U+00A0 separator on the verdict line's own latest round (class 6, second location) refuses rather than falling through to the stale APPROVE, through close-out.sh"
+spec_review_case T-99611 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n## Spec review\n\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + an earlier REQUEST_CHANGES followed by a later, fixed APPROVE round passes through close-out.sh (positive control: the redesigned reader does not over-narrow the ordinary answered-then-approved flow)"
 
 printf '\nAll close-out assertions passed.\n'

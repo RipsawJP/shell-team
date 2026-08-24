@@ -24,10 +24,24 @@
 # Before any of the above runs, fail-closed gates must pass, in order: T-068's
 # pending fast-follow disposition gate, then T-1084's situational dispatch
 # record gate (validate-if-present — silent when no `- dispatch:` sub-bullet
-# exists), then T-1017's interventions gate, then T-1022's source-line gate —
+# exists), then T-1017's interventions gate, then T-1096's close-out spec-
+# review backstop (#344, validate-if-present — silent when the task did not
+# elect `spec-review — cross-provider`), then T-1022's source-line gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
+#   an elected spec review whose record's last verdict is not an approval refuses the close-out before any board write.
 #   a source line the hand-off lint would reject refuses the close-out before any board write.
 #   a malformed `- dispatch:` sub-bullet refuses the close-out before any board write.
+#
+# T-1096's backstop is deliberately NOT a general-purpose reader: it invokes
+# the sibling bin/check-spec-review.sh, which resolves its own reviews
+# directory ($TEAM_REVIEWS_DIR at the same override precedence
+# $TEAM_INTERVENTIONS_DIR already has below, else the sibling
+# team-paths.sh) and refuses a task whose elected review's record has no
+# last verdict line reading an approval. The OTHER pre-freeze gate this
+# same task ships (#341's board-sub-bullet reader, a distinct sibling under
+# bin/) is deliberately NOT invoked anywhere in this file — its own
+# forward-only scoping depends on firing only at the pre-freeze seam for
+# the one task being frozen, never here.
 # The interventions record is resolved from $TEAM_INTERVENTIONS_DIR (same
 # override precedence as $TEAM_TODO below) or else the sibling team-paths.sh,
 # then verified with the sibling check-interventions.sh --task T-NNN. The
@@ -249,6 +263,15 @@ spec-review:none|cross-provider"
 DISPATCH_LINES="$(sed -n "${A_START},${A_END}p" "$BOARD" \
      | grep -E -- '^[[:space:]]*- dispatch:' || true)"
 
+# T-1096 (#344): the spec-review election, captured while this same loop
+# already walks every dispatch line — never a second, independent parse of
+# the board. Empty unless a well-formed `spec-review` row is seen below;
+# used only to decide whether the backstop gate further down needs to
+# resolve a reviews directory at all (validate-if-present: an entry that
+# never elects `spec-review — cross-provider` must not pay for, or fail on,
+# a reviews-directory resolution it has no use for).
+SPEC_REVIEW_ELECTION=""
+
 if [ -n "$DISPATCH_LINES" ]; then
   DISPATCH_SEEN_AXES=" "
   while IFS= read -r d_line; do
@@ -298,6 +321,10 @@ if [ -n "$DISPATCH_LINES" ]; then
     # extraction pattern already assumes.
     if ! printf '%s\n' "$d_ground" | grep -qE -- '^(saving|recommendation|break-even|cost-input): [a-z0-9-]+'; then
       fail "$TASK has a malformed dispatch record (ground does not open with a non-empty id after saving:/recommendation:/break-even:/cost-input:): $d_line"
+    fi
+
+    if [ "$d_axis" = "spec-review" ]; then
+      SPEC_REVIEW_ELECTION="$d_value"
     fi
   done <<< "$DISPATCH_LINES"
 fi
@@ -429,6 +456,49 @@ TMP_BOARD="$(mktemp "${TMPDIR:-/tmp}/close-out-board.XXXXXX")"
 GATE_ERR="$(mktemp "${TMPDIR:-/tmp}/close-out-gate-err.XXXXXX")"
 SYN_BOARD="$(mktemp "${TMPDIR:-/tmp}/close-out-synboard.XXXXXX")"
 trap 'rm -f "$ENTRY_FILE" "$TMP_BOARD" "$GATE_ERR" "$SYN_BOARD"' EXIT
+
+# --- fail-closed gate: an elected spec review must have reached an ---------
+# approval verdict (T-1096, #344). Validate-if-present, matching the
+# dispatch grammar gate's own back-compat shape above: an entry that never
+# elects `spec-review — cross-provider` — `none`, or no `spec-review` row at
+# all — must not pay for, or fail on, a reviews-directory resolution it has
+# no use for, so this whole gate is SKIPPED (not merely a silent pass
+# inside the checker) unless SPEC_REVIEW_ELECTION was captured above as
+# exactly `cross-provider`. Resolution then mirrors the interventions-
+# directory resolution above: an env override at the same precedence
+# $TEAM_TODO/$TEAM_INTERVENTIONS_DIR already have, else the sibling
+# team-paths.sh — this task's own reader (bin/check-spec-review.sh) then
+# additionally validates the resolved value is a directory, refusing with
+# its own exit 2 when it is not, rather than a guessing fallback.
+if [ "$SPEC_REVIEW_ELECTION" = "cross-provider" ]; then
+  if [ -n "${TEAM_REVIEWS_DIR:-}" ]; then
+    REVIEWS_DIR="$TEAM_REVIEWS_DIR"
+  else
+    REVIEWS_DIR="$(bash "$SCRIPT_DIR/team-paths.sh" --get reviews 2>/dev/null)" \
+      || die "cannot resolve the reviews directory (team-paths.sh unavailable) — set \$TEAM_REVIEWS_DIR or fix the install"
+  fi
+  export TEAM_REVIEWS_DIR="$REVIEWS_DIR"
+
+  SPEC_REVIEW_CHECKER="$SCRIPT_DIR/check-spec-review.sh"
+  if [ ! -f "$SPEC_REVIEW_CHECKER" ] || [ ! -r "$SPEC_REVIEW_CHECKER" ]; then
+    die "cannot verify the elected spec review (check-spec-review.sh missing or unreadable next to close-out.sh)"
+  fi
+
+  SR_ERR="$(bash "$SPEC_REVIEW_CHECKER" --board "$BOARD" --task "$TASK" 2>&1 >/dev/null)" && SR_RC=0 || SR_RC=$?
+  if [ "$SR_RC" -ne 0 ]; then
+    if [ -n "$SR_ERR" ]; then
+      printf '%s\n' "$SR_ERR" >&2 || true
+    fi
+    case "$SR_RC" in
+      1)
+        fail "$TASK's elected spec review has no APPROVE verdict"
+        ;;
+      *)
+        die "cannot verify the elected spec review ($TASK: check-spec-review.sh exited $SR_RC)"
+        ;;
+    esac
+  fi
+fi
 
 # --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh
 # invocation below (the source-line gate) — covers the pre-write interlock
