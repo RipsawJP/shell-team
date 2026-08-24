@@ -600,4 +600,114 @@ set -e
 [ ! -e "$GF/plain2/.shell-team" ] || fail "T-1097 git-free: --trial-branch run scaffolded despite the shim failing"
 pass "T-1097 git-free: the no-flag path invokes no git command (shim never reached, scaffold lands); --trial-branch genuinely reaches an executable git (shim reached, scaffold refused)"
 
+# =============================================================================
+# T-1097 rework (delivered-change review round 1: Major 1, Major 2, Major 3)
+# =============================================================================
+
+# --- T-1097 no-track: --no-track suppresses branch.autoSetupMerge=always ----
+NT="$GIT_TMP/no-track"
+mkdir -p "$NT/repo"
+git init -q "$NT/repo" >/dev/null 2>&1 || fail "T-1097 no-track: git init failed (control)"
+git -C "$NT/repo" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m init >/dev/null 2>&1 \
+  || fail "T-1097 no-track: initial commit failed (control)"
+git -C "$NT/repo" config branch.autoSetupMerge always \
+  || fail "T-1097 no-track: could not set branch.autoSetupMerge=always (control)"
+[ "$(git -C "$NT/repo" config --get branch.autoSetupMerge 2>/dev/null)" = "always" ] \
+  || fail "T-1097 no-track: branch.autoSetupMerge is not 'always' (control)"
+
+init --trial-branch trial/notrack "$NT/repo" >/dev/null 2>&1 \
+  || fail "T-1097 no-track: exited non-zero under branch.autoSetupMerge=always"
+[ "$(git -C "$NT/repo" symbolic-ref --short HEAD 2>/dev/null)" = "trial/notrack" ] \
+  || fail "T-1097 no-track: HEAD is not trial/notrack after the flag"
+if git -C "$NT/repo" config --get branch.trial/notrack.remote >/dev/null 2>&1; then
+  fail "T-1097 no-track: upstream tracking was set despite branch.autoSetupMerge=always (Major 1 regressed)"
+fi
+if git -C "$NT/repo" config --get branch.trial/notrack.merge >/dev/null 2>&1; then
+  fail "T-1097 no-track: an upstream merge ref was set despite branch.autoSetupMerge=always (Major 1 regressed)"
+fi
+pass "T-1097 no-track: --trial-branch never sets upstream tracking, even under branch.autoSetupMerge=always"
+
+# --- T-1097 at-shorthand: '@', '@{-1}', 'HEAD' as values all refuse cleanly -
+ATS="$GIT_TMP/at-shorthand"
+mkdir -p "$ATS/repo"
+git init -q "$ATS/repo" >/dev/null 2>&1 || fail "T-1097 at-shorthand: git init failed (control)"
+git -C "$ATS/repo" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m init >/dev/null 2>&1 \
+  || fail "T-1097 at-shorthand: initial commit failed (control)"
+# A real "previous branch" so `@{-1}` has something non-synthetic to expand
+# to if the flag's own validation ever mis-resolved it against this repo.
+git -C "$ATS/repo" branch other >/dev/null 2>&1 || fail "T-1097 at-shorthand: could not create 'other' (control)"
+git -C "$ATS/repo" switch other >/dev/null 2>&1 || fail "T-1097 at-shorthand: could not switch to 'other' (control)"
+git -C "$ATS/repo" switch - >/dev/null 2>&1 || fail "T-1097 at-shorthand: could not switch back (control)"
+CUR_ATS="$(git -C "$ATS/repo" symbolic-ref --short HEAD 2>/dev/null)"
+H0_ATS="$(git -C "$ATS/repo" rev-parse HEAD 2>/dev/null)"
+[ -n "$CUR_ATS" ] || fail "T-1097 at-shorthand: fixture has no current branch (control)"
+
+for name in '@' '@{-1}' 'HEAD'; do
+  set +e
+  init --trial-branch "$name" "$ATS/repo" >/dev/null 2>"$ATS/err"; rc=$?
+  set -e
+  [ "$rc" -eq 2 ] || fail "T-1097 at-shorthand: '$name' should exit 2, got $rc"
+  grep -qF -- '--trial-branch' "$ATS/err" || fail "T-1097 at-shorthand: '$name' refusal does not name --trial-branch"
+  # '@' and '@{-1}' must be caught by this script's OWN leading-"@" guard
+  # (message names "revision shorthand") — never fall through to git's own
+  # raw, uncontrolled switch-collision message. "HEAD" is refused by
+  # check-ref-format itself (a different, still-valid path) and carries no
+  # such wording, so it is deliberately excluded from this assertion.
+  case "$name" in
+    '@'|'@{-1}')
+      grep -qF -- 'revision shorthand' "$ATS/err" \
+        || fail "T-1097 at-shorthand: '$name' was not refused by this script's own leading-@ guard (message: $(cat "$ATS/err"))"
+      ;;
+  esac
+  rm -f "$ATS/err"
+done
+[ ! -e "$ATS/repo/.shell-team" ] || fail "T-1097 at-shorthand: a refusal still scaffolded a base dir"
+[ "$(git -C "$ATS/repo" symbolic-ref --short HEAD 2>/dev/null)" = "$CUR_ATS" ] \
+  || fail "T-1097 at-shorthand: HEAD moved during a refusal"
+[ "$(git -C "$ATS/repo" rev-parse HEAD 2>/dev/null)" = "$H0_ATS" ] \
+  || fail "T-1097 at-shorthand: HEAD's commit moved during a refusal"
+pass "T-1097 at-shorthand: '@', '@{-1}' and 'HEAD' as --trial-branch values all refuse cleanly (exit 2, names --trial-branch), with no scaffold and no HEAD movement"
+
+# --- T-1097 env-leak: GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE never reach the --
+# --- flag's own git calls; an ambient leak must never move a DIFFERENT, ----
+# --- unrelated repository's HEAD. ------------------------------------------
+EL="$GIT_TMP/env-leak"
+mkdir -p "$EL/decoy" "$EL/target"
+git init -q "$EL/decoy" >/dev/null 2>&1 || fail "T-1097 env-leak: git init failed for the decoy (control)"
+git -C "$EL/decoy" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m init >/dev/null 2>&1 \
+  || fail "T-1097 env-leak: initial commit failed for the decoy (control)"
+DECOY_HEAD0="$(git -C "$EL/decoy" rev-parse HEAD 2>/dev/null)"
+DECOY_BRANCH0="$(git -C "$EL/decoy" symbolic-ref --short HEAD 2>/dev/null)"
+[ -n "$DECOY_HEAD0" ] || fail "T-1097 env-leak: decoy has no HEAD (control)"
+[ -n "$DECOY_BRANCH0" ] || fail "T-1097 env-leak: decoy has no current branch (control)"
+# $EL/target is deliberately NOT a git repository at all.
+
+set +e
+GIT_DIR="$EL/decoy/.git" GIT_WORK_TREE="$EL/target" \
+  env -u TEAM_RUN_BASE bash "$INIT" --trial-branch trial/leak "$EL/target" >/dev/null 2>"$EL/err"; rc=$?
+set -e
+[ "$rc" -eq 2 ] || fail "T-1097 env-leak: a leaked GIT_DIR/GIT_WORK_TREE should still exit 2, got $rc"
+[ -s "$EL/err" ] || fail "T-1097 env-leak: stderr is empty"
+grep -qF -- '--trial-branch' "$EL/err" || fail "T-1097 env-leak: stderr does not name --trial-branch"
+[ "$(git -C "$EL/decoy" rev-parse HEAD 2>/dev/null)" = "$DECOY_HEAD0" ] \
+  || fail "T-1097 env-leak: the DECOY repository's HEAD commit moved (Major 3 regressed)"
+[ "$(git -C "$EL/decoy" symbolic-ref --short HEAD 2>/dev/null)" = "$DECOY_BRANCH0" ] \
+  || fail "T-1097 env-leak: the DECOY repository's current branch changed (Major 3 regressed)"
+[ ! -e "$EL/target/.shell-team" ] || fail "T-1097 env-leak: the (non-repository) target got scaffolded"
+
+# GIT_INDEX_FILE alone, against a genuinely valid target, must not derail a
+# legitimate run (the neutralization must not merely refuse everything).
+IL="$GIT_TMP/env-leak-index"
+mkdir -p "$IL/repo"
+git init -q "$IL/repo" >/dev/null 2>&1 || fail "T-1097 env-leak: git init failed for the index-leak repo (control)"
+git -C "$IL/repo" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m init >/dev/null 2>&1 \
+  || fail "T-1097 env-leak: initial commit failed for the index-leak repo (control)"
+GIT_INDEX_FILE="$IL/decoy-index" \
+  env -u TEAM_RUN_BASE bash "$INIT" --trial-branch trial/idx "$IL/repo" >/dev/null 2>&1 \
+  || fail "T-1097 env-leak: a leaked GIT_INDEX_FILE broke an otherwise-legitimate run"
+[ "$(git -C "$IL/repo" symbolic-ref --short HEAD 2>/dev/null)" = "trial/idx" ] \
+  || fail "T-1097 env-leak: HEAD is not trial/idx after the legitimate GIT_INDEX_FILE-leak run"
+[ -f "$IL/repo/.shell-team/todo.md" ] || fail "T-1097 env-leak: the legitimate run did not scaffold"
+pass "T-1097 env-leak: GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE never reach the flag's own git calls — a leaked GIT_DIR/GIT_WORK_TREE refuses cleanly without moving an unrelated decoy repository's HEAD, and a leaked GIT_INDEX_FILE alone does not break an otherwise-legitimate run"
+
 printf '\nAll team-init assertions passed.\n'
