@@ -43,5 +43,12 @@ PASS: reject: duplicate --trigger
 PASS: reject: flag-valued --trigger
 PASS: reject: early mode with all-distinct classes (DP-3 contradiction)
 PASS: early mode: signature self-check yields NO_VERDICT
+PASS: --reflection: all five enum values print their own 'reflection: <value>' line (trigger mode)
+PASS: --reflection: works in STOP-mode digest too, not only the early trigger mode
+PASS: --reflection omitted: digest carries no reflection: line
+PASS: reject: --reflection out-of-enum value
+PASS: reject: --reflection missing value (trailing)
+PASS: reject: --reflection duplicate
+PASS: --reflection: fail-closed on out-of-enum, missing and duplicate values
 
 All rework-digest assertions passed.

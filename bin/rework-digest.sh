@@ -35,6 +35,39 @@
 #                    loop-guard STOP. `--stop-reason` and `--trigger` are
 #                    mutually exclusive and exactly one is required (both
 #                    present, or neither present, fails closed).
+#   --reflection     OPTIONAL (T-1095). Records the outcome of the
+#                    means-ends reflection duty (`templates/prompt-blocks/
+#                    means-ends-reflection.md`) as a closed five-value enum —
+#                    never free text, because the assembled digest is piped
+#                    through goal-state.sh `signature` below and a prose
+#                    field could leak a verdict label or an AC<digits> token:
+#                      disposition-executed        — the pre-priced drop for
+#                                                     the earliest droppable
+#                                                     component executed on
+#                                                     the loop's own authority
+#                      escalated-primary-not-green — an item of the
+#                                                     never-dropped set was
+#                                                     not green
+#                      escalated-never-dropped     — a finding targeted the
+#                                                     never-dropped set
+#                      escalated-irreversible      — the pre-priced
+#                                                     disposition was itself
+#                                                     destructive/irreversible
+#                      escalated-no-disposition    — no pre-priced disposition
+#                                                     existed for a targeted
+#                                                     component (this also
+#                                                     covers an empty or
+#                                                     unclassified finding set)
+#                    Where more than one condition holds at once, the value
+#                    to record is the EARLIEST in this fixed precedence order:
+#                    escalated-primary-not-green, escalated-never-dropped,
+#                    escalated-irreversible, escalated-no-disposition — this
+#                    script only records the label the caller supplies, it
+#                    never computes or arbitrates the precedence itself.
+#                    Optional and mode-independent: usable with either
+#                    --stop-reason or --trigger, and omitting it leaves the
+#                    digest's printed shape byte-identical to before this
+#                    flag existed.
 #
 # Judgment: any class slug appearing >= 2 times across the records =>
 # `judgment: same-class-repetition` plus a `repeated-classes:` line; all
@@ -56,7 +89,8 @@ usage() {
   cat >&2 <<'EOF' || true
 usage: rework-digest.sh --round N --phase validate|review --class <slug> \
                         [--round N --phase ... --class ...]... \
-                        (--stop-reason <reason> | --trigger same-class-2)
+                        (--stop-reason <reason> | --trigger same-class-2) \
+                        [--reflection <value>]
 
   Records are --round/--phase/--class triples (repeatable; a new --round
   closes the previous record, which must be complete). Exactly one of
@@ -68,6 +102,15 @@ usage: rework-digest.sh --round N --phase validate|review --class <slug> \
                    escalation) — requires the records to show a repeated
                    class (>= 2 occurrences).
   Class slugs are lowercase alphanumerics + hyphens (^[a-z0-9][a-z0-9-]*$).
+
+  --reflection <value>  OPTIONAL, closed enum, works with either mode above:
+    disposition-executed | escalated-primary-not-green |
+    escalated-never-dropped | escalated-irreversible |
+    escalated-no-disposition
+  Precedence when more than one escalation condition holds at once (the
+  caller decides and supplies the single earliest value; this script never
+  computes it): escalated-primary-not-green, escalated-never-dropped,
+  escalated-irreversible, escalated-no-disposition.
 EOF
   exit 2
 }
@@ -82,6 +125,7 @@ PHASES=()
 CLASSES=()
 STOP_REASON=""
 TRIGGER=""
+REFLECTION=""
 cur_round=""
 cur_phase=""
 cur_class=""
@@ -158,6 +202,15 @@ while [[ $# -gt 0 ]]; do
       esac
       shift 2
       ;;
+    --reflection)
+      if [[ $# -lt 2 ]]; then fail "missing value for --reflection"; fi
+      if [[ -n "$REFLECTION" ]]; then fail "duplicate --reflection"; fi
+      case "$2" in
+        disposition-executed|escalated-no-disposition|escalated-never-dropped|escalated-irreversible|escalated-primary-not-green) REFLECTION="$2" ;;
+        *) fail "--reflection must be one of the five enum values: '$2'" ;;
+      esac
+      shift 2
+      ;;
     *)
       fail "unknown argument: $1"
       ;;
@@ -229,6 +282,9 @@ if [[ -n "$repeated" ]]; then
 else
   out+=$'\n'"judgment: new-classes-each-round"
   out+=$'\n'"note: distinct root-cause class each round; extending may still converge."
+fi
+if [[ -n "$REFLECTION" ]]; then
+  out+=$'\n'"reflection: ${REFLECTION}"
 fi
 out+=$'\n'"=== END DIGEST ==="
 

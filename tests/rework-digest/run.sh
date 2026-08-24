@@ -284,4 +284,39 @@ sig_early="$(printf '%s\n' "$out_early" | bash "$REPO_ROOT/bin/goal-state.sh" si
 [ "$sig_early" = "NO_VERDICT" ] || fail "early mode: signature self-check expected NO_VERDICT, got '$sig_early'"
 pass "early mode: signature self-check yields NO_VERDICT"
 
+# --- T-1095: optional --reflection field (Droppable 1st) --------------------
+# Closed five-value enum, works in either mode, byte-unchanged output when
+# omitted (checked separately below), fail-closed on any malformed value.
+for v in disposition-executed escalated-no-disposition escalated-never-dropped escalated-irreversible escalated-primary-not-green; do
+  out_refl="$(bash "$RD" \
+    --round 1 --phase validate --class guard-anchor-weakness \
+    --round 2 --phase review --class guard-anchor-weakness \
+    --trigger same-class-2 --reflection "$v")"
+  printf '%s\n' "$out_refl" | grep -Fxq "reflection: $v" \
+    || fail "--reflection $v: printed line missing or malformed"
+done
+pass "--reflection: all five enum values print their own 'reflection: <value>' line (trigger mode)"
+
+# --reflection must also work paired with --stop-reason (STOP-mode digest),
+# not only the early --trigger mode.
+out_refl_stop="$(bash "$RD" \
+  --round 1 --phase validate --class guard-anchor-weakness \
+  --stop-reason max_iterations_reached --reflection disposition-executed)"
+printf '%s\n' "$out_refl_stop" | grep -Fxq 'reflection: disposition-executed' \
+  || fail "--reflection: missing in STOP-mode digest"
+pass "--reflection: works in STOP-mode digest too, not only the early trigger mode"
+
+# Omitting --reflection leaves the digest exactly as before this flag existed.
+out_no_refl="$(bash "$RD" --round 1 --phase validate --class only-once --stop-reason guard_error)"
+printf '%s\n' "$out_no_refl" | grep -Fq 'reflection:' && fail "--reflection omitted: a reflection: line must not appear"
+pass "--reflection omitted: digest carries no reflection: line"
+
+reject "--reflection out-of-enum value" \
+  --round 1 --phase validate --class a-class --stop-reason no_progress --reflection not-a-value
+reject "--reflection missing value (trailing)" \
+  --round 1 --phase validate --class a-class --stop-reason no_progress --reflection
+reject "--reflection duplicate" \
+  --round 1 --phase validate --class a-class --stop-reason no_progress --reflection disposition-executed --reflection escalated-irreversible
+pass "--reflection: fail-closed on out-of-enum, missing and duplicate values"
+
 printf '\nAll rework-digest assertions passed.\n'
