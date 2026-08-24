@@ -16,12 +16,25 @@
 #   - existing scaffold files are skipped (use --force to overwrite)
 # Re-running is therefore safe and non-destructive.
 #
-# External dependencies: bash + standard POSIX tools (cp, mkdir, printf, grep).
+# Optional --trial-branch <name>: before any scaffold byte is written, creates
+# <name> in the target repository and switches to it — the manual `git switch
+# -c` line docs/adopting.md's trial-adoption route otherwise asks for by hand.
+# Refuses (exit 2, remedy in the message) when the target is not inside a git
+# work tree at all (including a bare one), is inside a work tree but is not
+# that work tree's top level, or <name> already exists. A dirty worktree is
+# permitted and preserved byte-for-byte. Scope is deliberately narrow: this
+# creates the branch and switches to it — nothing is staged, committed,
+# pushed, or torn down; those remain the adopter's own documented steps. With
+# the flag absent this script invokes no git command at all, exactly as
+# before.
+#
+# External dependencies: bash + standard POSIX tools (cp, mkdir, printf, grep)
+# plus, only when --trial-branch is given, git.
 # No JSON/YAML processors and no language runtimes (per the framework's
 # external-dependency-zero rule).
 #
 # Usage:
-#   bin/team-init.sh [--force] <target_path>
+#   bin/team-init.sh [--force] [--trial-branch <name>] <target_path>
 #   bin/team-init.sh --help
 #
 # Exit codes:
@@ -65,7 +78,7 @@ die()      { log_err "ERROR: $*"; exit 2; }
 
 print_help() {
   cat <<'EOF'
-Usage: bin/team-init.sh [--force] <target_path>
+Usage: bin/team-init.sh [--force] [--trial-branch <name>] <target_path>
 
 Scaffold an adopting repository for the shell-team loop.
 
@@ -90,8 +103,17 @@ override with $TEAM_RUN_BASE; an existing tasks/ layout is detected and reused):
 Does NOT modify <target_path>/CLAUDE.md or <target_path>/.gitignore.
 
 Options:
-  --force         Overwrite existing scaffold files. Default: skip with warning.
-  --help, -h      Show this help and exit.
+  --force                 Overwrite existing scaffold files. Default: skip with warning.
+  --trial-branch <name>   Before scaffolding, create <name> in the target repository and
+                          switch to it. Exits 2 with a remedy in the message when the
+                          target is not inside a git work tree at all (including a bare
+                          one), is inside a work tree but is not that work tree's top
+                          level, or <name> already exists. Scope: creates the branch and
+                          switches to it only — nothing is staged, committed, pushed, or
+                          torn down; those stay your own documented steps. A dirty
+                          worktree is permitted and is left byte-for-byte untouched.
+                          Without this flag, no git command is invoked at all.
+  --help, -h              Show this help and exit.
 
 Idempotent: re-running skips existing files and never modifies host-root files.
 EOF
@@ -101,6 +123,8 @@ EOF
 # Argument parsing.
 # ---------------------------------------------------------------------------
 FORCE=0
+TRIAL_BRANCH=""
+TRIAL_BRANCH_GIVEN=0
 positionals=()
 
 while [ "$#" -gt 0 ]; do
@@ -112,6 +136,22 @@ while [ "$#" -gt 0 ]; do
     --force)
       FORCE=1
       shift
+      ;;
+    --trial-branch)
+      # Two-token form only — the single-token `--trial-branch=<name>` spelling
+      # is deliberately not accepted and falls through the --* branch below.
+      if [ "$TRIAL_BRANCH_GIVEN" -eq 1 ]; then
+        die "--trial-branch given more than once"
+      fi
+      if [ "$#" -lt 2 ]; then
+        die "--trial-branch requires a branch name"
+      fi
+      case "$2" in
+        -*|'') die "--trial-branch requires a branch name" ;;
+      esac
+      TRIAL_BRANCH="$2"
+      TRIAL_BRANCH_GIVEN=1
+      shift 2
       ;;
     --)
       shift
@@ -160,6 +200,41 @@ if ! resolver_exports="$(bash "$SCRIPT_DIR/team-paths.sh" --root "$TARGET" --exp
   die "could not resolve operating paths (see team-paths.sh error above) — check \$TEAM_RUN_BASE"
 fi
 eval "$resolver_exports"
+
+# ---------------------------------------------------------------------------
+# --trial-branch: validate the target and the branch name, then create the
+# branch and switch to it — entirely BEFORE the first scaffold byte is
+# written below, so a refusal leaves the target exactly as it was found (no
+# base dir, no partial scaffold, no moved HEAD). Each refusal goes through
+# die() (exit 2) and names both --trial-branch and a remedy. The base-dir
+# resolver above is untouched by any of this — it already ran.
+# ---------------------------------------------------------------------------
+if [ "$TRIAL_BRANCH_GIVEN" -eq 1 ]; then
+  # Argument parsing above already refused a value beginning with "-", so
+  # $TRIAL_BRANCH is safe to pass without a "--" separator here (git's own
+  # --branch form does not accept one).
+  git check-ref-format --branch "$TRIAL_BRANCH" >/dev/null 2>&1 \
+    || die "--trial-branch: invalid branch name: $TRIAL_BRANCH"
+
+  # true only inside a non-bare work tree; empty (command failed) with no
+  # repository at all, "false" inside a bare repository — both refused alike.
+  wt=""
+  wt="$(git -C "$TARGET" rev-parse --is-inside-work-tree 2>/dev/null)" || wt=""
+  [ "$wt" = "true" ] \
+    || die "--trial-branch requires a git work tree at the target — it is in no repository at all, or in a bare one (remedy: git init)"
+
+  toplevel_raw="$(git -C "$TARGET" rev-parse --show-toplevel 2>/dev/null)" \
+    || die "--trial-branch requires a git work tree at the target — it is in no repository at all, or in a bare one (remedy: git init)"
+  toplevel="$(cd "$toplevel_raw" && pwd -P)"
+  [ "$toplevel" = "$TARGET" ] \
+    || die "--trial-branch must be run at the repository root, not a subdirectory (target: $TARGET; repository root: $toplevel)"
+
+  git -C "$TARGET" show-ref --verify --quiet "refs/heads/$TRIAL_BRANCH" \
+    && die "--trial-branch: branch already exists: $TRIAL_BRANCH"
+
+  git -C "$TARGET" switch -c "$TRIAL_BRANCH" >/dev/null \
+    || die "--trial-branch: failed to create and switch to branch: $TRIAL_BRANCH"
+fi
 
 # ---------------------------------------------------------------------------
 # Counters for the closing summary.
