@@ -208,31 +208,63 @@ eval "$resolver_exports"
 # base dir, no partial scaffold, no moved HEAD). Each refusal goes through
 # die() (exit 2) and names both --trial-branch and a remedy. The base-dir
 # resolver above is untouched by any of this — it already ran.
+#
+# Every git call below is run -C "$TARGET" (never the invoking shell's own
+# repository) AND with GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE explicitly
+# unset for that one call (never inherited from the caller's environment):
+# an ambient override of any of the three can otherwise make this validate
+# ONE directory while switch -c moves an entirely different, real
+# repository's HEAD (T-1097 delivered-change review round 1, Major 3).
 # ---------------------------------------------------------------------------
 if [ "$TRIAL_BRANCH_GIVEN" -eq 1 ]; then
+  # git's own revision-shorthand grammar (gitrevisions(7)): any value
+  # beginning with "@" ("@", "@{-1}", "@{upstream}", "@{u}", ...) is refused
+  # OUTRIGHT, before any git call, rather than validated through git's own
+  # --branch DOES-WHAT-I-MEAN expansion mode below. That mode expands these
+  # forms against the CURRENT repository's own ref history, and a mismatch
+  # between the literal value the adopter typed and what actually gets
+  # looked up (or created) is exactly the class of surprise this flag must
+  # never produce (review round 1, Major 2).
+  case "$TRIAL_BRANCH" in
+    @*) die "--trial-branch: invalid branch name (a value beginning with @ is a git revision shorthand, not a literal branch name): $TRIAL_BRANCH" ;;
+  esac
+
   # Argument parsing above already refused a value beginning with "-", so
   # $TRIAL_BRANCH is safe to pass without a "--" separator here (git's own
   # --branch form does not accept one).
-  git check-ref-format --branch "$TRIAL_BRANCH" >/dev/null 2>&1 \
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+    git -C "$TARGET" check-ref-format --branch "$TRIAL_BRANCH" >/dev/null 2>&1 \
     || die "--trial-branch: invalid branch name: $TRIAL_BRANCH"
 
   # true only inside a non-bare work tree; empty (command failed) with no
   # repository at all, "false" inside a bare repository — both refused alike.
   wt=""
-  wt="$(git -C "$TARGET" rev-parse --is-inside-work-tree 2>/dev/null)" || wt=""
+  wt="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+    git -C "$TARGET" rev-parse --is-inside-work-tree 2>/dev/null)" || wt=""
   [ "$wt" = "true" ] \
     || die "--trial-branch requires a git work tree at the target — it is in no repository at all, or in a bare one (remedy: git init)"
 
-  toplevel_raw="$(git -C "$TARGET" rev-parse --show-toplevel 2>/dev/null)" \
+  toplevel_raw="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+    git -C "$TARGET" rev-parse --show-toplevel 2>/dev/null)" \
     || die "--trial-branch requires a git work tree at the target — it is in no repository at all, or in a bare one (remedy: git init)"
-  toplevel="$(cd "$toplevel_raw" && pwd -P)"
+  toplevel="$(cd "$toplevel_raw" && pwd -P)" \
+    || die "--trial-branch: could not resolve the repository root (target moved or vanished mid-run: $TARGET)"
   [ "$toplevel" = "$TARGET" ] \
     || die "--trial-branch must be run at the repository root, not a subdirectory (target: $TARGET; repository root: $toplevel)"
 
-  git -C "$TARGET" show-ref --verify --quiet "refs/heads/$TRIAL_BRANCH" \
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+    git -C "$TARGET" show-ref --verify --quiet "refs/heads/$TRIAL_BRANCH" \
     && die "--trial-branch: branch already exists: $TRIAL_BRANCH"
 
-  git -C "$TARGET" switch -c "$TRIAL_BRANCH" >/dev/null \
+  # --no-track: a bare `switch -c` inherits the target repository's own
+  # `branch.autoSetupMerge` config and can silently set upstream tracking
+  # under a real (if uncommon) adopter setting — contradicting this flag's
+  # own scope boundary, which never sets upstream tracking (review round 1,
+  # Major 1). `-c <name> --no-track`, in that token order: `-c --no-track
+  # <name>` mis-parses (git treats the very next token after `-c` as the
+  # branch name, so `--no-track` itself would be read as the name).
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+    git -C "$TARGET" switch -c "$TRIAL_BRANCH" --no-track >/dev/null \
     || die "--trial-branch: failed to create and switch to branch: $TRIAL_BRANCH"
 fi
 
