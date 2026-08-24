@@ -1114,7 +1114,6 @@ mkdir -p "$DISPATCH_ROOT"
 dispatch_case() {
   local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5" label="${6:-T-1084}"
   local root="$DISPATCH_ROOT/$task"
-  mkdir -p "$root"
   write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
   # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
   printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
@@ -1217,5 +1216,25 @@ dispatch_case T-991 "$OKV\n  - dispatch: implement — pm-authored — unconditi
 dispatch_case T-992 "$OKI\n$OKS\n$OKS" 1 "'specify' appears more than once" "duplicated specify axis refuses" T-1091
 dispatch_case T-993 "$OKI\n  - dispatch:${TAB}specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density" 1 "does not match the grammar" "tab-after-dispatch-colon on specify refuses (seen and refused, not silently invisible)" T-1091
 dispatch_case T-994 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: specify — pm-authored — unconditional — cost-input: spec-authorship-judgment-density" 0 silent "tab-indented conformant specify record still passes (positive control on the widened anchor)" T-1091
+
+# ============================================================================
+# T-1092: the `spec-review` axis — one more data row on the same
+# DISPATCH_AXIS_TABLE (grammar cases, exercised via dispatch_case exactly as
+# T-1091's own cases above are). The close-out backstop that used to sit
+# beside this grammar gate (a second, independent refusal class reading a
+# redirected reviews directory for an APPROVE verdict) was carved out under
+# this spec's own pre-commitment (operator-ruled 2026-08-23, six enumerated
+# defeat classes) — issue #344 owns it, and no reviews-dir redirection or
+# verdict-matching fixture ships here any more.
+# ============================================================================
+OKR='  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default'
+
+dispatch_case T-99510 "$OKI\n$OKV\n$OKS\n$OKR" 0 silent "conformant four-axis record (implement/verify/specify/spec-review) passes the gate" T-1092
+dispatch_case T-99511 "$OKI\n$OKV\n$OKS" 0 silent "three-axis record with no spec-review sub-bullet still passes (every in-flight task under the three-axis dispatcher, never refused retroactively)" T-1092
+dispatch_case T-99512 "$OKI\n  - dispatch: spec-review — serial — unconditional — recommendation: spec-review-none-default" 1 "'serial' is not in axis 'spec-review'" "cross-axis value 'spec-review — serial' refuses (all four axes share one editing surface)" T-1092
+dispatch_case T-99513 "$OKV\n  - dispatch: implement — cross-provider — unconditional — recommendation: tier2-parallel-implementations-judge" 1 "'cross-provider' is not in axis 'implement'" "cross-axis value 'implement — cross-provider' refuses (the transposition in the other direction)" T-1092
+dispatch_case T-99514 "$OKI\n$OKR\n$OKR" 1 "'spec-review' appears more than once" "duplicated spec-review axis refuses" T-1092
+dispatch_case T-99515 "$OKI\n  - dispatch:${TAB}spec-review — none — unconditional — recommendation: spec-review-none-default" 1 "does not match the grammar" "tab-after-dispatch-colon on spec-review refuses (seen and refused, not silently invisible)" T-1092
+dispatch_case T-99516 "${TAB}- dispatch: implement — serial — unconditional — recommendation: tier2-parallel-implementations-judge\n${TAB}- dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default" 0 silent "tab-indented conformant spec-review record still passes (positive control on the widened anchor)" T-1092
 
 printf '\nAll close-out assertions passed.\n'
