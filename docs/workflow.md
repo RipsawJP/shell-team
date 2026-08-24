@@ -62,6 +62,21 @@ the board's own record of that hand-off. See
 [Declaring the verification ceiling](adopting.md#declaring-the-verification-ceiling)
 for the grammar and what it does and does not guarantee.
 
+At three mechanically detectable points — the same-class-2 count reaching
+two, a spec pre-commitment's factual trigger, and a loop-guard `STOP:`
+escalation — the loop runs a **means-ends reflection** (T-1095, issue #346)
+before it composes any hand-off to you: it answers four fixed questions in
+writing, and when a pre-priced disposition already exists for the auxiliary
+component every finding targets, that disposition executes on the loop's
+own authority and is recorded on your board with the four answers as its
+ground, rather than being escalated as one option beside a cheaper-looking
+patch. The three standing human gates — the batch GO before a merge, sprint
+planning approval, and any destructive or irreversible operation — are
+unchanged; this only changes what the loop will and will not interrupt you
+for at those three points. See
+[`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)
+for the one worked example this reflection currently rests on.
+
 ## Language — mirror the conversation
 
 Team output **mirrors the user's conversation language**: when `/shell-team:run` or

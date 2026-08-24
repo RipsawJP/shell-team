@@ -63,6 +63,21 @@ transcribe されたものであり、決して invent されない——が追�
 [verification ceiling を宣言する](adopting.ja.md#verification-ceiling-を宣言する)
 を参照。
 
+3 つの機械的に検出可能な地点——same-class-2 のカウントが 2 に達した時、spec
+pre-commitment の factual trigger が発火した時、loop-guard の `STOP:`
+escalation——のそれぞれで、loop はあなたへの hand-off を組み立てる前に
+**means-ends reflection**（T-1095、issue #346）を実行する: 4 つの固定質問に
+書面で答え、findings が対象とする auxiliary component に対してすでに
+pre-priced disposition が存在する場合、その disposition は loop 自身の
+権限で execute され、その 4 つの答えを根拠として board に記録される——
+安く見える別の patch と並ぶ一選択肢として escalate されるのではない。
+3 つの standing human gate——マージ前の batch GO、スプリントプランニングの
+承認、破壊的・不可逆な操作——は変わらない。これはこの 3 地点で loop が
+あなたに割り込むか否かだけを変える。この reflection がこれまでのところ
+拠って立つ唯一の worked example は
+[`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)
+を参照。
+
 ## 言語 — 会話をミラーする
 
 チームの出力は**ユーザーの会話言語をミラーします**: `/shell-team:run` や `/goal` が
