@@ -109,7 +109,12 @@ scan="$(awk -v task="$TASK" '
 read -r A_START A_END A_COUNT <<< "$scan"
 [ "$A_COUNT" -eq 1 ] || die "$TASK is not exactly one top-level entry in ## Active of $BOARD"
 
-ENTRY="$(sed -n "${A_START},${A_END}p" "$BOARD")"
+# Strip a trailing CR per line (T-1096 rework round 1, Major 3) — the same
+# CRLF tolerance bin/check-handoff.sh already applies to a board line and
+# the sibling bin/check-spec-review.sh already applies to a review record,
+# for the identical reason: an otherwise-conformant value must not be
+# refused merely because the board file itself is CRLF-terminated.
+ENTRY="$(sed -n "${A_START},${A_END}p" "$BOARD" | sed 's/\r$//')"
 
 print_entry_mode_remedy() {
   # shellcheck disable=SC2016  # backtick-quoted board grammar, not a substitution
@@ -124,8 +129,22 @@ EM_LINES="$(printf '%s\n' "$ENTRY" | grep -E '^[[:space:]]*- entry-mode: ' || tr
 EM_COUNT="$(printf '%s\n' "$EM_LINES" | grep -c . || true)"
 
 if [ "$EM_COUNT" -eq 0 ]; then
-  # shellcheck disable=SC2016  # backtick-quoted board grammar, not a substitution
-  printf 'check-entry-mode: %s has no `- entry-mode:` sub-bullet on its Active board entry (source 1 absent)\n' "$TASK" >&2 || true
+  # T-1096 rework round 1, Major 2: a whitespace variant this spec's own
+  # ## Input space names as reachable (a doubled space after the bullet
+  # dash) fails the strict single-space anchor above and would otherwise be
+  # misreported as "absent" — a genuinely different, misleading diagnostic
+  # from "the sub-bullet is malformed." Distinguish the two with a wider,
+  # detection-only stem (never used to extract a value, only to name what
+  # was actually found) before choosing the message; either branch still
+  # refuses (exit 1) — this is a diagnostic fix, not a behavior change.
+  EM_LOOSE="$(printf '%s\n' "$ENTRY" | grep -E '^[[:space:]]*-[[:space:]]+entry-mode:' || true)"
+  if [ -n "$EM_LOOSE" ]; then
+    # shellcheck disable=SC2016  # backtick-quoted board grammar, not a substitution
+    printf 'check-entry-mode: %s has a malformed `- entry-mode:` sub-bullet — found, but its spacing does not match the canonical single-space grammar: %s\n' "$TASK" "$EM_LOOSE" >&2 || true
+  else
+    # shellcheck disable=SC2016  # backtick-quoted board grammar, not a substitution
+    printf 'check-entry-mode: %s has no `- entry-mode:` sub-bullet on its Active board entry (source 1 absent)\n' "$TASK" >&2 || true
+  fi
   print_entry_mode_remedy
   exit 1
 fi
@@ -144,6 +163,14 @@ D_LINES="$(printf '%s\n' "$ENTRY" | grep -E '^[[:space:]]*- dispatch: specify �
 D_COUNT="$(printf '%s\n' "$D_LINES" | grep -c . || true)"
 
 if [ "$D_COUNT" -eq 0 ]; then
+  # T-1096 rework round 1, Major 2 (source 2's own half): a doubled space
+  # after the bullet dash — the same reachable class handled for source 1
+  # above — fails the strict anchor above; name it as malformed rather than
+  # absent when a wider, detection-only stem still finds it.
+  D_LOOSE="$(printf '%s\n' "$ENTRY" | grep -E '^[[:space:]]*-[[:space:]]+dispatch:[[:space:]]+specify[[:space:]]+—' || true)"
+  if [ -n "$D_LOOSE" ]; then
+    fail "$TASK has a malformed \`- dispatch: specify — ...\` sub-bullet — found, but its spacing does not match the canonical grammar: $D_LOOSE"
+  fi
   fail "$TASK has no \`- dispatch: specify — ...\` sub-bullet on its Active board entry (source 2 absent)"
 fi
 if [ "$D_COUNT" -gt 1 ]; then
@@ -151,6 +178,15 @@ if [ "$D_COUNT" -gt 1 ]; then
 fi
 
 D_VALUE="$(printf '%s\n' "$D_LINES" | sed -nE 's/^[[:space:]]*- dispatch: specify — ([a-z0-9-]+) — .*$/\1/p')"
+if [ -z "$D_VALUE" ]; then
+  # T-1096 rework round 1, Major 2 (the separator-doubling case): the
+  # coarse D_LINES anchor above has no trailing `$`, so a doubled space
+  # INSIDE the ` — ` separator right before the value (a reachable class
+  # this spec's own ## Input space names) still satisfies it, but the
+  # strict extraction above then yields nothing — never misreport this as
+  # "value outside the closed pair: ''" (a real vocabulary violation).
+  fail "$TASK's \`- dispatch: specify — ...\` sub-bullet exists but its value field could not be parsed — check the spacing around each ' — ' separator: $D_LINES"
+fi
 case "$D_VALUE" in
   pm-authored|operator-authored) : ;;
   *) fail "$TASK's \`- dispatch: specify — ...\` value is outside the closed pair pm-authored/operator-authored: '$D_VALUE'" ;;
@@ -166,9 +202,24 @@ fi
 # `- flagged-gap` is its own prefix). A line carrying either stem but not
 # parsing cleanly into `(<id>): <non-empty text>` is refused immediately,
 # distinct from a merely-absent or orphaned id.
-res_stem_re='^[[:space:]]*- flagged-gap-resolution'
+#
+# T-1096 rework round 1, Blocker 2: the stem net's own whitespace between
+# the bullet dash and the field name was pinned to exactly one space
+# (`- flagged-gap`), which is narrower than the collection-net-vs-remainder
+# discipline §2 already uses for the verdict-line stem. A doubled space
+# after the bullet — a class this spec's own ## Input space explicitly
+# names as reachable — made the WHOLE marker invisible to both the gap and
+# resolution stem tests (contributing to neither set), so a genuinely
+# flagged, genuinely unresolved gap silently read as the conformant
+# zero-gaps case: the exact "absence versus a failed read" shape defeat
+# class 5 exists to close, reopened at this second location. The stem net
+# is now `-[[:space:]]+` (one or more spaces, any count) so every such
+# variant is COLLECTED; the full-grammar regexes below stay strict (exactly
+# one space), so a variant that fails them is REFUSED as malformed rather
+# than falling through the invisible gap this rework closes.
+res_stem_re='^[[:space:]]*-[[:space:]]+flagged-gap-resolution'
 res_full_re='^[[:space:]]*- flagged-gap-resolution \(([a-z0-9-]+)\): (.*)$'
-gap_stem_re='^[[:space:]]*- flagged-gap'
+gap_stem_re='^[[:space:]]*-[[:space:]]+flagged-gap'
 gap_full_re='^[[:space:]]*- flagged-gap \(([a-z0-9-]+)\): (.*)$'
 
 GAP_IDS=" "
