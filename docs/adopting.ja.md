@@ -50,6 +50,11 @@ base dir を git に載せない場合、その方法 2 つは効く範囲が違
 その行を持っており、`.shell-team/` を global に無視している操作者の環境でも自分の
 base dir は追跡されたままになります。
 
+稼働ファイルを追跡せずに残した場合にループの **gates** が実際にどうなるかは、下記の
+[1 チケットでチームを試す](#1-チケットでチームを試す) を参照してください——
+このパラグラフは scope（範囲）についてのものであり、追跡そのものを丸ごとスキップし
+た場合に何が起きるかについてではありません。
+
 global ファイルにはもう 1 つ影響があります。あるパスが無視されるかを git に
 問い合わせるもの——`git check-ignore` や、それを土台にしたチェック——もその
 ファイルを読みます。したがってそうしたチェックは、global excludes の無い CI では
@@ -316,6 +321,46 @@ mechanical check の役割ではない。path の allowlist を作れば adopter
 はタスクの bootstrap freeze でのみ適用され、すでに記録済みのハッシュの
 re-freeze では適用されない。
 
+## 1 チケットでチームを試す
+
+チーム全体でどう導入するかを決める前に、実際のチケット 1 件でループを一度だけ試したいなら: **trial branch（お試し用ブランチ）** を作り、そこへ shell-team 本来の仕組みでスキャフォールドし、稼働ファイルをそのブランチ上でコミットし、ループを実行し、終わったらブランチを削除します。ループの gate は稼働ファイルが **tracked（追跡済み）** であることを前提にしており、このルートはその前提を回避せず尊重します——新しいフラグも新しい仕組みも要らず、`git switch -c` に続けて `team-init` を実行するだけです。
+
+**セットアップ。**
+
+```bash
+git switch -c trial/one-ticket
+team-init.sh .
+git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
+git commit -m "chore: scaffold shell-team for a one-ticket trial"
+```
+
+`team-init.sh` は自身では git コマンドを一切実行せず、どのブランチにいるかも気にしません。したがってこれで完全なセットアップです。`--get` 引数は両方とも重要です: デフォルトレイアウトでは同じディレクトリに解決されますが、レガシーな `tasks/` + `docs/specs/` レイアウトでは `docs/specs/` がベースディレクトリの外にあるため、2 つめの引数を落とすと specs ディレクトリが永久に未追跡のままになります——両方を使ってコミットしてください（単一ディレクトリをハードコードした形は使わないでください）。
+
+マシンの global excludes（`core.excludesFile`）がベースディレクトリを隠している場合、この普通の `git add` はその場で拒否されます。このお試し用ブランチに限って `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"` で強制するか、[稼働ファイルの置き場所](#稼働ファイルの置き場所) にあるとおり、`team-paths.sh --get base` があなたの repo で解決するパスを root `.gitignore` に repo レベルで re-include してください（デフォルトレイアウトでは `!.shell-team/`、レガシーレイアウトでは `!tasks/`）——そうすれば通常の形が恒久的に効くようになります。
+
+あとはいつも通り、このお試し用ブランチ上で `/shell-team:run <作りたいもの>` を実行します。
+
+**後始末。** `<integration-branch>` にはあなた自身のリポジトリの integration branch を代入してください——この repository では `develop`、他の多くの repository では `main` です。
+
+```bash
+git switch <integration-branch>
+git branch -D trial/one-ticket
+```
+
+**未マージ (unmerged)** のブランチを削除すると、そのブランチからしか到達できないコミット——スキャフォールドされたベースディレクトリ、ボード、spec、そのタスク自身の記録——がすべて失われ、それ以外は何も変わりません: 他のブランチの tip は動かず、本流の履歴も変わらず、お試し用ブランチにコミットしなかったファイルにも触れません。ブランチは設計上未マージのままなので `git branch -d` は拒否し、強制形の `git branch -D` が必要になります——これは何かが間違っている兆候ではなく、ここでは期待される通常の結果です。それらのコミットは、いずれガベージコレクションされるまで `git reflog` から復元可能なままです。
+
+「未マージ」は「決して伝播しない」ことを意味しません。お試し用ブランチ上のコミットは、ブランチが一度もマージされなくても本流に届くことがあります——誰かがそれを `cherry-pick` するかもしれませんし、共有リモートへ `push` すれば自動化や別の人がそれを拾うかもしれません。お試し用ブランチは **ローカル (local)** に留め、もし push していたなら、ローカルのものを消すときに **remote copy（リモート側のコピー）** も一緒に削除してください——分離を支えているのはその discipline であり、未マージであることだけではありません。
+
+稼働ファイルを一度もコミットしないまま——git 無視されているか、単に一度も追加していない状態で——ループを走らせることは**サポートされていません (not supported)**。理由は gate ごとに異なり、それぞれが実際に持つ失敗の形と、実際にそこへ到達するシナリオで述べます。1 つの一括した主張として述べるのではありません。
+
+`bin/check-durability.sh` は**拒否 (refuses)** します。どちらの拒否に出会うかは、あなたが何をしたかによります。`<base>/durability-mode` ファイルが一切無い場合、デフォルトのモードは `tracked` であり、ループが必要とするすべての記録が、記録されたコミット内のどの blob にも解決しません: `not-in-recorded-commit`、あるいは作業ファイル自体も無ければ `missing-working-file` です。`untracked-opt-out` はより狭いケースです——`working-tree-only` を宣言する **mode file（モードファイル）** 自体がコミットされていない場合にのみ発火します。どちらにせよ、お試しは green な hand-off に到達しません。
+
+`bin/check-pii-shapes.sh` は、ループ自身の記録を**一度も読まないまま (without having read)** clean を報告します。diff スコープのモードはコミット済みの変更しか見ず、`--all` モードは untracked だが ignore されていないファイルにしか届きません——**gitignored（git 無視された）** ベースディレクトリは **どちらのモードでも (neither mode)** 読まれません。これはまさに、base dir を git から外しておく方法そのものです。
+
+`bin/check-intent.sh` は、それ自身に恒久的な存在を持たない台帳から答え続けます: frozen-intent のハッシュとその attestation はボード上に生きているので、**fresh（新規）** な clone やチェックアウト、あるいは `git clean -fdx`（その `-x` フラグが gitignore されたパスにまで届きます）は、それらを一度も持ちません。`git reset --hard` は **追跡されていないボードをそのまま残します (leaves an untracked)**——つまりそれらを取り除く操作ではありません。
+
+そして、ベースディレクトリをリポジトリの外へ移すことも抜け道にはなりません: `bin/team-paths.sh` は絶対パスの `TEAM_RUN_BASE` をそのまま拒否するため、ベースディレクトリはリゾルバ自身の判断により **repo-relative（リポジトリ相対）** であり続けます。
+
 ## stacked-branch base-ref discriminator と borrowed-vocabulary sweep の宣言
 
 T-1081 以降に凍結するすべての spec は、凍結された intent block 内の 1 行
@@ -425,6 +470,135 @@ literal」だけに scope した sweep では不十分である——merged さ�
 task によって既に stack に持ち込まれた token を見逃してしまう——そして
 測定されなかった borrowed-vocabulary count premise は broken check line
 として扱われる。
+
+## verification ceiling を宣言する
+
+T-1093 以降、すべての spec は自分の凍結 intent block 内、上記の
+`- user-visible:`・`- verification-class:`・`- base-ref-discriminator:` の
+各 key が既に占めている宣言領域に、もう 1 行——top-level bullet
+`- verification-ceiling: unit-and-static | real-environment — <rationale>`
+——を追加で宣言する。これが **verification ceiling**（検証の天井）——この
+spec に対して QA が実際に到達できる検証レベル——であり、green flag が
+bare な green ではなく「このレベルまでは green」と読めるようにするために
+存在する: `unit-and-static` は loop 自身の gate が unit test と static /
+textual verification までしか届かず checkout の外には出られないことを、
+`real-environment` は criterion が名指す実 runtime（storage put が queue
+に流れ worker に届く経路・手動 deploy・cloud credential の裏でしか届かない
+作業）を追加で exercise できることを意味する。
+
+**どちらの値も all-or-nothing ではない。** 宣言された値は、個別に印が
+付いていないすべての criterion について gate が何に到達したかを述べる。
+宣言された ceiling より上に位置する criterion は、自分自身の indented
+`- above-ceiling: <gate 通過後にこの criterion を所有する human>` サブ
+箇条を持つ——ゲート通過後にそれを所有する human を名指しし、出荷済みの
+`- adopter-surface:` idiom を再利用するのであって新しい free-text list
+ではなく、1 つのサブ箇条が複数の criterion を代表することも決してない。
+このサブ箇条は **どちらの宣言値の下でも** 利用可能であり、これが正直な
+mixed case を可能にする: spec の criteria が複数の real-environment
+capability class に、それぞれ異なる到達度でまたがる場合——例えば ある
+criterion については gate が実際に exercise した staging の
+storage-to-queue-to-worker path があり、別の criterion については gate が
+届かない production deploy や credentialed な作業がある場合——は
+`real-environment` を宣言して gate が到達した部分を表し、届かなかった方を
+`- above-ceiling:` として印を付ける。どちらか一方の criterion を誤って
+記述する値へ押し込まれることはない。
+
+**exception set には floor があり、この対称性は「何も言わない」ために
+使うことはできない。** 宣言された値は **少なくとも 1 つの criterion が
+その値で verify されている** ことを attest しなければならない:
+すべての criterion が `- above-ceiling:` と印付けられた
+`real-environment` 宣言は refuse される——それは `unit-and-static` と
+区別が付かず、読者に何も伝えないからである——その spec の正直な宣言は、
+少なくとも 1 つの criterion が実際に verify されている最高の値である。
+`unit-and-static` は floor であり、これ以上下げることはできないため、
+残る唯一の degenerate case——floor でさえすべての criterion がその上に
+ある場合——は refuse ではなく documented される: 宣言行は、宣言された値の
+直後に固定 token `no criterion verified at this ceiling` を carry しなけ
+ればならない。この token はその後 **そのまま verbatim で** QA の PASS
+block の field と board の `READY_FOR_REVIEW` append の両方へ carry
+forward される——spec を開かない読者にも、baseline coverage のように
+見える bare な値ではなく、実際にその disclosure が読める行に届くように
+するためである。
+
+現時点の強制は、上記の宣言と同じ足場で **チェッカーではなく duty** で
+ある: タスクの最初の凍結時に coordinating session がこの宣言領域を自分で
+読み、ちょうど 1 つの conformant な `- verification-ceiling:` 行を要求し、
+無い・重複している・closed vocabulary 外・vacuous な宣言——あるいは
+宣言された ceiling を超える capability を明らかに要求している criterion
+に `- above-ceiling:` サブ箇条でその所有者が名指しされていない場合——を
+refuse して spec を author へ差し戻す。**機械的なチェッカーはまだ出荷され
+ていない**——mismatch case は grep が決められる state ではなく human が
+行う reading judgment であり、これはこのリポジトリの他の宣言領域 gate が
+既に持つのと同じ disclosed-limitation pattern（issue #250）に乗る。この
+duty はタスクの bootstrap freeze にのみ適用され、既に記録済みの hash の
+re-freeze には適用されない。そして、宣言された ceiling が何を防ぐかに
+ついての主張は一切していない——それは QA が到達したレベルを、後で
+hand-off や board line を読む誰にとっても legible にするだけである。
+
+## spec を誰が書くかを選ぶ（T-1091）
+
+T-1091 以降、spec の著者を誰にするか自体が dispatch decision になった——
+既存の `implement`/`verify` 軸と並ぶ第三の軸 `specify` で、`pm-authored` と
+`operator-authored` の 2 値に閉じており、Plan で決め、同じ座で task の
+board entry に記録する。
+
+**`pm-authored` が出荷時デフォルト。** `pm-spec` が今まで通り spec を書く。
+task の decision input が 1 つの session の context に集中していない、
+ほとんどの task がこの形に当てはまる場合はこちらを選ぶ——formalization
+（依頼をテスト可能な spec に変える作業）は `pm-spec` の比較優位である。
+
+**`operator-authored` は judgment-density のボトルネックのため。** その
+task の decision input——複数 repo にまたがる測定済みの事実、live 環境での
+確認、インシデント履歴——が既に coordinating session 自身の context に
+存在している場合はこちらへ routing する: `pm-spec` へ委譲する価値は算術的
+にゼロになる——完全な hand-off package を書くこと自体が spec を書くこと
+そのものであり、委譲は検証済みの一次情報を relayed な情報に変えるだけに
+なる。このモードでは coordinating session（operator）が直接 spec を書き、
+`pm-spec` は author ではなく **conformance formatter** として参加する——
+check-intent と check-acs の grammar に整形するだけで、author が決めた
+ことを書き換えることは決してなく、substantive な gap は自分の判断で
+閉じずに author へ差し戻す。
+
+**このガイドが防ぎたい anti-pattern。** `pm-spec` による authorship を
+断ることは、loop の machinery まで置き去りにする理由にはならない。
+凍結された intent block、board record、freeze sweep、2 つの review gate、
+interventions ledger——これらは `pm-spec` が犯す間違いと同じくらい
+operator が犯す間違いも捉える仕組みである。operator-authored な spec も
+freeze sweep 以降は full loop がそのまま走る。`operator-authored` を選ぶ
+のは spec を誰が書くかだけであり、machinery の残りが走るかどうかを選ぶ
+ことでは決してない。
+
+## Specify seam で spec review を elect する（T-1092）
+
+`specify` と並んで、実装着手前に spec の **domain**（ドメイン）前提を
+cross-provider の `codex-reviewer` に追加で 1 回読ませるかどうかを決める
+第四の軸がある: `spec-review`——`none` と `cross-provider` の 2 値に閉じ、
+`docs/loop-engineering/specify-seam-review.md` で定義・値付けされている。
+
+**`none` が出荷時デフォルト。** 追加の pass は走らず、task には何の変化も
+ない——通常の mechanism task は追加ラウンドの代償を払わない。
+
+**この repo が自ら測定できない domain 前提に spec の正しさが依存する時、
+`cross-provider` を elect する**——デプロイ順序の前提、本番で成立するとは
+限らない rollback precondition、この repo の外にあるシステムについての
+blast-radius claim 等。追加ラウンドは spec document 自体を読む——凍結
+intent block とその declaration region であり、branch diff は決して読まない
+——freeze sweep の後・`- intent-hash (v1)` を記録する前に走り、task の
+review record 内の `## Spec review` セクションに `APPROVE` か
+`REQUEST_CHANGES` を返す。`REQUEST_CHANGES` は spec 自身の author
+（`pm-authored` モードでは `pm-spec`、`operator-authored` モードでは
+operator）へ差し戻され、答えが返るまで freeze sweep は先へ進まない。
+
+**保証すること・しないこと。** elect された spec review は loop の
+**both gates**（`qa-verifier` の PASS と、実際に届いた変更に対する
+`codex-reviewer` の APPROVE）のどちらでもなく、この軸の値に関わらず
+両方とも引き続き必須であり、spec-review の APPROVE がどちらの代わりにも
+なることはない。またこの読みは自身の入力を認証しない（cross-check する
+2 つの条件テキストはどちらも agent が生成したものである)、読みが実際に
+行われたことも検証しない、そして「domain 前提が健全である」ことを
+reading judgment 以上の何かにすることもない。この軸はまだ一度も
+end-to-end で発火していないため、間違って world について誤った spec の
+実装をどれだけ防げるかは `undetermined`（未測定）である。
 
 ## 運用ルール
 

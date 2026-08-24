@@ -39,6 +39,8 @@
 | Reviewing someone else's PR | Use `/review` — only `codex-reviewer` runs |
 | Responding to review feedback already on your PR | Use `/review-response` — Codex-evaluates the received findings, risk-gates them (a deterministic floor forces risky ones to a human), then hands the adopted set to `shell-team` |
 | Spec only (no code yet) | Stop after `pm-spec`; task is at `READY_FOR_ARCH` (spec written) and pauses |
+| Spec already authored (`specify — operator-authored`, not the shipped `pm-authored` default) | `pm-spec` does not skip — it runs as a conformance formatter instead of an author; see [Choosing who authors the spec](adopting.md#choosing-who-authors-the-spec-t-1091) |
+| Spec review elected (`spec-review — cross-provider`, not the shipped `none` default) | No phase is skipped — an extra `codex-reviewer` pass reads the spec document's domain premises at the Specify seam, after the freeze sweep and before the intent hash; a `REQUEST_CHANGES` routes back to the spec's own author before Implement starts. See [Electing a spec review at the Specify seam](adopting.md#electing-a-spec-review-at-the-specify-seam-t-1092), `docs/loop-engineering/specify-seam-review.md` |
 
 `/review` vs `/review-response`: `review` generates a *fresh* Codex review of the current branch diff; `review-response` triages review findings that **already came back** on a PR — it evaluates and risk-gates them, then (on your GO for any risky ones) drives `shell-team` to implement the adopted set. Neither replaces the other.
 
@@ -51,6 +53,14 @@ Each agent's hand-off block in the main session must include:
 - One sentence on what's notable for the next agent
 
 This block is the *only* reliable channel between agents — they don't share memory.
+
+When a spec carries a `- verification-ceiling:` declaration (T-1093), a
+`READY_FOR_REVIEW` hand-off additionally carries the declared value —
+transcribed verbatim from the spec, never invented — so the flag reads
+"green up to" this level rather than bare green; the same line rides onto
+the board's own record of that hand-off. See
+[Declaring the verification ceiling](adopting.md#declaring-the-verification-ceiling)
+for the grammar and what it does and does not guarantee.
 
 ## Language — mirror the conversation
 

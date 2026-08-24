@@ -49,6 +49,8 @@ re-include it in a single repo, add `!.shell-team/` to that repo's root
 carries that line for exactly that reason, so its own base dir stays tracked
 even for an operator who ignores `.shell-team/` globally.
 
+For what the loop's **gates** actually do if you leave the operating files untracked instead of committing them, see [Trying the team on one ticket](#trying-the-team-on-one-ticket) below — this paragraph is about scope, not about what happens if you skip tracking altogether.
+
 That global file has a second consequence. Anything that asks git whether a
 path is ignored — `git check-ignore`, and checks built on it — reads it too, so
 such a check can fail on your machine while passing in CI, where no global
@@ -314,6 +316,46 @@ path allowlist would coerce every adopter's repository into this one's
 layout. The duty applies at a task's bootstrap freeze only, never at a
 re-freeze of an already-recorded hash.
 
+## Trying the team on one ticket
+
+If you just want to run the loop once, on one real ticket, without deciding anything about how your whole team adopts it: create a **trial branch**, scaffold onto it with shipped mechanics, commit the operating files there, run the loop, and delete the branch afterward. The loop's gates assume the operating files are **tracked**, and this route honors that assumption instead of working around it — no new flag and no new mechanism, just `git switch -c` followed by `team-init`.
+
+**Setup.**
+
+```bash
+git switch -c trial/one-ticket
+team-init.sh .
+git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
+git commit -m "chore: scaffold shell-team for a one-ticket trial"
+```
+
+`team-init.sh` runs no git command of its own and does not care which branch you are on, so this is the whole setup. Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
+
+If your machine's global excludes (`core.excludesFile`) hide the base dir, that plain `git add` refuses outright the moment you run it. Force the scaffolded files onto this one branch with `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`, or add a repo-level re-include to your root `.gitignore` for whatever `team-paths.sh --get base` resolves to in your repo — `!.shell-team/` in the default layout, `!tasks/` in the legacy layout — as described in [Where the operating files live](#where-the-operating-files-live), so the ordinary form works for good.
+
+Now run `/shell-team:run <what you want built>` as usual, on the trial branch.
+
+**Teardown.** Substitute your own repository's integration branch for `<integration-branch>` — `develop` in this repository, `main` in many others.
+
+```bash
+git switch <integration-branch>
+git branch -D trial/one-ticket
+```
+
+Deleting an **unmerged** branch destroys every commit **reachable only from** it — the scaffolded base dir, the board, the spec and the task's own records — and nothing else: no other branch's tip moves, no mainline history changes, and no file you never committed to the trial branch is touched. Because the branch is unmerged by design, `git branch -d` declines the deletion and you need the force form, `git branch -D`; that is the expected, non-anomalous outcome here, not a sign something went wrong. Those commits stay recoverable from `git reflog` until they are eventually garbage-collected.
+
+"Unmerged" is not the same as "never propagated." A commit made on the trial branch can still reach your mainline without the branch ever merging — someone can `cherry-pick` it, or you can `push` the branch to a shared remote where automation or another person picks it up. Keep the trial branch **local**, and if you did push it, delete the remote copy too when you delete the local one — the isolation rests on that discipline, not on the branch being unmerged alone.
+
+Running the loop with the operating files never committed — git-ignored, or simply never added — is **not supported**. The reason differs per gate, stated in the failure mode each one actually has and in the scenario that actually reaches it, rather than as one blanket claim that they all stop working.
+
+`bin/check-durability.sh` **refuses**, and which refusal you meet depends on what you did. With no `<base>/durability-mode` file at all the default mode is `tracked`, and every record the loop needs resolves to no blob in the recorded commit: `not-in-recorded-commit`, or `missing-working-file` when the working file itself is gone too. `untracked-opt-out` is the narrower case — it fires only when a **mode file** declaring `working-tree-only` is itself not committed. Either way the trial reaches no green hand-off.
+
+`bin/check-pii-shapes.sh` reports clean **without having read** the loop's own records at all. Its diff-scoped mode only sees committed changes, and its `--all` mode reaches untracked-but-not-ignored files only — a **gitignored** base dir is read by **neither mode**, which is exactly how you keep the base dir out of git in the first place.
+
+`bin/check-intent.sh` keeps answering from a ledger with no durable existence of its own: the frozen-intent hash and its attestation live on the board, so a **fresh** clone or checkout, or `git clean -fdx` (its `-x` flag is what reaches a gitignored path), simply never has them. `git reset --hard` **leaves an untracked** board alone, so that is not the operation that removes it.
+
+And relocating the base dir outside the repository is not an escape hatch either: `bin/team-paths.sh` refuses an absolute `TEAM_RUN_BASE` outright, so the base dir stays **repo-relative** by the resolver's own decision.
+
 ## Declaring the stacked-branch base-ref discriminator and the borrowed-vocabulary sweep
 
 Every spec frozen from T-1081 onward additionally declares, on one line
@@ -425,6 +467,139 @@ only to "the new literals this task introduces" is not sufficient — a
 token already carried onto the stack by a merged sibling task escapes
 it, and an unmeasured borrowed-vocabulary count premise is treated as a
 broken check line.
+
+## Declaring the verification ceiling
+
+Every spec frozen from T-1093 onward additionally declares, on one line
+inside its own frozen intent block, in the same declaration region the
+`- user-visible:`, `- verification-class:` and `- base-ref-discriminator:`
+keys above already occupy: a top-level bullet
+`- verification-ceiling: unit-and-static | real-environment — <rationale>`.
+This is the **verification ceiling** — the level QA can actually reach for
+this spec — and it exists so a green flag reads "green *up to* this level"
+rather than bare green: `unit-and-static` means the loop's own gate can
+reach unit tests plus static and textual verification and nothing beyond
+the checkout, and `real-environment` means it can additionally exercise the
+real runtime a criterion names (a storage put feeding a queue feeding a
+worker, a manual deploy, work reachable only behind cloud credentials).
+
+**Neither value is all-or-nothing.** The declared value states what the
+gate reached for every criterion *not* individually marked otherwise; a
+criterion that sits above the declared ceiling carries its own indented
+`- above-ceiling: <who owns this criterion after the gate>` sub-bullet,
+naming the human who owns it once the gate has passed — reusing the
+shipped `- adopter-surface:` idiom rather than a new free-text list, and
+never one sub-bullet standing in for several criteria. This sub-bullet is
+available under **either declared value**, which is what makes the honest
+mixed case possible: a spec whose criteria span more than one
+real-environment capability class at different reach — say a staging
+storage-to-queue-to-worker path the gate genuinely exercises for one
+criterion, alongside a production deploy or credentialed work it cannot
+reach for another — declares `real-environment` for what the gate reached
+and marks the rest `- above-ceiling:`, rather than being forced into a
+value that misdescribes one criterion or the other.
+
+**The exception set has a floor, so the symmetry cannot be used to say
+nothing.** A declared value must attest **at least one criterion at it**:
+a `real-environment` declaration under which every criterion is marked
+`- above-ceiling:` is refused, because it would be interchangeable with
+`unit-and-static` and tell a reader nothing — the honest declaration for
+that spec is the highest value at which at least one criterion is actually
+verified. `unit-and-static` is the floor and cannot be lowered further, so
+the one remaining degenerate case — every criterion sitting above even the
+floor — is documented rather than refused: the declaration line must carry
+the fixed token `no criterion verified at this ceiling` immediately after
+the declared value. That token is then **carried forward, verbatim**, onto
+both QA's PASS-block field and the board's `READY_FOR_REVIEW` append, so
+the reader who never opens the spec still sees the disclosure on the line
+they actually read, rather than a bare value that looks like baseline
+coverage.
+
+Enforcement today is a **duty, not a checker**, on the same footing as the
+declarations above: at a task's first freeze the coordinating session
+reads the declaration region itself, requires exactly one conformant
+`- verification-ceiling:` line, and refuses a missing, duplicated,
+out-of-vocabulary or vacuous declaration — or a criterion plainly
+demanding capabilities above the declared ceiling with no
+`- above-ceiling:` sub-bullet naming its owner — routing the spec back to
+its author. **No mechanical checker ships for it yet**; the mismatch case
+is a reading judgment a human performs, not a state a grep can decide, and
+it rides on the same disclosed-limitation pattern issue #250 already
+carries for this repository's other declaration-region gates. The duty
+applies at a task's bootstrap freeze only, never at a re-freeze of an
+already-recorded hash, and it makes no claim about what a declared ceiling
+prevents — it only makes the level QA reached legible to whoever reads the
+hand-off or the board line afterward.
+
+## Choosing who authors the spec (T-1091)
+
+From T-1091 onward, spec authorship is itself a dispatch decision — a
+third axis, `specify`, closed over `pm-authored` and `operator-authored` —
+alongside the existing `implement`/`verify` axes, decided at Plan and
+recorded on the task's board entry at the same seam.
+
+**`pm-authored` is the shipped default.** `pm-spec` authors the spec, exactly
+as it does today. Pick this whenever a task's decision inputs are not
+concentrated in one session's own context — most tasks fit this shape, and
+formalization (turning a request into a testable spec) is `pm-spec`'s
+comparative advantage.
+
+**`operator-authored` is for a judgment-density bottleneck.** Route here when
+the decision inputs for the task — measured facts across repositories,
+live-environment confirmations, incident history — already live in the
+coordinating session's own context, so delegating authorship to `pm-spec`
+would have arithmetically zero value: writing a complete hand-off package
+already **is** writing the spec, and the delegation would only convert
+verified first-hand facts into relayed ones. In this mode the coordinating
+session (the operator) writes the spec directly; `pm-spec` then participates
+as a **conformance formatter**, not an author — it shapes the document into
+the check-intent and check-acs grammars, never rewrites what the author
+decided, and flags any substantive gap back to the author rather than
+closing it on its own judgment.
+
+**The anti-pattern this guide exists to prevent.** Refusing `pm-spec`
+authorship is not a reason to leave the loop's machinery behind. The
+frozen intent block, the board records, the freeze sweep, both review
+gates, and the interventions ledger are what catch mistakes an operator
+makes just as readily as ones `pm-spec` makes — an operator-authored spec
+still runs the full loop, unchanged from the freeze sweep onward. Choosing
+`operator-authored` chooses who writes the spec, never whether the rest of
+the machinery runs.
+
+## Electing a spec review at the Specify seam (T-1092)
+
+Alongside `specify`, a fourth dispatch axis elects whether an extra
+cross-provider `codex-reviewer` pass reads a spec's **domain** premises
+before implementation begins: `spec-review`, closed over `none` and
+`cross-provider`, defined and priced in
+`docs/loop-engineering/specify-seam-review.md`.
+
+**`none` is the shipped default.** No extra pass runs, and nothing about
+the task changes; a routine mechanism task does not pay for the extra
+round.
+
+**Elect `cross-provider` when the spec's correctness rests on a domain
+premise this repository cannot itself measure** — a deployment or ordering
+assumption, a rollback precondition that may not hold in production, a
+blast-radius claim about a system outside this repository's reach. The
+extra round reads the spec document itself — the frozen intent block plus
+its declaration region, never a branch diff — after the freeze sweep and
+before the `- intent-hash (v1)` is recorded, and returns `APPROVE` or
+`REQUEST_CHANGES` in a `## Spec review` section of the task's review
+record. A `REQUEST_CHANGES` routes back to the spec's own author
+(`pm-spec` in `pm-authored` mode, the operator in `operator-authored`
+mode); the freeze sweep does not proceed until it is answered.
+
+**What it does and does not guarantee.** An elected spec review is never
+one of the loop's **both gates** — `qa-verifier`'s PASS and
+`codex-reviewer`'s APPROVE on the delivered change both remain required
+regardless of this axis's value, and a spec-review APPROVE never
+substitutes for either. It also does not authenticate its own inputs (both
+condition texts it is cross-checked against are agent-produced), does not
+verify that the read actually happened, and does not turn "the domain
+premises are sound" into anything more than a reading judgment. No arm of
+this axis has run end to end yet, so how often it prevents a
+wrong-about-the-world spec from being implemented is `undetermined`.
 
 ## Operating rules
 

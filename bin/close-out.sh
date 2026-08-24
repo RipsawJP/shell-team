@@ -242,7 +242,9 @@ fi
 # The axis -> closed-value-set table is the ONE place a later axis (issue
 # #274's depth axis) is added; nothing below hardcodes a count of axes.
 DISPATCH_AXIS_TABLE="implement:serial|tier2|tier3
-verify:serial|tier1-fanout"
+verify:serial|tier1-fanout
+specify:pm-authored|operator-authored
+spec-review:none|cross-provider"
 
 DISPATCH_LINES="$(sed -n "${A_START},${A_END}p" "$BOARD" \
      | grep -E -- '^[[:space:]]*- dispatch:' || true)"

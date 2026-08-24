@@ -39,6 +39,8 @@
 | 他人の PR をレビューする | `/review` を使う — `codex-reviewer` のみが走る |
 | 自分の PR に返ってきたレビュー指摘に対応する | `/review-response` を使う — 受領した指摘を Codex で評価し、リスクゲート（決定論フロアがリスクの高い指摘を人間確認へ強制）を通してから、採用分を `shell-team` に渡す |
 | 仕様のみ（コードはまだ無し） | `pm-spec` の後で停止。タスクは `READY_FOR_ARCH`（仕様記述済）で一時停止 |
+| すでに spec が書かれている（`specify — operator-authored`。出荷時デフォルトの `pm-authored` ではない） | `pm-spec` はスキップしない——author ではなく conformance formatter として走る。[spec を誰が書くかを選ぶ](adopting.ja.md#spec-を誰が書くかを選ぶt-1091)を参照 |
+| spec review が elect されている（`spec-review — cross-provider`。出荷時デフォルトの `none` ではない） | フェーズは何もスキップされない——Specify seam で、freeze sweep の後・intent hash を記録する前に、追加の `codex-reviewer` パスが spec document の domain 前提を読む。`REQUEST_CHANGES` は Implement が始まる前に spec 自身の author へ差し戻される。[Specify seam で spec review を elect する](adopting.ja.md#specify-seam-で-spec-review-を-elect-するt-1092)、`docs/loop-engineering/specify-seam-review.md` を参照 |
 
 `/review` と `/review-response` の違い: `review` は現ブランチ diff の *新規* Codex レビューを生成する。`review-response` は PR に**すでに返ってきた**レビュー指摘をトリアージする — 指摘を評価しリスクゲートに通し、（リスクの高い指摘への GO を得たら）採用分を `shell-team` で実装させる。互いを置き換えるものではない。
 
@@ -51,6 +53,15 @@
 - 次のエージェントにとって注目すべき点を 1 文で
 
 このブロックがエージェント間の*唯一*信頼できるチャネルです — メモリは共有されません。
+
+spec が `- verification-ceiling:` 宣言（T-1093）を持つ場合、
+`READY_FOR_REVIEW` の hand-off には宣言された値——spec から verbatim に
+transcribe されたものであり、決して invent されない——が追加で載る。
+これにより flag は bare な green ではなく「このレベルまでは green」と
+読める。同じ行は board 自身のその hand-off の記録にも乗る。文法と、それが
+何を保証し何を保証しないかは
+[verification ceiling を宣言する](adopting.ja.md#verification-ceiling-を宣言する)
+を参照。
 
 ## 言語 — 会話をミラーする
 
