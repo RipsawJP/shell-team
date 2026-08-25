@@ -1700,3 +1700,85 @@ that file's order.
   each one as a local branch at the correct SHA (`origin/<name>` for
   `develop`, an explicit known SHA for a stacked sibling not reachable from
   any remote-tracking ref) before running a single check line.
+- T-1098: `bash tests/trial-recipe/run.sh` is the new fixture suite
+  executing the shipped trial-adoption recipe (`docs/adopting.md`'s
+  "Trying the team on one ticket" section) end to end, extracted via the
+  separately-invocable `tests/trial-recipe/extract-recipe.sh <doc> setup|
+  teardown|flag` rather than retyped. No new prerequisite: pure bash + git +
+  coreutils. Reuses `tests/team-init/run.sh`'s idioms verbatim (a
+  `$TMPDIR`-backed git-fixture root, `GIT_CEILING_DIRECTORIES` pinned there,
+  `fail`/`pass`, the `set +e` non-zero-exit capture idiom, reserved-domain
+  throwaway identity) but per T-1044's guidance for a NEW suite building
+  `git init` fixtures, uses the `${TMPDIR:-/tmp}`-only `mktemp -d` arm with
+  NO `$HERE` fallback (a fallback would nest a `.git` inside this
+  checkout's own tree, which a sandboxed run denies).
+  - **The extractor's fail-closed contract needed a whole-document line-
+    count FLOOR, not just a section-scoped one.** AC2's own four adversarial
+    mutants (built from `docs/adopting.md` by a shared awk one-liner) do
+    NOT all mutate the trial-adoption section's own text: two of them
+    (`m2`, deleting one fence-delimiter line; `m3`, truncating a fence
+    body) mutate the FIRST, unrelated fenced block in the document (the
+    ASCII directory tree under "## Where the operating files live"),
+    confirmed by direct diff against the real file. A heading-text-match
+    plus within-section fence-count/floor extractor (the first, narrower
+    design tried) extracts the identical, correct setup/teardown text from
+    both of these mutants and therefore cannot fail on them — the defect
+    these two mutants are built to represent is invisible from inside the
+    target section alone. The fix: after identifying which language's
+    heading matched (English or Japanese), also require the WHOLE
+    document's own line count to be `>=` its currently-shipped value (a
+    floor, never a ceiling, so an unrelated future addition elsewhere in
+    either doc never breaks this lock) — this is what actually catches a
+    stray deletion earlier in the file that a section-scoped read alone
+    never sees. Before designing a fail-closed extraction check against
+    adversarial mutants a spec's own `- check:` line constructs, literally
+    RUN the exact mutant-construction commands against the real file and
+    diff the result — do not assume a mutant's prose description ("the
+    setup block truncated") matches where its mechanical construction
+    actually lands.
+  - **A branch switch cannot remove a file it never tracked, even after
+    the file's own gitignore rule is gone too.** The teardown case's first
+    draft asserted `[ ! -e "$D1/$D1_BASE" ]` ("the resolved base dir is
+    absent from the working tree") and failed on every run: the shipped
+    `templates/shell-team.gitignore` ignores `runs/`, so a plain
+    `git add <base>` never tracks `<base>/runs/.gitkeep` in the first
+    place (confirmed: the scaffold commit's tracked-file list never
+    contains it). After the trial branch is force-deleted and the working
+    tree is back on the integration branch, `<base>/runs/.gitkeep` survives
+    as an untracked leftover — `git switch`/`checkout` only ever removes
+    files that WERE tracked in the branch being left; it cannot remove one
+    that never was. A second attempt asserted the leftover is caught by
+    `git check-ignore` instead, and that ALSO failed: `<base>/.gitignore`
+    itself was tracked, so the same branch switch correctly removes the
+    ignore RULE along with everything else, and `check-ignore` reports the
+    survivor as no-longer-ignored once its own governing rule is gone. The
+    working fix: assert the git-level property that's actually true
+    (`git ls-files -- <base>` is empty once back on the integration
+    branch — nothing tracked survives) and, separately, name the
+    filesystem survivor BY PATH (`<base>/runs/*`) rather than by asking
+    `check-ignore` a question whose answer depends on state the same
+    teardown just removed.
+  - **`git config --global` cannot appear in this suite even as a
+    string, including inside a comment.** AC14's shellcheck/hygiene sweep
+    is a literal `grep -cF` over the WHOLE file, not code-only, so the
+    substring "git config --global" appearing anywhere — an explanatory
+    comment included — fails it. Requirement 2's own scratch
+    global-config scope (GIT_CONFIG_GLOBAL, or a redirected HOME +
+    XDG_CONFIG_HOME as the fallback) is established and mutated by writing
+    `[core]\n\texcludesFile = <path>\n` directly into the resolved scratch
+    config FILE with `printf`, never by invoking the `--global` flag on
+    `git config` at all — the flag's only effect is choosing which file
+    gets written, and a plain text write to that same path is equivalent
+    for this purpose without ever spelling the forbidden token.
+  - Standalone run: `exit=0`, 12 `PASS:` lines (one per named case token:
+    `extract-fail-closed`, `substitution-closed`, `default-manual`,
+    `flag-path`, `legacy-marker`, `marker-vacuity-control`,
+    `both-paths-committed`, `specs-arg-control`, `hermetic-global`,
+    `adverse-excludes`, `teardown`, `ja-fence-parity`), 0 `FAIL:` lines
+    (`grep -c '^PASS:' <log>` / `grep -c '^FAIL:' <log>` against a captured
+    run). The whole spec's own `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh
+    .shell-team/specs/T-1098-trial-recipe-execution.md` (all 17 criteria,
+    `--dry-run` first) measured all 17 PASS on this machine — eight of the
+    17 criteria re-run the whole fixture suite, so raise the timeout for
+    this spec rather than assuming the default is enough, same guidance
+    T-1097's own entry gives.
