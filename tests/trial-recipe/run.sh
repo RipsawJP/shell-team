@@ -80,13 +80,33 @@ subst_recipe() {
     -e "s|team-paths\.sh|$TEAM_PATHS_BIN|g"
 }
 
+# isolate_backtick_span <needle> — read a prose line on stdin, print the
+# FIRST backtick-quoted span (stripped of its backticks) that contains
+# <needle>. Shared by the flag and remedy modes, both of which pull one
+# runnable command out of a prose line that also carries other
+# backtick-quoted mentions on the same line — so the whole line, printed by
+# extract-recipe.sh's own fail-closed "found exactly once" contract, is
+# never itself the thing executed.
+isolate_backtick_span() {
+  local needle="$1"
+  # shellcheck disable=SC2016
+  grep -oE '`[^`]*`' | grep -F -- "$needle" | sed -e 's/^`//' -e 's/`$//' | head -n1
+}
+
 # run_lines_in_repo <dir> <text> — eval each non-empty line of <text> with
-# cwd set to <dir>, stopping (return 1) at the first failure.
+# cwd set to <dir>, stopping (return 1) at the first failure. Each line
+# runs in its own subshell with TEAM_RUN_BASE/GIT_DIR/GIT_WORK_TREE/
+# GIT_INDEX_FILE unset first — the same four variables bin/team-init.sh's
+# own `--trial-branch` git calls neutralize per-invocation, applied here by
+# `unset` in a subshell (rather than an external `env -u` prefix, since
+# `eval` is a shell builtin an `env` prefix cannot wrap) so a leaked value
+# from this suite's own environment can never reach a recipe-execution
+# call without rewriting a single byte of the extracted command text.
 run_lines_in_repo() {
   local dir="$1" text="$2" line
   while IFS= read -r line; do
     [ -n "$line" ] || continue
-    ( cd "$dir" && eval "$line" ) || return 1
+    ( unset TEAM_RUN_BASE GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE; cd "$dir" && eval "$line" ) || return 1
   done <<EOF
 $text
 EOF
@@ -113,10 +133,9 @@ GLOBAL_CFG_FILE=""
 # rather than through the `--global` git-config invocation (this suite's own
 # hygiene lock forbids that exact command spelling from appearing here, since
 # it writes real global state on a machine with no scratch redirection
-# active) — a config file is
-# plain text, and `[core]\n\texcludesFile = <path>\n` is exactly what that
-# invocation would have produced, just written by hand into a path this
-# suite already owns and cleans up.
+# active) — a config file is plain text, and `[core]\n\texcludesFile =
+# <path>\n` is exactly what that invocation would have produced, just
+# written by hand into a path this suite already owns and cleans up.
 write_global_excludes() {
   printf '[core]\n\texcludesFile = %s\n' "$1" > "$GLOBAL_CFG_FILE"
 }
@@ -207,7 +226,42 @@ D1_STATUS="$(git -C "$D1" status --porcelain 2>/dev/null)"
 D1_COMMITS_AFTER="$(git -C "$D1" rev-list --count HEAD 2>/dev/null)"
 [ "$D1_COMMITS_AFTER" = "$((D1_COMMITS_BEFORE + 1))" ] \
   || fail "T-1098 default-manual: expected exactly one new commit (before=$D1_COMMITS_BEFORE after=$D1_COMMITS_AFTER)"
-pass "T-1098 default-manual: the extracted setup fence runs end to end in a default-layout fixture"
+
+# Env-var isolation (reviewer Minor: run_lines_in_repo must not let a
+# leaked TEAM_RUN_BASE/GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE reach a
+# recipe-execution call). A DECOY repo and a genuine target: all four
+# variables are set to point at the decoy for the duration of one
+# run_lines_in_repo call against the REAL target; the decoy's HEAD must not
+# move, and the target must still reach the correct end state — proving
+# the isolation, not just asserting the code path exists.
+ENVLEAK_DECOY="$GIT_TMP/envleak-decoy"
+ENVLEAK_TARGET="$GIT_TMP/envleak-target"
+mkdir -p "$ENVLEAK_DECOY" "$ENVLEAK_TARGET"
+git -C "$ENVLEAK_DECOY" init -q >/dev/null 2>&1 || fail "T-1098 default-manual: env-leak decoy git init failed (control)"
+set_identity "$ENVLEAK_DECOY"
+git -C "$ENVLEAK_DECOY" commit -q --allow-empty -m init >/dev/null 2>&1 || fail "T-1098 default-manual: env-leak decoy initial commit failed (control)"
+ENVLEAK_DECOY_HEAD0="$(git -C "$ENVLEAK_DECOY" rev-parse HEAD 2>/dev/null)"
+[ -n "$ENVLEAK_DECOY_HEAD0" ] || fail "T-1098 default-manual: env-leak decoy has no HEAD (control)"
+
+git -C "$ENVLEAK_TARGET" init -q >/dev/null 2>&1 || fail "T-1098 default-manual: env-leak target git init failed (control)"
+set_identity "$ENVLEAK_TARGET"
+git -C "$ENVLEAK_TARGET" commit -q --allow-empty -m init >/dev/null 2>&1 || fail "T-1098 default-manual: env-leak target initial commit failed (control)"
+
+TEAM_RUN_BASE=.leaked-ops GIT_DIR="$ENVLEAK_DECOY/.git" GIT_WORK_TREE="$ENVLEAK_DECOY" GIT_INDEX_FILE="$ENVLEAK_DECOY/.git/index" \
+  run_lines_in_repo "$ENVLEAK_TARGET" "$SUB_SETUP_D1" \
+  || fail "T-1098 default-manual: the setup lines failed under a leaked TEAM_RUN_BASE/GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE"
+
+[ "$(git -C "$ENVLEAK_DECOY" rev-parse HEAD 2>/dev/null)" = "$ENVLEAK_DECOY_HEAD0" ] \
+  || fail "T-1098 default-manual: the DECOY repository's HEAD moved during a leaked-env run (isolation regressed)"
+[ "$(git -C "$ENVLEAK_TARGET" symbolic-ref --short HEAD 2>/dev/null)" = "trial/one-ticket" ] \
+  || fail "T-1098 default-manual: the real target did not reach trial/one-ticket under a leaked env"
+ENVLEAK_TARGET_BASE="$(tp --root "$ENVLEAK_TARGET" --get base)"
+[ "$ENVLEAK_TARGET_BASE" = "$D1_BASE" ] \
+  || fail "T-1098 default-manual: the real target resolved a different base dir under a leaked TEAM_RUN_BASE (isolation regressed)"
+[ -d "$ENVLEAK_TARGET/$ENVLEAK_TARGET_BASE" ] \
+  || fail "T-1098 default-manual: the real target did not scaffold under a leaked env"
+
+pass "T-1098 default-manual: the extracted setup fence runs end to end in a default-layout fixture, and a leaked TEAM_RUN_BASE/GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE never reaches a recipe-execution call"
 
 # =============================================================================
 # AC5 / T-1098 flag-path: the one-step flag form reaches the same end state
@@ -219,8 +273,7 @@ set_identity "$D2"
 git -C "$D2" commit -q --allow-empty -m init >/dev/null 2>&1 || fail "T-1098 flag-path: initial commit failed (control)"
 
 RAW_FLAG_LINE="$(bash "$EXTRACT" "$ADOPTING_EN" flag)" || fail "T-1098 flag-path: extraction of the flag prose failed"
-# shellcheck disable=SC2016
-FLAG_INVOCATION="$(printf '%s\n' "$RAW_FLAG_LINE" | grep -oE '`[^`]*`' | grep -F -- 'team-init.sh --trial-branch ' | sed -e 's/^`//' -e 's/`$//' | head -n1)"
+FLAG_INVOCATION="$(printf '%s\n' "$RAW_FLAG_LINE" | isolate_backtick_span 'team-init.sh --trial-branch ')"
 [ -n "$FLAG_INVOCATION" ] || fail "T-1098 flag-path: could not isolate the one-step invocation from the extracted flag prose"
 SUB_FLAG="$(printf '%s\n' "$FLAG_INVOCATION" | subst_recipe)"
 SUB_SETUP_D2="$(printf '%s\n' "$RAW_SETUP" | subst_recipe)"
@@ -385,15 +438,23 @@ git -C "$ADV" check-ignore -q "$ADV_BASE" \
 
 IDX_BEFORE="$(git -C "$ADV" diff --cached --name-only 2>/dev/null)"
 set +e
-( cd "$ADV" && eval "$ADV_ADD_LINE" ) >/dev/null 2>&1
+( unset TEAM_RUN_BASE GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE; cd "$ADV" && eval "$ADV_ADD_LINE" ) >/dev/null 2>&1
 ADD_RC=$?
 set -e
 [ "$ADD_RC" -ne 0 ] || fail "T-1098 adverse-excludes: the plain git add line did not refuse under the hostile excludes plant"
 IDX_AFTER="$(git -C "$ADV" diff --cached --name-only 2>/dev/null)"
 [ "$IDX_BEFORE" = "$IDX_AFTER" ] || fail "T-1098 adverse-excludes: the refused git add left the index changed"
 
-ADV_ADD_F_LINE="git add -f \"$ADV_BASE\" \"$ADV_SPECS\""
-( cd "$ADV" && eval "$ADV_ADD_F_LINE" ) >/dev/null 2>&1 \
+# The remedy line is EXTRACTED from the doc's own prose, never hand-built
+# from resolved-path variables — a regression that weakens or drops the
+# shipped remedy sentence (removes -f, drops the second argument) must
+# make this extraction refuse or change, not leave this case silently
+# running the original, correct form regardless of what the doc now says.
+RAW_REMEDY_LINE="$(bash "$EXTRACT" "$ADOPTING_EN" remedy)" || fail "T-1098 adverse-excludes: extraction of the remedy prose failed"
+REMEDY_INVOCATION="$(printf '%s\n' "$RAW_REMEDY_LINE" | isolate_backtick_span 'git add -f ')"
+[ -n "$REMEDY_INVOCATION" ] || fail "T-1098 adverse-excludes: could not isolate the remedy invocation from the extracted prose"
+ADV_ADD_F_LINE="$(printf '%s\n' "$REMEDY_INVOCATION" | subst_recipe)"
+( unset TEAM_RUN_BASE GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE; cd "$ADV" && eval "$ADV_ADD_F_LINE" ) >/dev/null 2>&1 \
   || fail "T-1098 adverse-excludes: the shipped git add -f remedy did not succeed"
 IDX_REMEDY="$(git -C "$ADV" diff --cached --name-only 2>/dev/null)"
 printf '%s\n' "$IDX_REMEDY" | grep -q "^$ADV_BASE/" || fail "T-1098 adverse-excludes: the remedy left no staged path under the base dir"
@@ -523,12 +584,33 @@ EFC="$GIT_TMP/extract-fail-closed"
 mkdir -p "$EFC"
 sed 's/^## Trying the team on one ticket$/## Renamed anchor/' "$ADOPTING_EN" > "$EFC/renamed.md"
 grep -v -F -- 'team-init.sh --trial-branch ' "$ADOPTING_EN" > "$EFC/no-flag-span.md"
+# Three shapes of remedy-sentence regression: the whole line removed; the
+# line kept but weakened (the -f flag dropped); and the line kept with -f
+# intact but the second (specs) argument dropped — requirement 3's own
+# named regression, applied to the remedy sentence itself. The remedy
+# span is the FULL two-argument invocation precisely so this third shape
+# is also caught by extraction, not merely by execution (a default-layout
+# fixture alone cannot distinguish one argument from two, since specs
+# sits under base there).
+grep -v -F -- 'git add -f ' "$ADOPTING_EN" > "$EFC/no-remedy-span.md"
+sed 's/git add -f /git add /' "$ADOPTING_EN" > "$EFC/weakened-remedy.md"
+# shellcheck disable=SC2016
+sed 's/git add -f "\$(team-paths\.sh --get base)" "\$(team-paths\.sh --get specs)"/git add -f "$(team-paths.sh --get base)"/' "$ADOPTING_EN" > "$EFC/dropped-arg-remedy.md"
+cmp -s "$ADOPTING_EN" "$EFC/no-remedy-span.md" && fail "T-1098 extract-fail-closed: no-remedy-span mutant is byte-identical to the real doc (positive control failed)"
+cmp -s "$ADOPTING_EN" "$EFC/weakened-remedy.md" && fail "T-1098 extract-fail-closed: weakened-remedy mutant is byte-identical to the real doc (positive control failed)"
+cmp -s "$ADOPTING_EN" "$EFC/dropped-arg-remedy.md" && fail "T-1098 extract-fail-closed: dropped-arg-remedy mutant is byte-identical to the real doc (positive control failed)"
 
 set +e
 bash "$EXTRACT" "$EFC/renamed.md" setup >"$EFC/o1" 2>"$EFC/e1"
 RC1=$?
 bash "$EXTRACT" "$EFC/no-flag-span.md" flag >"$EFC/o2" 2>"$EFC/e2"
 RC2=$?
+bash "$EXTRACT" "$EFC/no-remedy-span.md" remedy >"$EFC/o3" 2>"$EFC/e3"
+RC3=$?
+bash "$EXTRACT" "$EFC/weakened-remedy.md" remedy >"$EFC/o4" 2>"$EFC/e4"
+RC4=$?
+bash "$EXTRACT" "$EFC/dropped-arg-remedy.md" remedy >"$EFC/o5" 2>"$EFC/e5"
+RC5=$?
 set -e
 [ "$RC1" -ne 0 ] || fail "T-1098 extract-fail-closed: extraction succeeded against a renamed-heading doc"
 [ -s "$EFC/e1" ] || fail "T-1098 extract-fail-closed: no stderr diagnosis for the renamed-heading doc"
@@ -536,6 +618,15 @@ set -e
 [ "$RC2" -ne 0 ] || fail "T-1098 extract-fail-closed: extraction succeeded against a doc with no invocation-form span"
 [ -s "$EFC/e2" ] || fail "T-1098 extract-fail-closed: no stderr diagnosis for the missing-flag-span doc"
 [ "$(grep -c . "$EFC/o2" || true)" = "0" ] || fail "T-1098 extract-fail-closed: missing-flag-span doc printed a command line"
-pass "T-1098 extract-fail-closed: extraction refuses (non-zero exit, stderr diagnosis, no stdout) against a renamed heading and against a missing invocation-form span"
+[ "$RC3" -ne 0 ] || fail "T-1098 extract-fail-closed: extraction succeeded against a doc with the remedy sentence removed"
+[ -s "$EFC/e3" ] || fail "T-1098 extract-fail-closed: no stderr diagnosis for the removed-remedy doc"
+[ "$(grep -c . "$EFC/o3" || true)" = "0" ] || fail "T-1098 extract-fail-closed: removed-remedy doc printed a command line"
+[ "$RC4" -ne 0 ] || fail "T-1098 extract-fail-closed: extraction succeeded against a doc with the remedy sentence weakened (-f dropped)"
+[ -s "$EFC/e4" ] || fail "T-1098 extract-fail-closed: no stderr diagnosis for the weakened-remedy doc"
+[ "$(grep -c . "$EFC/o4" || true)" = "0" ] || fail "T-1098 extract-fail-closed: weakened-remedy doc printed a command line"
+[ "$RC5" -ne 0 ] || fail "T-1098 extract-fail-closed: extraction succeeded against a doc with the remedy's second (specs) argument dropped"
+[ -s "$EFC/e5" ] || fail "T-1098 extract-fail-closed: no stderr diagnosis for the dropped-arg-remedy doc"
+[ "$(grep -c . "$EFC/o5" || true)" = "0" ] || fail "T-1098 extract-fail-closed: dropped-arg-remedy doc printed a command line"
+pass "T-1098 extract-fail-closed: extraction refuses (non-zero exit, stderr diagnosis, no stdout) against a renamed heading, a missing invocation-form span, a removed remedy sentence, a weakened (-f dropped) remedy sentence, and a remedy with its second argument dropped"
 
 printf '\nAll trial-recipe assertions passed.\n'

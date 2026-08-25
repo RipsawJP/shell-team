@@ -6,24 +6,24 @@
 #
 # Fail-closed contract: a heading that does not match, a fence count other
 # than the shipped one, a block shorter than its documented floor, or a
-# prose flag-span that is not found exactly once is an error with a
-# diagnosis on stderr and NOTHING on stdout — never a silent zero-command
-# pass.
+# prose flag-span or remedy span that is not found exactly once is an error
+# with a diagnosis on stderr and NOTHING on stdout — never a silent
+# zero-command pass.
 #
-# Usage: extract-recipe.sh <doc-path> setup|teardown|flag
+# Usage: extract-recipe.sh <doc-path> setup|teardown|flag|remedy
 
 set -euo pipefail
 
 PROG="extract-recipe"
 die() { printf '%s: %s\n' "$PROG" "$1" >&2; exit 1; }
 
-[ "$#" -eq 2 ] || die "usage: extract-recipe.sh <doc-path> setup|teardown|flag"
+[ "$#" -eq 2 ] || die "usage: extract-recipe.sh <doc-path> setup|teardown|flag|remedy"
 DOC="$1"
 MODE="$2"
 
 case "$MODE" in
-  setup|teardown|flag) ;;
-  *) die "unknown mode: $MODE (expected setup|teardown|flag)" ;;
+  setup|teardown|flag|remedy) ;;
+  *) die "unknown mode: $MODE (expected setup|teardown|flag|remedy)" ;;
 esac
 
 [ -f "$DOC" ] || die "no such file: $DOC"
@@ -132,6 +132,25 @@ case "$MODE" in
     span='team-init.sh --trial-branch '
     matches="$(printf '%s\n' "$section" | grep -cF -- "$span" || true)"
     [ "$matches" -eq 1 ] || die "invocation-form span '$span' not found exactly once in the section (found $matches)"
+    printf '%s\n' "$section" | grep -F -- "$span"
+    ;;
+  remedy)
+    # The global-excludes remedy — the section's own prose-embedded
+    # `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`
+    # sentence — is extracted the same way the flag invocation is: located
+    # by a distinctive span, required exactly once, never retyped. The span
+    # is the FULL two-argument invocation, not merely the `git add -f `
+    # prefix, precisely so that dropping the second (specs) argument —
+    # requirement 3's own named regression — makes this span vanish too;
+    # a prefix-only span would keep matching a one-argument remedy and
+    # silently re-extract a weakened form. Any regression that removes
+    # `-f`, drops an argument, or rewords the sentence away must make this
+    # mode refuse rather than silently keep returning the last-known-good
+    # text.
+    # shellcheck disable=SC2016
+    span='git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"'
+    matches="$(printf '%s\n' "$section" | grep -cF -- "$span" || true)"
+    [ "$matches" -eq 1 ] || die "remedy span not found exactly once in the section (found $matches)"
     printf '%s\n' "$section" | grep -F -- "$span"
     ;;
 esac
