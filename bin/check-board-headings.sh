@@ -251,10 +251,19 @@ extract_ids_to_file() {
   #    `## Active Backlog`) still falls through to the general `/^##([[:space:]]|$)/`
   #    rule and does NOT enable in_section (over-match guard preserved).
   awk -v headfile="$headfile" '
+    # T-1099 review round 1 (Blocker + Major): an OTHER record is
+    # length-prefixed — `OTHER<TAB><byte-length-of-ident><TAB><ident>` —
+    # rather than a bare `OTHER` (empty ident) or a single `OTHER<TAB>ident`
+    # (ident may itself contain a tab). The length field, computed here at
+    # write time, makes an empty identity a real, non-blank, countable
+    # token (the record is never just whitespace), and every consumer
+    # locates the identity by BYTE OFFSET past the tag+length fields
+    # (never by re-splitting the record on tab), so an internal tab inside
+    # the identity itself can never be mistaken for a field boundary.
     function log_heading(tag, ident) {
       if (headfile == "") return
-      if (ident == "") { print tag >> headfile }
-      else { print tag "\t" ident >> headfile }
+      if (tag == "OTHER") { print tag "\t" length(ident) "\t" ident >> headfile }
+      else { print tag >> headfile }
     }
     !in_fence {
       if (match($0, /^[ ]{0,3}`{3,}/)) {
@@ -423,11 +432,42 @@ elif [ "$done_n" -gt 1 ]; then
   emit "duplicate structural heading" "Done"
 fi
 
-# awk (not grep+cut, to avoid a literal-tab-in-pattern portability question
-# across GNU/BSD grep) selects the OTHER-tagged lines' identity field.
-other_dupes="$(awk -F'\t' '$1 == "OTHER" { print $2 }' "$HEADINGS_LOG" | sort | uniq -d)"
-if [ -n "$other_dupes" ]; then
-  emit "duplicate structural heading" "$(printf '%s' "$other_dupes" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+# T-1099 review round 1 fix (Blocker + Major, same root cause: an unsafe
+# read-side extraction of the OTHER identity). This ONE awk pass does the
+# entire duplicate JUDGMENT internally, over an in-awk associative array —
+# never returning a bare, possibly-empty identity string to bash for a
+# `[ -n ... ]` truthiness test (that is exactly how the Blocker's empty-
+# identity case was silently swallowed: a lone blank line surviving
+# `uniq -d` is stripped to nothing by command substitution's trailing-
+# newline trimming). The identity is located by BYTE OFFSET past the
+# `OTHER<TAB><len><TAB>` prefix — via `length($1)`/`length($2)`, both
+# guaranteed tab-free by construction (the tag is a literal, the length is
+# decimal digits) — and reconstructed with `substr($0, ...)` on the RAW
+# line, never by re-splitting the record on tab, so an identity carrying
+# its own internal tab byte is read back whole (the Major's root cause).
+# Only a guaranteed-non-blank report line (`DUP<TAB><display>`, with an
+# explicit placeholder for a duplicated empty identity) crosses back into
+# bash, and presence is decided by a LINE COUNT (`grep -c`), never by
+# testing a substituted string's own emptiness.
+other_report="$(awk -F'\t' '
+  $1 == "OTHER" {
+    prefix_len = length($1) + 1 + length($2) + 1
+    ident = substr($0, prefix_len + 1)
+    cnt[ident]++
+  }
+  END {
+    for (id in cnt) {
+      if (cnt[id] > 1) {
+        display = (id == "" ? "(blank heading)" : id)
+        print "DUP\t" display
+      }
+    }
+  }
+' "$HEADINGS_LOG")"
+other_dup_n="$(printf '%s\n' "$other_report" | grep -c '^DUP' || true)"
+if [ "$other_dup_n" -gt 0 ]; then
+  other_names="$(printf '%s\n' "$other_report" | sed 's/^DUP\t//' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  emit "duplicate structural heading" "$other_names"
 fi
 
 if [ "$SKIP_STRUCTURAL" -eq 0 ]; then

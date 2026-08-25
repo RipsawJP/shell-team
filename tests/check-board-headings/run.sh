@@ -1007,5 +1007,102 @@ badclose_count="$(fence_blind_done_count "$FIX/t1099-badclose-head.md")"
 [[ "$badclose_count" -ge 2 ]] || fail "T-1099 lookalikes counterfactual: expected the fence-blind counter to count >=2 '## Done' lines in the invalid-closer fixture (got: $badclose_count)"
 pass "T-1099 lookalikes counterfactual — a deliberately fence-blind '## Done' occurrence counter falsely flags both the fenced-phantom and the invalid-closer fixtures as duplicates (raw line count >= 2); the extended checker's fence-aware structural-heading assertion above correctly passes both (exit 0)"
 
+# --- T-1099 review round 1 rework: identity-encoding edge set -----------------
+# Codex round 1 (REQUEST_CHANGES) found a Blocker (two bare `##` headings —
+# empty normalized identity — silently PASS the at-most-once rule, because
+# the old read-side extraction produced a lone blank line that command
+# substitution stripped to nothing before the `[ -n ... ]` truthiness test)
+# and a Major (two textually DISTINCT headings sharing a prefix up to an
+# internal tab byte were falsely flagged as duplicates, because the old
+# tab-delimited log truncated the read-back identity at that tab). Both
+# were fixed by re-encoding the OTHER log record as
+# `OTHER<TAB><byte-length><TAB><identity>` and moving the whole duplicate
+# JUDGMENT inside one awk pass (an associative array, never a bash
+# `[ -n ... ]` test on a possibly-blank extracted string). This block
+# proves the fix and enumerates the identity-representation edge set the
+# spec's own Input space reaches: empty, whitespace-only, internal tab,
+# very long, and trailing-spaces-pre-normalization.
+
+# Blocker fixture: two bare `##` sections (empty identity) must fail.
+run_check "$FIX/t1099-bare-dup-head.md" --base-file "$FIX/t1099-bare-dup-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 identity-encoding: bare-dup fixture expected non-zero exit, got 0"
+grep -Fq 'duplicate structural heading' "$err" || fail "T-1099 identity-encoding: bare-dup stderr should name a duplicate structural heading (got: $(cat "$err"))"
+
+# Positive control: exactly one bare `##` heading must still pass — the
+# at-most-once rule carries no presence requirement.
+run_check "$FIX/t1099-bare-single-head.md" --base-file "$FIX/t1099-bare-single-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 identity-encoding: bare-single fixture expected exit 0, got $rc (stderr: $(cat "$err"))"
+
+# Whitespace-only identity normalizes to the same empty identity as a bare
+# `##` and must be caught as a duplicate of it.
+run_check "$FIX/t1099-whitespace-only-dup-head.md" --base-file "$FIX/t1099-whitespace-only-dup-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 identity-encoding: whitespace-only-dup fixture expected non-zero exit, got 0"
+grep -Fq 'duplicate structural heading' "$err" || fail "T-1099 identity-encoding: whitespace-only-dup stderr should name a duplicate structural heading (got: $(cat "$err"))"
+
+# Trailing spaces pre-normalization ("## Format" vs "## Format   ") must
+# still collide once surrounding whitespace is trimmed.
+run_check "$FIX/t1099-trailing-ws-dup-head.md" --base-file "$FIX/t1099-trailing-ws-dup-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 identity-encoding: trailing-ws-dup fixture expected non-zero exit, got 0"
+grep -Fq 'Format' "$err" || fail "T-1099 identity-encoding: trailing-ws-dup stderr should name Format (got: $(cat "$err"))"
+
+# Major fixture: two DISTINCT headings sharing a prefix up to an internal
+# tab must NOT be flagged (internal whitespace, including a tab, is
+# preserved literally per decision (b)).
+run_check "$FIX/t1099-internal-tab-distinct-head.md" --base-file "$FIX/t1099-internal-tab-distinct-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 identity-encoding: internal-tab-distinct fixture expected exit 0, got $rc (stderr: $(cat "$err"))"
+
+# Positive control: two headings identical INCLUDING the internal tab byte
+# must still be flagged as duplicates.
+run_check "$FIX/t1099-internal-tab-identical-head.md" --base-file "$FIX/t1099-internal-tab-identical-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 identity-encoding: internal-tab-identical fixture expected non-zero exit, got 0"
+grep -Fq 'duplicate structural heading' "$err" || fail "T-1099 identity-encoding: internal-tab-identical stderr should name a duplicate structural heading (got: $(cat "$err"))"
+
+# Very long identity: a single occurrence passes (no truncation/crash);
+# two byte-identical long occurrences are flagged.
+run_check "$FIX/t1099-long-single-head.md" --base-file "$FIX/t1099-long-single-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 identity-encoding: long-single fixture expected exit 0, got $rc (stderr: $(cat "$err"))"
+run_check "$FIX/t1099-long-dup-head.md" --base-file "$FIX/t1099-long-dup-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 identity-encoding: long-dup fixture expected non-zero exit, got 0"
+grep -Fq 'duplicate structural heading' "$err" || fail "T-1099 identity-encoding: long-dup stderr should name a duplicate structural heading (got: $(cat "$err"))"
+
+pass "T-1099 identity-encoding — the length-prefixed OTHER record (Codex round 1 rework) closes both the empty-identity Blocker (bare ##, whitespace-only ##, trailing-spaces-pre-normalization all correctly flag as duplicates; a single bare ## still passes) and the internal-tab Major (a distinct-heading pair sharing a tab-delimited prefix is never falsely flagged; a byte-identical-including-tab pair still is) across the full identity-representation edge set, including a very long identity"
+
+# --- T-1099 review round 1: non-vacuous counterfactuals against the OLD
+# (pre-rework) read-side extraction, frozen inline (never a moving git ref)
+# --------------------------------------------------------------------------
+# shellcheck disable=SC2016  # single-quoted on purpose: this is the frozen
+# awk program source (a literal string handed to `awk`), not a shell
+# expansion.
+OLD_OTHER_EXTRACT_AWK='$1 == "OTHER" { print $2 }'
+old_other_dupes() {
+  # $1 = a HEADINGS_LOG-shaped file built by the OLD (pre-rework) writer,
+  # i.e. bare "OTHER" for an empty identity or "OTHER<TAB>ident" otherwise
+  # (never the new length-prefixed form) — reproduced inline below.
+  awk -F'\t' "$OLD_OTHER_EXTRACT_AWK" "$1" | sort | uniq -d
+}
+old_write_other() {
+  # $1 = output file, $2 = identity. Byte-for-byte the OLD (pre-rework)
+  # log_heading()'s OTHER branch.
+  if [ -z "$2" ]; then printf 'OTHER\n' >> "$1"; else printf 'OTHER\t%s\n' "$2" >> "$1"; fi
+}
+
+OLDLOG="$TMP/t1099-old-bare-dup.log"
+: > "$OLDLOG"
+old_write_other "$OLDLOG" ""
+old_write_other "$OLDLOG" ""
+old_bare_dupes="$(old_other_dupes "$OLDLOG")"
+[[ -z "$old_bare_dupes" ]] || fail "T-1099 dup-done counterfactual (identity-encoding, empty-identity class): expected the OLD read-side extraction to produce a blank duplicate line that a bash '[ -n ]' test cannot see, but got a non-empty result: $old_bare_dupes"
+pass "T-1099 dup-done counterfactual — the OLD (pre-round-1-rework) read-side extraction on two bare '##' headings produces a lone blank duplicate line that a bash string-emptiness test cannot distinguish from 'no duplicate' (this is the Blocker itself, reproduced inline); the rework's in-awk associative-array judgment above correctly flags it"
+
+OLDLOG2="$TMP/t1099-old-tab-distinct.log"
+: > "$OLDLOG2"
+TABCHAR="$(printf '\t')"
+old_write_other "$OLDLOG2" "Foo${TABCHAR}Bar"
+old_write_other "$OLDLOG2" "Foo${TABCHAR}Baz"
+old_tab_dupes="$(old_other_dupes "$OLDLOG2")"
+[[ -n "$old_tab_dupes" ]] || fail "T-1099 dup-active counterfactual (identity-encoding, internal-tab class): expected the OLD read-side extraction to falsely collapse two distinct tab-containing identities to the same truncated field, but got no duplicate"
+printf '%s' "$old_tab_dupes" | grep -Fq 'Foo' || fail "T-1099 dup-active counterfactual: expected the OLD extraction's false duplicate to be the truncated common prefix 'Foo' (got: $old_tab_dupes)"
+pass "T-1099 dup-active counterfactual — the OLD (pre-round-1-rework) tab-delimited read-side extraction falsely collapses 'Foo${TABCHAR}Bar' and 'Foo${TABCHAR}Baz' to the same truncated field 'Foo' (this is the Major itself, reproduced inline); the rework's byte-offset reconstruction above correctly keeps them distinct"
+
 printf 'OK\n'
 exit 0
