@@ -72,9 +72,37 @@
 # Order of headings is never gated (close-out moves entries to the TOP of
 # ## Done, which legitimately reorders Done — DP-C).
 #
-# Exit: 0 = no violations (or structural check skipped for lack of a base,
-#           per (4) above, and no duplicates found).
-#       1 = deletion / replacement / duplicate found.
+# T-1099 (issue #301): a second, structural assertion beside the id-level
+# duplicate check above — base-independent, requiring no --base/--base-file
+# at all, and always run (even when the id-diff structural check above is
+# skipped per (4)). `## Active` and `## Done` must each occur exactly once,
+# counted by the SAME section-opening predicate this script's extraction
+# already relies on, never a looser normalization — a heading check-
+# handoff.sh/close-out.sh cannot see must never satisfy this half. Every
+# OTHER top-level (`##`) heading may occur at most once, with NO presence
+# requirement, so an adopter's own sections (`## Reserved`, `## Planned`,
+# anything) are never coerced. Identity for these "other" headings is the
+# heading text with the leading `##` removed, an optional ATX-closing hash
+# run PRECEDED BY AT LEAST ONE SPACE removed, and the remainder's
+# surrounding whitespace trimmed (internal whitespace preserved literally)
+# — so `## Format ##` collides with `## Format`, while `## Active Backlog`
+# and `## Active###` (no space before the closing run) stay DISTINCT
+# headings from `Active`. Level 1 (`#`) and level 3 (`###`) headings are out
+# of scope: no consumer keys on either, and this repository's own board
+# legitimately carries dozens of identical level-3 `### Local test result`
+# headings inside entries, which would make an at-most-once rule (every
+# other structural heading occurs at most once) false on the very board
+# this script guards. Fenced and indented heading-shaped lines are never
+# headings here either, per the same fence/ATX state machine
+# `extract_ids_to_file` already runs (no second parser — this reuses that
+# one pass rather than forking it).
+#
+# Exit: 0 = no violations (or the id-level structural check skipped for
+#           lack of a base, per (4) above, and no duplicates — id-level or
+#           structural-heading — found).
+#       1 = deletion / replacement / duplicate found, OR a structural
+#           heading (`## Active`/`## Done`) is missing/duplicated, OR any
+#           other top-level heading occurs more than once.
 #       2 = usage error, unreadable board/base-file, or an EXPLICITLY
 #           requested --base/--base-file could not be resolved.
 #
@@ -172,6 +200,19 @@ fi
 # turns extraction off again, so only lines strictly inside an Active or Done
 # block are ever considered.
 extract_ids_to_file() {
+  # $1 = input file, $2 = ids output file (as always), $3 = OPTIONAL
+  # heading-occurrences log (T-1099). When $3 is non-empty, this SAME awk
+  # pass (one fence/ATX implementation, never a second one — Notes for
+  # engineer) additionally writes one line per top-level (`##`) heading
+  # line it sees, in encounter order: `ACTIVE` / `DONE` for a line matching
+  # the exact section-opening predicate already used for id extraction
+  # below, or `OTHER<TAB><normalized-identity>` for every other `##`
+  # heading line. Fenced and indented heading-shaped lines never reach this
+  # log either, since the fence/indent suppression above already applies
+  # before any heading pattern is tested. Left empty ("") on the BASE-side
+  # call (line ~371), since the T-1099 structural-heading assertion is
+  # base-independent and reads only the board under check.
+  local headfile="${3:-}"
   # T-095 (item1/item2 — issue #300, board-headings-parser-hardening) +
   # round1 Codex hardening (same-class-2: 2 fence-toggle Majors + 1 ATX
   # Blocker on the FIRST T-095 cut, fixed by moving fence tracking to a
@@ -209,7 +250,12 @@ extract_ids_to_file() {
   #    different heading that merely STARTS WITH "## Active" (e.g.
   #    `## Active Backlog`) still falls through to the general `/^##([[:space:]]|$)/`
   #    rule and does NOT enable in_section (over-match guard preserved).
-  awk '
+  awk -v headfile="$headfile" '
+    function log_heading(tag, ident) {
+      if (headfile == "") return
+      if (ident == "") { print tag >> headfile }
+      else { print tag "\t" ident >> headfile }
+    }
     !in_fence {
       if (match($0, /^[ ]{0,3}`{3,}/)) {
         fence_run = substr($0, RSTART, RLENGTH)
@@ -224,9 +270,25 @@ extract_ids_to_file() {
       if ($0 ~ close_pat) { in_fence = 0 }
       next
     }
-    /^## Active([[:space:]]+#+)?[[:space:]]*$/ { in_section=1; next }
-    /^## Done([[:space:]]+#+)?[[:space:]]*$/   { in_section=1; next }
-    /^##([[:space:]]|$)/ { in_section=0; next }
+    /^## Active([[:space:]]+#+)?[[:space:]]*$/ { in_section=1; log_heading("ACTIVE", ""); next }
+    /^## Done([[:space:]]+#+)?[[:space:]]*$/   { in_section=1; log_heading("DONE", ""); next }
+    /^##([[:space:]]|$)/ {
+      # T-1099: every OTHER top-level heading (decision (b)) — identity is
+      # the text with the leading "##" removed, an optional ATX-closing
+      # hash run PRECEDED BY AT LEAST ONE SPACE removed, and the remainder
+      # trimmed of surrounding whitespace only (internal whitespace
+      # preserved literally), so "## Format ##" collides with "## Format"
+      # while "## Active Backlog" / "## Active###" stay distinct from
+      # "Active".
+      ident = $0
+      sub(/^##/, "", ident)
+      sub(/[[:space:]]+#+[[:space:]]*$/, "", ident)
+      gsub(/^[[:space:]]+/, "", ident)
+      gsub(/[[:space:]]+$/, "", ident)
+      log_heading("OTHER", ident)
+      in_section=0
+      next
+    }
     !in_section { next }
     # board-entry continuation canon (T-1016): skip every indented,
     # non-blank line (the canonical continuation predicate), not merely a
@@ -322,7 +384,8 @@ fi
 
 # --- extraction ---------------------------------------------------------------
 HEAD_RAW="$(new_tmp)"
-extract_ids_to_file "$BOARD" "$HEAD_RAW"
+HEADINGS_LOG="$(new_tmp)"
+extract_ids_to_file "$BOARD" "$HEAD_RAW" "$HEADINGS_LOG"
 
 violations=0
 emit() {
@@ -336,6 +399,35 @@ emit() {
 dupes="$(sort "$HEAD_RAW" | uniq -d)"
 if [ -n "$dupes" ]; then
   emit "duplicate heading(s)" "$(printf '%s' "$dupes" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+fi
+
+# --- structural top-level heading check (T-1099, issue #301) ------------------
+# Base-independent (reads only $HEADINGS_LOG, which was built from $BOARD
+# alone) — always runs, even when the id-diff structural check below is
+# skipped for lack of a resolvable base, exactly like the duplicate check
+# above. `## Active` and `## Done` must occur exactly once each (decision
+# (b)); every other top-level heading at most once, by its normalized
+# identity, with no presence requirement.
+active_n="$(grep -c '^ACTIVE$' "$HEADINGS_LOG" || true)"
+done_n="$(grep -c '^DONE$' "$HEADINGS_LOG" || true)"
+
+if [ "$active_n" -eq 0 ]; then
+  emit "missing structural heading" "Active"
+elif [ "$active_n" -gt 1 ]; then
+  emit "duplicate structural heading" "Active"
+fi
+
+if [ "$done_n" -eq 0 ]; then
+  emit "missing structural heading" "Done"
+elif [ "$done_n" -gt 1 ]; then
+  emit "duplicate structural heading" "Done"
+fi
+
+# awk (not grep+cut, to avoid a literal-tab-in-pattern portability question
+# across GNU/BSD grep) selects the OTHER-tagged lines' identity field.
+other_dupes="$(awk -F'\t' '$1 == "OTHER" { print $2 }' "$HEADINGS_LOG" | sort | uniq -d)"
+if [ -n "$other_dupes" ]; then
+  emit "duplicate structural heading" "$(printf '%s' "$other_dupes" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
 fi
 
 if [ "$SKIP_STRUCTURAL" -eq 0 ]; then

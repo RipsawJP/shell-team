@@ -835,5 +835,177 @@ pre_t103_bare_dupes="$(sort "$TMP/pre-t103-bare-head-raw" | uniq -d)"
 printf '%s' "$pre_t103_bare_dupes" | grep -Fq 'T-202' || fail "AC2 counterfactual: expected PRE-T103 duplicate set to include T-202 (got: $pre_t103_bare_dupes)"
 pass "AC2 non-vacuous counterfactual — PRE-T103 (literal '/^## /', no bare-hash match) awk fails to reset in_section on the bare '##' heading and phantom-duplicates T-202 (a false-duplicate would fire); the fixed checker above correctly suppresses it"
 
+# --- T-1099 (issue #301): structural top-level heading assertion --------------
+# Beside the pre-existing id-level duplicate check, a second, BASE-
+# INDEPENDENT assertion: `## Active` and `## Done` must each occur exactly
+# once (counted by the same section-opening predicate extract_ids_to_file
+# already uses for id extraction); every other top-level `##` heading may
+# occur at most once, by normalized identity, with no presence requirement.
+# It always runs, even when the id-diff structural check is skipped for
+# lack of a resolvable base — exactly like the pre-existing duplicate-id
+# check.
+
+# --- T-1099 AC5: duplicated ## Done / duplicated ## Active -> fail-closed -----
+run_check "$FIX/t1099-dup-done-head.md" --base-file "$FIX/t1099-dup-done-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 dup-done: expected non-zero exit (--base-file form), got 0"
+grep -Fq 'Done' "$err" || fail "T-1099 dup-done: stderr should name Done (got: $(cat "$err"))"
+
+run_check "$FIX/t1099-dup-active-head.md" --base-file "$FIX/t1099-dup-active-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 dup-active: expected non-zero exit (--base-file form), got 0"
+grep -Fq 'Active' "$err" || fail "T-1099 dup-active: stderr should name Active (got: $(cat "$err"))"
+
+run_check "$FIX/t1099-ok-head.md" --base-file "$FIX/t1099-ok-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 dup-done/dup-active positive control (--base-file form) expected exit 0, got $rc (stderr: $(cat "$err"))"
+
+# Base-independent proof: the SAME dup-done fixture, with NO --base/--base-
+# file at all, invoked from a directory that is not inside any git
+# repository — the exact path where the pre-existing duplicate-id check's
+# structural (id-diff) half is skipped for lack of a base (SKIP_STRUCTURAL=1,
+# already proven above by the "no-base" cases) — must still exit 1, proving
+# the new assertion runs unconditionally, exactly like the pre-existing
+# duplicate-id check.
+NOREPO="$TMP/t1099-norepo"
+mkdir -p "$NOREPO"
+cp "$FIX/t1099-dup-done-head.md" "$NOREPO/dupdone.md"
+cp "$FIX/t1099-ok-head.md" "$NOREPO/ok.md"
+set +e
+(cd "$NOREPO" && env -u CHECK_BOARD_HEADINGS_BASE -u GITHUB_BASE_REF bash "$SCRIPT" dupdone.md) >"$out" 2>"$err"
+rc=$?
+set -e
+[[ "$rc" -eq 1 ]] || fail "T-1099 dup-done (no base at all, outside any git repository) expected exit 1, got $rc (stderr: $(cat "$err"))"
+grep -Fq 'Done' "$err" || fail "T-1099 dup-done (no base) stderr should name Done (got: $(cat "$err"))"
+set +e
+(cd "$NOREPO" && env -u CHECK_BOARD_HEADINGS_BASE -u GITHUB_BASE_REF bash "$SCRIPT" ok.md) >"$out" 2>"$err"
+rc=$?
+set -e
+[[ "$rc" -eq 0 ]] || fail "T-1099 ok fixture (no base at all, outside any git repository) expected exit 0, got $rc (stderr: $(cat "$err"))"
+pass "T-1099 dup-done — non-zero exit naming Done via --base-file AND with no base at all from outside any git repository (the id-diff-skip path); a single-Active/single-Done board exits 0 under both invocations (positive control)"
+pass "T-1099 dup-active — non-zero exit naming Active (--base-file form); base-independence for this class is already proven by the dup-done case above (the same unconditional code path serves both)"
+
+# --- T-1099 AC6: heading-lookalike classes are NOT duplicates -----------------
+for f in t1099-fenced-dup-head t1099-badclose-head t1099-atx-closing-head t1099-overmatch-head t1099-zerows-head t1099-indented-head; do
+  run_check "$FIX/$f.md" --base-file "$FIX/$f.md"
+  [[ "$rc" -eq 0 ]] || fail "T-1099 lookalikes: $f expected exit 0, got $rc (stderr: $(cat "$err"))"
+done
+# Positive control: the same writer's genuinely-duplicated board (the
+# phantom `## Done` moved OUTSIDE the fence) must still exit 1 — a checker
+# that had simply stopped counting could not pass this criterion.
+run_check "$FIX/t1099-real-dup-head.md" --base-file "$FIX/t1099-real-dup-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 lookalikes: real-dup positive control expected non-zero exit, got 0"
+grep -Fq 'Done' "$err" || fail "T-1099 lookalikes: real-dup stderr should name Done (got: $(cat "$err"))"
+pass "T-1099 lookalikes — a fenced phantom ## Done, an invalid-closer phantom ## Done, ATX-closing (## Active ##/## Done ##) sections, '## Active Backlog', '## Active###' and an indented self-referential heading-shaped line all exit 0 (no false duplicate); the same writer's genuine second ## Done (moved outside the fence) still exits 1 (positive control)"
+
+# --- T-1099 AC7: presence half + shipped-template positive control ------------
+run_check "$FIX/t1099-no-active-head.md" --base-file "$FIX/t1099-no-active-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 presence: no-active fixture expected non-zero exit, got 0"
+grep -Fq 'Active' "$err" || fail "T-1099 presence: no-active stderr should name Active (got: $(cat "$err"))"
+
+run_check "$FIX/t1099-no-done-head.md" --base-file "$FIX/t1099-no-done-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 presence: no-done fixture expected non-zero exit, got 0"
+grep -Fq 'Done' "$err" || fail "T-1099 presence: no-done stderr should name Done (got: $(cat "$err"))"
+
+# The presence assertion applies to the board under check only, never to a
+# base blob: a conformant head board with a SECTION-LESS base must still
+# exit 0.
+run_check "$FIX/t1099-ok-head.md" --base-file "$FIX/t1099-no-done-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 presence: conformant head with a section-less base expected exit 0, got $rc (stderr: $(cat "$err"))"
+pass "T-1099 presence — a board missing ## Active, or missing ## Done, exits 1 naming the missing heading; a conformant head board is unaffected by a section-less BASE (the assertion reads only the board under check, never the base)"
+
+run_check "$REPO_ROOT/templates/todo-template.md" --base-file "$REPO_ROOT/templates/todo-template.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 template-control: templates/todo-template.md expected exit 0, got $rc (stderr: $(cat "$err"))"
+pass "T-1099 template-control — the shipped templates/todo-template.md (# Tasks, ## Status flags, ## Active, ## Done, ## Format once each) passes the structural-heading assertion exactly as an adopter receives it"
+
+# --- T-1099 AC8: every OTHER level-2 heading is at-most-once, no presence -----
+run_check "$FIX/t1099-dup-format-head.md" --base-file "$FIX/t1099-dup-format-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 other-headings: dup-format fixture expected non-zero exit, got 0"
+grep -Fq 'Format' "$err" || fail "T-1099 other-headings: dup-format stderr should name Format (got: $(cat "$err"))"
+
+run_check "$FIX/t1099-ok-head.md" --base-file "$FIX/t1099-ok-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 other-headings: ok fixture (Active+Done only, no Format/Reserved/Planned) expected exit 0, got $rc (stderr: $(cat "$err"))"
+
+run_check "$FIX/t1099-host-sections-head.md" --base-file "$FIX/t1099-host-sections-head.md"
+[[ "$rc" -eq 0 ]] || fail "T-1099 other-headings: host-added ## Reserved/## Planned sections expected exit 0, got $rc (stderr: $(cat "$err"))"
+
+run_check "$FIX/t1099-atx-dup-format-head.md" --base-file "$FIX/t1099-atx-dup-format-head.md"
+[[ "$rc" -ne 0 ]] || fail "T-1099 other-headings: atx-dup-format fixture expected non-zero exit, got 0"
+grep -Fq 'Format' "$err" || fail "T-1099 other-headings: atx-dup-format stderr should name Format (got: $(cat "$err"))"
+pass "T-1099 other-headings — two plain '## Format' headings, and one '## Format' plus one ATX-closing '## Format ##' (same normalized identity), both exit 1 naming Format; a board with only Active/Done, and a board with host-added ## Reserved/## Planned sections (no presence requirement for adopter-added sections), both exit 0"
+
+# --- T-1099 AC9: non-vacuous counterfactuals -----------------------------------
+# A frozen, self-contained, byte-verbatim inline copy of the PRE-T-1099
+# judgment (extract_ids_to_file's own body immediately before this task
+# added the heading-occurrences log and the structural-heading assertion —
+# confirmed byte-identical to `git show <branch-point>:bin/check-board-
+# headings.sh` at authoring time, modulo the function-call wrapper) must
+# find NO violation on each duplicate/absence fixture below — proving the
+# #301 class was genuinely invisible to the old, id-only judgment.
+# shellcheck disable=SC2016  # single-quoted on purpose: this is the frozen
+# awk program source (a literal string handed to `awk`), not a shell
+# expansion.
+PRE_T1099_AWK_PROG='
+  !in_fence {
+    if (match($0, /^[ ]{0,3}`{3,}/)) {
+      fence_run = substr($0, RSTART, RLENGTH)
+      gsub(/^[ ]+/, "", fence_run)
+      fence_len = length(fence_run)
+      in_fence = 1
+      next
+    }
+  }
+  in_fence {
+    close_pat = "^[ ]{0,3}`{" fence_len ",}[[:space:]]*$"
+    if ($0 ~ close_pat) { in_fence = 0 }
+    next
+  }
+  /^## Active([[:space:]]+#+)?[[:space:]]*$/ { in_section=1; next }
+  /^## Done([[:space:]]+#+)?[[:space:]]*$/   { in_section=1; next }
+  /^##([[:space:]]|$)/ { in_section=0; next }
+  !in_section { next }
+  /^[[:space:]]+[^[:space:]]/ { next }
+  /^- \[[x ]\] (\*\*)?T-[0-9]+(\*\*)? / {
+    if (match($0, /T-[0-9]+/)) print substr($0, RSTART, RLENGTH)
+  }
+'
+pre_t1099_extract() { awk "$PRE_T1099_AWK_PROG" "$1"; }
+# $1 = fixture. Since every T-1099 fixture above is checked against ITSELF
+# as the base (--base-file pointing at the same file), the old judgment's
+# id-diff half can never fire (base and head are byte-identical) — the only
+# possible old-judgment violation left is an id-level duplicate.
+pre_t1099_no_violation() {
+  local raw dupes
+  raw="$(pre_t1099_extract "$1")"
+  dupes="$(printf '%s\n' "$raw" | sort | uniq -d)"
+  [[ -z "$dupes" ]]
+}
+
+pre_t1099_no_violation "$FIX/t1099-dup-done-head.md" \
+  || fail "T-1099 dup-done counterfactual: expected the PRE-T-1099 (id-only) judgment to find no violation on a board with two distinct-id ## Done sections, but it found a duplicate id"
+pass "T-1099 dup-done counterfactual — the PRE-T-1099 (id-level duplicate/deletion only) judgment finds NO violation on a board carrying two distinct-id ## Done sections (the #301 class itself); the extended checker above correctly flags it"
+
+pre_t1099_no_violation "$FIX/t1099-dup-active-head.md" \
+  || fail "T-1099 dup-active counterfactual: expected the PRE-T-1099 judgment to find no violation on a board with two distinct-id ## Active sections, but it found a duplicate id"
+pass "T-1099 dup-active counterfactual — the PRE-T-1099 judgment finds NO violation on a board carrying two distinct-id ## Active sections; the extended checker above correctly flags it"
+
+pre_t1099_no_violation "$FIX/t1099-no-active-head.md" \
+  || fail "T-1099 presence counterfactual: expected the PRE-T-1099 judgment to find no violation on a board missing ## Active entirely, but it found a duplicate id"
+pre_t1099_no_violation "$FIX/t1099-no-done-head.md" \
+  || fail "T-1099 presence counterfactual: expected the PRE-T-1099 judgment to find no violation on a board missing ## Done entirely, but it found a duplicate id"
+pass "T-1099 presence counterfactual — the PRE-T-1099 judgment finds NO violation on a board missing ## Active, or missing ## Done, entirely (exactly the vacuous-pass class check-handoff.sh's own in_active flag has); the extended checker above correctly refuses both"
+
+# Opposite direction: a deliberately FENCE-BLIND heading occurrence counter
+# (no fence tracking at all — a naive literal-line match) must FALSELY flag
+# the fenced-phantom and invalid-closer boards as duplicates, proving the
+# real checker's fence-awareness is doing genuine work for the NEW
+# structural-heading assertion too (not merely for id extraction, which
+# T-095's own counterfactuals already cover).
+fence_blind_done_count() {
+  grep -cE '^## Done([[:space:]]+#+)?[[:space:]]*$' "$1"
+}
+fenced_count="$(fence_blind_done_count "$FIX/t1099-fenced-dup-head.md")"
+[[ "$fenced_count" -ge 2 ]] || fail "T-1099 lookalikes counterfactual: expected the fence-blind counter to count >=2 '## Done' lines in the fenced-phantom fixture (got: $fenced_count)"
+badclose_count="$(fence_blind_done_count "$FIX/t1099-badclose-head.md")"
+[[ "$badclose_count" -ge 2 ]] || fail "T-1099 lookalikes counterfactual: expected the fence-blind counter to count >=2 '## Done' lines in the invalid-closer fixture (got: $badclose_count)"
+pass "T-1099 lookalikes counterfactual — a deliberately fence-blind '## Done' occurrence counter falsely flags both the fenced-phantom and the invalid-closer fixtures as duplicates (raw line count >= 2); the extended checker's fence-aware structural-heading assertion above correctly passes both (exit 0)"
+
 printf 'OK\n'
 exit 0

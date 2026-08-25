@@ -203,8 +203,8 @@ Every literal count premise below is classified `own-coinage` or `borrowed`, wit
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
 - set: base — status: 0 — lines: 103 — items: 103 — command: git ls-tree -r --name-only "$B" -- .shell-team/specs/ | grep -E '\.md$'
-- set: head — status: 0 — lines: 103 — items: 103 — command: git ls-files -- '.shell-team/specs/*.md'
-- union: items: 103
+- set: head — status: 0 — lines: 104 — items: 104 — command: git ls-files -- '.shell-team/specs/*.md'
+- union: items: 104
 - bucket: base+head — items: 103
   - .shell-team/specs/T-1000-operating-conventions.md
   - .shell-team/specs/T-1001-retro-input-acquisition.md
@@ -309,6 +309,8 @@ Every literal count premise below is classified `own-coinage` or `borrowed`, wit
   - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
   - .shell-team/specs/T-113-lessons-deidentification.md
   - .shell-team/specs/design-note-T-1012.md
+- bucket: head — items: 1
+  - .shell-team/specs/T-1099-board-heading-integrity.md
 <!-- END derivation: t1099-spec-population -->
 
 ## Body-to-AC correspondence

@@ -219,6 +219,13 @@ jobs:
       - name: Run check-board-headings fixture suite
         run: bash tests/check-board-headings/run.sh
 
+      - name: Dogfood check-board-headings — this repository's own board
+        run: |
+          set -e
+          B="$(bash bin/team-paths.sh --get todo)"
+          test -r "$B"
+          bash bin/check-board-headings.sh "$B" --base "origin/${GITHUB_BASE_REF:-develop}"
+
       - name: Run errexit-safe regression suite
         run: bash tests/errexit-safe/run.sh
 

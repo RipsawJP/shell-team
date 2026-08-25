@@ -81,3 +81,28 @@ take arm A: `bin/check-entry-mode.sh` (#341) and `bin/check-spec-review.sh`
 (#344), each a callable script with its own suite and its own CI step —
 never an invented `bin/lib/` sourcing convention, since `bin/` carries no
 sourcing pattern anywhere in this repository.
+
+## The third obligation promoted into arm A (T-1099, 2026-08-25)
+
+Applying the rule a third time, to the duplicate-structural-heading
+obligation issue **#301** describes: its verdict **gates a loop
+transition** — the new CI step's exit status gates a pull request, and a
+board whose structural headings are broken is a board every later phase
+gate reads — and its judgment — does each of `## Active`/`## Done` occur
+exactly once, and does every other top-level heading occur at most once —
+is **mechanically executable from committed bytes**, being a count of
+heading lines in one file. Both conjuncts hold, so this obligation takes
+**arm A** too. Its structural form is satisfied by an existing arm-A
+script rather than a new one: the assertion lands inside
+`bin/check-board-headings.sh` (already a named `bin/` script with its own
+`tests/check-board-headings/run.sh` suite and its own CI step), beside the
+base-relative `T-NNN` id-diff judgment that script already owns.
+
+This is the **third** obligation promoted into arm A, after **#341**
+(`bin/check-entry-mode.sh`) and **#344** (`bin/check-spec-review.sh`)
+above — which is precisely the condition this note's own re-evaluation
+trigger names ("the promotion of a third obligation into arm A"). **T-1099's
+own promotion is what fires that trigger**, and it is owed at the next
+retro following this task; the trigger counts obligations, not scripts, so
+reusing an existing arm-A script for this third promotion makes the
+promotion cheap, not absent.
