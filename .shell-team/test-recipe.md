@@ -1847,3 +1847,27 @@ that file's order.
   does, should not hit this conflict at all. Cross-provider review round 1
   (`.shell-team/reviews/T-1100.md`) independently reproduced the repair by
   direct execution and confirmed it protects the same back-compat intent.
+- T-1101: before writing a NEW pattern's `RE_*=` literal into
+  `bin/check-pii-shapes.sh`, verify the self-reference trap by hand: write
+  the candidate regex (and its own defining source line, verbatim) to a
+  scratch file under `$TMPDIR`, then `grep -nE -- "$re" "$scratchfile"` and
+  confirm no match — do this BEFORE editing the real file, not after,
+  since the failure mode is the defining line matching the very shape it
+  defines (T-111's own documented trap, `.shell-team/specs/T-111-pii-
+  shape-checker.md` DP-1). After editing the real file, `bash
+  bin/check-pii-shapes.sh --all` against the whole tree is the second,
+  authoritative check (never trust the scratch-file check alone — the
+  real file's surrounding comment prose can independently trip the new
+  rule even when the bare regex literal itself does not). Separately:
+  when a new pattern id needs a fixture-side "reaches the rule but is
+  excluded by one specific requirement" precondition (the
+  `assert_reaches_email_candidates` idiom, for a rule that has no
+  candidate-enumeration or exclusion machinery of its own), decompose the
+  new pattern into two top-level variables — a base/root sub-shape,
+  extractable and testable on its own, and a composed full pattern that
+  adds the one extra requirement — mirroring the pre-existing
+  `RE_HOME_PATH = RE_HOME_PATH_BOUNDARY + RE_HOME_PATH_RAW` composition,
+  rather than trying to derive the "reaches" half by string-slicing the
+  full pattern's own source text inside the test file (fragile, and not
+  needed — the checker source is already the single source of truth for
+  both halves once decomposed).
