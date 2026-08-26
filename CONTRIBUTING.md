@@ -84,7 +84,7 @@ and nothing else added to either supporting section:
   - note: a supporting detail from whichever agent last touched this entry.
 ```
 
-- **Lint the board before pushing**: `bash bin/check-handoff.sh "$(bash bin/team-paths.sh --get todo)"`, and `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base develop`, which compares the set of `T-NNN` heading ids against the base ref — it is the only check that notices an id deleted, overwritten with a different id, or duplicated, and it cannot see a rewrite that leaves the id in place.
+- **Lint the board before pushing**: `bash bin/check-handoff.sh "$(bash bin/team-paths.sh --get todo)"`, and `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base develop`. That second checker carries two distinct judgments now (T-1099, issue #301): a base-relative comparison of the set of `T-NNN` heading ids against the base ref — the only check that notices an id deleted, overwritten with a different id, or duplicated, though it cannot see a rewrite that leaves the id in place — and a base-independent structural check (runs even with `--base` omitted) that `## Active` and `## Done` each occur exactly once and every other top-level heading occurs at most once, catching the class of defect a stray second `## Done` section is an instance of.
 - **The status-flag vocabulary is not restated here**: it is listed in `templates/todo-template.md` and enforced by `bin/check-handoff.sh`.
 
 ## Re-freezing a frozen intent block

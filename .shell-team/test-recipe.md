@@ -1782,3 +1782,24 @@ that file's order.
     17 criteria re-run the whole fixture suite, so raise the timeout for
     this spec rather than assuming the default is enough, same guidance
     T-1097's own entry gives.
+- T-1099: `bash tests/check-board-headings/run.sh` gained a new,
+  base-independent structural-heading assertion (`## Active`/`## Done`
+  exactly once each; every other top-level heading at most once) beside
+  `bin/check-board-headings.sh`'s pre-existing base-relative `T-NNN` id
+  diff — same suite, same invocation, no new prerequisite. Standalone run
+  measured `exit=0`, `grep -c '^PASS:' <log>` = 53, `grep -c '^FAIL' <log>`
+  = 0, elapsed ~4.5s (`time bash tests/check-board-headings/run.sh`) on
+  this machine. `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh
+  .shell-team/specs/T-1099-board-heading-integrity.md` (all 18 criteria)
+  measured 18 passed / 0 failed / 0 skipped — several criteria re-run this
+  whole suite plus `tests/close-out/run.sh` and `tests/errexit-safe/run.sh`,
+  so raise the timeout rather than assuming the default is enough, same
+  guidance the T-1097/T-1098 entries above give. The new CI wiring is a
+  **repo-local dogfood step only** ("Dogfood check-board-headings — this
+  repository's own board", `.github/workflows/check-handoff.yml`) — it
+  does not ship to adopters; only `bin/check-board-headings.sh` itself
+  does. When adding a NEW top-level (`##`) section to this repository's own
+  board template or an entry's own prose, remember the new at-most-once
+  rule applies to every level-2 heading except level 3 (`### Local test
+  result`, deliberately out of scope, since this board legitimately
+  repeats that one many times inside entries).
