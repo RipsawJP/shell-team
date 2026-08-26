@@ -315,12 +315,31 @@ assert_clean "POS/NEG pair: home-encoded (near-miss negative NOT reported)" \
   "$HE_NEG_REPO" "$HE_NEG_BASE"
 
 # Family (AC16): underscore-encoded as well as hyphen-encoded; the home
-# root as well as the Users root — one fixture, four lines, four findings.
+# root as well as the Users root; PLUS the four spellings round-1 review
+# found missed by the pre-widening name class (T-1101 rework 1): a
+# 2-character name, a hyphen-split (multi-component) name, a digit-led
+# name, and an underscore-led name (the real macOS system-account
+# convention, e.g. _www) — one fixture, eight lines, eight findings. The
+# label text is unchanged (AC16's check is a `grep -qF` on the fixed
+# string below, which imposes no cardinality on the fixture set), so this
+# is a pure additive extension, not a re-freeze.
+HE_N5="a"; HE_N6="b"
+HE_SHORT="${HE_N5}${HE_N6}"
+HE_N7="a"; HE_N8="b"
+HE_HYPHEN_SPLIT="${HE_N7}-${HE_N8}"
+HE_N9="123"; HE_N10="4"
+HE_DIGIT_LED="${HE_N9}${HE_N10}"
+HE_N11="_"; HE_N12="www"
+HE_UNDERSCORE_LED="${HE_N11}${HE_N12}"
 HE_FAM_LINES=(
   "-Users-${HE_NAME}-"
   "_Users_${HE_NAME}_"
   "-home-${HE_NAME2}-"
   "_home_${HE_NAME2}_"
+  "-Users-${HE_SHORT}-"
+  "-Users-${HE_HYPHEN_SPLIT}-"
+  "-Users-${HE_DIGIT_LED}-"
+  "-Users-${HE_UNDERSCORE_LED}-"
 )
 HE_FAM_REPO="$(new_repo)"; HE_FAM_BASE="$(git -C "$HE_FAM_REPO" rev-parse HEAD)"
 add_fixture_lines "$HE_FAM_REPO" "family.txt" "${HE_FAM_LINES[@]}"
@@ -334,6 +353,21 @@ if [ "$HE_FAM_RC" -eq 1 ] && [ "$HE_FAM_HITS" = "${#HE_FAM_LINES[@]}" ]; then
 else
   fail "family: the encoded-home rule fires on both separators and both roots (rc=$HE_FAM_RC hits=$HE_FAM_HITS out=$HE_FAM_OUT)"
 fi
+
+# =============================================================================
+# regression lock (T-1101 rework 1, round-1 review interaction risk): the
+# name-class widening must NOT make a bare separator run (no real name at
+# all) start firing — the class requires a non-separator anchor character
+# at both the start and the end of whatever it captures as "the name", so
+# a run composed only of -/_ characters can never satisfy it.
+# =============================================================================
+printf '\n--- regression: a bare separator run (no real name) stays clean after the name-class widening ---\n'
+
+HE_BARE_LINE="backup at -Users--- lost"
+HE_BARE_REPO="$(new_repo)"; HE_BARE_BASE="$(git -C "$HE_BARE_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_BARE_REPO" "bare.txt" "$HE_BARE_LINE"
+assert_clean "regression: a bare separator run (no real name) stays clean after the name-class widening" \
+  "$HE_BARE_REPO" "$HE_BARE_BASE"
 
 # =============================================================================
 # POS/NEG pair: temp-session (T-1101)
@@ -376,13 +410,17 @@ add_fixture_line "$TS_NEG_REPO" "neg.txt" "$TS_NEG_LINE"
 assert_clean "POS/NEG pair: temp-session (near-miss negative NOT reported)" \
   "$TS_NEG_REPO" "$TS_NEG_BASE"
 
-# Family (AC16): every documented temp root, every UUID case spelling —
-# one fixture, four lines, four findings.
+# Family (AC16): every documented temp root, every UUID case spelling,
+# PLUS the round-1-review-reproduced `=` prefix-character gap (T-1101
+# rework 1: RE_TEMP_SESSION_ROOT's class was widened to include a literal
+# `=` in the intermediate path segment) — one fixture, five lines, five
+# findings. The label text is unchanged (a pure additive extension).
 TS_FAM_LINES=(
   "/tmp/${TS_WORKTREE}-scratch/${TS_UUID_LOWER}-work"
   "/var/folders/xy/${TS_WORKTREE}-scratch/T/${TS_UUID_LOWER}-work"
   "/private/tmp/claude-502/${TS_WORKTREE}-scratch/${TS_UUID_UPPER}-work"
   "/private/tmp/claude-502/${TS_WORKTREE}-scratch/${TS_UUID_MIXED}-work"
+  "/var/folders/xy=z/${TS_WORKTREE}-scratch/${TS_UUID_LOWER}-work"
 )
 TS_FAM_REPO="$(new_repo)"; TS_FAM_BASE="$(git -C "$TS_FAM_REPO" rev-parse HEAD)"
 add_fixture_lines "$TS_FAM_REPO" "family.txt" "${TS_FAM_LINES[@]}"

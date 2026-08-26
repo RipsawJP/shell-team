@@ -1871,3 +1871,32 @@ that file's order.
   full pattern's own source text inside the test file (fragile, and not
   needed — the checker source is already the single source of truth for
   both halves once decomposed).
+- T-1101 (rework 1, round-1 review): widening a pattern's own character
+  class to close a reproduced coverage gap can itself CREATE a new
+  self-reference trip against a DIFFERENT tracked file than the one the
+  original widening was aimed at — specifically, the cross-provider
+  review's own round-1 record (`.shell-team/reviews/<task>.md`) quoting
+  the gap's reproduction examples as literal (non-placeholder) text, which
+  the now-wider rule correctly starts reporting. Check `bash
+  bin/check-pii-shapes.sh --all` (and, once the widening is committed,
+  `--base develop`/`--base <branch base>`) against the WHOLE tree
+  immediately after any character-class widening, not just against the
+  file being widened for — a clean run on the target file alone is not
+  sufficient. Where the newly-tripped file is prose that must legitimately
+  DISCUSS the shape (a review record, same as T-111's own frozen AC15
+  names for a spec/provenance/board note), the fix is the same documented
+  angle-bracket placeholder convention (AC9) applied to that file's own
+  example spellings — verify the diff touches ONLY the shape literals
+  (nothing about a verdict, a severity or the surrounding prose) via a
+  before/after `diff` and a before/after token count of the verdict/
+  severity vocabulary (`APPROVE`/`REQUEST_CHANGES`/`Blockers`/`Major`/
+  `Minor`) over that one file. Separately: when a character class's
+  widening decision hinges on avoiding a false-positive-surface increase
+  (here, whether to admit bare whitespace into an already-unbounded `*`-
+  quantified prefix class), decompose the reviewer's example into what was
+  actually LIVE-REPRODUCED (here, only `=`) versus what was offered as a
+  hypothetical illustration (here, whitespace) — widen for the reproduced
+  part (cheap, self-reference-safe, directly closes a confirmed gap) and
+  disclose the hypothetical part as a declared limitation in both docs
+  mirrors, rather than treating the reviewer's one combined example as one
+  monolithic go/no-go decision.

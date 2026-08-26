@@ -363,27 +363,55 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     segment, a CLOSING separator) — the closing separator is exactly what
 #     distinguishes a completed shape from an unclosed one (T-1101 AC2's
 #     near-miss: a separator run that never closes the name segment stays
-#     clean). The name class admits no `<`/`>`, so the documented
-#     placeholder forms (`-Users-<name>-`, `_home_<name>_`) are non-matches
-#     by construction, exactly as home-path's own placeholder convention
-#     (AC9). Deliberately NOT boundary-guarded the way RE_HOME_PATH_BOUNDARY
-#     is: an encoded segment has no URL-authority false-positive class to
-#     close (T-1101 DP-3), so DP-10's bias toward firing applies with no
-#     narrowing at all. Accepted noise, disclosed rather than chased: a
-#     hyphen- or underscore-delimited English compound that happens to
-#     spell the `home` root (e.g. the shape `-home-<word>-` embedded in a
-#     kebab-case identifier) fires; the resolution is the placeholder form
-#     at the authoring site, never a wider suppression (T-1101 DP-3, Input
-#     space class 8).
+#     clean). The name class is now (round-1 review Major, T-1101) at
+#     parity with `RE_HOME_PATH_RAW`'s own coverage philosophy: any single
+#     alphanumeric-or-dot character is a sufficient whole name (closes the
+#     shipped rule's 3-character floor, e.g. a 2-character account name);
+#     the leading character may be a digit or an underscore as well as a
+#     letter (closes both the digit-led and the underscore-led gaps — the
+#     latter the real macOS system-account convention, `_www` among them);
+#     and a hyphen may appear INSIDE the name as long as the name both
+#     starts and ends on an alphanumeric-or-dot character (closes the
+#     hyphen-split-name gap, e.g. `a-b`), which is also what keeps a bare
+#     separator run (`-Users---`, no real name at all) a correct non-match:
+#     the class requires a non-separator anchor character at both the start
+#     and the end of whatever it captures as "the name", so a run composed
+#     only of `-`/`_` characters can never satisfy it. The name class admits
+#     no `<`/`>`, so the documented placeholder forms (`-Users-<name>-`,
+#     `_home_<name>_`) are non-matches by construction, exactly as
+#     home-path's own placeholder convention (AC9) — re-verified live after
+#     this widening, both by hand against the checker's own file and by
+#     `--all` against the whole tree. Deliberately NOT boundary-guarded the
+#     way RE_HOME_PATH_BOUNDARY is: an encoded segment has no URL-authority
+#     false-positive class to close (T-1101 DP-3), so DP-10's bias toward
+#     firing applies with no narrowing at all. Accepted noise, disclosed
+#     rather than chased: a hyphen- or underscore-delimited English compound
+#     that happens to spell the `home` root (e.g. the shape `-home-<word>-`
+#     embedded in a kebab-case identifier) fires; the resolution is the
+#     placeholder form at the authoring site, never a wider suppression
+#     (T-1101 DP-3, Input space class 8).
 #   RE_TEMP_SESSION_ROOT  not anchored at either end; matches one of the
 #     documented temp/session roots (`/private/tmp/`, `/tmp/`,
-#     `/var/folders/`) followed by ordinary path characters. Exists as its
-#     own named unit (T-1101 AC5) so a negative-control fixture can be
-#     proven to genuinely REACH a temp/session path shape while still
-#     being excluded by the separate UUID requirement below — the same
-#     "reaches but is excluded" idiom `RE_EMAIL_BASE` already establishes
-#     for the email exclusions (`assert_reaches_email_candidates`). Not
-#     itself a reported pattern id, so it carries no independent finding.
+#     `/var/folders/`) followed by ordinary path characters, now including
+#     a literal `=` (round-1 review Minor, T-1101 — a live-reproduced gap,
+#     `/var/folders/xy=z/<uuid>` was not reported; cheap and
+#     self-reference-safe to widen, so it was). Embedded whitespace in that
+#     same intermediate segment is DELIBERATELY still excluded rather than
+#     widened: an unbounded class admitting a bare space risks the prefix
+#     spanning across unrelated words on the same line before it ever
+#     reaches a UUID, a materially different and larger false-positive
+#     surface than one more literal character — disclosed as a declared
+#     limitation (docs/pii-controls.md, docs/pii-controls.ja.md) rather than
+#     chased, on the same measured ground the review itself offered: no
+#     generator in this repository's reach emits a space in a temp-root
+#     prefix, and the measured negative-control population carries none.
+#     Exists as its own named unit (T-1101 AC5) so a negative-control
+#     fixture can be proven to genuinely REACH a temp/session path shape
+#     while still being excluded by the separate UUID requirement below —
+#     the same "reaches but is excluded" idiom `RE_EMAIL_BASE` already
+#     establishes for the email exclusions
+#     (`assert_reaches_email_candidates`). Not itself a reported pattern id,
+#     so it carries no independent finding.
 #   RE_TEMP_SESSION  composes `RE_TEMP_SESSION_ROOT` with a dashed
 #     8-4-4-4-12 hex UUID segment, case-insensitive (lower, upper, and
 #     mixed case all fire — T-1101 AC16). The undashed 32-hex form is
@@ -419,10 +447,10 @@ RE_PRIVATE_KEY='-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
 RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}'
 # shellcheck disable=SC2016  # both separators, both roots — see the
 # RE_HOME_ENCODED inventory entry above (T-1101)
-RE_HOME_ENCODED='[-_](Users|home)[-_][A-Za-z][A-Za-z0-9_.]{2,}[-_]'
+RE_HOME_ENCODED='[-_](Users|home)[-_][A-Za-z0-9_.]([A-Za-z0-9_.-]*[A-Za-z0-9_.])?[-_]'
 # shellcheck disable=SC2016  # the reachable-root half only — see the
 # RE_TEMP_SESSION_ROOT inventory entry above (T-1101)
-RE_TEMP_SESSION_ROOT='(/private/tmp/|/tmp/|/var/folders/)[A-Za-z0-9_./-]*'
+RE_TEMP_SESSION_ROOT='(/private/tmp/|/tmp/|/var/folders/)[A-Za-z0-9_./=-]*'
 RE_TEMP_SESSION="${RE_TEMP_SESSION_ROOT}[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
 # --- known-shapes list (DP-8) ------------------------------------------------
