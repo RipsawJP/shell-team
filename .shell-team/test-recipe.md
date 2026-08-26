@@ -1831,3 +1831,19 @@ that file's order.
   split form onto its board entry before its own AC5-shaped criterion is
   measured should expect the same conflict and route it back rather than
   patch around it.
+
+  **Update (2026-08-26, review round 1 rework)**: the paragraph above
+  describes the conflict as it stood at the v1 freeze, when AC5 read the
+  population from the CURRENT board at check time. It was resolved, not
+  worked around: a host-ratified class-B re-freeze (intent v1→v2, commit
+  `d352e3a`) repaired AC5 itself to read the population from **the base
+  ref's committed board blob** (`git show <base ref>:<board path>`, never
+  the working tree) instead of the resolved board — which by construction
+  excludes any row this task's own board entry introduces, closing the
+  conflict at the instrument rather than at the board. The original
+  observation above is left as written (it was true of v1, and is why the
+  re-freeze exists); a future axis-refinement task that follows the
+  base-ref-scoped population definition from the start, as AC5 v2 now
+  does, should not hit this conflict at all. Cross-provider review round 1
+  (`.shell-team/reviews/T-1100.md`) independently reproduced the repair by
+  direct execution and confirmed it protects the same back-compat intent.
