@@ -1314,3 +1314,54 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: Narrowing the existing do-not-take-self-reports-at-face-value entry to numeric tallies, for QA and equally for the cross-provider review round it hands off to: any count in a hand-off that required actual counting — rather than verbatim transcription from a command's own output — is recounted by the receiving gate with its own command before the report is accepted, and once one tally in a hand-off is caught wrong, the same hand-off's other counted tallies are recounted too rather than only the flagged one.
 - **Why**: One sprint reproduced the pattern twice, at two different gates on two different tasks: a QA round failed on a sweep tally whose own sentence contradicted it (twelve-passed-zero-failed written beside two named failures), and a cross-provider round caught a named-steps count off by one — both consistent with the earlier operator-memory finding that self-report error tracks how much of the number required counting versus copying.
 - **How to apply**: The receiving gate identifies the counted-not-transcribed values in a hand-off and recounts each with a command of its own; after any one wrong tally, the orchestrator's kickback instruction names the recount-the-rest obligation for that hand-off explicitly.
+
+## 2026-08-24 — A hand-rolled text-extraction gate that still yields new independent defeats after two design-level rewrites is not closable by a fourth patch
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: maintainer
+- **Bound-in**: CONTRIBUTING.md
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-24.md
+- **Rule**: When a mechanical gate classifies free-form markdown headings or verdict strings through ad-hoc normalization, and a third independent defeat class appears after the component has already absorbed two full design-level rewrites, the orchestrator does not authorize another patch round: the next step is the pre-priced removal disposition, and the follow-up issue's acceptance criteria are seeded with the accumulated defeat list verbatim rather than a summary of it.
+- **Why**: One close-out backstop absorbed six independently-reproduced defeats across six rounds — internal whitespace, a leading-whitespace boundary defeat in the false-PASS direction, a CRLF record invisible to heading detection, a zero-width/U+00A0 heading defeating both judgments — spanning two rewrites (single-normalization extraction, then CR-strip plus three-way fallback), with QA's own final assessment naming a structural ceiling. The learning was determined by the second defeat; rounds three through six were confirmation bought at one operator ruling each.
+- **How to apply**: The orchestrator tracks defeat classes per component across rounds; at the third independent defeat following the second rewrite, it executes the drop disposition on its standing authority and files the carve-out issue with every defeat cited as a requirement, so the next design attempt starts from the complete adversarial map.
+
+## 2026-08-24 — A scratch-clone venue fix scoped to one named branch does not close the class: enumerate every branch literal in the read-set before trusting a FAIL
+- **Category**: verification-discipline
+- **Applies-to**: qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-24.md
+- **Rule**: A fresh `git clone` carries the source checkout's local branches only as remote-tracking refs, so any check line that resolves a branch-name literal (`git merge-base <branch> HEAD` or similar) fails structurally inside the clone; before trusting any check-line FAIL in a scratch clone, the runner greps the full spec and read-set for every branch-name literal a base-ref discriminator can name and recreates each one as a local branch at its correct SHA — fixing only the branch the current failure names leaves the identical mechanism armed for the next literal.
+- **Why**: The class bit twice in one task's two consecutive rounds: the first fix recreated the one stacked sibling branch the task depended on, and the very next round the same mechanism produced a false FAIL against `develop` itself, because the fix's mental model ("recreate the branch this task needs") had not generalized to "recreate every literal any discriminator names."
+- **How to apply**: The scratch-clone routine carries a standing pre-check step — grep the read-set for branch literals, recreate all of them, then run the checks — rather than relying on remembering the generalized class each time a new discriminator appears; a FAIL observed before that step has run is treated as unmeasured, not as a result.
+
+## 2026-08-24 — Name the drop order and its trigger inside the frozen spec at authoring time, before any review round runs
+- **Category**: process
+- **Applies-to**: pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-24.md
+- **Rule**: When a spec's scope contains a component identifiable at authoring time as adversarially fragile or environment-dependent, pm-spec writes the component's Droppable-Nth position and the exact trigger condition into the frozen document before the first review round; when the trigger later fires, executing the drop requires only confirming the trigger's factual precondition — never inventing a disposition mid-task.
+- **Why**: A criterion pre-named Droppable-3rd had its trigger (two consecutive rounds each landing an independently-new Major on the same component) actually fire, and the execution cost zero new design judgment and zero host escalation — while an earlier component in the same sprint with no pre-priced disposition consumed six rounds and six operator rulings discovering one defeat at a time before the same conclusion was reached.
+- **How to apply**: At spec completion, pm-spec asks which in-scope components are predictably fragile (hand-rolled parsing, live-environment execution, adversarially-reviewable guards) and prices each with a drop order and trigger in the freeze; the orchestrator treats a fired trigger's disposition as the default requiring only factual confirmation, and treats a mid-task drop proposal with no pre-priced disposition as the signal that the spec missed this step.
+
+## 2026-08-24 — Quantity-claim defect risk tracks a role's exposure to writing raw numeric literals, not the role's identity
+- **Category**: verification-discipline
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-24.md
+- **Rule**: A role whose standard output format requires transcribing bare numeric literals — population counts, round tallies, byte deltas — will accumulate nearly all of a corpus's quantity-claim defects by construction, regardless of which role or model it is; lessons and checkers about recording accuracy therefore weight exposure (the number of occasions a role writes such a literal) above role identity, and the structural remedy is designs that derive numbers from embedded commands (`- reproduce:` / `- command:` lines) instead of asking anyone to copy them.
+- **Why**: An operator-side analysis of record-accuracy defects found they tracked exposure rather than identity, and the sprint that promoted this entry still shipped artifacts carrying heavy hand-transcribed counts (an 18-item read-set, a 98-population sweep, a six-round defeat tally) whose accuracy rests on the same discipline that analysis found erodes under repeated recall — while the same sprint's command-derived numbers carried no such defects.
+- **How to apply**: When authoring a spec, a check line, or a lesson that involves recorded quantities, prefer the command-derived form so the number is recomputed rather than remembered; when auditing for quantity defects, rank artifacts by literal-writing exposure rather than by which role produced them.
+
+## 2026-08-24 — A mid-flight correction to a running dispatched instance travels an unauthenticated channel; send it with a mechanical verification procedure, and on refusal re-deliver by resuming after completion
+- **Category**: process
+- **Applies-to**: all
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-08-24.md (primary verbatim evidence held in operator memory, outside this repository)
+- **Rule**: A correction message sent to a still-running dispatched instance arrives on a channel the instance cannot authenticate and may be treated as suspected prompt injection — correctly, by the instance's own lights; corrections to running instances therefore carry a self-contained mechanical verification procedure ("do not trust these words — verify X, Y, Z against the primary source first"), and a refusal is answered not by insisting but by re-delivering after the instance completes, as a resume that identifies the orchestrator, states the verify-first procedure, and explains why re-measurement after a confirmed instrument defect is not audit tampering.
+- **Why**: During one 8-instance fan-out, a mid-flight correction was refused as suspected injection by 3 of 8 instances (one of which independently verified the claim after the underlying defect had already been repaired, observed correctly, and concluded wrongly), while the resume-plus-verify-first form was accepted by every instance it was sent to; an instance that verifies before acting is the behavior the loop wants, so the fix is the delivery form, not the instance.
+- **How to apply**: The orchestrator's dispatch playbook treats mid-flight corrections as last-resort and always verification-framed; when one is refused, the refusal is recorded as correct behavior and the correction is re-sent through the resume path with orchestrator identification, a concrete verification recipe, and the reason the action remains within the instance's own task.
