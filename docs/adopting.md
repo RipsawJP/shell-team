@@ -318,7 +318,7 @@ re-freeze of an already-recorded hash.
 
 ## Trying the team on one ticket
 
-If you just want to run the loop once, on one real ticket, without deciding anything about how your whole team adopts it: create a **trial branch**, scaffold onto it with shipped mechanics, commit the operating files there, run the loop, and delete the branch afterward. The loop's gates assume the operating files are **tracked**, and this route honors that assumption instead of working around it — no new flag and no new mechanism, just `git switch -c` followed by `team-init`.
+If you just want to run the loop once, on one real ticket, without deciding anything about how your whole team adopts it: create a **trial branch**, scaffold onto it with shipped mechanics, commit the operating files there, run the loop, and delete the branch afterward. The loop's gates assume the operating files are **tracked**, and this route honors that assumption instead of working around it — `git switch -c` followed by `team-init`, or the two combined with `team-init.sh`'s own `--trial-branch <name>` flag.
 
 **Setup.**
 
@@ -329,7 +329,9 @@ git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
 git commit -m "chore: scaffold shell-team for a one-ticket trial"
 ```
 
-`team-init.sh` runs no git command of its own and does not care which branch you are on, so this is the whole setup. Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
+Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
+
+The first line and the `team-init.sh` line above can also be run as one step: `team-init.sh --trial-branch trial/one-ticket .` creates `trial/one-ticket` and switches to it before scaffolding, refusing (exit 2, with a remedy) if the target is not inside a git work tree, is not that work tree's top level, or the branch already exists — the two commands staying separate is not required, only convenient to show. Without `--trial-branch`, `team-init.sh` invokes no git command of its own and does not care which branch you are on.
 
 If your machine's global excludes (`core.excludesFile`) hide the base dir, that plain `git add` refuses outright the moment you run it. Force the scaffolded files onto this one branch with `git add -f "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"`, or add a repo-level re-include to your root `.gitignore` for whatever `team-paths.sh --get base` resolves to in your repo — `!.shell-team/` in the default layout, `!tasks/` in the legacy layout — as described in [Where the operating files live](#where-the-operating-files-live), so the ordinary form works for good.
 
