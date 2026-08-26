@@ -363,20 +363,28 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     segment, a CLOSING separator) — the closing separator is exactly what
 #     distinguishes a completed shape from an unclosed one (T-1101 AC2's
 #     near-miss: a separator run that never closes the name segment stays
-#     clean). The name class is now (round-1 review Major, T-1101) at
-#     parity with `RE_HOME_PATH_RAW`'s own coverage philosophy: any single
-#     alphanumeric-or-dot character is a sufficient whole name (closes the
-#     shipped rule's 3-character floor, e.g. a 2-character account name);
-#     the leading character may be a digit or an underscore as well as a
-#     letter (closes both the digit-led and the underscore-led gaps — the
+#     clean). The name class is at parity with `RE_HOME_PATH_RAW`'s own
+#     coverage philosophy: any single alphanumeric-or-dot character is a
+#     sufficient whole name (closes the round-1-review-named 2-character-
+#     name gap); the leading character may be a digit or an underscore as
+#     well as a letter (closes the digit-led and underscore-led gaps — the
 #     latter the real macOS system-account convention, `_www` among them);
-#     and a hyphen may appear INSIDE the name as long as the name both
-#     starts and ends on an alphanumeric-or-dot character (closes the
-#     hyphen-split-name gap, e.g. `a-b`), which is also what keeps a bare
-#     separator run (`-Users---`, no real name at all) a correct non-match:
-#     the class requires a non-separator anchor character at both the start
-#     and the end of whatever it captures as "the name", so a run composed
-#     only of `-`/`_` characters can never satisfy it. The name class admits
+#     and a hyphen or underscore may appear anywhere in the name as long as
+#     AT LEAST ONE character in the whole captured name is alphanumeric-or-
+#     dot (closes the hyphen-split-name gap, e.g. `a-b`, and — round-2
+#     review Minor, T-1101 — closes a bare `_` false-positiving as "the
+#     name": `_` is a member of BOTH the separator alphabet `[-_]` and the
+#     name-continuation class, so a name-continuation class with no further
+#     constraint would let a single `_` (or a run of only `_`/`-`
+#     characters) satisfy "the name" all by itself, between either
+#     separator flavour; the mandatory alphanumeric-or-dot character is
+#     what closes that gap for both flavours symmetrically). The accurate
+#     claim, verified against this shipped regex rather than stated from
+#     intent: a captured span containing NO alphanumeric-or-dot character
+#     at all — a run composed only of `-`/`_` characters, whatever their
+#     mix — can never satisfy the name requirement, so `-Users---`,
+#     `_Users___`, `_home___` and `-Users-_-` (a lone `_` between hyphen
+#     separators) all correctly stay clean. The name class admits
 #     no `<`/`>`, so the documented placeholder forms (`-Users-<name>-`,
 #     `_home_<name>_`) are non-matches by construction, exactly as
 #     home-path's own placeholder convention (AC9) — re-verified live after
@@ -447,7 +455,7 @@ RE_PRIVATE_KEY='-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
 RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}'
 # shellcheck disable=SC2016  # both separators, both roots — see the
 # RE_HOME_ENCODED inventory entry above (T-1101)
-RE_HOME_ENCODED='[-_](Users|home)[-_][A-Za-z0-9_.]([A-Za-z0-9_.-]*[A-Za-z0-9_.])?[-_]'
+RE_HOME_ENCODED='[-_](Users|home)[-_][A-Za-z0-9_.-]*[A-Za-z0-9.][A-Za-z0-9_.-]*[-_]'
 # shellcheck disable=SC2016  # the reachable-root half only — see the
 # RE_TEMP_SESSION_ROOT inventory entry above (T-1101)
 RE_TEMP_SESSION_ROOT='(/private/tmp/|/tmp/|/var/folders/)[A-Za-z0-9_./=-]*'

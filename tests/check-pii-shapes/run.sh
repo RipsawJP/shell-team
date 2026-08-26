@@ -355,19 +355,61 @@ else
 fi
 
 # =============================================================================
-# regression lock (T-1101 rework 1, round-1 review interaction risk): the
-# name-class widening must NOT make a bare separator run (no real name at
-# all) start firing — the class requires a non-separator anchor character
-# at both the start and the end of whatever it captures as "the name", so
-# a run composed only of -/_ characters can never satisfy it.
+# regression lock (T-1101 rework 1+2): the name-class widening must NOT
+# make a captured span with NO alphanumeric-or-dot character at all start
+# firing — a run composed only of -/_ characters, whatever their mix,
+# can never satisfy the mandatory alphanumeric-or-dot requirement. Round 1
+# locked the hyphen-only flavour (`-Users---`); round 2 review found `_`
+# is a member of BOTH the separator alphabet and (pre-fix) the
+# name-continuation class, so a BARE underscore positioned as "the name"
+# was a false positive under three independent shapes — underscore
+# separators around a lone `_` in both roots, and hyphen separators
+# around a lone `_` (proving the gap is about a bare `_` acting as "the
+# name", not only about underscore-flavoured separator runs). All four
+# shapes are locked here.
 # =============================================================================
 printf '\n--- regression: a bare separator run (no real name) stays clean after the name-class widening ---\n'
+printf '\n--- regression: a bare underscore as the name stays clean, both separator flavours, both roots ---\n'
 
 HE_BARE_LINE="backup at -Users--- lost"
 HE_BARE_REPO="$(new_repo)"; HE_BARE_BASE="$(git -C "$HE_BARE_REPO" rev-parse HEAD)"
 add_fixture_line "$HE_BARE_REPO" "bare.txt" "$HE_BARE_LINE"
 assert_clean "regression: a bare separator run (no real name) stays clean after the name-class widening" \
   "$HE_BARE_REPO" "$HE_BARE_BASE"
+
+# T-1101 rework 2 (round-2 review Minor): a lone `_` as the captured name
+# is not a real name — locked clean for both separator flavours and both
+# roots, plus the cross-flavour shape (hyphen separators, underscore
+# name) that shows the gap was about the character, not the flavour.
+HE_LONE_U1="backup at _Users___ lost"
+HE_LONE_U2="backup at _home___ lost"
+HE_LONE_U3="backup at -Users-_- lost"
+
+HE_LONEU1_REPO="$(new_repo)"; HE_LONEU1_BASE="$(git -C "$HE_LONEU1_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_LONEU1_REPO" "lone1.txt" "$HE_LONE_U1"
+assert_clean "regression: a bare underscore as the name stays clean (underscore separators, Users root)" \
+  "$HE_LONEU1_REPO" "$HE_LONEU1_BASE"
+
+HE_LONEU2_REPO="$(new_repo)"; HE_LONEU2_BASE="$(git -C "$HE_LONEU2_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_LONEU2_REPO" "lone2.txt" "$HE_LONE_U2"
+assert_clean "regression: a bare underscore as the name stays clean (underscore separators, home root)" \
+  "$HE_LONEU2_REPO" "$HE_LONEU2_BASE"
+
+HE_LONEU3_REPO="$(new_repo)"; HE_LONEU3_BASE="$(git -C "$HE_LONEU3_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_LONEU3_REPO" "lone3.txt" "$HE_LONE_U3"
+assert_clean "regression: a bare underscore as the name stays clean (hyphen separators, Users root)" \
+  "$HE_LONEU3_REPO" "$HE_LONEU3_BASE"
+
+# Positive control alongside the three locks above: _www (underscore-LED,
+# NOT underscore-ONLY) must still fire — already covered by HE_FAM_LINES'
+# HE_UNDERSCORE_LED entry, re-asserted directly here as a standalone
+# case so this specific regression section is self-contained proof that
+# the fix distinguishes "underscore-led" from "underscore-only".
+HE_UWWW_LINE="backup at -Users-${HE_UNDERSCORE_LED}- lost"
+HE_UWWW_REPO="$(new_repo)"; HE_UWWW_BASE="$(git -C "$HE_UWWW_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_UWWW_REPO" "uwww.txt" "$HE_UWWW_LINE"
+assert_finding "positive control: an underscore-LED (not underscore-ONLY) name still fires (_www)" \
+  "home-encoded" "$HE_UWWW_REPO" "$HE_UWWW_BASE"
 
 # =============================================================================
 # POS/NEG pair: temp-session (T-1101)

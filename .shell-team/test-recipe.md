@@ -1900,3 +1900,28 @@ that file's order.
   disclose the hypothetical part as a declared limitation in both docs
   mirrors, rather than treating the reviewer's one combined example as one
   monolithic go/no-go decision.
+- T-1101 (rework 2, round-2 review): when a character class repair
+  introduces an "anchor character at both ends" shape to keep a
+  separator-run negative clean, check whether any character in the
+  anchor alphabet is ALSO a member of the separator alphabet used to
+  delimit the shape. If one is (here, `_`, present in both `[-_]` and
+  `[A-Za-z0-9_.]`), an anchor-based design is insufficient on its own —
+  a captured span consisting ENTIRELY of that overloaded character
+  satisfies "non-separator anchor at both ends" using nothing but the
+  overloaded character itself, which is exactly the false positive a
+  round of review found (`_Users___`, `_home___`, and — the shape that
+  proves it's about the character and not the separator flavour —
+  `-Users-_-`, a lone `_` between *hyphen* separators). The robust
+  design requires at least one character from the OVERLAP-FREE subset
+  (here, `[A-Za-z0-9.]`, excluding both `-` and `_`) to exist SOMEWHERE
+  in the captured span, with the full permissive class free on both
+  sides of it — not an "anchor at the edges" shape, which inherits
+  whatever overlap the anchor alphabet has with the separator alphabet.
+  Separately: an adopter-facing claim in a header comment (anything
+  `--help` derives text from) about what a regression-lock fixture
+  proves must be reworded and RE-VERIFIED against the actual shipped
+  regex line whenever that regex changes — a claim that was accurate at
+  an earlier revision can silently go stale (true for one flavour, false
+  for another) without the fixture itself failing, since the fixture
+  only proves what it was written to prove, not what the prose claims
+  in general.
