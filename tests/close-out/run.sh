@@ -624,7 +624,13 @@ cmp -s "$RF_ROOT/root/todo.md" "$RF_ROOT/root/todo.orig" || fail "interventions-
 grep -qF -- 'cannot resolve the interventions directory' "$RF_ROOT/err" || fail "interventions-resolver-failure-exit2: reason D must be printed"
 pass "interventions-resolver-failure-exit2 — with team-paths.sh removed and no override, resolution fails exit 2, reason D (no guessing fallback — a conformant record sits at the default location a fallback would use)"
 
-( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2" \
+# T-1103 (#343): the oversight-profile pre-merge gate is unconditional and
+# resolves its own base the same env-override-else-team-paths.sh way the
+# interventions gate does — this crippled bin/ copy has no team-paths.sh at
+# all, so $TEAM_OVERSIGHT_BASE must be supplied too (pointing at a directory
+# that carries no oversight.conf, so the checker resolves the shipped
+# `autonomous` default and stays silent).
+( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" TEAM_OVERSIGHT_BASE="$RF_ROOT/root/.shell-team" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2" \
   || fail "interventions-resolver-failure-exit2 positive control: the override needs no resolver (stderr: $(cat "$RF_ROOT/err2"))"
 pass "interventions-resolver-failure-exit2 positive control — the same crippled bin/ copy succeeds once \$TEAM_INTERVENTIONS_DIR is set"
 
@@ -1319,5 +1325,57 @@ dispatch_case T-99704 "$OKI\n$OKV\n$OKF" 1 "never both" "parent 'verify' plus re
 dispatch_case T-99705 "$OKI\n$OKM\n$OKM" 1 "'verify-mechanism' appears more than once" "duplicated verify-mechanism axis refuses (existing per-key uniqueness rule, unchanged)" T-1100
 dispatch_case T-99706 "$OKI\n  - dispatch: verify-fixture — tier2 — unconditional — recommendation: tier1-verification-fanout" 1 "'tier2' is not in axis 'verify-fixture'" "cross-axis value 'verify-fixture — tier2' refuses" T-1100
 dispatch_case T-99707 "$OKI\n  - dispatch: verify-mechanism — pm-authored — unconditional — recommendation: tier1-verification-fanout" 1 "'pm-authored' is not in axis 'verify-mechanism'" "cross-axis value 'verify-mechanism — pm-authored' refuses" T-1100
+
+# ============================================================================
+# T-1103 (#343): the oversight-profile pre-merge seam's own teeth, wired
+# unconditionally into bin/close-out.sh (unlike the spec-review gate above,
+# there is no per-task election to read). This block proves the WIRING
+# (the checker invocation, the sentinel, board-byte-untouched on refusal,
+# the entry moving to Done on a conformant record) through the real
+# close-out.sh entry point; the exhaustive grammar/anchor matrix lives in
+# tests/check-oversight/run.sh and this spec's own AC3/AC5/AC12/AC22 check
+# lines.
+# ============================================================================
+OVERSIGHT_SENTINEL='oversight-profile pre-merge approval'
+OVERSIGHT_HC="$(cd "$REPO_ROOT" && git rev-parse HEAD)"
+oversight_case() {
+  local task="$1" oversight_conf="$2" board_extra="$3" expect_rc="$4" mode="$5" name="$6"
+  local root="$DISPATCH_ROOT/$task"
+  mkdir -p "$root/.shell-team/interventions"
+  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
+  if [ -n "$oversight_conf" ]; then
+    printf -- '%b\n' "$oversight_conf" > "$root/.shell-team/oversight.conf"
+  fi
+  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
+    "$task" "$board_extra" > "$root/todo.md"
+  cp "$root/todo.md" "$root/todo.orig"
+  local rc=0
+  # Deliberately NOT `cd`-ed into the scratch root (unlike the T-1096 block
+  # above): the pre-merge anchor invokes real git plumbing against HEAD, so
+  # this call runs with cwd still inside the real checkout (REPO_ROOT) while
+  # every path the checker and close-out.sh themselves read is redirected
+  # through the absolute env overrides below.
+  ( TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_OVERSIGHT_BASE="$root/.shell-team" \
+      bash "$CLOSEOUT" --task "$task" --date 2026-08-24 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
+  [ "$rc" -eq "$expect_rc" ] || fail "T-1103 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  if [ "$mode" = silent ]; then
+    grep -qF -- "$OVERSIGHT_SENTINEL" "$root/err" \
+      && fail "T-1103 $name: the gate must say NOTHING here — found the oversight sentinel in stderr"
+    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
+      || fail "T-1103 $name: close-out should have moved the entry to Done"
+  else
+    cmp -s "$root/todo.orig" "$root/todo.md" \
+      || fail "T-1103 $name: a refused close-out must leave the board byte-untouched"
+    grep -qF -- "$OVERSIGHT_SENTINEL" "$root/err" \
+      || fail "T-1103 $name: refusal stderr must carry the sentinel '$OVERSIGHT_SENTINEL'"
+  fi
+  pass "T-1103 $name"
+}
+
+oversight_case T-99801 "" "" 0 silent "no oversight.conf at all: the shipped autonomous default passes silently through close-out.sh"
+oversight_case T-99802 "schema 1\nprofile governance-controlled\nseam pre-merge" "" 1 refuse "governance-controlled declaring pre-merge with no approval record refuses through close-out.sh"
+oversight_case T-99803 "schema 1\nprofile governance-controlled\nseam pre-merge" "  - oversight-approval (pre-merge): approver=reviewer-01 — producer=author-02 — approves=$OVERSIGHT_HC — date=2026-08-27 — record=docs/specs/fixture.md" 0 silent "governance-controlled declaring pre-merge with a conformant distinct-handle record (approves=HEAD) passes through close-out.sh and moves the entry to Done"
+oversight_case T-99804 "schema 1\nprofile governance-controlled\nseam specify-seam" "" 0 silent "governance-controlled declaring only specify-seam imposes nothing at pre-merge through close-out.sh (declared-but-not-this-seam)"
 
 printf '\nAll close-out assertions passed.\n'

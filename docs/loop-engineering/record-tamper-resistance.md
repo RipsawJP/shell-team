@@ -106,3 +106,42 @@ own promotion is what fires that trigger**, and it is owed at the next
 retro following this task; the trigger counts obligations, not scripts, so
 reusing an existing arm-A script for this third promotion makes the
 promotion cheap, not absent.
+
+## The fourth obligation promoted into arm A (T-1103, issue #343, 2026-08-28)
+
+Selectable oversight profiles (T-1103) name three duties, and the rule
+sends them to two different arms. **Duty A** — does a conformant
+`- oversight-approval (<seam>):` record exist for a declared seam, and is
+its `approver` handle distinct from its `producer` handle — applies the
+rule directly: its verdict gates a freeze (`specify-seam`) and a close-out
+(`pre-merge`), two of the three loop transitions this note's own
+parenthetical names, and its judgment (a line match, a field extraction, a
+charset test and a string inequality over committed bytes) is mechanically
+executable from committed bytes. Both conjuncts hold, so this duty takes
+**arm-A-tested-primitive**: `bin/check-oversight.sh`, a named `bin/` script
+with its own `tests/check-oversight/run.sh` suite and its own step in
+`.github/workflows/check-handoff.yml`, invoked by every caller as a
+subprocess rather than re-implemented inline.
+
+**Duty B** — profile resolution (which profile is in force, and which
+seams it declares) — looks at first glance like configuration reading
+rather than a gated judgment. The **reclassification clause** applies
+directly, exactly as it does above: a resolution that silently answered
+`autonomous` for an unreadable or malformed declaration would let duty A's
+verdict pass vacuously at every declared seam at once, so duty B
+**reclassifies** into arm A, with fail-closed refusal on every occupancy
+and grammar case the declaration can present.
+
+**Duty C** — the approval's substance (did the approver actually read and
+approve the artifact) and the handle's ownership (is the handle theirs) —
+fails conjunct 2 outright: no judgment over committed bytes distinguishes a
+substantive approval from a waved-through one, and nothing in a git
+repository binds an opaque handle to a person. This duty takes
+**arm-B-enumerated-instrument**: a `disclosed, not closed` eleven-item
+enumeration in the task's own spec Goal section, never a check line.
+
+This is the **fourth** obligation promoted into arm A, after **#341**
+(`bin/check-entry-mode.sh`), **#344** (`bin/check-spec-review.sh`) and the
+third promotion above (T-1099, inside `bin/check-board-headings.sh`). The
+re-evaluation trigger already fired on the third promotion, so this fourth
+one does not fire it again; discharging it stays owed at a retro.

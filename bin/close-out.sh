@@ -521,6 +521,43 @@ if [ "$SPEC_REVIEW_ELECTION" = "cross-provider" ]; then
   fi
 fi
 
+# --- fail-closed gate: the oversight-profile pre-merge seam (T-1103, #343) --
+# Deliberately NOT election-scoped, unlike the spec-review gate immediately
+# above: there is no per-task election to read here, the oversight profile
+# is a per-repository property, and the checker's own resolution is what
+# makes the shipped `autonomous` default silent — so this call runs
+# unconditionally, and the checker's occupancy lattice is what keeps an
+# unenrolled repository's close-out free. Wiring mirrors the spec-review
+# gate above line for line: the sibling screen (a missing/unreadable
+# sibling is an install problem, never a board defect), stderr re-printed
+# verbatim, `1` mapped to `fail` (a board-content refusal, board left
+# byte-untouched) and every other non-zero mapped to `die` (an environment
+# the operator repairs — `enrollment-vanished` included, since an enrolled
+# repository whose declaration has gone missing is the operator's to
+# restore or to de-enrol explicitly, never the task author's to fix by
+# editing their entry). This call never passes `--base` or `--config`: the
+# checker's own resolver ($TEAM_OVERSIGHT_BASE, a testing affordance, else
+# the sibling team-paths.sh) decides what it reads.
+OVERSIGHT_CHECKER="$SCRIPT_DIR/check-oversight.sh"
+if [ ! -f "$OVERSIGHT_CHECKER" ] || [ ! -r "$OVERSIGHT_CHECKER" ]; then
+  die "cannot verify the oversight profile (check-oversight.sh missing or unreadable next to close-out.sh)"
+fi
+
+OV_ERR="$(bash "$OVERSIGHT_CHECKER" --seam pre-merge --task "$TASK" --board "$BOARD" 2>&1 >/dev/null)" && OV_RC=0 || OV_RC=$?
+if [ "$OV_RC" -ne 0 ]; then
+  if [ -n "$OV_ERR" ]; then
+    printf '%s\n' "$OV_ERR" >&2 || true
+  fi
+  case "$OV_RC" in
+    1)
+      fail "$TASK's oversight-profile pre-merge approval is missing or non-conformant"
+      ;;
+    *)
+      die "cannot verify the oversight profile ($TASK: check-oversight.sh exited $OV_RC)"
+      ;;
+  esac
+fi
+
 # --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh
 # invocation below (the source-line gate) — covers the pre-write interlock
 # further down too, so there is exactly one of it. A missing or unreadable
