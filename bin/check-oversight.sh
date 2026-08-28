@@ -83,7 +83,11 @@
 #       duplicate-seam, seam-under-autonomous, no-seam-declared,
 #       approval-missing, approval-malformed, approval-duplicate,
 #       bad-handle, approver-equals-producer, approval-anchor-malformed,
-#       approval-stale, approval-anchor-ahead.
+#       approval-stale, approval-anchor-ahead, intent-hash-malformed (a
+#       `- intent-hash (vN):` sub-bullet on the entry whose own grammar
+#       does not match the bounded form this checker requires before
+#       feeding N into arithmetic — T-1103 round-3 rework, see the MAXV
+#       loop below).
 #   2 = the input could not be evaluated at all: usage,
 #       declaration-occupancy (a non-regular-file occupant),
 #       declaration-unreadable (an unreadable regular file, a missing
@@ -561,13 +565,55 @@ if [ "$SEAM_ARG" = "specify-seam" ]; then
   # `- intent-ratified:` sub-bullet included) participates in this
   # arithmetic, by design (T-1103 DP-13: the gate is version-based and
   # class-blind).
+  #
+  # T-1103 round-3 rework (Codex impl-review round 2, fresh Blocker): this
+  # loop's own capture used to be `^[[:space:]]*-\ intent-hash\ \(v([0-9]+)\):`
+  # — an UNBOUNDED digit count feeding `$((10#$v))` — the identical overflow
+  # class Blocker 1 above already closed on the equality's OTHER operand
+  # (APPROVES), left open here on MAXV. Live repro that motivated this fix: a
+  # board entry carrying only `- intent-hash (v18446744073709551617):`
+  # alongside `approves=v2` refused nothing (exit 0, silent), because
+  # `$((10#18446744073709551617))` wraps to 1, making MAXV=1 and EXPECTED=2
+  # — indistinguishable from a genuine `v1` entry.
+  #
+  # The bound is PORTED from bin/check-intent.sh's own HASH_FULL_RE
+  # (`^[[:space:]]+- intent-hash \(v([0-9]{1,4})\): ([0-9a-f]{40})$`,
+  # check-intent.sh:440), which bounds the identical field to {1,4} digits
+  # with a comment citing T-1021 (D4, Codex round1 Major) as the reason the
+  # bound exists there: "hash_version is fed straight into a `10#`
+  # arithmetic expansion... with no width bound on the capture" — same
+  # sibling file, same board grammar, same underlying class of defect.
+  # {1,4} (max 9999) carries the same headroom this repo's own board history
+  # already established sufficient at the sibling site.
+  #
+  # Refusal semantics for a line that LOOKS like an intent-hash sub-bullet
+  # (matches the loose anchor) but fails the bounded full grammar: this is
+  # board content the checker cannot evaluate, so it refuses fail-closed
+  # (intent-hash-malformed, exit 1 — the same exit-1 "content refusal" class
+  # every other malformed-grammar refusal in this file uses) rather than
+  # skipping the line and silently continuing. Skip-and-continue was
+  # rejected on purpose: it would let a fabricated oversized (or otherwise
+  # malformed) intent-hash line hide the board's real maximum from this
+  # equality instead of being counted against it. This mirrors
+  # check-intent.sh's own disposition for the identical shape — a line that
+  # matches HASH_LINE_RE but not HASH_FULL_RE increments hash_bad_count,
+  # which unconditionally fails the check (fail_hash_structural) rather than
+  # being dropped from the count. The refusal message never echoes the
+  # offending digit string (or any other byte of the malformed line), only
+  # naming which task's entry and which sub-bullet shape was rejected.
+  HASH_LOOSE_RE='^[[:space:]]*-\ intent-hash\ \('
+  HASH_STRICT_RE='^[[:space:]]*-\ intent-hash\ \(v([0-9]{1,4})\):\ [0-9a-f]{40}$'
   MAXV=0
   while IFS= read -r iln; do
     [ -n "$iln" ] || continue
-    if [[ "$iln" =~ ^[[:space:]]*-\ intent-hash\ \(v([0-9]+)\): ]]; then
-      v="${BASH_REMATCH[1]}"
-      v="$((10#$v))"
-      if [ "$v" -gt "$MAXV" ]; then MAXV="$v"; fi
+    if [[ "$iln" =~ $HASH_LOOSE_RE ]]; then
+      if [[ "$iln" =~ $HASH_STRICT_RE ]]; then
+        v="${BASH_REMATCH[1]}"
+        v="$((10#$v))"
+        if [ "$v" -gt "$MAXV" ]; then MAXV="$v"; fi
+      else
+        refuse intent-hash-malformed 1 "$TASK_ARG's board entry carries a '- intent-hash (...):' sub-bullet whose grammar does not match the required bounded form (v<N>, at most 4 digits, followed by a 40-hex hash) — refusing rather than silently truncating or dropping an oversized or malformed version number from this equality's maximum"
+      fi
     fi
   done <<< "$ENTRY"
   EXPECTED=$((MAXV + 1))

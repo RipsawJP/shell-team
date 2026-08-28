@@ -373,6 +373,42 @@ chk "anchor bound: a leading-zero approves=v01 refuses approval-anchor-malformed
 grep -qF -- 'approval-anchor-malformed' "$T/err" || fail "expected approval-anchor-malformed token for the leading-zero value"
 
 # =============================================================================
+# 13b. Round-3 rework (Codex impl-review round 2, fresh Blocker): the
+#      specify-seam equality's OTHER operand — MAXV, derived from the
+#      board's own `- intent-hash (v<M>):` sub-bullets — is bounded the
+#      same way, before ITS `$((10#$v))` conversion runs.
+# =============================================================================
+
+# The reviewer's exact live repro: a single oversized intent-hash line with
+# no genuine higher entry beside it. Under the pre-fix unbounded capture
+# this passed silently (exit 0) because `$((10#18446744073709551617))`
+# wraps to 1, making MAXV=1 and EXPECTED=2 — indistinguishable from a
+# genuine v1 entry. Must now refuse.
+bd board-maxv-overflow.md "- intent-hash (v18446744073709551617): $HC" "$(rec specify-seam reviewer-01 author-02 v2)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-maxv-overflow.md")
+chk "MAXV bound: an oversized intent-hash version (20 digits, wraps 2^64 to 1) refuses intent-hash-malformed rather than exit 0" 1 "$rc"
+grep -qF -- 'intent-hash-malformed' "$T/err" || fail "expected intent-hash-malformed token for the oversized intent-hash version"
+grep -qF -- '18446744073709551617' "$T/err" && fail "the intent-hash-malformed refusal must not echo the oversized digit string"
+
+# One digit past the ported {1,4} bound (5 digits) — the boundary case.
+bd board-maxv-5digit.md "- intent-hash (v99999): $HC" "$(rec specify-seam reviewer-01 author-02 v1)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-maxv-5digit.md")
+chk "MAXV bound: a 5-digit intent-hash version (one past the ported {1,4} bound) refuses intent-hash-malformed" 1 "$rc"
+grep -qF -- 'intent-hash-malformed' "$T/err" || fail "expected intent-hash-malformed token for the 5-digit intent-hash version"
+
+# Positive control: a conformant multi-version board (two well-formed
+# intent-hash sub-bullets, v1 and v2) still derives MAXV=2 correctly, so a
+# ratified approves=v3 passes and a stale approves=v2 still refuses.
+bd board-maxv-multi-ok.md "- intent-hash (v1): $HC" "- intent-hash (v2): $HC" "$(rec specify-seam reviewer-01 author-02 v3)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-maxv-multi-ok.md")
+chk "MAXV bound: a conformant two-entry intent-hash board (v1, v2) still derives MAXV=2, and a current approves=v3 passes" 0 "$rc"
+
+bd board-maxv-multi-stale.md "- intent-hash (v1): $HC" "- intent-hash (v2): $HC" "$(rec specify-seam reviewer-01 author-02 v2)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-maxv-multi-stale.md")
+chk "MAXV bound: the same conformant two-entry board still refuses a stale approves=v2 (expected v3)" 1 "$rc"
+grep -qF -- 'approval-stale' "$T/err" || fail "expected approval-stale token for the stale case against the multi-entry MAXV"
+
+# =============================================================================
 # 14. Round-2 rework, Blocker 2: an em-dash-delimited decoy tail inside
 #     record='s own free-form value cannot shift an earlier field's
 #     extraction — a conformant record with a decoy-bearing locator still
