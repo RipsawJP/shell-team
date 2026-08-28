@@ -352,4 +352,110 @@ rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$
 chk "class-M: a stale approves=v1 at a class-M re-freeze STILL refuses (no class-M exemption)" 1 "$rc"
 grep -qF -- 'approval-stale' "$T/err" || fail "expected approval-stale token at the class-M stale case"
 
+# =============================================================================
+# 13. Round-2 rework, Blocker 1: the specify-seam anchor equality is bounded
+#     BEFORE any arithmetic runs on the untrusted approves= field — the
+#     overflow value itself, a 20-digit value, and a leading-zero form.
+# =============================================================================
+bd board-overflow.md "$(rec specify-seam reviewer-01 author-02 v18446744073709551617)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-overflow.md")
+chk "anchor bound: approves=v18446744073709551617 (wraps 2^64 to 1 under unbounded 10# arithmetic) refuses approval-anchor-malformed" 1 "$rc"
+grep -qF -- 'approval-anchor-malformed' "$T/err" || fail "expected approval-anchor-malformed token for the overflow value"
+
+bd board-20digit.md "$(rec specify-seam reviewer-01 author-02 v99999999999999999999)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-20digit.md")
+chk "anchor bound: a 20-digit approves= value refuses approval-anchor-malformed" 1 "$rc"
+grep -qF -- 'approval-anchor-malformed' "$T/err" || fail "expected approval-anchor-malformed token for the 20-digit value"
+
+bd board-leadzero.md "$(rec specify-seam reviewer-01 author-02 v01)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-leadzero.md")
+chk "anchor bound: a leading-zero approves=v01 refuses approval-anchor-malformed rather than being read as v1" 1 "$rc"
+grep -qF -- 'approval-anchor-malformed' "$T/err" || fail "expected approval-anchor-malformed token for the leading-zero value"
+
+# =============================================================================
+# 14. Round-2 rework, Blocker 2: an em-dash-delimited decoy tail inside
+#     record='s own free-form value cannot shift an earlier field's
+#     extraction — a conformant record with a decoy-bearing locator still
+#     passes, and a genuinely malformed record is not rescued by a decoy.
+# =============================================================================
+# A single decoy segment (just a trailing "— approves=v999") is NOT
+# genuinely ambiguous under a greedy-`.*` extraction: since there is only
+# one "date=" and one "record=" substring in the whole line, the regex
+# engine has exactly one way to satisfy the fields still required after the
+# capture, so it resolves correctly by construction rather than by this
+# fix. The decoy below duplicates BOTH "date=" and "record=" (not just
+# "approves=") after the real fields, which is what makes the earlier
+# fields' extraction genuinely ambiguous under a greedy-backtracking design
+# — verified directly against this exact string with three independent
+# regex engines (BSD sed, Python `re`, Perl) before this fixture was
+# written, each resolving `approves=` to the decoy's `v999` under the
+# pre-fix five-independent-greedy-`sed`-pass shape.
+DECOY_OK="  - oversight-approval (specify-seam): approver=reviewer-01 $EM producer=author-02 $EM approves=v1 $EM date=2026-08-27 $EM record=docs/specs/fixture.md $EM approves=v999 $EM date=2099-01-01 $EM record=evil.md"
+bd board-decoy-ok.md "$DECOY_OK"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-decoy-ok.md")
+chk "record forgery: an em-dash decoy tail inside record= (duplicating approves=/date=/record=, the genuinely ambiguous shape under a greedy-.* extraction) does not shift the real approves= — the conformant record still passes" 0 "$rc"
+
+DECOY_BAD="  - oversight-approval (specify-seam): approver=reviewer-01 $EM producer=author-02 $EM date=2026-08-27 $EM record=docs/specs/fixture.md $EM approves=v1"
+bd board-decoy-bad.md "$DECOY_BAD"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-decoy-bad.md")
+chk "record forgery: a genuinely malformed record (approves= missing from its own slot) is not rescued by a decoy approves= inside record=" 1 "$rc"
+grep -qF -- 'approval-malformed' "$T/err" || fail "expected approval-malformed token for the decoy-rescued-malformed case"
+
+# =============================================================================
+# 15. Round-2 rework, Major 1: the absent arm genuinely resolves and
+#     validates the shipped templates/oversight-default.conf from the
+#     SCRIPT'S OWN installed directory, member for member with
+#     bin/resolve-executor.sh's absent arm — proven with a scratch bin/ +
+#     templates/ pair the real repo's own templates/oversight-default.conf
+#     cannot satisfy by accident.
+# =============================================================================
+mkdir -p "$T/shipped-present/bin" "$T/shipped-present/templates" "$T/shipped-present/absentbase"
+cp "$SCRIPT" "$T/shipped-present/bin/check-oversight.sh"
+printf 'schema 1\n\nprofile autonomous\n' > "$T/shipped-present/templates/oversight-default.conf"
+rc=$(bash "$T/shipped-present/bin/check-oversight.sh" --base "$T/shipped-present/absentbase" --print-profile >"$T/out" 2>"$T/err"; echo $?)
+chk "absent arm: a present shipped default (script's own installed dir) resolves and prints its declared profile" 0 "$rc"
+[ "$(cat "$T/out")" = "profile autonomous" ] || fail "absent arm: stdout must be exactly 'profile autonomous' from the shipped default"
+
+mkdir -p "$T/shipped-missing/bin" "$T/shipped-missing/absentbase"
+cp "$SCRIPT" "$T/shipped-missing/bin/check-oversight.sh"
+rc=$(bash "$T/shipped-missing/bin/check-oversight.sh" --base "$T/shipped-missing/absentbase" --print-profile >"$T/out" 2>"$T/err"; echo $?)
+chk "absent arm: a missing shipped templates/oversight-default.conf refuses declaration-unreadable (exit 2), never a hardcoded literal" 2 "$rc"
+grep -qF -- 'declaration-unreadable' "$T/err" || fail "expected declaration-unreadable token for a missing shipped default"
+
+# =============================================================================
+# 16. Round-2 rework, Major 2: approval-malformed never echoes a real-looking
+#     handle's bytes — extending the AC12-style no-echo assertion to the
+#     grammar-mismatch class it did not previously cover.
+# =============================================================================
+GRAMMAR_BAD="  - oversight-approval (specify-seam): approver=reviewer-01 producer=author-02 approves=v1 date=2026-08-27 record=docs/specs/fixture.md"
+bd board-grammar-handles.md "$GRAMMAR_BAD"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-grammar-handles.md")
+chk "no-echo: a grammar-mismatching record (missing EM separators) refuses approval-malformed" 1 "$rc"
+grep -qF -- 'approval-malformed' "$T/err" || fail "expected approval-malformed token"
+grep -qF -- 'reviewer-01' "$T/err" && fail "approval-malformed must never echo the approver handle's bytes"
+grep -qF -- 'author-02' "$T/err" && fail "approval-malformed must never echo the producer handle's bytes"
+
+# =============================================================================
+# 17. Round-2 rework, Minor 1: a genuine `git log` failure (an anomalous
+#     spec: path) refuses rather than being silently treated as "no commit
+#     has touched this path yet" (the legitimate, reachable skip case).
+# =============================================================================
+mkdir -p "$T/gitfail"
+printf 'schema 1\nprofile governance-controlled\nseam pre-merge\n' > "$T/gitfail/oversight.conf"
+BOGUS_SPEC=':(bogus)notreal.md'
+printf '# Tasks\n\n## Active\n\n- [ ] **T-000** Fixture %s %sREADY_FOR_ARCH%s %s spec: %s\n  %s\n\n## Done\n' \
+  "$EM" "$BT" "$BT" "$EM" "$BOGUS_SPEC" "$(rec pre-merge reviewer-01 author-02 "$HC")" > "$T/board-gitfail.md"
+rc=$(invoke --base "$T/gitfail" --seam pre-merge --task T-000 --board "$T/board-gitfail.md")
+chk "git-log failure: an anomalous spec: path that makes git log itself fail refuses rather than silently skipping the precedence check" 2 "$rc"
+grep -qF -- 'git log' "$T/err" || fail "expected the refusal to name the git log failure"
+
+# =============================================================================
+# 18. Round-2 rework, Minor 2: date= is validated against its documented
+#     YYYY-MM-DD grammar rather than accepted as free text.
+# =============================================================================
+bd board-baddate.md "- oversight-approval (specify-seam): approver=reviewer-01 $EM producer=author-02 $EM approves=v1 $EM date=not-a-date $EM record=docs/specs/fixture.md"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-baddate.md")
+chk "date grammar: date=not-a-date refuses approval-malformed" 1 "$rc"
+grep -qF -- 'approval-malformed' "$T/err" || fail "expected approval-malformed token for the date grammar violation"
+
 echo "check-oversight suite: all assertions passed"

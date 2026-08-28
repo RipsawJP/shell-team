@@ -568,6 +568,13 @@ pass "interventions-checker-absent-exit2 — a missing sibling checker is exit 2
 STUB_ROOT="$IV_ROOT/stub"
 mkdir -p "$STUB_ROOT"
 cp -R "$REPO_ROOT/bin" "$STUB_ROOT/bin"
+# T-1103 (#343): the unconditional oversight-profile pre-merge gate resolves
+# its shipped default from the invoked checker's OWN installed directory
+# (one level up), never the real repo's — so a scratch bin/ copy whose
+# positive-control invocation reaches that gate needs its own sibling
+# templates/ carrying the shipped default, mirroring the real installed
+# layout (the same shape tests/check-adapter/run.sh already copies).
+cp -R "$REPO_ROOT/templates" "$STUB_ROOT/templates"
 mkdir -p "$STUB_ROOT/root"
 write_conformant_interventions_record "$STUB_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
@@ -609,6 +616,12 @@ pass "interventions-usage-classification-exit2 positive control — a stub check
 RF_ROOT="$IV_ROOT/resolver-failure"
 mkdir -p "$RF_ROOT"
 cp -R "$REPO_ROOT/bin" "$RF_ROOT/bin"
+# T-1103 (#343): see the STUB_ROOT comment above — the positive control below
+# reaches the oversight-profile gate too, and its own $TEAM_OVERSIGHT_BASE
+# override still lands on the absent arm (no oversight.conf at that path),
+# which resolves the shipped default from this scratch bin/'s own sibling
+# templates/.
+cp -R "$REPO_ROOT/templates" "$RF_ROOT/templates"
 mkdir -p "$RF_ROOT/root"
 write_conformant_interventions_record "$RF_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
@@ -739,6 +752,9 @@ pass "interventions-board-untouched-on-refusal — every interventions-gate refu
 HS_ROOT="$TMP/handoff-sibling"
 mkdir -p "$HS_ROOT/root"
 cp -R "$REPO_ROOT/bin" "$HS_ROOT/bin"
+# T-1103 (#343): see the STUB_ROOT comment above — the positive control at
+# the end of this block reaches the unconditional oversight-profile gate.
+cp -R "$REPO_ROOT/templates" "$HS_ROOT/templates"
 write_conformant_interventions_record "$HS_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
 printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$HS_ROOT/root/todo.md"
@@ -872,6 +888,9 @@ pass "closeout-sourceline-stderr-order-note-checker-reason — D4's three-part o
 STUB_SL_ROOT="$TMP/sourceline-stub"
 mkdir -p "$STUB_SL_ROOT/root"
 cp -R "$REPO_ROOT/bin" "$STUB_SL_ROOT/bin"
+# T-1103 (#343): see the STUB_ROOT comment above — the zero-exit positive
+# control below reaches the unconditional oversight-profile gate.
+cp -R "$REPO_ROOT/templates" "$STUB_SL_ROOT/templates"
 write_conformant_interventions_record "$STUB_SL_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
 printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$STUB_SL_ROOT/root/todo.md"

@@ -143,6 +143,15 @@ self_name="$(basename "$script_path")" \
   || fail_usage "basename failed to resolve this script's own file name for: $script_path"
 SELF="$SCRIPT_DIR/$self_name"
 
+# One level above this script's own installed directory, computed the same
+# way as bin/resolve-executor.sh:295-296's own TEMPLATES_ROOT (a fresh
+# `cd && pwd -P` rather than assuming SCRIPT_DIR's one-level-up traversal
+# introduces no new symlink) — NEVER the current working directory, so a
+# decoy templates/oversight-default.conf in an adopter's own tree cannot
+# substitute a profile (T-1103 round-2 rework, Major 1).
+TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)" \
+  || fail_usage "cannot resolve the templates directory (one level above check-oversight.sh's own installed directory)"
+
 print_help() {
   awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}' "$SELF" \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
@@ -347,8 +356,22 @@ if [ "$PRESENT" -eq 1 ]; then
     || refuse declaration-unreadable 2 "cannot read the oversight declaration: $CONFIG_PATH"
   parse_config "$CONFIG_PATH"
 else
-  PROFILE="autonomous"
-  SEAMS=()
+  # T-1103 round-2 rework, Major 1: the absent arm now actually resolves and
+  # validates the shipped templates/oversight-default.conf through the
+  # SAME parse_config() sibling a host declaration goes through, member for
+  # member with bin/resolve-executor.sh:319-326's own absent arm (which
+  # resolves templates/binding-default.conf and delegates to
+  # check-binding.sh rather than hardcoding the result). A missing or
+  # unreadable shipped default refuses declaration-unreadable, exit 2 —
+  # this task's own Input space: "An install whose bin/check-oversight.sh
+  # or shipped templates/oversight-default.conf is missing or unreadable.
+  # die, exit 2 ..." — never a silently hardcoded 'autonomous' literal.
+  DEFAULT_CONFIG="$TEMPLATES_ROOT/templates/oversight-default.conf"
+  if [ -f "$DEFAULT_CONFIG" ] && [ -r "$DEFAULT_CONFIG" ]; then
+    parse_config "$DEFAULT_CONFIG"
+  else
+    refuse declaration-unreadable 2 "the shipped default oversight declaration is missing or unreadable: $DEFAULT_CONFIG"
+  fi
 fi
 
 # --- --print-profile mode: done, no board needed ----------------------------
@@ -429,16 +452,70 @@ MCOUNT="$(printf '%s\n' "$MATCHES" | grep -c . || true)"
 RLINE="$MATCHES"
 REM="$(printf '%s\n' "$RLINE" | sed -E "s/^[[:space:]]*- oversight-approval \\($SEAM_ARG\\): //")"
 
-FULL_RE='^approver=.* '"$EM"' producer=.* '"$EM"' approves=.* '"$EM"' date=.* '"$EM"' record=.*$'
-printf '%s\n' "$REM" | grep -qE -- "$FULL_RE" \
-  || refuse approval-malformed 1 "$TASK_ARG's '- oversight-approval ($SEAM_ARG):' record does not match the required grammar (approver=... — producer=... — approves=... — date=... — record=...): $RLINE"
+# Absolute board line number of the record, so a malformed-grammar refusal
+# can name WHERE the problem is without ever echoing WHAT it contains (round
+# -2 rework, Major 2: approval-malformed used to interpolate the whole raw
+# line, handle bytes included, into its stderr message, contradicting this
+# file's own no-echo invariant, header lines 93-96).
+REL_LINE="$(printf '%s\n' "$ENTRY" | grep -n -E -- "$RECORD_ANCHOR" | sed -n '1p' | cut -d: -f1)"
+RLINE_NUM=$((REL_LINE + A_START - 1))
 
-approver_raw="$(printf '%s\n' "$REM" | sed -nE "s/^approver=(.*) $EM producer=.* $EM approves=.* $EM date=.* $EM record=.*\$/\1/p")"
-producer_raw="$(printf '%s\n' "$REM" | sed -nE "s/^approver=.* $EM producer=(.*) $EM approves=.* $EM date=.* $EM record=.*\$/\1/p")"
-approves_raw="$(printf '%s\n' "$REM" | sed -nE "s/^approver=.* $EM producer=.* $EM approves=(.*) $EM date=.* $EM record=.*\$/\1/p")"
+# --- single-pass field extraction (round-2 rework, Blocker 2) ---------------
+# The previous shape ran three INDEPENDENT greedy `sed` passes, one per
+# field, each anchored to the WHOLE line with its own `.*` before the next
+# literal ` EM ` separator. Because record= is genuinely free-form and
+# permitted to contain the separator itself (this file's own header, and the
+# dispatch-record precedent it copies — bin/close-out.sh:288-291), an em-
+# dash-delimited decoy sequence planted inside record='s own value gave every
+# EARLIER field's greedy `.*` a second, later place in the line to anchor
+# on — shifting approves_raw (or any other field) to the decoy's value
+# instead of the record's real one. The fix reads the five fields left to
+# right in ONE pass, consuming exactly one ` EM `-delimited key=value prefix
+# per field before advancing past it, so record= — the last field — can
+# never influence where an EARLIER field is read from: the decoy tail lands
+# entirely inside record='s own (unread) value. This is the same left-to-
+# right discipline bin/close-out.sh:288-291's dispatch-record parse already
+# uses, adapted from restricted-charset fields to arbitrary-byte ones by
+# consuming the separator itself rather than a charset boundary.
+approver_raw="" producer_raw="" approves_raw="" date_raw=""
+rest="$REM"
+parse_ok=1
+for key in approver producer approves date; do
+  case "$rest" in
+    "$key="*) : ;;
+    *) parse_ok=0 ;;
+  esac
+  if [ "$parse_ok" -eq 1 ]; then
+    case "$rest" in
+      *" $EM "*)
+        kv="${rest%% "$EM" *}"
+        rest="${rest#*"$EM" }"
+        ;;
+      *) parse_ok=0 ;;
+    esac
+  fi
+  [ "$parse_ok" -eq 1 ] || break
+  val="${kv#"$key"=}"
+  case "$key" in
+    approver) approver_raw="$val" ;;
+    producer) producer_raw="$val" ;;
+    approves) approves_raw="$val" ;;
+    date)     date_raw="$val" ;;
+  esac
+done
+if [ "$parse_ok" -eq 1 ]; then
+  case "$rest" in
+    record=*) : ;;
+    *) parse_ok=0 ;;
+  esac
+fi
+
+[ "$parse_ok" -eq 1 ] \
+  || refuse approval-malformed 1 "$TASK_ARG's '- oversight-approval ($SEAM_ARG):' record at board line $RLINE_NUM does not match the required grammar (approver=... — producer=... — approves=... — date=... — record=...)"
 
 APPROVER="$(trim "$approver_raw")"
 PRODUCER="$(trim "$producer_raw")"
+DATE="$(trim "$date_raw")"
 
 [[ "$APPROVER" =~ $HANDLE_RE ]] || refuse bad-handle 1 "$TASK_ARG's '- oversight-approval ($SEAM_ARG):' approver= value does not match the required handle grammar"
 [[ "$PRODUCER" =~ $HANDLE_RE ]] || refuse bad-handle 1 "$TASK_ARG's '- oversight-approval ($SEAM_ARG):' producer= value does not match the required handle grammar"
@@ -447,12 +524,37 @@ if [ "$(lower_ascii "$APPROVER")" = "$(lower_ascii "$PRODUCER")" ]; then
   refuse approver-equals-producer 1 "$TASK_ARG's '- oversight-approval ($SEAM_ARG):' approver and producer are the same party after ASCII normalization"
 fi
 
+# T-1103 round-2 rework, Minor 2: date= grammar (YYYY-MM-DD), the shape this
+# task's own record-grammar paragraph states. date= plays no role in the
+# anchor/staleness logic (that is approves='s job, below), so this is
+# audit-trail quality rather than a control gap — but it was unvalidated
+# before this rework.
+DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+[[ "$DATE" =~ $DATE_RE ]] \
+  || refuse approval-malformed 1 "$TASK_ARG's '- oversight-approval ($SEAM_ARG):' date= value does not match the required form YYYY-MM-DD"
+
 APPROVES="$(trim "$approves_raw")"
 
 # --- the two anchor comparisons ---------------------------------------------
 if [ "$SEAM_ARG" = "specify-seam" ]; then
-  [[ "$APPROVES" =~ ^v[0-9]+$ ]] \
-    || refuse approval-anchor-malformed 1 "$TASK_ARG's '- oversight-approval (specify-seam):' approves= value is not of the required form v<N>: '$APPROVES'"
+  # T-1103 round-2 rework, Blocker 1: bounded BEFORE any `$((10#...))`
+  # arithmetic runs on this untrusted, party-authored field (duty C (ii)
+  # discloses that one party can write approves= unsupervised). The
+  # previous form (`^v[0-9]+$`, unbounded digit count) let
+  # `approves=v18446744073709551617` wrap bash's fixed-width arithmetic
+  # modulo 2^64 (`$((10#18446744073709551617))` == 1) and pass the equality
+  # check silently as if it read `approves=v1` — the identical class of
+  # defect (an anchor value that should be bounded but isn't) two prior
+  # review rounds already fought to close via the comparison operator,
+  # resurfacing here through integer overflow instead. Fifteen digits
+  # (max ~10^15) is comfortably below bash's 64-bit signed ceiling
+  # (~9.2*10^18, 19-20 digits) with no realistic board ever approaching it,
+  # and a leading zero (other than the literal single digit '0') is refused
+  # rather than silently accepted as an equivalent numeral, since this
+  # anchor is compared for EQUALITY against a canonical `v<N>` form with no
+  # leading zeros.
+  [[ "$APPROVES" =~ ^v(0|[1-9][0-9]{0,14})$ ]] \
+    || refuse approval-anchor-malformed 1 "$TASK_ARG's '- oversight-approval (specify-seam):' approves= value is not of the required form v<N> (at most 15 digits, no leading zero): '$APPROVES'"
 
   # The checker reads ONLY `- intent-hash (v<M>):` sub-bullets and the
   # approval record — nothing else on the entry (a `- refreeze-class:` or
@@ -495,7 +597,19 @@ else
 
   SPEC_PATH="$(printf '%s\n' "$ENTRY" | sed -n '1p' | sed -nE 's/^- \[ \] \*\*T-[0-9]+\*\* .* spec: ([^[:space:]]+\.md)[[:space:]]*$/\1/p')"
   if [ -n "$SPEC_PATH" ]; then
-    LAST_TOUCH="$(git log -1 --format=%H -- "$SPEC_PATH" 2>/dev/null || true)"
+    # T-1103 round-2 rework, Minor 1: a genuine `git log` FAILURE (an
+    # anomalous spec: path git rejects, e.g. invalid pathspec magic) must
+    # not read the same as "no commit has ever touched this path" (a
+    # legitimate, reachable, explicitly-skipped class per this task's own
+    # Input space) — the previous `|| true` collapsed both into an empty
+    # LAST_TOUCH and silently skipped the freshness check either way. The
+    # exit status is captured through the errexit-safe `cmd || rc=$?` shape
+    # (repo convention) rather than swallowed, so a real failure refuses
+    # instead of silently passing.
+    GIT_LOG_RC=0
+    LAST_TOUCH="$(git log -1 --format=%H -- "$SPEC_PATH" 2>/dev/null)" || GIT_LOG_RC=$?
+    [ "$GIT_LOG_RC" -eq 0 ] \
+      || refuse not-a-git-repo 2 "git log exited $GIT_LOG_RC while resolving the last commit that touched $SPEC_PATH"
     if [ -n "$LAST_TOUCH" ]; then
       git merge-base --is-ancestor "$LAST_TOUCH" "$APPROVES" 2>/dev/null \
         || refuse approval-stale 1 "$TASK_ARG's '- oversight-approval (pre-merge):' approves= value predates the last commit that touched $SPEC_PATH"
