@@ -377,7 +377,8 @@ if [ "$PRESENT" -eq 0 ]; then
 fi
 
 # --- locate the task's own ## Active entry extent (shared shape with
-# bin/check-entry-mode.sh / bin/check-spec-review.sh / bin/close-out.sh) ----
+# bin/check-entry-mode.sh, its close-out-side arm-A sibling, and
+# bin/close-out.sh itself) ----------------------------------------------------
 scan="$(awk -v task="$TASK_ARG" '
   BEGIN { sec=""; a_start=0; a_end=0; a_count=0; capturing=0 }
   /^## /            { sec=$0; capturing=0 }
