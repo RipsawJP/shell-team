@@ -396,6 +396,14 @@ rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$
 chk "MAXV bound: a 5-digit intent-hash version (one past the ported {1,4} bound) refuses intent-hash-malformed" 1 "$rc"
 grep -qF -- 'intent-hash-malformed' "$T/err" || fail "expected intent-hash-malformed token for the 5-digit intent-hash version"
 
+# The {1,4} bound's ACCEPTING side, pinned (impl-review round 3, Minor): a
+# 4-digit intent-hash version sits exactly at the ceiling, still inside the
+# ported bound, so it must parse and derive MAXV=9999/EXPECTED=10000
+# normally rather than refuse.
+bd board-maxv-4digit.md "- intent-hash (v9999): $HC" "$(rec specify-seam reviewer-01 author-02 v10000)"
+rc=$(invoke --base "$T/approvalbase" --seam specify-seam --task T-000 --board "$T/board-maxv-4digit.md")
+chk "MAXV bound: a 4-digit intent-hash version (the ported {1,4} bound's own ceiling) parses, and a matching approves=v10000 passes" 0 "$rc"
+
 # Positive control: a conformant multi-version board (two well-formed
 # intent-hash sub-bullets, v1 and v2) still derives MAXV=2 correctly, so a
 # ratified approves=v3 passes and a stale approves=v2 still refuses.
