@@ -395,34 +395,68 @@ Two populations, both derived at HEAD rather than counted by eye. The freeze run
 <!-- BEGIN derivation: t1103surface -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
-- set: conf — status: 1 — lines: 0 — items: 0 — command: git grep -l -F -e 'oversight.conf' -- bin templates skills docs .github
-- set: checker — status: 1 — lines: 0 — items: 0 — command: git grep -l -F -e 'check-oversight.sh' -- bin tests templates skills docs .github
-- union: items: 0
+- set: conf — status: 0 — lines: 4 — items: 4 — command: git grep -l -F -e 'oversight.conf' -- bin templates skills docs .github
+- set: checker — status: 0 — lines: 10 — items: 10 — command: git grep -l -F -e 'check-oversight.sh' -- bin tests templates skills docs .github
+- union: items: 10
+- bucket: checker — items: 6
+  - .github/workflows/check-handoff.yml
+  - bin/close-out.sh
+  - docs/loop-engineering/record-tamper-resistance.md
+  - skills/run/SKILL.md
+  - tests/check-oversight/fixtures/example-record.md
+  - tests/check-oversight/run.sh
+- bucket: conf+checker — items: 4
+  - bin/check-oversight.sh
+  - docs/adopting.ja.md
+  - docs/adopting.md
+  - templates/oversight-default.conf
 <!-- END derivation: t1103surface -->
+- post-implementation note: this block was re-derived after the diff landed
+  (measured against the current tree, superseding the pre-implementation
+  zero the freeze run recorded), because `git grep`'s default scope covers
+  the working tree of tracked files, so this task's own committed diff
+  necessarily changes a population defined over the literals it introduces
+  — the same class of self-reference this task's own tracked files are
+  now part of the population they name. **AC16** requires the block to
+  match its own reproduce command's live output, not a point-in-time
+  snapshot, so re-deriving it here rather than leaving the pre-
+  implementation zero standing is what the criterion itself asks for.
 
 - reproduce: bash bin/derive-populations.sh --label t1103seams --set "seamspecify=git grep -l -F -e 'specify-seam' -- bin tests templates skills docs" --set "seampremerge=git grep -l -F -e 'pre-merge' -- bin tests templates skills docs" --accept-status seamspecify=1 --accept-status seampremerge=1
 
 <!-- BEGIN derivation: t1103seams -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
-- set: seamspecify — status: 0 — lines: 7 — items: 7 — command: git grep -l -F -e 'specify-seam' -- bin tests templates skills docs
-- set: seampremerge — status: 0 — lines: 5 — items: 5 — command: git grep -l -F -e 'pre-merge' -- bin tests templates skills docs
-- union: items: 11
-- bucket: seampremerge — items: 4
+- set: seamspecify — status: 0 — lines: 12 — items: 12 — command: git grep -l -F -e 'specify-seam' -- bin tests templates skills docs
+- set: seampremerge — status: 0 — lines: 12 — items: 12 — command: git grep -l -F -e 'pre-merge' -- bin tests templates skills docs
+- union: items: 17
+- bucket: seampremerge — items: 5
   - bin/check-durability.sh
+  - bin/close-out.sh
   - skills/review-response/SKILL.md
   - templates/durability-records.txt
   - tests/check-durability/run.sh
-- bucket: seamspecify — items: 6
-  - docs/adopting.ja.md
-  - docs/adopting.md
+- bucket: seamspecify — items: 5
   - docs/loop-engineering/specify-seam-review.md
   - docs/workflow.ja.md
   - docs/workflow.md
   - templates/prompt-blocks/dispatch-record.md
-- bucket: seamspecify+seampremerge — items: 1
+  - tests/check-oversight/fixtures/example-record.md
+- bucket: seamspecify+seampremerge — items: 7
+  - bin/check-oversight.sh
+  - docs/adopting.ja.md
+  - docs/adopting.md
+  - docs/loop-engineering/record-tamper-resistance.md
   - skills/run/SKILL.md
+  - tests/check-oversight/run.sh
+  - tests/close-out/run.sh
 <!-- END derivation: t1103seams -->
+- post-implementation note: re-derived for the same reason as the block
+  above — `specify-seam` and `pre-merge` are now used, as literals, inside
+  this task's own shipped diff (the checker, its suite, the run-skill gate
+  bullet and both adopter sections), so the pre-implementation population
+  this criterion's own base measurement recorded no longer matches the
+  live tree, and **AC16** measures the live tree.
 
 ## Assumptions
 
