@@ -2125,3 +2125,61 @@ that file's order.
   first `cd`-ing into `$REPO_ROOT` (or the equivalent `-C`), or its output
   paths become relative to the wrong directory and every subsequent
   `grep -qxF` membership check silently fails to match.
+- T-1107: when a new fail-closed gate is added to `bin/close-out.sh` and its
+  own fixture suite (`tests/close-out/run.sh`) has dozens of inline boards
+  that hardcode a valid-but-arbitrary flag token as an incidental "some
+  valid flag" choice while testing an unrelated property, do not try to
+  enumerate the affected sites by hand — two prior spec-review rounds each
+  found sites a careful, purpose-read table had missed. Convert the
+  guidance into a RULE with a small EXCEPTION ROSTER instead: every
+  incidental flag token defaults to the new gate's own accepted value, and
+  only the roster (the differential corpus's own flag-axis rows, the
+  out-of-vocabulary negatives, and any loop whose own job is to enumerate
+  the flag vocabulary) keeps a different value. After converting, run
+  `grep -nE 'READY_FOR_[A-Z]+|BLOCKED|REWORK' tests/close-out/run.sh` and
+  confirm every hit outside the roster reads the new gate's accepted
+  value — this re-derives the population from the file itself instead of
+  trusting any list, and is cheap enough to re-run after every edit.
+  Composing a differential harness's oracle with a second conjunct (here,
+  `bin/check-handoff.sh`'s exit code AND a live-extracted flag equal to
+  the accepted value) needs a corpus that can actually falsify the wrong
+  extraction rule: a single title-embedded decoy backtick pair is not
+  enough if both a correct and a buggy extraction reach the same
+  accept/refuse verdict on it (traced live: the pre-existing
+  `tests/close-out/run.sh:997`-shaped decoy does not, because both
+  readings refuse there) — add two rows that swap which side (first vs.
+  rightmost) carries the accepted value, so a first-match bug diverges
+  from a rightmost-slot implementation on the accept/refuse decision
+  itself, in both directions. When raising a differential harness's own
+  floor assertions after such a change, do not hand-derive the new
+  post-conversion bucket sizes: run the suite once, read its own printed
+  `corpus=/refused=/accepted=/notlocated=` line, and set each new floor
+  below that measured value with a safety margin (verified live this
+  round: measured `corpus=34 refused=20 accepted=10 notlocated=4
+  mismatches=0`, floors raised to `30/16/9/3`, base-ref values were
+  `24/6/8/3`). Separately: this task's own AC10 (re-run every merged
+  spec's `- check:` line that drives `close-out.sh` against a
+  `READY_FOR_MERGE` fixture) surfaced two FAILs that are demonstrably
+  **pre-existing and unrelated to this task's diff**, confirmed by
+  reproducing each one against the base-ref-committed `bin/close-out.sh`
+  with no T-1107 changes applied at all: (1) `T-1092-specify-seam-review.md`
+  AC5/AC6 assert the spec-review-election backstop and its refusal
+  sentinel are absent from `bin/close-out.sh` (a 2026-08-23 carve-out,
+  issue #344), but `T-1096`'s later spec re-added that exact backstop
+  under a redesigned reader — the sentinel is present in `bin/close-out.sh`
+  at the true base ref already, so T-1092's own check line already fails
+  there, independent of anything T-1107 touches. (2)
+  `T-1100-verify-axis-split.md`'s AC at line 69 builds a scratch `bin/`
+  copy (`cp -R bin/. "$T/binbase/"`) to run the base-ref close-out.sh
+  against every board dispatch row, but never copies a sibling
+  `templates/` next to that scratch copy — so once `check-oversight.sh`'s
+  unconditional gate (T-1103) reaches far enough to resolve the shipped
+  `oversight-default.conf`, the scratch-copy arm dies `exit 2` with
+  `declaration-unreadable` while the check line's own "head" arm (which
+  calls the REAL `bin/close-out.sh`, whose real `templates/` sibling
+  resolves fine) does not — a staleness bug in T-1100's own check line
+  exposed by T-1103 landing after T-1100 was frozen, reproducible against
+  the base-ref script with zero T-1107 changes present. Both are disclosed
+  in the hand-off rather than repaired (repairing another task's frozen
+  criterion is out of this task's scope); the two isolating repro scripts
+  used to confirm this are not part of the shipped diff.

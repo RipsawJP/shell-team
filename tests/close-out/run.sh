@@ -236,7 +236,7 @@ inject_pending_task() {
   awk -v disp="$disposition" '
     { print }
     /^- \[ \] \*\*T-101\*\*/ {
-      print "- [ ] **T-150** pending fast-follow disposition fixture (T-068) — `READY_FOR_REVIEW` — spec: docs/specs/t-150.md"
+      print "- [ ] **T-150** pending fast-follow disposition fixture (T-068) — `READY_FOR_MERGE` — spec: docs/specs/t-150.md"
       print "  - fast-follow disposition (2026-07-16): " disp
     }
   ' "$root/tasks/todo.md" > "$root/tasks/todo.md.new"
@@ -292,7 +292,7 @@ inject_prose_quote_task() {
   awk '
     { print }
     /^- \[ \] \*\*T-101\*\*/ {
-      print "- [ ] **T-151** prose-quote false-positive regression fixture (T-068) — `READY_FOR_REVIEW` — spec: docs/specs/t-151.md"
+      print "- [ ] **T-151** prose-quote false-positive regression fixture (T-068) — `READY_FOR_MERGE` — spec: docs/specs/t-151.md"
       print "  - note: rework 注記の例 — `- fast-follow disposition (` と `pending:` を同一行で引用（disposition 実体なし）"
     }
   ' "$root/tasks/todo.md" > "$root/tasks/todo.md.new"
@@ -330,7 +330,7 @@ M1="$MOVE_ROOT/m1"
 mkdir -p "$M1"
 write_conformant_interventions_record "$M1/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - first note\n\n  | a | b |\n  |---|---|\n\n  - last note\n\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M1/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - first note\n\n  | a | b |\n  |---|---|\n\n  - last note\n\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M1/todo.md"
 ( cd "$M1" && TEAM_TODO="$M1/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M1/out" 2>"$M1/err" \
   || fail "move-carries-internal-blank: close-out should exit 0 (stderr: $(cat "$M1/err"))"
 m1_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M1/todo.md" | grep -c '[^[:space:]]' || true)"
@@ -357,7 +357,7 @@ M2="$MOVE_ROOT/m2"
 mkdir -p "$M2"
 write_conformant_interventions_record "$M2/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note one\n\n  | a | b |\n' > "$M2/todo.md"
+printf -- '# Tasks\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - note one\n\n  | a | b |\n' > "$M2/todo.md"
 ( cd "$M2" && TEAM_TODO="$M2/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M2/out" 2>"$M2/err" \
   || fail "move-final-entry-eof: close-out should exit 0 (stderr: $(cat "$M2/err"))"
 m2_a_count="$(awk '/^## Active/{f=1;next} f&&/^## /{f=0} f' "$M2/todo.md" | grep -c '[^[:space:]]' || true)"
@@ -376,7 +376,7 @@ M3="$MOVE_ROOT/m3"
 mkdir -p "$M3"
 write_conformant_interventions_record "$M3/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - first note\n\n  | a | b |\n\n  - last note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M3/plain.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - first note\n\n  | a | b |\n\n  - last note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M3/plain.md"
 awk '{ printf "%s\r\n", $0 }' "$M3/plain.md" > "$M3/todo.md"
 ( cd "$M3" && TEAM_TODO="$M3/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M3/out" 2>"$M3/err" \
   || fail "move-crlf-board: close-out should exit 0 on a CRLF board (stderr: $(cat "$M3/err"))"
@@ -392,7 +392,7 @@ M4="$MOVE_ROOT/m4"
 mkdir -p "$M4"
 write_conformant_interventions_record "$M4/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\t- tab note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M4/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\t- tab note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$M4/todo.md"
 ( cd "$M4" && TEAM_TODO="$M4/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M4/out" 2>"$M4/err" \
   || fail "move-tab-indented-subbullets: close-out should exit 0 (stderr: $(cat "$M4/err"))"
 grep -qF -- "$(printf '\t- tab note')" "$M4/todo.md" \
@@ -412,7 +412,7 @@ M5="$MOVE_ROOT/m5"
 mkdir -p "$M5"
 write_conformant_interventions_record "$M5/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n  - stranded line\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n' > "$M5/bad.md"
+printf -- '# Tasks\n\n## Active\n\n  - stranded line\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - note\n\n## Done\n' > "$M5/bad.md"
 cp "$M5/bad.md" "$M5/bad.orig"
 set +e
 ( cd "$M5" && TEAM_TODO="$M5/bad.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M5/out" 2>"$M5/err"
@@ -428,7 +428,7 @@ grep -qF -- 'stranded continuation line' "$M5/err" \
 pass "move-refusal-names-the-reason — the refusal's stderr names the strand reason instead of only \"would fail check-handoff.sh\" (D6)"
 
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n' > "$M5/good.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - note\n\n## Done\n' > "$M5/good.md"
 ( cd "$M5" && TEAM_TODO="$M5/good.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$M5/out2" 2>"$M5/err2" \
   || fail "move-refuses-stranded-board positive control: close-out should succeed once the strand is removed and nothing else changed"
 pass "move-refuses-stranded-board positive control — the same board with the strand removed and nothing else changed exits 0"
@@ -447,7 +447,7 @@ IH="$IV_ROOT/happy"
 mkdir -p "$IH"
 write_conformant_interventions_record "$IH/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$IH/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - note\n\n## Done\n\n- [x] **T-800** old — `READY_FOR_MERGE` — spec: y.md\n' > "$IH/todo.md"
 ( cd "$IH" && TEAM_TODO="$IH/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$IH/out" 2>"$IH/err" \
   || fail "interventions-happy-path-unchanged: close-out should still exit 0 with a conformant record present (stderr: $(cat "$IH/err"))"
 grep -q '^- \[x\] \*\*T-901\*\*' "$IH/todo.md" || fail "interventions-happy-path-unchanged: T-901 must move to Done"
@@ -462,7 +462,7 @@ MG="$IV_ROOT/missing-good"
 mkdir -p "$MB" "$MG"
 write_conformant_interventions_record "$MG/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$MB/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$MB/todo.md"
 cp "$MB/todo.md" "$MB/todo.orig"
 cp "$MB/todo.md" "$MG/todo.md"
 set +e
@@ -490,7 +490,7 @@ pass "interventions-missing-positive-control — the same board differing only b
 SC="$IV_ROOT/schema"
 mkdir -p "$SC/.shell-team/interventions"
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$SC/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$SC/todo.md"
 cp "$SC/todo.md" "$SC/todo.orig"
 printf '<!-- BEGIN interventions: T-901 -->\n- intervention: bogus-class\n<!-- END interventions: T-901 -->\n' > "$SC/.shell-team/interventions/T-901.md"
 set +e
@@ -515,7 +515,7 @@ ST="$IV_ROOT/structural"
 mkdir -p "$ST/.shell-team/interventions"
 STR="$ST/.shell-team/interventions/T-901.md"
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$ST/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$ST/todo.md"
 cp "$ST/todo.md" "$ST/todo.orig"
 printf '<!-- BEGIN interventions: T-902 -->\nno interventions occurred\n<!-- END interventions: T-902 -->\n' > "$STR"
 set +e
@@ -549,7 +549,7 @@ cp -R "$REPO_ROOT/bin" "$CA_ROOT/bin"
 mkdir -p "$CA_ROOT/root"
 write_conformant_interventions_record "$CA_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$CA_ROOT/root/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$CA_ROOT/root/todo.md"
 cp "$CA_ROOT/root/todo.md" "$CA_ROOT/root/todo.orig"
 rm -f "$CA_ROOT/bin/check-interventions.sh"
 set +e
@@ -578,7 +578,7 @@ cp -R "$REPO_ROOT/templates" "$STUB_ROOT/templates"
 mkdir -p "$STUB_ROOT/root"
 write_conformant_interventions_record "$STUB_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$STUB_ROOT/root/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$STUB_ROOT/root/todo.md"
 cp "$STUB_ROOT/root/todo.md" "$STUB_ROOT/root/todo.orig"
 STUB="$STUB_ROOT/bin/check-interventions.sh"
 
@@ -625,7 +625,7 @@ cp -R "$REPO_ROOT/templates" "$RF_ROOT/templates"
 mkdir -p "$RF_ROOT/root"
 write_conformant_interventions_record "$RF_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$RF_ROOT/root/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$RF_ROOT/root/todo.md"
 cp "$RF_ROOT/root/todo.md" "$RF_ROOT/root/todo.orig"
 rm -f "$RF_ROOT/bin/team-paths.sh"
 set +e
@@ -661,7 +661,7 @@ mkdir -p "$OV1/elsewhere" "$OV2/.shell-team/interventions" "$OV2/empty"
 write_conformant_interventions_record "$OV1/elsewhere/T-901.md" T-901
 write_conformant_interventions_record "$OV2/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$OV1/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$OV1/todo.md"
 cp "$OV1/todo.md" "$OV2/todo.md"
 cp "$OV2/todo.md" "$OV2/todo.orig"
 ( cd "$OV1" && TEAM_TODO="$OV1/todo.md" TEAM_INTERVENTIONS_DIR="$OV1/elsewhere" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OV1/out" 2>"$OV1/err" \
@@ -682,7 +682,7 @@ mkdir -p "$LL_ROOT/tasks/loops" "$LL_ROOT/tasks/interventions" "$LL_ROOT/docs/sp
 : > "$LL_ROOT/tasks/loops/shell-team.contract.yaml"
 write_conformant_interventions_record "$LL_ROOT/tasks/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: docs/specs/x.md\n\n## Done\n' > "$LL_ROOT/todo-src.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: docs/specs/x.md\n\n## Done\n' > "$LL_ROOT/todo-src.md"
 cp "$LL_ROOT/todo-src.md" "$LL_ROOT/tasks/todo.md"
 ( cd "$LL_ROOT" && bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$LL_ROOT/out" 2>"$LL_ROOT/err" \
   || fail "interventions-legacy-layout-resolution: a record at tasks/interventions/T-901.md must close the task out (stderr: $(cat "$LL_ROOT/err"))"
@@ -705,7 +705,7 @@ pass "interventions-legacy-layout-resolution positive+negative — the legacy re
 OD_ROOT="$IV_ROOT/order-disposition"
 mkdir -p "$OD_ROOT"
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - fast-follow disposition (2026-01-01): pending: issue filing pending approval\n\n## Done\n' > "$OD_ROOT/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - fast-follow disposition (2026-01-01): pending: issue filing pending approval\n\n## Done\n' > "$OD_ROOT/todo.md"
 cp "$OD_ROOT/todo.md" "$OD_ROOT/todo.orig"
 set +e
 ( cd "$OD_ROOT" && TEAM_TODO="$OD_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OD_ROOT/out" 2>"$OD_ROOT/err"
@@ -721,7 +721,7 @@ fi
 pass "interventions-order-disposition-first — an unresolved pending disposition wins over a missing interventions record (D4 ordering)"
 
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n  - fast-follow disposition (2026-01-01): filed as issue #999\n\n## Done\n' > "$OD_ROOT/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n  - fast-follow disposition (2026-01-01): filed as issue #999\n\n## Done\n' > "$OD_ROOT/todo.md"
 set +e
 ( cd "$OD_ROOT" && TEAM_TODO="$OD_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$OD_ROOT/out2" 2>"$OD_ROOT/err2"
 od_rc2=$?
@@ -735,7 +735,7 @@ pass "interventions-order-disposition-first positive control — once the dispos
 BU_ROOT="$IV_ROOT/board-untouched"
 mkdir -p "$BU_ROOT"
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$BU_ROOT/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$BU_ROOT/todo.md"
 cp "$BU_ROOT/todo.md" "$BU_ROOT/todo.orig"
 set +e
 ( cd "$BU_ROOT" && TEAM_TODO="$BU_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) >"$BU_ROOT/out" 2>"$BU_ROOT/err"
@@ -764,7 +764,7 @@ cp -R "$REPO_ROOT/bin" "$HS_ROOT/bin"
 cp -R "$REPO_ROOT/templates" "$HS_ROOT/templates"
 write_conformant_interventions_record "$HS_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$HS_ROOT/root/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$HS_ROOT/root/todo.md"
 cp "$HS_ROOT/root/todo.md" "$HS_ROOT/root/todo.orig"
 HS_SIBLING="$HS_ROOT/bin/check-handoff.sh"
 
@@ -833,7 +833,7 @@ sl_case() {
 
 # --- closeout-sourceline-whitespace-title-refuses / -flag-vocabulary-positive-control ---
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-sl_case whitespace-title '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+sl_case whitespace-title '- [ ] **T-901**    — `READY_FOR_MERGE` — spec: x.md'
 [ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-whitespace-title-refuses: expected exit 1, got $sl_rc"
 cmp -s "$SL_ROOT/whitespace-title/todo.md" "$SL_ROOT/whitespace-title/todo.orig" \
   || fail "closeout-sourceline-whitespace-title-refuses: board must stay byte-identical"
@@ -842,7 +842,7 @@ grep -qF -- 'would be rejected by the hand-off lint — refusing to move a malfo
 pass "closeout-sourceline-whitespace-title-refuses — a whitespace-only title (accepted by the flag rewrite, rejected by LINE_RE) refuses with exit 1, reason F, board untouched"
 
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-sl_case whitespace-title-good '- [ ] **T-901** real title — `READY_FOR_QA` — spec: x.md'
+sl_case whitespace-title-good '- [ ] **T-901** real title — `READY_FOR_MERGE` — spec: x.md'
 [ "$sl_rc" -eq 0 ] || fail "closeout-sourceline-flag-vocabulary-positive-control: expected exit 0 for a well-formed title, got $sl_rc"
 grep -q '^- \[x\] \*\*T-901\*\*' "$SL_ROOT/whitespace-title-good/todo.md" \
   || fail "closeout-sourceline-flag-vocabulary-positive-control: T-901 must move to Done"
@@ -866,15 +866,29 @@ pass "closeout-sourceline-invalid-flag-refuses — D1's declared additional refu
 
 for f in READY_FOR_ARCH READY_FOR_ENG READY_FOR_QA READY_FOR_REVIEW READY_FOR_MERGE BLOCKED REWORK; do
   sl_case "flag-ok-$f" "- [ ] **T-901** demo — \`$f\` — spec: x.md"
-  [ "$sl_rc" -eq 0 ] || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f expected exit 0, got $sl_rc"
-  grep -q '^- \[x\] \*\*T-901\*\*' "$SL_ROOT/flag-ok-$f/todo.md" \
-    || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f must move to Done"
+  if [ "$f" = "READY_FOR_MERGE" ]; then
+    # The vocabulary gate's own positive control: READY_FOR_MERGE is the one
+    # flag the T-1107 pre-flip gate also accepts, so the close-out completes.
+    [ "$sl_rc" -eq 0 ] || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f expected exit 0, got $sl_rc"
+    grep -q '^- \[x\] \*\*T-901\*\*' "$SL_ROOT/flag-ok-$f/todo.md" \
+      || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f must move to Done"
+  else
+    # T-1107: the other six allowed flags are still ACCEPTED by the
+    # vocabulary gate (proven by the absence of that gate's own two
+    # literals below) and are refused only by the NEW pre-flip gate that
+    # sits after it — the per-flag form of AC2's discriminator.
+    [ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f expected exit 1 (refused by the pre-flip gate, not the vocabulary gate), got $sl_rc"
+    grep -qF -- 'the file:line below refers to a synthesized single-entry board' "$SL_ROOT/flag-ok-$f/err" \
+      && fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f must NOT carry the source-line gate's synthesized-board literal — the vocabulary gate accepted it"
+    grep -qF -- 'would be rejected by the hand-off lint' "$SL_ROOT/flag-ok-$f/err" \
+      && fail "closeout-sourceline-flag-vocabulary-positive-control: flag $f must NOT carry the source-line gate's hand-off-lint literal — the vocabulary gate accepted it"
+  fi
 done
-pass "closeout-sourceline-flag-vocabulary-positive-control — each of the seven allowed flags closes out with exit 0"
+pass "closeout-sourceline-flag-vocabulary-positive-control — the vocabulary gate still accepts all seven allowed flags (READY_FOR_MERGE completes the close-out; the other six are refused by the NEW pre-flip gate, never by the vocabulary gate)"
 
 # --- closeout-sourceline-stderr-order-note-checker-reason -------------------
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-sl_case ordering '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+sl_case ordering '- [ ] **T-901**    — `READY_FOR_MERGE` — spec: x.md'
 [ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-stderr-order-note-checker-reason: expected exit 1, got $sl_rc"
 [ -s "$SL_ROOT/ordering/err" ] || fail "closeout-sourceline-stderr-order-note-checker-reason: expected non-empty stderr"
 grep -qF -- 'the file:line below refers to a synthesized single-entry board, not the real board' "$SL_ROOT/ordering/err" \
@@ -900,7 +914,7 @@ cp -R "$REPO_ROOT/bin" "$STUB_SL_ROOT/bin"
 cp -R "$REPO_ROOT/templates" "$STUB_SL_ROOT/templates"
 write_conformant_interventions_record "$STUB_SL_ROOT/root/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n' > "$STUB_SL_ROOT/root/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$STUB_SL_ROOT/root/todo.md"
 cp "$STUB_SL_ROOT/root/todo.md" "$STUB_SL_ROOT/root/todo.orig"
 STUB_SL="$STUB_SL_ROOT/bin/check-handoff.sh"
 
@@ -937,7 +951,7 @@ pass "closeout-sourceline-stub-zero-positive-control — a stub checker exiting 
 # Already asserted per-case above via cmp; this dedicated id checks it
 # directly against a fresh fixture, not only inferred from the cases above.
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-sl_case board-untouched '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
+sl_case board-untouched '- [ ] **T-901**    — `READY_FOR_MERGE` — spec: x.md'
 [ "$sl_rc" -eq 1 ] || fail "closeout-sourceline-board-untouched-on-refusal: expected exit 1, got $sl_rc"
 cmp -s "$SL_ROOT/board-untouched/todo.md" "$SL_ROOT/board-untouched/todo.orig" \
   || fail "closeout-sourceline-board-untouched-on-refusal: the board must be byte-identical after a source-line refusal"
@@ -950,7 +964,7 @@ NTL_ROOT="$TMP/sourceline-notemp"
 mkdir -p "$NTL_ROOT"
 write_conformant_interventions_record "$NTL_ROOT/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-printf -- '# Tasks\n\n## Active\n\n%s\n\n## Done\n' '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md' > "$NTL_ROOT/todo.md"
+printf -- '# Tasks\n\n## Active\n\n%s\n\n## Done\n' '- [ ] **T-901**    — `READY_FOR_MERGE` — spec: x.md' > "$NTL_ROOT/todo.md"
 cp "$NTL_ROOT/todo.md" "$NTL_ROOT/todo.orig"
 ntl_rc=0
 ( cd "$NTL_ROOT" && TMPDIR="$NTL_TMP" TEAM_TODO="$NTL_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
@@ -987,34 +1001,48 @@ mkdir -p "$LS_ROOT"
 # separator shape (em-dash with spaces / hyphen-minus / missing surrounding
 # space), checkbox/id shape (the deliberately-not-located set).
 # shellcheck disable=SC2016  # every backtick below is literal board grammar, not expansion
+# T-1107 (#53): every flag token below defaults to READY_FOR_MERGE now that
+# close-out.sh refuses a non-READY_FOR_MERGE Active flag — a title/path/
+# separator/checkbox-shape row is testing THAT axis, not the flag, so its
+# flag is incidental and stays READY_FOR_MERGE so the row still exercises
+# its own axis through to acceptance (the same instruction the T-1107
+# spec's Notes for engineer give for this exact corpus). The rows that keep
+# a non-MERGE flag on purpose are the explicit "N flag" rows below (one per
+# allowed flag, E1's flag-axis subject) and the two divergent decoy rows
+# (E1, AC3(v)) — everywhere else, the flag is READY_FOR_MERGE.
 LS_LINES=(
-  '- [ ] **T-901** demo title — `READY_FOR_QA` — spec: x.md'
-  '- [ ] **T-901**   padded title   — `READY_FOR_ENG` — spec: x.md'
-  '- [ ] **T-901** has a `token` inside — `BLOCKED` — spec: z.md'
+  '- [ ] **T-901** demo title — `READY_FOR_MERGE` — spec: x.md'
+  '- [ ] **T-901**   padded title   — `READY_FOR_MERGE` — spec: x.md'
+  '- [ ] **T-901** has a `token` inside — `READY_FOR_MERGE` — spec: z.md'
   '- [ ] **T-901** legacy path — `READY_FOR_MERGE` — spec: docs/specs/y.md'
-  '- [ ] **T-901** default layout path — `REWORK` — spec: .shell-team/specs/y.md'
-  '- [ ] **T-901** trailing space var — `READY_FOR_QA` — spec: x.md '
-  '- [ ] **T-901** decoy separator — `x` — spec: y.md but continues — `READY_FOR_REVIEW` — spec: real.md'
+  '- [ ] **T-901** default layout path — `READY_FOR_MERGE` — spec: .shell-team/specs/y.md'
+  '- [ ] **T-901** trailing space var — `READY_FOR_MERGE` — spec: x.md '
+  '- [ ] **T-901** decoy separator — `x` — spec: y.md but continues — `READY_FOR_MERGE` — spec: real.md'
   '- [ ] **T-901** arch flag — `READY_FOR_ARCH` — spec: x.md'
+  '- [ ] **T-901** eng flag — `READY_FOR_ENG` — spec: x.md'
   '- [ ] **T-901** merge flag — `READY_FOR_MERGE` — spec: x.md'
   '- [ ] **T-901** review flag — `READY_FOR_REVIEW` — spec: x.md'
-  '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md'
-  '- [ ] **T-901**  — `READY_FOR_QA` — spec: x.md'
-  $'- [ ] **T-901** \t — `READY_FOR_QA` — spec: x.md'
+  '- [ ] **T-901** blocked flag — `BLOCKED` — spec: x.md'
+  '- [ ] **T-901** rework flag — `REWORK` — spec: x.md'
+  '- [ ] **T-901** divergent decoy row A (false-accept catcher) — `READY_FOR_MERGE` — spec: fake.md but continues — `READY_FOR_ARCH` — spec: real.md'
+  '- [ ] **T-901** divergent decoy row B (false-refuse catcher) — `READY_FOR_ARCH` — spec: fake.md but continues — `READY_FOR_MERGE` — spec: real.md'
+  '- [ ] **T-901**    — `READY_FOR_MERGE` — spec: x.md'
+  '- [ ] **T-901**  — `READY_FOR_MERGE` — spec: x.md'
+  $'- [ ] **T-901** \t — `READY_FOR_MERGE` — spec: x.md'
   '- [ ] **T-901** demo — `ready_for_qa` — spec: x.md'
   '- [ ] **T-901** demo — `READY_FOR_MERGED` — spec: x.md'
   '- [ ] **T-901** demo — `READY FOR QA` — spec: x.md'
-  '- [ ] **T-901** demo — `READY_FOR_QA` — spec: x'
-  '- [ ] **T-901** demo - `READY_FOR_QA` - spec: x.md'
-  '- [ ] **T-901** demo—`READY_FOR_QA`— spec: x.md'
+  '- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x'
+  '- [ ] **T-901** demo - `READY_FOR_MERGE` - spec: x.md'
+  '- [ ] **T-901** demo—`READY_FOR_MERGE`— spec: x.md'
   '- [ ] **T-901** demo — `readyforqa` — spec: x.md'
   '- [ ] **T-901** demo — `REWORK ` — spec: x.md'
-  '- [x] **T-901** demo — `READY_FOR_QA` — spec: x.md'
-  '  - [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md'
-  '- [ ]  **T-901** demo — `READY_FOR_QA` — spec: x.md'
-  '- [ ] **T-902** demo — `READY_FOR_QA` — spec: x.md'
+  '- [x] **T-901** demo — `READY_FOR_MERGE` — spec: x.md'
+  '  - [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md'
+  '- [ ]  **T-901** demo — `READY_FOR_MERGE` — spec: x.md'
+  '- [ ] **T-902** demo — `READY_FOR_MERGE` — spec: x.md'
   '- [ ] **T-901** qa flag plain — `READY_FOR_QA` — spec: x.md'
-  '- [ ] **T-901** default path variant — `READY_FOR_QA` — spec: .shell-team/specs/x.md'
+  '- [ ] **T-901** default path variant — `READY_FOR_MERGE` — spec: .shell-team/specs/x.md'
 )
 
 ls_corpus=0 ls_refused=0 ls_accepted=0 ls_notlocated=0 ls_mismatches=0
@@ -1042,7 +1070,12 @@ lineshape_case() {
   fi
 
   # Oracle: bin/check-handoff.sh run live against an independently-built
-  # single-entry synthesized board — never a hardcoded verdict.
+  # single-entry synthesized board — never a hardcoded verdict — COMPOSED
+  # (T-1107, #53) with the flag extracted live from the corpus line by the
+  # same rightmost-slot rule bin/close-out.sh's own rewrite regex uses
+  # (:463-464). A decoy backticked token earlier on the line must not be
+  # mistaken for the flag — this mirrors, and never duplicates, the real
+  # extraction; it never trusts a hardcoded per-line verdict.
   if [ "$crlf" = "1" ]; then
     printf -- '## Active\n\n%s\n' "$line" > "$dir/oracle-plain.md"
     awk '{ printf "%s\r\n", $0 }' "$dir/oracle-plain.md" > "$dir/oracle.md"
@@ -1052,7 +1085,12 @@ lineshape_case() {
   local oracle_rc=0
   bash "$REPO_ROOT/bin/check-handoff.sh" "$dir/oracle.md" >/dev/null 2>&1 || oracle_rc=$?
 
-  if [ "$oracle_rc" -ne 0 ]; then
+  local extracted_flag=""
+  if [[ "$line" =~ ^(.+)\ —\ \`([^\`]+)\`\ —\ spec:\ ([^[:space:]]+\.md)[[:space:]]*$ ]]; then
+    extracted_flag="${BASH_REMATCH[2]}"
+  fi
+
+  if [ "$oracle_rc" -ne 0 ] || [ "$extracted_flag" != "READY_FOR_MERGE" ]; then
     ls_refused=$((ls_refused + 1))
     if [ "$got" = "0" ] || ! cmp -s "$dir/todo.md" "$dir/todo.orig"; then
       ls_mismatches=$((ls_mismatches + 1))
@@ -1074,16 +1112,16 @@ for l in "${LS_LINES[@]}"; do
 done
 # Line-terminator axis: the same shapes, CRLF-terminated throughout.
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-lineshape_case "crlf-accepted" '- [ ] **T-901** crlf accepted — `READY_FOR_QA` — spec: x.md' 1
+lineshape_case "crlf-accepted" '- [ ] **T-901** crlf accepted — `READY_FOR_MERGE` — spec: x.md' 1
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-lineshape_case "crlf-refused"  '- [ ] **T-901**    — `READY_FOR_QA` — spec: x.md' 1
+lineshape_case "crlf-refused"  '- [ ] **T-901**    — `READY_FOR_MERGE` — spec: x.md' 1
 
 printf 'closeout-lineshape-differential corpus=%d refused=%d accepted=%d notlocated=%d mismatches=%d\n' \
   "$ls_corpus" "$ls_refused" "$ls_accepted" "$ls_notlocated" "$ls_mismatches"
 
-[ "$ls_corpus" -ge 24 ]     || fail "closeout-lineshape-differential: corpus floor not met ($ls_corpus < 24)"
-[ "$ls_refused" -ge 6 ]     || fail "closeout-lineshape-differential: refused floor not met ($ls_refused < 6)"
-[ "$ls_accepted" -ge 8 ]    || fail "closeout-lineshape-differential: accepted floor not met ($ls_accepted < 8)"
+[ "$ls_corpus" -ge 30 ]     || fail "closeout-lineshape-differential: corpus floor not met ($ls_corpus < 30)"
+[ "$ls_refused" -ge 16 ]    || fail "closeout-lineshape-differential: refused floor not met ($ls_refused < 16)"
+[ "$ls_accepted" -ge 9 ]    || fail "closeout-lineshape-differential: accepted floor not met ($ls_accepted < 9)"
 [ "$ls_notlocated" -ge 3 ]  || fail "closeout-lineshape-differential: notlocated floor not met ($ls_notlocated < 3)"
 [ "$ls_mismatches" -eq 0 ]  || fail "closeout-lineshape-differential: $ls_mismatches mismatch(es) between the live oracle and close-out's real behavior"
 pass "closeout-lineshape-differential — the escape surface is enumerated mechanically (D9/D10), never transcribed: corpus=$ls_corpus refused=$ls_refused accepted=$ls_accepted notlocated=$ls_notlocated mismatches=$ls_mismatches"
@@ -1097,7 +1135,7 @@ UAL_ROOT="$TMP/unrelated-active-line"
 mkdir -p "$UAL_ROOT"
 write_conformant_interventions_record "$UAL_ROOT/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n- [ ] **T-902** broken line with no separator at all\n\n## Done\n' > "$UAL_ROOT/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n- [ ] **T-902** broken line with no separator at all\n\n## Done\n' > "$UAL_ROOT/todo.md"
 cp "$UAL_ROOT/todo.md" "$UAL_ROOT/todo.orig"
 ual_rc=0
 ( cd "$UAL_ROOT" && TEAM_TODO="$UAL_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
@@ -1112,7 +1150,7 @@ DSL_ROOT="$TMP/done-loose-entry"
 mkdir -p "$DSL_ROOT"
 write_conformant_interventions_record "$DSL_ROOT/.shell-team/interventions/T-901.md" T-901
 # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
-printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_QA` — spec: x.md\n\n## Done\n\n- [x] T-800 an old loose entry with no spec path\n' > "$DSL_ROOT/todo.md"
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n\n- [x] T-800 an old loose entry with no spec path\n' > "$DSL_ROOT/todo.md"
 dsl_rc=0
 ( cd "$DSL_ROOT" && TEAM_TODO="$DSL_ROOT/todo.md" bash "$CLOSEOUT" --task T-901 --date 2026-01-01 ) \
   >"$DSL_ROOT/out" 2>"$DSL_ROOT/err" </dev/null || dsl_rc=$?
