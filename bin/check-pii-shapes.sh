@@ -10,8 +10,8 @@
 # tree), and it is fail-closed — a run that cannot evaluate its input never
 # reports clean.
 #
-# Five shapes are matched, each identified by a stable pattern id used in
-# every finding line:
+# Each shape is identified by a stable pattern id used in every finding
+# line:
 #   home-path         a POSIX home-directory absolute path with a real name
 #                     segment (e.g. the placeholder shape /Users/<name>/ —
 #                     written here with angle brackets precisely so this
@@ -25,6 +25,36 @@
 #                     a backslash-delimited path never appears as a URL
 #                     authority, so the false-positive class DP-5 closes for
 #                     home-path does not reach this form.
+#   home-encoded      a home-directory path whose separators have been
+#                     replaced by a repeated hyphen or underscore, so the
+#                     literal /Users/ or /home/ the two shapes above require
+#                     never appears (e.g. the placeholder shapes
+#                     -Users-<name>- and _home_<name>_ — same angle-bracket
+#                     convention, AC9). Both separators and both roots fire
+#                     (T-1101 AC16); not boundary-guarded (T-1101 DP-3) —
+#                     an encoded segment has no URL-authority false-positive
+#                     class to close, so DP-10's bias toward firing applies
+#                     unmodified. Accepted, disclosed noise: a hyphen- or
+#                     underscore-delimited English compound that happens to
+#                     spell the home root also fires; the resolution is the
+#                     placeholder form at the authoring site, never a wider
+#                     suppression (T-1101 DP-3, Input space class 8).
+#   temp-session      a machine-local temp or session root
+#                     (/private/tmp/, /tmp/, /var/folders/) carrying a
+#                     dashed 8-4-4-4-12 hex UUID-shaped segment (any case
+#                     spelling — T-1101 AC16). A temp/session citation with
+#                     no UUID-shaped segment (this repository's own
+#                     .shell-team/runs/ convention among them) is the
+#                     negative-control population and stays clean because
+#                     the UUID requirement is load-bearing, proven rather
+#                     than assumed (T-1101 AC5). The placeholder form (a
+#                     session segment written <session-uuid>) is a
+#                     non-match by construction, same convention as AC9's
+#                     other placeholder forms. An undashed 32-hex form is
+#                     deliberately not matched — declared out of scope
+#                     (T-1101 spec, Input space, out-of-scope 1) because it
+#                     cannot be separated from the 40-hex git SHAs and
+#                     frozen intent hashes this corpus carries densely.
 #   email-nonnoreply  a mailbox-shaped string at a real, deliverable domain.
 #                     Every mailbox-shaped candidate on a line is judged
 #                     (AC26), not just the first. Excluded, by domain
@@ -243,7 +273,7 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 # --- pattern + exclusion definitions -----------------------------------------
 # Each rule lives on its own assignment line so a fixture suite can
 # neutralise exactly one at a time by rewriting that one line. There are
-# nine independently load-bearing rules: five patterns, plus four
+# eleven independently load-bearing rules: seven patterns, plus four
 # exclusions (the domain-anchored noreply rule, the plain web-flow address,
 # the reserved-domain rule, and the home-path boundary rule).
 #
@@ -328,6 +358,77 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     boundary (line start, space, `=`, `:`, quotes, brackets, `-`, `.`, `/`)
 #     still fires, and gh[oprs]_/AKIA still fire after an alphanumeric since
 #     neither carries a guard.
+#   RE_HOME_ENCODED  not anchored at either end within its own two-sided
+#     shape (an opening separator, the root, a second separator, a name
+#     segment, a CLOSING separator) — the closing separator is exactly what
+#     distinguishes a completed shape from an unclosed one (T-1101 AC2's
+#     near-miss: a separator run that never closes the name segment stays
+#     clean). The name class is at parity with `RE_HOME_PATH_RAW`'s own
+#     coverage philosophy: any single alphanumeric-or-dot character is a
+#     sufficient whole name (closes the round-1-review-named 2-character-
+#     name gap); the leading character may be a digit or an underscore as
+#     well as a letter (closes the digit-led and underscore-led gaps — the
+#     latter the real macOS system-account convention, `_www` among them);
+#     and a hyphen or underscore may appear anywhere in the name as long as
+#     AT LEAST ONE character in the whole captured name is alphanumeric-or-
+#     dot (closes the hyphen-split-name gap, e.g. `a-b`, and — round-2
+#     review Minor, T-1101 — closes a bare `_` false-positiving as "the
+#     name": `_` is a member of BOTH the separator alphabet `[-_]` and the
+#     name-continuation class, so a name-continuation class with no further
+#     constraint would let a single `_` (or a run of only `_`/`-`
+#     characters) satisfy "the name" all by itself, between either
+#     separator flavour; the mandatory alphanumeric-or-dot character is
+#     what closes that gap for both flavours symmetrically). The accurate
+#     claim, verified against this shipped regex rather than stated from
+#     intent: a captured span containing NO alphanumeric-or-dot character
+#     at all — a run composed only of `-`/`_` characters, whatever their
+#     mix — can never satisfy the name requirement, so `-Users---`,
+#     `_Users___`, `_home___` and `-Users-_-` (a lone `_` between hyphen
+#     separators) all correctly stay clean. The name class admits
+#     no `<`/`>`, so the documented placeholder forms (`-Users-<name>-`,
+#     `_home_<name>_`) are non-matches by construction, exactly as
+#     home-path's own placeholder convention (AC9) — re-verified live after
+#     this widening, both by hand against the checker's own file and by
+#     `--all` against the whole tree. Deliberately NOT boundary-guarded the
+#     way RE_HOME_PATH_BOUNDARY is: an encoded segment has no URL-authority
+#     false-positive class to close (T-1101 DP-3), so DP-10's bias toward
+#     firing applies with no narrowing at all. Accepted noise, disclosed
+#     rather than chased: a hyphen- or underscore-delimited English compound
+#     that happens to spell the `home` root (e.g. the shape `-home-<word>-`
+#     embedded in a kebab-case identifier) fires; the resolution is the
+#     placeholder form at the authoring site, never a wider suppression
+#     (T-1101 DP-3, Input space class 8).
+#   RE_TEMP_SESSION_ROOT  not anchored at either end; matches one of the
+#     documented temp/session roots (`/private/tmp/`, `/tmp/`,
+#     `/var/folders/`) followed by ordinary path characters, now including
+#     a literal `=` (round-1 review Minor, T-1101 — a live-reproduced gap,
+#     `/var/folders/xy=z/<uuid>` was not reported; cheap and
+#     self-reference-safe to widen, so it was). Embedded whitespace in that
+#     same intermediate segment is DELIBERATELY still excluded rather than
+#     widened: an unbounded class admitting a bare space risks the prefix
+#     spanning across unrelated words on the same line before it ever
+#     reaches a UUID, a materially different and larger false-positive
+#     surface than one more literal character — disclosed as a declared
+#     limitation (docs/pii-controls.md, docs/pii-controls.ja.md) rather than
+#     chased, on the same measured ground the review itself offered: no
+#     generator in this repository's reach emits a space in a temp-root
+#     prefix, and the measured negative-control population carries none.
+#     Exists as its own named unit (T-1101 AC5) so a negative-control
+#     fixture can be proven to genuinely REACH a temp/session path shape
+#     while still being excluded by the separate UUID requirement below —
+#     the same "reaches but is excluded" idiom `RE_EMAIL_BASE` already
+#     establishes for the email exclusions
+#     (`assert_reaches_email_candidates`). Not itself a reported pattern id,
+#     so it carries no independent finding.
+#   RE_TEMP_SESSION  composes `RE_TEMP_SESSION_ROOT` with a dashed
+#     8-4-4-4-12 hex UUID segment, case-insensitive (lower, upper, and
+#     mixed case all fire — T-1101 AC16). The undashed 32-hex form is
+#     deliberately NOT matched (T-1101 spec, Input space, out-of-scope 1):
+#     an undashed hex run is a substring of every 40-hex git SHA and frozen
+#     intent hash this corpus carries densely, so it cannot be separated
+#     from that population. The placeholder form (a session segment
+#     written `<session-uuid>`) is a non-match by construction, same
+#     convention as AC9's other placeholder forms.
 #
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
 RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9.-])'
@@ -352,6 +453,13 @@ RE_PRIVATE_KEY='-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
 # above and the T-1051 spec's DP1/DP2 for why gh[oprs]_ and AKIA stay
 # unguarded and why this class is narrower than RE_HOME_PATH_BOUNDARY's.
 RE_TOKEN='gh[oprs]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{12,}|(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}'
+# shellcheck disable=SC2016  # both separators, both roots — see the
+# RE_HOME_ENCODED inventory entry above (T-1101)
+RE_HOME_ENCODED='[-_](Users|home)[-_][A-Za-z0-9_.-]*[A-Za-z0-9.][A-Za-z0-9_.-]*[-_]'
+# shellcheck disable=SC2016  # the reachable-root half only — see the
+# RE_TEMP_SESSION_ROOT inventory entry above (T-1101)
+RE_TEMP_SESSION_ROOT='(/private/tmp/|/tmp/|/var/folders/)[A-Za-z0-9_./=-]*'
+RE_TEMP_SESSION="${RE_TEMP_SESSION_ROOT}[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
 # --- known-shapes list (DP-8) ------------------------------------------------
 # Per-file only — no directory entry, no glob, no pattern. Fixtures that
@@ -434,12 +542,14 @@ scan_email_candidates() {
   done < "$WORKDIR/emails"
 }
 
-# scan_content_file <path> <contentfile> — runs all five pattern checks
-# against already-materialized, already-confirmed-non-binary content.
+# scan_content_file <path> <contentfile> — runs every content-scan pattern
+# check against already-materialized, already-confirmed-non-binary content.
 scan_content_file() {
   local path="$1" file="$2"
   report_pattern_lines home-path "$path" "$file" "$RE_HOME_PATH"
   report_pattern_lines home-path-win "$path" "$file" "$RE_HOME_PATH_WIN"
+  report_pattern_lines home-encoded "$path" "$file" "$RE_HOME_ENCODED"
+  report_pattern_lines temp-session "$path" "$file" "$RE_TEMP_SESSION"
   report_pattern_lines private-key "$path" "$file" "$RE_PRIVATE_KEY"
   report_pattern_lines token "$path" "$file" "$RE_TOKEN"
   scan_email_candidates "$path" "$file"

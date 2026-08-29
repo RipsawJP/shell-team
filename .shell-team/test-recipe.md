@@ -1847,3 +1847,81 @@ that file's order.
   does, should not hit this conflict at all. Cross-provider review round 1
   (`.shell-team/reviews/T-1100.md`) independently reproduced the repair by
   direct execution and confirmed it protects the same back-compat intent.
+- T-1101: before writing a NEW pattern's `RE_*=` literal into
+  `bin/check-pii-shapes.sh`, verify the self-reference trap by hand: write
+  the candidate regex (and its own defining source line, verbatim) to a
+  scratch file under `$TMPDIR`, then `grep -nE -- "$re" "$scratchfile"` and
+  confirm no match — do this BEFORE editing the real file, not after,
+  since the failure mode is the defining line matching the very shape it
+  defines (T-111's own documented trap, `.shell-team/specs/T-111-pii-
+  shape-checker.md` DP-1). After editing the real file, `bash
+  bin/check-pii-shapes.sh --all` against the whole tree is the second,
+  authoritative check (never trust the scratch-file check alone — the
+  real file's surrounding comment prose can independently trip the new
+  rule even when the bare regex literal itself does not). Separately:
+  when a new pattern id needs a fixture-side "reaches the rule but is
+  excluded by one specific requirement" precondition (the
+  `assert_reaches_email_candidates` idiom, for a rule that has no
+  candidate-enumeration or exclusion machinery of its own), decompose the
+  new pattern into two top-level variables — a base/root sub-shape,
+  extractable and testable on its own, and a composed full pattern that
+  adds the one extra requirement — mirroring the pre-existing
+  `RE_HOME_PATH = RE_HOME_PATH_BOUNDARY + RE_HOME_PATH_RAW` composition,
+  rather than trying to derive the "reaches" half by string-slicing the
+  full pattern's own source text inside the test file (fragile, and not
+  needed — the checker source is already the single source of truth for
+  both halves once decomposed).
+- T-1101 (rework 1, round-1 review): widening a pattern's own character
+  class to close a reproduced coverage gap can itself CREATE a new
+  self-reference trip against a DIFFERENT tracked file than the one the
+  original widening was aimed at — specifically, the cross-provider
+  review's own round-1 record (`.shell-team/reviews/<task>.md`) quoting
+  the gap's reproduction examples as literal (non-placeholder) text, which
+  the now-wider rule correctly starts reporting. Check `bash
+  bin/check-pii-shapes.sh --all` (and, once the widening is committed,
+  `--base develop`/`--base <branch base>`) against the WHOLE tree
+  immediately after any character-class widening, not just against the
+  file being widened for — a clean run on the target file alone is not
+  sufficient. Where the newly-tripped file is prose that must legitimately
+  DISCUSS the shape (a review record, same as T-111's own frozen AC15
+  names for a spec/provenance/board note), the fix is the same documented
+  angle-bracket placeholder convention (AC9) applied to that file's own
+  example spellings — verify the diff touches ONLY the shape literals
+  (nothing about a verdict, a severity or the surrounding prose) via a
+  before/after `diff` and a before/after token count of the verdict/
+  severity vocabulary (`APPROVE`/`REQUEST_CHANGES`/`Blockers`/`Major`/
+  `Minor`) over that one file. Separately: when a character class's
+  widening decision hinges on avoiding a false-positive-surface increase
+  (here, whether to admit bare whitespace into an already-unbounded `*`-
+  quantified prefix class), decompose the reviewer's example into what was
+  actually LIVE-REPRODUCED (here, only `=`) versus what was offered as a
+  hypothetical illustration (here, whitespace) — widen for the reproduced
+  part (cheap, self-reference-safe, directly closes a confirmed gap) and
+  disclose the hypothetical part as a declared limitation in both docs
+  mirrors, rather than treating the reviewer's one combined example as one
+  monolithic go/no-go decision.
+- T-1101 (rework 2, round-2 review): when a character class repair
+  introduces an "anchor character at both ends" shape to keep a
+  separator-run negative clean, check whether any character in the
+  anchor alphabet is ALSO a member of the separator alphabet used to
+  delimit the shape. If one is (here, `_`, present in both `[-_]` and
+  `[A-Za-z0-9_.]`), an anchor-based design is insufficient on its own —
+  a captured span consisting ENTIRELY of that overloaded character
+  satisfies "non-separator anchor at both ends" using nothing but the
+  overloaded character itself, which is exactly the false positive a
+  round of review found (`_Users___`, `_home___`, and — the shape that
+  proves it's about the character and not the separator flavour —
+  `-Users-_-`, a lone `_` between *hyphen* separators). The robust
+  design requires at least one character from the OVERLAP-FREE subset
+  (here, `[A-Za-z0-9.]`, excluding both `-` and `_`) to exist SOMEWHERE
+  in the captured span, with the full permissive class free on both
+  sides of it — not an "anchor at the edges" shape, which inherits
+  whatever overlap the anchor alphabet has with the separator alphabet.
+  Separately: an adopter-facing claim in a header comment (anything
+  `--help` derives text from) about what a regression-lock fixture
+  proves must be reworded and RE-VERIFIED against the actual shipped
+  regex line whenever that regex changes — a claim that was accurate at
+  an earlier revision can silently go stale (true for one flavour, false
+  for another) without the fixture itself failing, since the fixture
+  only proves what it was written to prove, not what the prose claims
+  in general.
