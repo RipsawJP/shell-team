@@ -195,12 +195,11 @@ fail-closed な refusal・各 adapter 自身の effort 値は、
 自身のヘッダであり、そこから乖離しえない）にある。
 
 **正直な境界線**には 2 つの軸がある。第 1 の軸は、呼び出しが**行われる
-かどうか**。binding は、それを参照するループにおいてこれを制御する。
-`/shell-team:run` と `/shell-team:goal` では resolution が先に走り、
-refusal はフォールバックせずフェーズを停止させるので、rebind によって
-呼び出しを完全に止められる。一方、`/shell-team:review` は binding を
-一切参照せず、`/shell-team:review-response` は run ループへ引き渡す
-rework 経由でのみ参照する（issue **#245**）。第 2 の軸は、行われる
+かどうか**。`/shell-team:run`・`/shell-team:goal`・`/shell-team:review`・
+`/shell-team:review-response` のいずれでも、resolution は紐付けられた
+各役割の invocation の直前に走り、refusal はフォールバックせず
+フェーズを停止させる。したがって rebind によって呼び出しを完全に
+止められる。第 2 の軸は、行われる
 呼び出しが**どう実行されるか**で、binding はこれを決して変えない。
 そちらで動くのは resolution が報告する値と**テレメトリ**が記録する値
 だけ（provider・model・effort・adapter のいずれも同じ）であり、別

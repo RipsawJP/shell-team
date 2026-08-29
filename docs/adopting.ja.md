@@ -252,15 +252,18 @@ config-condition refusal で、3 つまでは通常の config 編集で到達し
 何かにフォールバックせず、フェーズを停止させる blocker である。通常の
 編集で `binding-unresolved`・`capability-unsupported`・
 `executor-unavailable` に到達しうる（いずれも上記参照）。単体で使う
-2 つの review 系コマンドは同じケースではなく、違いは 1 つの委譲ステップ
-にある。`/shell-team:review` は reviewer を直接呼ぶだけで **binding を
-一切参照しない**ので、rebind はこれにどちらの方向にも影響しない。
-`/shell-team:review-response` も**自身の review ステップでは** binding を
-参照しないが、最後のステップで採用した findings を `/shell-team:run` に
-引き渡し、その pipeline は他の run と同様に resolution を参照する。
-したがって rebind は `review-response` に**そのステップ経由でのみ**到達し、
-refuse によってそれを停止させることもある。review ステップ自体に
-resolution を配線することは issue **#245** が追跡している。
+2 つの review 系コマンドも、自身の review ステップで binding を
+参照する。`/shell-team:review` は reviewer を呼び出す直前に
+`codex-reviewer` の executor を解決し、`/shell-team:review-response`
+も自身のクロス評価ステップの前に同じことを行う。どちらでも refusal は
+フォールバックせずコマンドを停止させる blocker であり、rebind は
+run に届くのとまったく同じようにこれらにも届く。
+`/shell-team:review-response` はさらにもう 1 つの経路でも resolution
+に到達する — 採用した findings を `/shell-team:run` へ引き渡す最後の
+ステップである。残る 2 つのコマンド `/shell-team:loop-triage` と
+`/shell-team:team-init` は紐付けられた役割を 1 つも呼び出さない
+（invoke no bound role）ので、そこには resolution が解決すべきものが
+無い。
 
 第 2 の軸は**行われる呼び出しがどう実行されるか**。こちらで binding が
 変えるのは、`resolve-executor.sh` が解決して報告する値と**テレメトリ**が
