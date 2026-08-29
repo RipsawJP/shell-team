@@ -704,6 +704,42 @@ not exercised by a live run in this repository — enrolling this repository
 would make the coordinating session both the producer and the approver of
 the very mechanism auditing that separation.
 
+## Recording review-input fidelity
+
+Each executor pass a review record's verdict section names states four
+things under one opaque pass id, and `bin/check-review-input.sh` (T-1104,
+issue #335) validates the grammar fail-closed: the pass's
+**executor-invocation** — the verbatim argv rendered on a single line —
+its **pass-role** from the closed set `generation` / `confirmation`, a
+**briefing-fidelity** statement whose first token is `carried` /
+`not-carried` / `not-applicable` followed by a non-empty explanation, and
+the **raw-capture** stem that pass published. A record carrying zero such
+fields — every record already committed today — exits 0: the requirement
+is forward-only.
+
+**What the verbatim field must never carry.** The `executor-invocation`
+value is real argv, and it lands in permanently tracked git history. It
+must never carry an environment dump or a variable's expanded value, a
+credential, token, key or authentication header, an
+absolute path outside the repository (a home-directory path or a
+`$TMPDIR` session root in particular), or any operator or account
+identity.
+`bin/check-pii-shapes.sh`'s diff-scoped CI step is a real, and equally
+finite, backstop — a **finite known-shape screen** keyed on named
+prefixes, named roots and stated length minimums, never comprehensive
+secret detection — so the field contract above is the primary control,
+applied at the moment of writing, which is the only moment it is cheap.
+
+**What this mechanism does not close.** It records what was invoked,
+never what a model actually received: no judgment over committed bytes
+can tell an invocation whose briefing reached the executor's context from
+one where it did not. It does not verify a `pass-role` label's
+truthfulness against its own verbatim field, or that a recorded argv is
+the argv that actually ran. And it cannot see whether the raw file a
+`raw-capture` field names is **not present on disk** — raw captures are
+untracked by construction (`/.gitignore`), so a stem naming nothing is
+conformant to this checker.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.

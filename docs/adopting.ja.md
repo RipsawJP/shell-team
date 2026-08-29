@@ -672,6 +672,41 @@ segregation-of-duties 統制を満たすかどうかは `undetermined`（未測�
 はどちらの profile でも変わらず必須であり、oversight-profile approval
 record がその代わりになることはどちらの向きにも無い。
 
+## review-input fidelity を記録する
+
+review record の verdict section が名指す各 executor pass は、1 つの
+opaque な pass id の下に 4 つの情報を持ち、`bin/check-review-input.sh`
+（T-1104・issue #335）がその grammar を fail-closed に検証する: pass の
+**executor-invocation**（1 行に rendered された verbatim な argv）、
+closed set `generation` / `confirmation` から選ぶ **pass-role**、先頭
+token が `carried` / `not-carried` / `not-applicable` のいずれかで後に
+非空の説明が続く **briefing-fidelity**、そしてその pass が publish した
+**raw-capture** stem。1 つもこれらの field を持たない record — 今日
+すでに commit されている全 record がこれに当たる — は exit 0 になる:
+この要件は forward-only である。
+
+**verbatim field が決して持ってはならないもの。** `executor-invocation`
+の値は実際の argv であり、永続的に tracked な git history に残る。
+environment dump や変数の展開値、credential・token・key・認証 header、
+repository 外の absolute path outside the repository（特に
+home-directory path や `$TMPDIR` session root）、あるいは operator や
+account の identity を決して含んではならない。`bin/check-pii-shapes.sh`
+の diff-scoped CI step は現実の、しかし同じく有限な backstop であり
+——named prefix・named root・長さの下限に基づく
+**finite known-shape screen** であって、網羅的な secret 検出ではない
+——ゆえに上記の field contract こそが、書く瞬間（それが安く済む唯一の瞬間）に適用
+される一次的な統制である。
+
+**この機構が閉じないもの。** 記録するのは what was invoked（何が
+invoke されたか）であって、model が実際に何を受け取ったかでは決してない
+——committed byte に対するいかなる判定も、briefing が executor の
+context に届いた invocation と届かなかった invocation を見分けられない。
+`pass-role` label の真偽も、記録された argv が実際に走った argv で
+あることも検証しない。そして `raw-capture` field が名指す raw file が
+**not present on disk**（disk 上に存在しない）ことも見抜けない——
+`raw-capture` の値は構造上 untracked（`/.gitignore`）なので、何も指さ
+ない stem もこの checker には conformant である。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。

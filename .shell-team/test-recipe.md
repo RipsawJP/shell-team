@@ -1996,3 +1996,43 @@ that file's order.
   added to its invocation, because the new gate is unconditional and
   therefore also needs an oversight-base resolution path even in a crippled
   `bin/` copy that has none.
+- T-1104: `bash tests/check-review-input/run.sh` is the new review-input
+  fidelity checker's own fixture suite (`bin/check-review-input.sh`, T-1104,
+  issue #335). No new prerequisite: pure bash + coreutils, the same
+  synthetic-fixture-in-a-temp-dir convention as `tests/check-spec-review/run.sh`
+  and `tests/check-oversight/run.sh` (no static `fixtures/` directory). It
+  covers usage/environment refusals (`usage`, `record-unreadable`,
+  `reviews-dir-unresolvable`), the two deliberate `--task`-only leniencies
+  (an absent reviews directory, an absent per-task record file — never for
+  an explicit `--record`), the forward-only zero-field pass, per-section
+  completeness (`section-incomplete`), per-pass field completeness and
+  non-duplication (`field-missing`/`field-duplicate`, including the
+  same-id-two-distinct-blocks shape), the pass-id charset
+  (`pass-id-charset`), both closed vocabularies
+  (`pass-role-vocabulary`/`briefing-fidelity-vocabulary`), the
+  never-judges-content property (a hostile-but-well-formed invocation
+  string still passes; an empty one, or one masked by a bare continuation
+  line, still refuses `field-grammar`), the raw-capture stem's task-id
+  prefix and cross-round/cross-section collision refusal
+  (`raw-capture-stem-mismatch`/`raw-capture-collision`), the task-id
+  precedence (the `--task` argument is the sole authority when given, else
+  the record path's basename — an internal `- Task:` line is never read),
+  and the no-echo discipline (a distinctive marker embedded in a
+  non-conformant `executor-invocation` value never appears in the
+  checker's own output). `bin/close-out.sh` gained a new unconditional
+  gate invoking this checker with `--task "$TASK"` only, wired in the same
+  five-part chain (sibling-path assignment, sibling screen, invocation
+  capturing status, `case` on that status, `1`→`fail`/other→`die`) the
+  spec-review and oversight gates already use; its wiring is proven end to
+  end through the real script in `tests/close-out/run.sh`'s
+  `review_input_case` block (five cases: no record file at all passing
+  silently, a zero-field record passing, a conformant single-pass record
+  passing and moving the entry to Done, a `field-missing` record refusing,
+  and a `raw-capture-stem-mismatch` record refusing). Because this new
+  gate is unconditional, it also needed `TEAM_REVIEWS_DIR` added to the
+  same pre-existing "interventions-resolver-failure-exit2 positive
+  control" fixture T-1103's entry above already widened for
+  `TEAM_OVERSIGHT_BASE` — but, unlike that override, the pointed-at
+  directory need not exist or carry a record at all, since the new gate's
+  own `--task`-only leniency treats an unresolvable-by-absence reviews
+  directory as "nothing to check yet" rather than a resolver failure.
