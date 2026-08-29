@@ -2036,3 +2036,37 @@ that file's order.
   directory need not exist or carry a record at all, since the new gate's
   own `--task`-only leniency treats an unresolvable-by-absence reviews
   directory as "nothing to check yet" rather than a resolver failure.
+- T-1104 rework round 2 (v2 re-freeze, codex round-1 implementation review
+  fixes): the completeness trigger is now **per verdict-heading section**,
+  not per record — a section opts in the moment it carries any of the
+  four fields, and a section carrying none is conformant regardless of
+  the rest of the record (this is what makes `AC3`/`AC21` and the
+  anti-retrofit Non-goals hold jointly against this task's own
+  multi-round review record). Section ownership is **section-scoped**: a
+  pass id is credited to a section only when all four of its field lines
+  resolve to that same section, never from its earliest field line
+  alone. Two dangling-symlink fail-open sites were closed (the
+  auto-resolved reviews directory and the auto-resolved per-task record
+  path each now fail closed — `reviews-dir-unresolvable` /
+  `record-unreadable` — on a broken occupant rather than taking the
+  absent-path leniency); a literal tab in a captured id or value is now
+  rejected outright (`field-grammar`) before it reaches the internal
+  tab-delimited work file, closing a vocabulary-check bypass; and the
+  `raw-capture-collision` refusal no longer echoes the colliding stem's
+  own value, naming only the two colliding pass ids. `LC_ALL=C` is now
+  exported at the top of the script (bracket-class charset checks), and
+  the internal `2>/dev/null || true` field/heading scans now distinguish
+  a real scan failure (`grep` exit > 1) from a clean no-match (exit 1).
+  `tests/check-review-input/run.sh` grew from 58 to 64 `PASS:` lines
+  (`grep -c '^PASS:'` on its own output): new fixtures for the mixed
+  record (a bare, pre-mechanism section beside an instrumented one — the
+  corpus's own shape, Input space class 12), the section-scoped-ownership
+  split reproduction, both dangling-symlink cases, the tab-injection case
+  (id and value), and the pre-existing no-echo collision test corrected
+  to embed its marker in the `raw-capture` value the refusal actually
+  interpolates rather than in the unrelated `executor-invocation` field.
+  Mutation self-check for all five fixes plus the two v2-specific AC4
+  probes (earliest-field-line credit; per-record re-arm) run against a
+  scratch `git worktree add --detach` at the round's own commit, never in
+  the working tree — each observed red on the reintroduced defect,
+  restored via `git checkout --`, observed green again.
