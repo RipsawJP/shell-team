@@ -1955,3 +1955,44 @@ that file's order.
   audit is unaffected — this task adds no new `>&2` write site to
   `bin/check-acs.sh` (measured: the base-vs-HEAD `>&2` count in that file is
   equal, re-derived at both refs rather than compared to a literal).
+- T-1103: `bash tests/check-oversight/run.sh` is the new checker's own
+  suite (45+ `PASS:` lines, 0 `FAIL:`) covering the occupancy lattice
+  (absent/regular/live-symlink/unreadable/FIFO, with a capability probe and
+  a reported skip for the unreadable and FIFO arms when the running
+  environment cannot exercise them — root defeats `chmod 000`, and `mkfifo`
+  is not universally available), the ten grammar/vocabulary refusals, the
+  five approval-record refusals, the case/padding/non-ASCII handle
+  evasions, the two-seam plural case, the sticky-enrollment scan in both
+  directions plus its repository-wide and seam-agnostic reach, both
+  per-seam anchor comparisons (including a genuine non-ancestor commit
+  built with a real second commit graph via `git init` in a scratch
+  directory), and the class-M mechanics-repair re-freeze pair. Exercise the
+  `governance-controlled` arm against a temp base directory with
+  `--base DIR` (never `$TEAM_RUN_BASE`, which `bin/team-paths.sh`'s
+  `validate_base()` rejects for any absolute path) or `$TEAM_OVERSIGHT_BASE`
+  — the same env-override precedence `$TEAM_TODO`/`$TEAM_INTERVENTIONS_DIR`
+  already have — never the real `<base>/oversight.conf`, since this
+  repository's own profile stays `autonomous` (no `oversight.conf` exists
+  under its resolved base at any commit; any line anywhere in this
+  repository's own tree that *begins* with the record grammar — quoted
+  here mid-line rather than at a line's own start, precisely to avoid
+  being such a line: `- oversight-approval (` — would make this
+  repository's own board refuse at every seam, per the sticky scan's
+  repository-wide reach, so an illustrative record belongs inside a
+  fixture, a quoted example or this parenthetical, never as a leading
+  sub-bullet in a file the scan can reach). `bin/close-out.sh`
+  gained a new unconditional `--seam pre-merge` gate (T-1103's own pre-merge
+  teeth); its wiring is proven end to end through the real script in
+  `tests/close-out/run.sh`'s `oversight_case` block (four cases: the
+  shipped default silent, a governance-controlled declaration with no
+  record refusing, a conformant record with `approves=` set to `HEAD`'s own
+  commit id passing and moving the entry to Done, and a declaration naming
+  only the other seam imposing nothing) — that block deliberately does NOT
+  `cd` into its scratch fixture root, unlike its `spec_review_case` sibling,
+  because the `pre-merge` anchor's `git` plumbing needs a real working
+  tree. One pre-existing fixture in that same suite
+  ("interventions-resolver-failure-exit2 positive control", a scratch
+  `bin/` copy with `team-paths.sh` deleted) needed `TEAM_OVERSIGHT_BASE`
+  added to its invocation, because the new gate is unconditional and
+  therefore also needs an oversight-base resolution path even in a crippled
+  `bin/` copy that has none.

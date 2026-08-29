@@ -631,6 +631,79 @@ close-out backstop reads for real. How often the round changes an
 otherwise-implemented, wrong-about-the-world spec remains `undetermined` —
 that claim is about the axis's *effect*, which neither checker measures.
 
+## Choosing an oversight profile
+
+A host repository selects an **oversight profile** in a host-authored
+`<base>/oversight.conf`, resolved and validated by `bin/check-oversight.sh`
+(T-1103, issue #343). The profile is closed over two values, `autonomous`
+and `governance-controlled`, and it governs two closed **seam** values,
+`specify-seam` (the Specify-seam freeze) and `pre-merge` (`bin/close-out.sh`'s
+own exit status). No `- dispatch:` record, no environment variable and no
+per-task board field selects a different profile for one task — the
+declaration is a per-repository property of one file.
+
+**`autonomous` is the shipped default.** No `<base>/oversight.conf` at all
+resolves to it, and it changes nothing: no existing seam gains a
+requirement, no existing gate's verdict moves, and every board, spec and
+record that is conformant today stays conformant byte for byte.
+
+**Declare `governance-controlled` when your organization's IT governance
+imposes segregation of duties** — a change may not advance on the approval
+of the party that produced it. Author `<base>/oversight.conf` with `schema
+1`, `profile governance-controlled`, and one `seam` row per gated seam.
+Each declared seam then requires a recorded, conformant
+`- oversight-approval (<seam>): approver=<handle> — producer=<handle> —
+approves=<anchor> — date=<YYYY-MM-DD> — record=<locator>` sub-bullet on the
+task's own board entry, whose `approver` handle must be distinct from its
+`producer` handle after a stated ASCII normalization, and whose `approves=`
+anchor must still name the artifact being gated — a stale or inflated
+anchor refuses rather than being silently accepted.
+
+**Enrollment does not evaporate.** Once your board carries at least one
+prior approval record anywhere on it — in `## Active` or `## Done`, on any
+task, for either seam — the declaration going missing refuses
+(`enrollment-vanished`) instead of silently resolving back to `autonomous`.
+The only authorized way out of governance — the **de-enrollment** path — is
+an explicit `profile autonomous` declaration: a present, diffable file,
+never a deletion. That evidence is deliberately **the whole board**,
+because the profile it protects is a repository-wide property rather than
+a per-task one.
+
+**An approval never substitutes for either of the loop's both gates.**
+`qa-verifier`'s PASS and `codex-reviewer`'s APPROVE on the delivered change
+remain required in **both** profiles; an oversight-profile approval record
+is never one of the two gates, in either direction.
+
+**What this mechanism claims, and what it does not guarantee.** It ships a
+**self-declared conflict check** with a content anchor — recorded as
+tracked workflow evidence, not an authenticated segregation-of-duties
+control. It **does not authenticate** any handle: no signature, no SSO or
+OIDC binding, no directory lookup, and nothing confirms the named
+`producer=` party is the change's actual producer or that the `approver`
+ever read what they approved. The board record is best-effort workflow
+evidence in the current snapshot, not a tamper-evident or independently
+retained audit store — pair it with your own branch protection, commit
+signing, retention and removal-monitoring **compensating controls** if your
+organization needs those guarantees. The two seams are this loop's own
+**callable transitions**, not an organization's release or deployment
+authorization boundary: a direct merge, a cherry-pick or a hotfix that
+never crosses either seam is never gated. A class-M mechanics-repair
+re-freeze is not exempt either — the gate is version-based and
+class-blind, so enrolling means every freeze owes a record, a
+**mechanics-repair re-freeze** included. Whether an opaque-handle
+comparison satisfies any real segregation-of-duties control is
+`undetermined`, and no checker in this repository measures it.
+
+**No requirement to wire anything into your CI.** The `pre-merge` seam's
+teeth are `bin/close-out.sh`'s own exit status, which an adopter already
+runs at that boundary; `check-oversight.sh --seam pre-merge` is documented
+here as an option for a host who additionally wants it inside their own CI,
+never as a precondition for the profile working. This checker's
+`governance-controlled` arm ships **fixture-exercised only**, deliberately
+not exercised by a live run in this repository — enrolling this repository
+would make the coordinating session both the producer and the approver of
+the very mechanism auditing that separation.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
