@@ -1803,3 +1803,47 @@ that file's order.
   rule applies to every level-2 heading except level 3 (`### Local test
   result`, deliberately out of scope, since this board legitimately
   repeats that one many times inside entries).
+- T-1100: two new `DISPATCH_AXIS_TABLE` rows (`verify-fixture`,
+  `verify-mechanism`) plus a parent-vs-refinement exclusivity refusal in
+  `bin/close-out.sh` — same suite, same invocation as T-1084/T-1091/T-1092,
+  no new prerequisite. `bash tests/close-out/run.sh` measured `exit=0`,
+  `grep -c '^PASS' <log>` = 116, `grep -c '^FAIL' <log>` = 0, `grep -c
+  '^PASS: T-1100' <log>` = 7 (the seven new fixtures, one per AC3 shape) on
+  this machine. `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh
+  .shell-team/specs/T-1100-verify-axis-split.md` (AC1–AC16 have
+  `- check:` lines; AC17 is `SKIP` by design) — several criteria re-run
+  this whole suite plus `bin/check-prompt-sync.sh`, so raise the timeout
+  rather than assuming the default is enough, same guidance every prior
+  entry in this file gives. **A genuine spec-vs-board conflict surfaced
+  here, not an environment quirk**: AC5 (byte-identical two-arm back-compat
+  verdict over every distinct `- dispatch:` line on the resolved board) and
+  AC12 (this task's own entry must carry the split-form rows by
+  close-out) are mutually exclusive once this task's board substitution
+  (DP-5, committed at the Specify-to-Implement seam before the engineer
+  phase) is on the board — AC5's population is read from the CURRENT
+  board at check time and necessarily includes the two new rows AC12
+  requires, and those rows cannot agree between the base-ref and HEAD
+  gates by construction. Recorded as an interventions entry
+  (`.shell-team/interventions/T-1100.md`) and a provenance entry
+  (`.shell-team/provenance/T-1100.md`, fourth decision) rather than forced
+  green by editing the frozen intent block or reverting the committed
+  board substitution. A future axis-refinement task that dogfoods its own
+  split form onto its board entry before its own AC5-shaped criterion is
+  measured should expect the same conflict and route it back rather than
+  patch around it.
+
+  **Update (2026-08-26, review round 1 rework)**: the paragraph above
+  describes the conflict as it stood at the v1 freeze, when AC5 read the
+  population from the CURRENT board at check time. It was resolved, not
+  worked around: a host-ratified class-B re-freeze (intent v1→v2, commit
+  `d352e3a`) repaired AC5 itself to read the population from **the base
+  ref's committed board blob** (`git show <base ref>:<board path>`, never
+  the working tree) instead of the resolved board — which by construction
+  excludes any row this task's own board entry introduces, closing the
+  conflict at the instrument rather than at the board. The original
+  observation above is left as written (it was true of v1, and is why the
+  re-freeze exists); a future axis-refinement task that follows the
+  base-ref-scoped population definition from the start, as AC5 v2 now
+  does, should not hit this conflict at all. Cross-provider review round 1
+  (`.shell-team/reviews/T-1100.md`) independently reproduced the repair by
+  direct execution and confirmed it protects the same back-compat intent.

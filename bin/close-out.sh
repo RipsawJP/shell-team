@@ -257,6 +257,8 @@ fi
 # #274's depth axis) is added; nothing below hardcodes a count of axes.
 DISPATCH_AXIS_TABLE="implement:serial|tier2|tier3
 verify:serial|tier1-fanout
+verify-fixture:serial|tier1-fanout
+verify-mechanism:serial|tier1-fanout
 specify:pm-authored|operator-authored
 spec-review:none|cross-provider"
 
@@ -327,6 +329,25 @@ if [ -n "$DISPATCH_LINES" ]; then
       SPEC_REVIEW_ELECTION="$d_value"
     fi
   done <<< "$DISPATCH_LINES"
+
+  # T-1100 (#365): parent-vs-refinement exclusivity. An entry records EITHER
+  # the parent `verify` axis OR one or more of its refinements
+  # (`verify-fixture` / `verify-mechanism`), never both — two records
+  # covering the same phase leave no fact about what was chosen, the same
+  # reason a repeated axis key is already refused above. This is only
+  # knowable after the WHOLE entry has been scanned (DISPATCH_SEEN_AXES),
+  # so it deliberately sits AFTER the loop rather than inside it — the loop
+  # above still refuses on the first malformed record it finds, exactly as
+  # before this task.
+  case "$DISPATCH_SEEN_AXES" in
+    *" verify "*)
+      case "$DISPATCH_SEEN_AXES" in
+        *" verify-fixture "*|*" verify-mechanism "*)
+          fail "$TASK has a malformed dispatch record (the parent axis 'verify' and a refinement axis 'verify-fixture'/'verify-mechanism' both appear on this entry — record either the parent 'verify' row or one or more of its refinements, never both)"
+          ;;
+      esac
+      ;;
+  esac
 fi
 
 # --- fail-closed gate: the task's interventions record exists and conforms ----

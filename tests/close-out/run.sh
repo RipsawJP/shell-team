@@ -1298,4 +1298,26 @@ spec_review_case T-99609 "$OKI\n$ELECT" '## Spec review\r\n\r\n### Codex Spec-Re
 spec_review_case T-99610 "$OKI\n$ELECT" '### Codex Spec-Review verdict: APPROVE\n\n### Codex Spec-Review verdict:\302\240REQUEST_CHANGES' 1 refuse "elected + a U+00A0 separator on the verdict line's own latest round (class 6, second location) refuses rather than falling through to the stale APPROVE, through close-out.sh"
 spec_review_case T-99611 "$OKI\n$ELECT" '## Spec review\n\n### Codex Spec-Review verdict: REQUEST_CHANGES\n\n## Spec review\n\n### Codex Spec-Review verdict: APPROVE' 0 silent "elected + an earlier REQUEST_CHANGES followed by a later, fixed APPROVE round passes through close-out.sh (positive control: the redesigned reader does not over-narrow the ordinary answered-then-approved flow)"
 
+# ============================================================================
+# T-1100 (#365): the `verify-fixture` / `verify-mechanism` refinement axes —
+# two new rows on the same DISPATCH_AXIS_TABLE (grammar cases, exercised via
+# dispatch_case exactly as T-1091's/T-1092's own cases above are) plus the
+# new parent-vs-refinement exclusivity refusal that only fires after the
+# whole entry has been scanned. Seven cases labelled "T-1100", mirroring the
+# spec's own AC3 shapes one-for-one: three the gate must say NOTHING about
+# (both refinements, the unchanged bare parent, and a single partial
+# refinement) and four it must refuse with exit 1 and the shared literal
+# "malformed dispatch record" on stderr.
+# ============================================================================
+OKF='  - dispatch: verify-fixture — serial — unconditional — recommendation: tier1-verification-fanout'
+OKM='  - dispatch: verify-mechanism — tier1-fanout — conditional — saving: tier1-verification-fanout'
+
+dispatch_case T-99701 "$OKI\n$OKF\n$OKM" 0 silent "conformant two-refinement record (verify-fixture + verify-mechanism) passes the gate" T-1100
+dispatch_case T-99702 "$OKI\n$OKV" 0 silent "bare parent verify record still passes unchanged (adopter back-compat)" T-1100
+dispatch_case T-99703 "$OKI\n$OKF" 0 silent "single-refinement (partial) record passes — completeness is norm text, not the gate's business" T-1100
+dispatch_case T-99704 "$OKI\n$OKV\n$OKF" 1 "never both" "parent 'verify' plus refinement 'verify-fixture' on the same entry refuses (the new exclusivity refusal)" T-1100
+dispatch_case T-99705 "$OKI\n$OKM\n$OKM" 1 "'verify-mechanism' appears more than once" "duplicated verify-mechanism axis refuses (existing per-key uniqueness rule, unchanged)" T-1100
+dispatch_case T-99706 "$OKI\n  - dispatch: verify-fixture — tier2 — unconditional — recommendation: tier1-verification-fanout" 1 "'tier2' is not in axis 'verify-fixture'" "cross-axis value 'verify-fixture — tier2' refuses" T-1100
+dispatch_case T-99707 "$OKI\n  - dispatch: verify-mechanism — pm-authored — unconditional — recommendation: tier1-verification-fanout" 1 "'pm-authored' is not in axis 'verify-mechanism'" "cross-axis value 'verify-mechanism — pm-authored' refuses" T-1100
+
 printf '\nAll close-out assertions passed.\n'
