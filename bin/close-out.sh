@@ -558,6 +558,44 @@ if [ "$OV_RC" -ne 0 ]; then
   esac
 fi
 
+# --- fail-closed gate: review-input fidelity (T-1104, #335) ----------------
+# Deliberately NOT election-scoped, like the oversight gate immediately
+# above: there is no per-task election to read here either, and the
+# checker's own per-record opt-in verdict (a record carrying zero
+# input-fidelity fields exits 0 — DP-3) is what keeps every
+# already-committed record, and every task whose review hasn't been
+# instrumented with this grammar yet, conformant. Wiring mirrors the two
+# gates above line for line: the sibling screen (a missing/unreadable
+# sibling is an install problem, never a board defect), stderr re-printed
+# verbatim, `1` mapped to `fail` (a board-content refusal, board left
+# byte-untouched) and every other non-zero mapped to `die`. This call
+# passes only `--task "$TASK"`: the checker resolves the record's own path
+# from that task id ($TEAM_REVIEWS_DIR when set, else the sibling
+# team-paths.sh, no guessing fallback), exactly as check-spec-review.sh
+# already does — and, unlike that gate, treats an unresolvable reviews
+# directory or an absent per-task record as "nothing to check yet" rather
+# than a refusal, which is what keeps this unconditional call cheap for
+# every task this grammar has not yet reached.
+REVIEW_INPUT_CHECKER="$SCRIPT_DIR/check-review-input.sh"
+if [ ! -f "$REVIEW_INPUT_CHECKER" ] || [ ! -r "$REVIEW_INPUT_CHECKER" ]; then
+  die "cannot verify the review record (check-review-input.sh missing or unreadable next to close-out.sh)"
+fi
+
+RI_ERR="$(bash "$REVIEW_INPUT_CHECKER" --task "$TASK" 2>&1 >/dev/null)" && RI_RC=0 || RI_RC=$?
+if [ "$RI_RC" -ne 0 ]; then
+  if [ -n "$RI_ERR" ]; then
+    printf '%s\n' "$RI_ERR" >&2 || true
+  fi
+  case "$RI_RC" in
+    1)
+      fail "$TASK's review record fails the input-fidelity grammar"
+      ;;
+    *)
+      die "cannot verify the review record ($TASK: check-review-input.sh exited $RI_RC)"
+      ;;
+  esac
+fi
+
 # --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh
 # invocation below (the source-line gate) — covers the pre-write interlock
 # further down too, so there is exactly one of it. A missing or unreadable

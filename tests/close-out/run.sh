@@ -643,7 +643,14 @@ pass "interventions-resolver-failure-exit2 — with team-paths.sh removed and no
 # all, so $TEAM_OVERSIGHT_BASE must be supplied too (pointing at a directory
 # that carries no oversight.conf, so the checker resolves the shipped
 # `autonomous` default and stays silent).
-( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" TEAM_OVERSIGHT_BASE="$RF_ROOT/root/.shell-team" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2" \
+# T-1104 (#335): the review-input gate is likewise unconditional and
+# resolves the reviews directory the same way — $TEAM_REVIEWS_DIR must be
+# supplied too. Unlike $TEAM_OVERSIGHT_BASE above, the pointed-at directory
+# need not exist or carry a T-901.md at all: the gate's own --task-only
+# leniency (see bin/check-review-input.sh) reads an absent reviews
+# directory, or an absent per-task record inside one that does exist, as
+# "nothing to check yet" rather than a resolver failure.
+( cd "$RF_ROOT/root" && TEAM_TODO="$RF_ROOT/root/todo.md" TEAM_INTERVENTIONS_DIR="$RF_ROOT/root/.shell-team/interventions" TEAM_OVERSIGHT_BASE="$RF_ROOT/root/.shell-team" TEAM_REVIEWS_DIR="$RF_ROOT/root/.shell-team/reviews" bash "$RF_ROOT/bin/close-out.sh" --task T-901 --date 2026-01-01 ) >"$RF_ROOT/out2" 2>"$RF_ROOT/err2" \
   || fail "interventions-resolver-failure-exit2 positive control: the override needs no resolver (stderr: $(cat "$RF_ROOT/err2"))"
 pass "interventions-resolver-failure-exit2 positive control — the same crippled bin/ copy succeeds once \$TEAM_INTERVENTIONS_DIR is set"
 
@@ -1396,5 +1403,58 @@ oversight_case T-99801 "" "" 0 silent "no oversight.conf at all: the shipped aut
 oversight_case T-99802 "schema 1\nprofile governance-controlled\nseam pre-merge" "" 1 refuse "governance-controlled declaring pre-merge with no approval record refuses through close-out.sh"
 oversight_case T-99803 "schema 1\nprofile governance-controlled\nseam pre-merge" "  - oversight-approval (pre-merge): approver=reviewer-01 — producer=author-02 — approves=$OVERSIGHT_HC — date=2026-08-27 — record=docs/specs/fixture.md" 0 silent "governance-controlled declaring pre-merge with a conformant distinct-handle record (approves=HEAD) passes through close-out.sh and moves the entry to Done"
 oversight_case T-99804 "schema 1\nprofile governance-controlled\nseam specify-seam" "" 0 silent "governance-controlled declaring only specify-seam imposes nothing at pre-merge through close-out.sh (declared-but-not-this-seam)"
+
+# ============================================================================
+# T-1104 (#335): the review-input fidelity gate's own teeth, wired
+# unconditionally into bin/close-out.sh (like the oversight gate above,
+# there is no per-task election to read). This block proves the WIRING
+# (the checker invocation, the sentinel, board-byte-untouched on refusal,
+# the entry moving to Done on a conformant or not-yet-instrumented record)
+# through the real close-out.sh entry point; the exhaustive grammar/
+# vocabulary/collision matrix lives in tests/check-review-input/run.sh and
+# this spec's own AC2-AC9/AC21 check lines. The gate's own two
+# --task-only leniencies (an absent reviews directory, an absent per-task
+# record file) are what let every dispatch_case/spec_review_case/
+# oversight_case fixture above — none of which anticipated this new gate,
+# and most of which set up no reviews directory at all — keep passing
+# unmodified once this gate became unconditional.
+# ============================================================================
+REVIEW_INPUT_SENTINEL="review record fails the input-fidelity grammar"
+review_input_case() {
+  local task="$1" review_body="$2" expect_rc="$3" mode="$4" name="$5"
+  local root="$DISPATCH_ROOT/$task"
+  mkdir -p "$root/.shell-team/reviews"
+  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
+  if [ -n "$review_body" ]; then
+    printf -- '%b\n' "$review_body" > "$root/.shell-team/reviews/$task.md"
+    test -s "$root/.shell-team/reviews/$task.md" || fail "T-1104 $name: could not write the synthesized review record"
+  fi
+  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n\n## Done\n' \
+    "$task" > "$root/todo.md"
+  cp "$root/todo.md" "$root/todo.orig"
+  local rc=0
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" TEAM_REVIEWS_DIR="$root/.shell-team/reviews" \
+      bash "$CLOSEOUT" --task "$task" --date 2026-08-29 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
+  [ "$rc" -eq "$expect_rc" ] || fail "T-1104 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  if [ "$mode" = silent ]; then
+    grep -qF -- "$REVIEW_INPUT_SENTINEL" "$root/err" \
+      && fail "T-1104 $name: the gate must say NOTHING here — found the refusal sentinel in stderr"
+    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
+      || fail "T-1104 $name: close-out should have moved the entry to Done"
+  else
+    cmp -s "$root/todo.orig" "$root/todo.md" \
+      || fail "T-1104 $name: a refused close-out must leave the board byte-untouched"
+    grep -qF -- "$REVIEW_INPUT_SENTINEL" "$root/err" \
+      || fail "T-1104 $name: refusal stderr must carry the sentinel '$REVIEW_INPUT_SENTINEL'"
+  fi
+  pass "T-1104 $name"
+}
+
+review_input_case T-99901 '' 0 silent "no review record file at all passes through close-out.sh (task-only leniency, DP-3 extended)"
+review_input_case T-99902 '### Codex Review verdict: APPROVE\n- Task: T-99902\n' 0 silent "a zero-field review record passes through close-out.sh (forward-only, DP-3)"
+review_input_case T-99903 '### Codex Review verdict: APPROVE\n- Task: T-99903\n  - executor-invocation (p1): codex exec --sandbox read-only review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-99903-codex-primary\n' 0 silent "a conformant single-pass record passes through close-out.sh and moves the entry to Done"
+review_input_case T-99904 '### Codex Review verdict: APPROVE\n- Task: T-99904\n  - executor-invocation (p1): codex exec --sandbox read-only review --base develop\n  - pass-role (p1): generation\n  - raw-capture (p1): T-99904-codex-primary\n' 1 refuse "a record missing a required field (field-missing) refuses through close-out.sh"
+review_input_case T-99905 '### Codex Review verdict: APPROVE\n- Task: T-99905\n  - executor-invocation (p1): codex exec --sandbox read-only review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n' 1 refuse "a record whose raw-capture stem is not prefixed by this task's own id (raw-capture-stem-mismatch) refuses through close-out.sh"
 
 printf '\nAll close-out assertions passed.\n'
