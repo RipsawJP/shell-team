@@ -658,10 +658,18 @@ assert_case cb-lock-body-crlf 0 'verified' --verify --lock "$crlfcopy" --config 
 popall="$TMP/cb-pop-all.txt"
 # `git grep -l` exits 1 (no diagnostic) on a genuinely empty match set; under
 # this suite's own `set -e`, an unguarded non-zero here would abort the whole
-# script with no FAIL: line at all — `|| true` absorbs only that "no match"
-# status so the very next line's explicit assertion is what actually reports
-# the vacuity, never a producer's own real failure (T-1016 test-recipe entry).
-(cd "$REPO_ROOT" && git grep -l -e 'check-binding.sh' -- 'bin/*.sh' '.github/workflows/*.yml') > "$popall" || true
+# script with no FAIL: line at all (T-1016 test-recipe entry). But a bare
+# `|| true` absorbs EVERY non-zero status, not only that documented "no
+# match" case — git's own convention is 0 = match, 1 = no match, >=2 =
+# fatal error, and a fatal error that emitted a partial match list before
+# dying would then be judged as a complete population (Codex round-2
+# Major). Capture the exit status explicitly and absorb ONLY exit 1; any
+# other non-zero status fails loudly instead of being silently swallowed.
+set +e
+(cd "$REPO_ROOT" && git grep -l -e 'check-binding.sh' -- 'bin/*.sh' '.github/workflows/*.yml') > "$popall"
+grc=$?
+set -e
+[ "$grc" -eq 0 ] || [ "$grc" -eq 1 ] || fail "cb-adapters-not-forwarded-population: git grep exited $grc (not a clean no-match)"
 [ -s "$popall" ] || fail "cb-adapters-not-forwarded-population: the live enumeration returned nothing"
 pop="$TMP/cb-pop.txt"
 grep -vxF -- 'bin/check-binding.sh' "$popall" > "$pop"
