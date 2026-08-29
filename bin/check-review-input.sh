@@ -49,10 +49,30 @@
 # log). The field's own contract forbids four things: an environment dump
 # or any variable's expanded value, a credential, token, key or
 # authentication header, an absolute path outside the repository, and any
-# operator or account identity.
+# operator or account identity. Where the real argv carries an absolute
+# path under the invoker's home directory (the --cd argument in
+# particular), the sanctioned alternative is to record that path as
+# <repo-root>, relative to the repository root, with every flag, every
+# other argument and their order kept verbatim — a recording convention
+# this script never inspects for: it never judges the field's content
+# beyond non-emptiness and single-line-ness, whether written with or
+# without the substitution.
 #
 # A record carrying ZERO input-fidelity fields exits 0 (the requirement is
 # forward-only over a corpus of already-committed records — DP-3).
+#
+# Per-section completeness (DP-4/AC4, v2): a verdict-heading section opts
+# in the moment IT carries at least one of the four fields; once opted in
+# it must carry at least one complete pass block ALL FOUR of whose field
+# lines sit inside that same section — crediting a section from a pass
+# id's earliest field line alone is exactly the defect this rewrite
+# closes. A section carrying none of the four fields is conformant
+# whatever the rest of the record carries (forward-only at section
+# granularity, not only at record granularity). The field/vocabulary/
+# shape rules run FIRST over the whole record, so `field-missing` and
+# `section-incomplete` name disjoint shapes: a pass whose field is
+# missing from the record entirely refuses field-missing, never
+# section-incomplete.
 #
 # Usage:
 #   check-review-input.sh --record PATH [--task T-NNN]
@@ -86,6 +106,7 @@
 # team-paths.sh unavailable).
 
 set -euo pipefail
+export LC_ALL=C
 
 die()  { printf 'check-review-input: %s\n' "$1" >&2 || true; exit 2; }
 fail() { printf 'check-review-input: %s\n' "$1" >&2 || true; exit 1; }
@@ -133,16 +154,21 @@ if [ "$EXPLICIT_RECORD" -eq 0 ]; then
     REVIEWS_DIR="$(bash "$SCRIPT_DIR/team-paths.sh" --get reviews 2>/dev/null)" \
       || die "cannot resolve the reviews directory (team-paths.sh unavailable) — set \$TEAM_REVIEWS_DIR or fix the install"
   fi
-  if [ ! -e "$REVIEWS_DIR" ]; then
-    # No reviews directory at all yet: nothing has ever been recorded for
-    # any task under this resolution, so there is no record for THIS task
-    # either. Forward-only leniency (see header) — never for --record.
+  if [ ! -e "$REVIEWS_DIR" ] && [ ! -L "$REVIEWS_DIR" ]; then
+    # No path component exists there AT ALL yet (not even a broken
+    # symlink): nothing has ever been recorded for any task under this
+    # resolution, so there is no record for THIS task either.
+    # Forward-only leniency (see header) — never for --record. A dangling
+    # symlink is NOT "does not exist" — it is "exists and is broken" —
+    # and falls through to the -d test below, which fails closed on it.
     exit 0
   fi
   [ -d "$REVIEWS_DIR" ] || die "reviews-dir-unresolvable: reviews directory is not a directory: $REVIEWS_DIR"
   RECORD="$REVIEWS_DIR/$TASK.md"
-  if [ ! -e "$RECORD" ]; then
-    # No record file yet for this task: same forward-only leniency.
+  if [ ! -e "$RECORD" ] && [ ! -L "$RECORD" ]; then
+    # No record file at all yet for this task (not even a broken symlink):
+    # same forward-only leniency. A dangling symlink falls through to the
+    # readability screen below, which fails closed on it.
     exit 0
   fi
 fi
@@ -164,47 +190,25 @@ fi
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-review-input.XXXXXX")" || die "mktemp failed"
 trap 'rm -rf "$WORK"' EXIT
 
-# --- extract every field line record-wide, with its line number. grep
-# reads the whole file (EOF-safe for a final line with no trailing
-# newline — never a `while read` loop directly over the record itself,
-# the discipline bin/check-spec-review.sh's own header fixes); its own
-# output always ends in a newline, so looping over IT is safe. A
-# continuation line that carries no field anchor of its own (an indented
-# line under a field, with no `- <name> (<id>): ` prefix) matches nothing
-# here and is silently skipped — never glued onto the previous value
-# (AC8's continuation-line case). ------------------------------------------
-FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
-grep -nE -- "$FIELD_RE" "$RECORD" > "$WORK/matches" 2>/dev/null || true
-
-if [ ! -s "$WORK/matches" ]; then
-  # Zero input-fidelity fields anywhere: forward-only pass (DP-3). Every
-  # already-committed record in this or any adopter repository is in this
-  # class at upgrade time.
-  exit 0
-fi
-
-: > "$WORK/fields"
-while IFS= read -r rec; do
-  n="${rec%%:*}"
-  content="${rec#*:}"
-  if [[ "$content" =~ $FIELD_RE ]]; then
-    printf '%s\t%s\t%s\t%s\n' "$n" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" >> "$WORK/fields"
-  fi
-done < "$WORK/matches"
-
-# --- verdict-heading line numbers: the section anchor is the fixed
-# literal stem, never the free-form `## ` heading text above it (the
-# Gotcha this task's Notes for engineer records — `## ` headings vary
-# across the corpus; `### Codex Review verdict:` and `### Codex
-# Spec-Review verdict:` are the two fixed stems agents/codex-reviewer.md
-# pins). --------------------------------------------------------------
+# --- verdict-heading line numbers FIRST, so field extraction below can
+# stamp each field line with its owning section as it goes. The section
+# anchor is the fixed literal stem, never the free-form `## ` heading text
+# above it (the Gotcha this task's Notes for engineer records — `## `
+# headings vary across the corpus; `### Codex Review verdict:` and
+# `### Codex Spec-Review verdict:` are the two fixed stems
+# agents/codex-reviewer.md pins). A real scan failure (grep exit > 1 —
+# e.g. a read error mid-file) is distinguished from a clean "no heading
+# found" (exit 1) rather than masked by a blanket `|| true`: an input
+# this checker cannot actually evaluate must never read as a silent,
+# heading-less pass. --------------------------------------------------
 HEADING_RE='^### Codex (Review|Spec-Review) verdict:'
-grep -nE -- "$HEADING_RE" "$RECORD" > "$WORK/headings" 2>/dev/null || true
+grep -nE -- "$HEADING_RE" "$RECORD" > "$WORK/headings" 2>"$WORK/headings.err" && hgx=0 || hgx=$?
+[ "$hgx" -le 1 ] || die "record-unreadable: scanning $RECORD for verdict headings failed"
 cut -d: -f1 "$WORK/headings" > "$WORK/heading_lines" 2>/dev/null || true
 
 # section_of LINE_NO — prints the heading line number that owns LINE_NO
 # (the greatest heading line <= LINE_NO), or 0 if none / no headings at
-# all.
+# all / the line precedes every heading.
 section_of() {
   local ln="$1" best=0 h
   if [ -s "$WORK/heading_lines" ]; then
@@ -217,11 +221,61 @@ section_of() {
   printf '%s\n' "$best"
 }
 
+# --- extract every field line record-wide, with its line number. grep
+# reads the whole file (EOF-safe for a final line with no trailing
+# newline — never a `while read` loop directly over the record itself,
+# the discipline bin/check-spec-review.sh's own header fixes); its own
+# output always ends in a newline, so looping over IT is safe. A
+# continuation line that carries no field anchor of its own (an indented
+# line under a field, with no `- <name> (<id>): ` prefix) matches nothing
+# here and is silently skipped — never glued onto the previous value
+# (AC8's continuation-line case). A real scan failure is distinguished
+# from a clean "no fields found" the same way the heading scan above
+# is. ------------------------------------------------------------------
+FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
+grep -nE -- "$FIELD_RE" "$RECORD" > "$WORK/matches" 2>"$WORK/matches.err" && fgx=0 || fgx=$?
+[ "$fgx" -le 1 ] || die "record-unreadable: scanning $RECORD for input-fidelity fields failed"
+
+if [ ! -s "$WORK/matches" ]; then
+  # Zero input-fidelity fields anywhere: forward-only pass (DP-3). Every
+  # already-committed record in this or any adopter repository is in this
+  # class at upgrade time.
+  exit 0
+fi
+
+# The internal transport is TAB-delimited, so a captured id or value that
+# itself contains a literal TAB byte is rejected outright here, before it
+# is ever written to the work file — closing the class of defect where an
+# embedded TAB forges a column boundary and truncates a value the
+# vocabulary/charset checks below then see only a prefix of (e.g. a
+# pass-role value of "generation<TAB>garbage" reading as bare
+# "generation"). This is a shape rule, not a content judgment (AC8): the
+# field contract already forbids control-character content in spirit, and
+# neither an id nor a value may legitimately need a TAB byte.
+: > "$WORK/fields"
+while IFS= read -r rec; do
+  n="${rec%%:*}"
+  content="${rec#*:}"
+  if [[ "$content" =~ $FIELD_RE ]]; then
+    fid="${BASH_REMATCH[2]}"
+    fval="${BASH_REMATCH[3]}"
+    case "$fid" in
+      *$'\t'*) fail "field-grammar: a pass id at line $n contains an embedded tab, which is not representable" ;;
+    esac
+    case "$fval" in
+      *$'\t'*) fail "field-grammar: a field value at line $n contains an embedded tab, which is not representable" ;;
+    esac
+    owner_ln="$(section_of "$n")"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$n" "${BASH_REMATCH[1]}" "$fid" "$fval" "$owner_ln" >> "$WORK/fields"
+  fi
+done < "$WORK/matches"
+
 # --- distinct pass ids, in order of first appearance -----------------------
 cut -f3 "$WORK/fields" | awk '!seen[$0]++' > "$WORK/ids"
 
 : > "$WORK/complete_ids"
 : > "$WORK/rawcap"
+: > "$WORK/section_owner"
 
 while IFS= read -r id; do
   ei_n=$(awk -F'\t' -v id="$id" '$2=="executor-invocation" && $3==id' "$WORK/fields" | grep -c . || true)
@@ -271,31 +325,51 @@ while IFS= read -r id; do
 
   printf '%s\n' "$id" >> "$WORK/complete_ids"
   printf '%s\t%s\n' "$id" "$rc_val" >> "$WORK/rawcap"
+
+  # Section ownership (DP-4/AC4, the section-scoped-ownership fix): this
+  # id's block is credited to a section ONLY when all four of its field
+  # lines resolve to the SAME owning section. A pass split across two
+  # sections (one field here, three elsewhere) is credited to no section
+  # at all, which is exactly what makes the section it is split across
+  # refuse rather than being satisfied from the pass's earliest field line
+  # alone (the review's Major 4 reproduction).
+  owners="$(awk -F'\t' -v id="$id" '$3==id{print $5}' "$WORK/fields" | sort -u)"
+  n_owners="$(printf '%s\n' "$owners" | grep -c . || true)"
+  if [ "$n_owners" -eq 1 ]; then
+    printf '%s\t%s\n' "$id" "$owners" >> "$WORK/section_owner"
+  fi
 done < "$WORK/ids"
 
 # --- cross-round / cross-section raw-capture collision: the whole record,
-# never scoped to one section (AC7's second case). --------------------------
-DUP_STEM="$(cut -f2 "$WORK/rawcap" | sort | uniq -d | head -1 || true)"
+# never scoped to one section (AC7's second case). No echo of the
+# colliding stem's own bytes — only the refusal token and the two
+# colliding pass ids are named, the no-echo discipline
+# bin/check-commit-identity.sh's header fixes, applied here because a
+# stem can carry a marker or fragment worth not re-publishing. --------------
+cut -f2 "$WORK/rawcap" > "$WORK/stems" || die "record-unreadable: extracting raw-capture stems failed"
+sort "$WORK/stems" > "$WORK/stems.sorted" || die "record-unreadable: sorting raw-capture stems failed"
+uniq -d "$WORK/stems.sorted" > "$WORK/dupstems" || die "record-unreadable: detecting raw-capture stem duplicates failed"
+DUP_STEM="$(head -1 "$WORK/dupstems")"
 if [ -n "$DUP_STEM" ]; then
-  DUP_ID="$(awk -F'\t' -v s="$DUP_STEM" '$2==s {print $1; exit}' "$WORK/rawcap")"
-  fail "raw-capture-collision: raw-capture stem '$DUP_STEM' is named by more than one pass id (first: '$DUP_ID')"
+  DUP_ID1="$(awk -F'\t' -v s="$DUP_STEM" '$2==s {print $1; exit}' "$WORK/rawcap")"
+  DUP_ID2="$(awk -F'\t' -v s="$DUP_STEM" -v skip="$DUP_ID1" '$2==s && $1!=skip {print $1; exit}' "$WORK/rawcap")"
+  fail "raw-capture-collision: two pass ids name the same raw-capture stem (first: '$DUP_ID1', second: '$DUP_ID2')"
 fi
 
-# --- per-section completeness (DP-4/AC4): once the record opts in, every
-# verdict-heading section must carry at least one complete pass block. -----
+# --- per-section completeness (DP-4/AC4, v2): once a verdict-heading
+# section opts in — carries at least one of the four fields, from any
+# pass id, complete or not — it must carry at least one pass id whose
+# section-owner (computed above) is that SAME heading line. A section
+# carrying none of the four fields is conformant whatever the rest of the
+# record carries. --------------------------------------------------------
 if [ -s "$WORK/heading_lines" ]; then
+  cut -f5 "$WORK/fields" | sort -u > "$WORK/armed_sections"
+  cut -f2 "$WORK/section_owner" | sort -u > "$WORK/owned_sections"
   while IFS= read -r h; do
-    owned=0
-    while IFS= read -r id; do
-      first_ln=$(awk -F'\t' -v id="$id" '$3==id {print $1}' "$WORK/fields" | sort -n | head -1)
-      owner="$(section_of "$first_ln")"
-      if [ "$owner" = "$h" ]; then
-        owned=1
-        break
+    if grep -Fqx -- "$h" "$WORK/armed_sections" 2>/dev/null; then
+      if ! grep -Fqx -- "$h" "$WORK/owned_sections" 2>/dev/null; then
+        fail "section-incomplete: the verdict-heading section at line $h carries no complete pass block"
       fi
-    done < "$WORK/complete_ids"
-    if [ "$owned" -eq 0 ]; then
-      fail "section-incomplete: the verdict-heading section at line $h carries no complete pass block"
     fi
   done < "$WORK/heading_lines"
 fi

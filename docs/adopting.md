@@ -723,7 +723,13 @@ must never carry an environment dump or a variable's expanded value, a
 credential, token, key or authentication header, an
 absolute path outside the repository (a home-directory path or a
 `$TMPDIR` session root in particular), or any operator or account
-identity.
+identity. Where the real argv carries an absolute path under the
+invoker's home directory — the `--cd` argument in particular — record
+that path as `<repo-root>`, relative to the repository root, instead;
+every flag, every other argument and their order stay verbatim. This is
+a recording convention, not something the checker enforces: it never
+judges the field's content, so a record written either way is
+conformant.
 `bin/check-pii-shapes.sh`'s diff-scoped CI step is a real, and equally
 finite, backstop — a **finite known-shape screen** keyed on named
 prefixes, named roots and stated length minimums, never comprehensive

@@ -690,7 +690,13 @@ token が `carried` / `not-carried` / `not-applicable` のいずれかで後に
 environment dump や変数の展開値、credential・token・key・認証 header、
 repository 外の absolute path outside the repository（特に
 home-directory path や `$TMPDIR` session root）、あるいは operator や
-account の identity を決して含んではならない。`bin/check-pii-shapes.sh`
+account の identity を決して含んではならない。実際の argv が invoker の
+home directory 配下の absolute path（特に `--cd` 引数）を含む場合は、
+その path を repository root からの相対パスとして `<repo-root>` と記録
+する——flag・他の引数・その順序はすべて verbatim のまま保つ。これは
+recording convention であって checker が強制するものではない: checker
+はこの field の内容を判定しないので、どちらの書き方でも record は
+conformant である。`bin/check-pii-shapes.sh`
 の diff-scoped CI step は現実の、しかし同じく有限な backstop であり
 ——named prefix・named root・長さの下限に基づく
 **finite known-shape screen** であって、網羅的な secret 検出ではない
