@@ -63,23 +63,24 @@ transcribe されたものであり、決して invent されない——が追�
 [verification ceiling を宣言する](adopting.ja.md#verification-ceiling-を宣言する)
 を参照。
 
-3 つの機械的に検出可能な地点——same-class-2 のカウントが 2 に達した時、spec
-pre-commitment の factual trigger が発火した時、loop-guard の `STOP:`
-escalation——のそれぞれで、loop はあなたへの hand-off を組み立てる前に
-**means-ends reflection**（T-1095、issue #346）を実行する: 4 つの固定質問に
-書面で答え、(1) タスク自身の never-dropped 項目がすべて green のまま、
-(2) findings が対象とするのがすでに名前の付いた auxiliary component（複数
-ある場合は pre-commitment に記録された drop order 順）のみ、(3) その中で
-最も早い component に対して pre-priced disposition が存在する——の 3 条件
-がすべて成り立つ場合に限り、その disposition は loop 自身の権限で execute
-され、その 4 つの答えを根拠として board に記録される——安く見える別の
-patch と並ぶ一選択肢として escalate されるのではない。この 3 条件のいずれか
-が成り立たない場合、disposition 自体が破壊的・不可逆な場合、または
-finding set が空か未分類の場合は、あなたへの escalation が引き続き必須と
-なる。3 つの standing human gate——マージ前の batch GO、スプリントプラン
-ニングの承認、破壊的・不可逆な操作——は変わらない。これはこの 3 地点で
-loop があなたに割り込むか否かだけを変える。この reflection がこれまでの
-ところ拠って立つ唯一の worked example は
+機械的に検出可能な 3 つの地点——same-class-2 のカウントが 2 に達した時、
+spec pre-commitment の factual trigger が発火した時、loop-guard の
+`STOP:` escalation——のそれぞれで、loop はあなたへの hand-off を組み立てる
+前に **means-ends reflection**（T-1095、issue #346）を実行する。4 つの
+固定質問に書面で答えたうえで、次の 3 条件がすべて成り立つ場合に限り、
+その disposition を loop 自身の権限で execute し、4 つの答えを根拠として
+board に記録する（安く見える別の patch と並ぶ一選択肢として escalate
+するのではない）。3 条件とは、(1) タスク自身の never-dropped 項目が
+すべて green のまま、(2) findings が対象とするのが、すでに名前の付いた
+auxiliary component（複数ある場合は pre-commitment に記録された drop
+order 順）のみ、(3) その中で最も早い component に対して pre-priced
+disposition が存在する、である。3 条件のいずれかが成り立たない場合、
+disposition 自体が破壊的・不可逆な場合、または finding set が空か未分類
+の場合は、あなたへの escalation が引き続き必須となる。3 つの standing
+human gate——マージ前の batch GO、スプリントプランニングの承認、破壊的・
+不可逆な操作——は変わらない。この機構が変えるのは、この 3 地点で loop が
+あなたに割り込むか否かだけである。この reflection がこれまでのところ
+拠って立つ唯一の worked example は
 [`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)
 を参照。
 

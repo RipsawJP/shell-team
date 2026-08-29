@@ -60,7 +60,7 @@ claude --plugin-dir ./
 
 ## バージョン系統
 
-**shell-team は単一のリリース線として配布されます。** `main` がリリースを担い、`develop` がその統合ブランチです。`plugin.json` の version は通常の `0.x.y` リリーススケジュールに従って進みます。`#ref` を付けない既定の `plugin marketplace add RipsawJP/shell-team` は default branch（`main`）の HEAD から marketplace manifest を解決するため、素の install は常に最新リリースを得ます。`/plugin marketplace update` はその ref を再取得し version を比較します。以前の並行配布体制——ref で pin する凍結 v0.2 系を v0.3 と併存させる構成——は廃止しました: pin・切り替え・backport の対象となる別系統はもうありません。チェックアウト上の `claude --plugin-dir ./` dogfood 経路は変わりません。
+**shell-team は単一のリリース線として配布されます。** `main` がリリースを担い、`develop` がその統合ブランチです。`plugin.json` の version は通常の `0.x.y` リリーススケジュールに従って進みます。`#ref` を付けない既定の `plugin marketplace add RipsawJP/shell-team` は default branch（`main`）の HEAD から marketplace manifest を解決するため、素の install は常に最新リリースを得ます。`/plugin marketplace update` はその ref を再取得し version を比較します。以前の並行配布体制（ref で pin する凍結 v0.2 系を v0.3 と併存させる構成）は廃止したので、pin・切り替え・backport の対象となる別系統はもうありません。チェックアウト上の `claude --plugin-dir ./` dogfood 経路は変わりません。
 
 ## ホスト限定のスケジューリング
 
@@ -71,7 +71,7 @@ claude --plugin-dir ./
 - **環境の `/loop` + `ScheduleWakeup`**（エージェントランタイムがそれらを提供する場合に推奨）。これらは**環境のプリミティブであって、リポジトリのスクリプトではありません** — このプラグインに `skills/loop/` は存在しないので、フレームワークがそれらを自己呼び出しすることはできません。ケイデンスは環境側で駆動し（例: `/loop 30m /shell-team:run …`）、意図を文書化するためにループ契約の `trigger.type: schedule` を設定してください。
 - **OS スケジューラ（cron / `launchctl` / systemd timer）**が、**あなたが所有する**小さなホスト側ラッパー（ここでは同梱しない）を呼ぶ方法。説明用で有効化されていないサンプルは [`loop-engineering/loop-cron.crontab.example`](loop-engineering/loop-cron.crontab.example) を参照。
 
-**`manual` は常にフォールバックです。** ホストのスケジューリングは薄く、取り外し可能なレイヤーです: crontab の行 / LaunchAgent を削除する（または `/loop` の使用をやめる）だけで、ループは以前とまったく同じように手で実行できます — **リポジトリ内部の挙動は一切変わりません**。（ホストのクロックを取り除いても契約ファイルは書き換わりません: `trigger.type: schedule` のまま残された契約は有効で手動実行可能です。オペレータは新しい意図を反映するために任意で `manual` に編集し直せます。）ホストは多様なので（cron か launchd か systemd か CI スケジューラかエージェントランタイムの `/loop` か）、この配線は**可搬ではなく**、よって文書化はするものの同梱や自動有効化は決してしません。スケジュールされたトリガが実際に発火するかどうかはホストランタイムの挙動であり — このリポジトリの CI ではなく、実機ホストでの dogfood によって検証されます。
+**`manual` は常にフォールバックです。** ホストのスケジューリングは薄く、取り外し可能なレイヤーです。crontab の行 / LaunchAgent を削除する（または `/loop` の使用をやめる）だけで、ループは以前とまったく同じように手で実行でき、**リポジトリ内部の挙動は一切変わりません**。ホストのクロックを取り除いても契約ファイルは書き換わりません。`trigger.type: schedule` のまま残された契約は有効で手動実行可能で、オペレータは新しい意図を反映するために任意で `manual` に編集し直せます。ホストは多様なので（cron か launchd か systemd か CI スケジューラかエージェントランタイムの `/loop` か）、この配線は**可搬ではありません**。よって文書化はするものの、同梱や自動有効化は決してしません。スケジュールされたトリガが実際に発火するかどうかはホストランタイムの挙動であり、このリポジトリの CI ではなく、実機ホストでの dogfood によって検証されます。
 
 ## エアギャップ / ロックされた CI でのフォールバック（vendoring）
 
