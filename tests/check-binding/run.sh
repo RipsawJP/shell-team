@@ -656,7 +656,12 @@ assert_case cb-lock-body-crlf 0 'verified' --verify --lock "$crlfcopy" --config 
 # naming check-binding.sh (self excluded) must spell --adapters zero times
 # =============================================================================
 popall="$TMP/cb-pop-all.txt"
-(cd "$REPO_ROOT" && git grep -l -e 'check-binding.sh' -- 'bin/*.sh' '.github/workflows/*.yml') > "$popall"
+# `git grep -l` exits 1 (no diagnostic) on a genuinely empty match set; under
+# this suite's own `set -e`, an unguarded non-zero here would abort the whole
+# script with no FAIL: line at all — `|| true` absorbs only that "no match"
+# status so the very next line's explicit assertion is what actually reports
+# the vacuity, never a producer's own real failure (T-1016 test-recipe entry).
+(cd "$REPO_ROOT" && git grep -l -e 'check-binding.sh' -- 'bin/*.sh' '.github/workflows/*.yml') > "$popall" || true
 [ -s "$popall" ] || fail "cb-adapters-not-forwarded-population: the live enumeration returned nothing"
 pop="$TMP/cb-pop.txt"
 grep -vxF -- 'bin/check-binding.sh' "$popall" > "$pop"
