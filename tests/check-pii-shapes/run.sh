@@ -287,6 +287,232 @@ assert_clean "POS/NEG pair: home-path-win (near-miss negative NOT reported)" \
   "$WP_NEG_REPO" "$WP_NEG_BASE"
 
 # =============================================================================
+# POS/NEG pair: home-encoded (T-1101)
+# family: both separators, both roots
+# =============================================================================
+printf '\n--- POS/NEG pair: home-encoded ---\n'
+printf '\n--- family: the encoded-home rule fires on both separators and both roots ---\n'
+
+HE_N1="ma"; HE_N2="rco"
+HE_NAME="${HE_N1}${HE_N2}"
+HE_N3="le"; HE_N4="na"
+HE_NAME2="${HE_N3}${HE_N4}"
+
+# Positive: a hyphen-encoded Users segment, both separators closed.
+HE_POS_LINE="backup at -Users-${HE_NAME}- lost"
+# Near-miss negative: the ONE feature removed — the separator run never
+# closes the name segment (T-1101 AC2).
+HE_NEG_LINE="backup at -Users-${HE_NAME} lost"
+
+HE_POS_REPO="$(new_repo)"; HE_POS_BASE="$(git -C "$HE_POS_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_POS_REPO" "pos.txt" "$HE_POS_LINE"
+assert_finding "POS/NEG pair: home-encoded (positive reported as pattern=home-encoded)" \
+  "home-encoded" "$HE_POS_REPO" "$HE_POS_BASE"
+
+HE_NEG_REPO="$(new_repo)"; HE_NEG_BASE="$(git -C "$HE_NEG_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_NEG_REPO" "neg.txt" "$HE_NEG_LINE"
+assert_clean "POS/NEG pair: home-encoded (near-miss negative NOT reported)" \
+  "$HE_NEG_REPO" "$HE_NEG_BASE"
+
+# Family (AC16): underscore-encoded as well as hyphen-encoded; the home
+# root as well as the Users root; PLUS the four spellings round-1 review
+# found missed by the pre-widening name class (T-1101 rework 1): a
+# 2-character name, a hyphen-split (multi-component) name, a digit-led
+# name, and an underscore-led name (the real macOS system-account
+# convention, e.g. _www) — one fixture, eight lines, eight findings. The
+# label text is unchanged (AC16's check is a `grep -qF` on the fixed
+# string below, which imposes no cardinality on the fixture set), so this
+# is a pure additive extension, not a re-freeze.
+HE_N5="a"; HE_N6="b"
+HE_SHORT="${HE_N5}${HE_N6}"
+HE_N7="a"; HE_N8="b"
+HE_HYPHEN_SPLIT="${HE_N7}-${HE_N8}"
+HE_N9="123"; HE_N10="4"
+HE_DIGIT_LED="${HE_N9}${HE_N10}"
+HE_N11="_"; HE_N12="www"
+HE_UNDERSCORE_LED="${HE_N11}${HE_N12}"
+HE_FAM_LINES=(
+  "-Users-${HE_NAME}-"
+  "_Users_${HE_NAME}_"
+  "-home-${HE_NAME2}-"
+  "_home_${HE_NAME2}_"
+  "-Users-${HE_SHORT}-"
+  "-Users-${HE_HYPHEN_SPLIT}-"
+  "-Users-${HE_DIGIT_LED}-"
+  "-Users-${HE_UNDERSCORE_LED}-"
+)
+HE_FAM_REPO="$(new_repo)"; HE_FAM_BASE="$(git -C "$HE_FAM_REPO" rev-parse HEAD)"
+add_fixture_lines "$HE_FAM_REPO" "family.txt" "${HE_FAM_LINES[@]}"
+set +e
+HE_FAM_OUT="$(cd "$HE_FAM_REPO" && bash "$BIN" --base "$HE_FAM_BASE" 2>&1)"
+HE_FAM_RC=$?
+set -e
+HE_FAM_HITS="$(printf '%s\n' "$HE_FAM_OUT" | grep -c '^FINDING pattern=home-encoded path=family\.txt' || true)"
+if [ "$HE_FAM_RC" -eq 1 ] && [ "$HE_FAM_HITS" = "${#HE_FAM_LINES[@]}" ]; then
+  pass "family: the encoded-home rule fires on both separators and both roots"
+else
+  fail "family: the encoded-home rule fires on both separators and both roots (rc=$HE_FAM_RC hits=$HE_FAM_HITS out=$HE_FAM_OUT)"
+fi
+
+# =============================================================================
+# regression lock (T-1101 rework 1+2): the name-class widening must NOT
+# make a captured span with NO alphanumeric-or-dot character at all start
+# firing — a run composed only of -/_ characters, whatever their mix,
+# can never satisfy the mandatory alphanumeric-or-dot requirement. Round 1
+# locked the hyphen-only flavour (`-Users---`); round 2 review found `_`
+# is a member of BOTH the separator alphabet and (pre-fix) the
+# name-continuation class, so a BARE underscore positioned as "the name"
+# was a false positive under three independent shapes — underscore
+# separators around a lone `_` in both roots, and hyphen separators
+# around a lone `_` (proving the gap is about a bare `_` acting as "the
+# name", not only about underscore-flavoured separator runs). All four
+# shapes are locked here.
+# =============================================================================
+printf '\n--- regression: a bare separator run (no real name) stays clean after the name-class widening ---\n'
+printf '\n--- regression: a bare underscore as the name stays clean, both separator flavours, both roots ---\n'
+
+HE_BARE_LINE="backup at -Users--- lost"
+HE_BARE_REPO="$(new_repo)"; HE_BARE_BASE="$(git -C "$HE_BARE_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_BARE_REPO" "bare.txt" "$HE_BARE_LINE"
+assert_clean "regression: a bare separator run (no real name) stays clean after the name-class widening" \
+  "$HE_BARE_REPO" "$HE_BARE_BASE"
+
+# T-1101 rework 2 (round-2 review Minor): a lone `_` as the captured name
+# is not a real name — locked clean for both separator flavours and both
+# roots, plus the cross-flavour shape (hyphen separators, underscore
+# name) that shows the gap was about the character, not the flavour.
+HE_LONE_U1="backup at _Users___ lost"
+HE_LONE_U2="backup at _home___ lost"
+HE_LONE_U3="backup at -Users-_- lost"
+
+HE_LONEU1_REPO="$(new_repo)"; HE_LONEU1_BASE="$(git -C "$HE_LONEU1_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_LONEU1_REPO" "lone1.txt" "$HE_LONE_U1"
+assert_clean "regression: a bare underscore as the name stays clean (underscore separators, Users root)" \
+  "$HE_LONEU1_REPO" "$HE_LONEU1_BASE"
+
+HE_LONEU2_REPO="$(new_repo)"; HE_LONEU2_BASE="$(git -C "$HE_LONEU2_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_LONEU2_REPO" "lone2.txt" "$HE_LONE_U2"
+assert_clean "regression: a bare underscore as the name stays clean (underscore separators, home root)" \
+  "$HE_LONEU2_REPO" "$HE_LONEU2_BASE"
+
+HE_LONEU3_REPO="$(new_repo)"; HE_LONEU3_BASE="$(git -C "$HE_LONEU3_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_LONEU3_REPO" "lone3.txt" "$HE_LONE_U3"
+assert_clean "regression: a bare underscore as the name stays clean (hyphen separators, Users root)" \
+  "$HE_LONEU3_REPO" "$HE_LONEU3_BASE"
+
+# Positive control alongside the three locks above: _www (underscore-LED,
+# NOT underscore-ONLY) must still fire — already covered by HE_FAM_LINES'
+# HE_UNDERSCORE_LED entry, re-asserted directly here as a standalone
+# case so this specific regression section is self-contained proof that
+# the fix distinguishes "underscore-led" from "underscore-only".
+HE_UWWW_LINE="backup at -Users-${HE_UNDERSCORE_LED}- lost"
+HE_UWWW_REPO="$(new_repo)"; HE_UWWW_BASE="$(git -C "$HE_UWWW_REPO" rev-parse HEAD)"
+add_fixture_line "$HE_UWWW_REPO" "uwww.txt" "$HE_UWWW_LINE"
+assert_finding "positive control: an underscore-LED (not underscore-ONLY) name still fires (_www)" \
+  "home-encoded" "$HE_UWWW_REPO" "$HE_UWWW_BASE"
+
+# =============================================================================
+# POS/NEG pair: temp-session (T-1101)
+# family: every documented temp root, every UUID case spelling
+# negative controls: a .shell-team/runs/ citation, and a UUID-free
+# machine-local temp citation, each proven to reach the root half of the
+# rule (precondition) while the whole rule stays clean
+# =============================================================================
+printf '\n--- POS/NEG pair: temp-session ---\n'
+printf '\n--- family: the temp-session rule fires on every documented temp root and every UUID case spelling ---\n'
+printf '\n--- negative control: a committed .shell-team/runs/ citation stays clean ---\n'
+printf '\n--- negative control: a UUID-free machine-local temp citation stays clean ---\n'
+printf '\n--- precondition: each negative control reaches the temp-session root but not its UUID requirement ---\n'
+
+# UUID fragments (lower, upper, mixed) — assembled so no contiguous
+# dashed-hex run ever appears as a completed literal in this file (DP-1).
+TS_L1="1b4e28ba"; TS_L2="2fa1"; TS_L3="11d2"; TS_L4="883f"; TS_L5="0016d3cca427"
+TS_UUID_LOWER="${TS_L1}-${TS_L2}-${TS_L3}-${TS_L4}-${TS_L5}"
+TS_U1="1B4E28BA"; TS_U2="2FA1"; TS_U3="11D2"; TS_U4="883F"; TS_U5="0016D3CCA427"
+TS_UUID_UPPER="${TS_U1}-${TS_U2}-${TS_U3}-${TS_U4}-${TS_U5}"
+TS_M1="1b4E28ba"; TS_M2="2FA1"; TS_M3="11d2"; TS_M4="883F"; TS_M5="0016d3CCA427"
+TS_UUID_MIXED="${TS_M1}-${TS_M2}-${TS_M3}-${TS_M4}-${TS_M5}"
+
+TS_WT1="wt"; TS_WT2="42"
+TS_WORKTREE="${TS_WT1}${TS_WT2}"
+
+# Positive: /private/tmp/ root, lowercase UUID.
+TS_POS_LINE="scratch at /private/tmp/claude-502/${TS_WORKTREE}-scratch-worktree/${TS_UUID_LOWER}-scratch"
+# Near-miss negative: the ONE feature removed — the same root and worktree
+# name, no UUID-shaped segment at all (T-1101 AC2).
+TS_NEG_LINE="scratch at /private/tmp/claude-502/${TS_WORKTREE}-scratch-worktree"
+
+TS_POS_REPO="$(new_repo)"; TS_POS_BASE="$(git -C "$TS_POS_REPO" rev-parse HEAD)"
+add_fixture_line "$TS_POS_REPO" "pos.txt" "$TS_POS_LINE"
+assert_finding "POS/NEG pair: temp-session (positive reported as pattern=temp-session)" \
+  "temp-session" "$TS_POS_REPO" "$TS_POS_BASE"
+
+TS_NEG_REPO="$(new_repo)"; TS_NEG_BASE="$(git -C "$TS_NEG_REPO" rev-parse HEAD)"
+add_fixture_line "$TS_NEG_REPO" "neg.txt" "$TS_NEG_LINE"
+assert_clean "POS/NEG pair: temp-session (near-miss negative NOT reported)" \
+  "$TS_NEG_REPO" "$TS_NEG_BASE"
+
+# Family (AC16): every documented temp root, every UUID case spelling,
+# PLUS the round-1-review-reproduced `=` prefix-character gap (T-1101
+# rework 1: RE_TEMP_SESSION_ROOT's class was widened to include a literal
+# `=` in the intermediate path segment) — one fixture, five lines, five
+# findings. The label text is unchanged (a pure additive extension).
+TS_FAM_LINES=(
+  "/tmp/${TS_WORKTREE}-scratch/${TS_UUID_LOWER}-work"
+  "/var/folders/xy/${TS_WORKTREE}-scratch/T/${TS_UUID_LOWER}-work"
+  "/private/tmp/claude-502/${TS_WORKTREE}-scratch/${TS_UUID_UPPER}-work"
+  "/private/tmp/claude-502/${TS_WORKTREE}-scratch/${TS_UUID_MIXED}-work"
+  "/var/folders/xy=z/${TS_WORKTREE}-scratch/${TS_UUID_LOWER}-work"
+)
+TS_FAM_REPO="$(new_repo)"; TS_FAM_BASE="$(git -C "$TS_FAM_REPO" rev-parse HEAD)"
+add_fixture_lines "$TS_FAM_REPO" "family.txt" "${TS_FAM_LINES[@]}"
+set +e
+TS_FAM_OUT="$(cd "$TS_FAM_REPO" && bash "$BIN" --base "$TS_FAM_BASE" 2>&1)"
+TS_FAM_RC=$?
+set -e
+TS_FAM_HITS="$(printf '%s\n' "$TS_FAM_OUT" | grep -c '^FINDING pattern=temp-session path=family\.txt' || true)"
+if [ "$TS_FAM_RC" -eq 1 ] && [ "$TS_FAM_HITS" = "${#TS_FAM_LINES[@]}" ]; then
+  pass "family: the temp-session rule fires on every documented temp root and every UUID case spelling"
+else
+  fail "family: the temp-session rule fires on every documented temp root and every UUID case spelling (rc=$TS_FAM_RC hits=$TS_FAM_HITS out=$TS_FAM_OUT)"
+fi
+
+# Negative controls (AC5): a committed .shell-team/runs/ relative-path
+# citation, and a machine-local temp citation carrying a worktree name but
+# no UUID-shaped segment — both proven, not assumed, to genuinely reach the
+# temp-root half of the rule (read out of the checker's own source, the
+# same idiom assert_reaches_email_candidates already established), while
+# the whole rule stays clean because the UUID requirement is load-bearing.
+RE_TEMP_ROOT_FOR_TEST="$(grep '^RE_TEMP_SESSION_ROOT=' "$BIN" | sed -E "s/^RE_TEMP_SESSION_ROOT='(.*)'\$/\\1/")"
+[ -n "$RE_TEMP_ROOT_FOR_TEST" ] || fail "precondition: could not read RE_TEMP_SESSION_ROOT out of $BIN"
+
+assert_reaches_temp_root() {  # $1 = label suffix, $2 = line
+  local label="precondition: each negative control reaches the temp-session root but not its UUID requirement ($1)" line="$2"
+  printf '%s\n' "$line" > "$WORK/precond-temp-line.txt"
+  if grep -qoE -- "$RE_TEMP_ROOT_FOR_TEST" "$WORK/precond-temp-line.txt"; then
+    pass "$label"
+  else
+    fail "$label (line did not reach the temp-session root at all: $line)"
+  fi
+}
+
+NC_RUNS_LINE="see .shell-team/runs/t1101-routing-map.md, captured under /private/tmp/claude-502/${TS_WORKTREE}-scratch-worktree"
+NC_TEMP_LINE="scratch dir /var/folders/xy/${TS_WORKTREE}-scratch-worktree/T/tmp.ABC123"
+
+NC_RUNS_REPO="$(new_repo)"; NC_RUNS_BASE="$(git -C "$NC_RUNS_REPO" rev-parse HEAD)"
+add_fixture_line "$NC_RUNS_REPO" "citation.txt" "$NC_RUNS_LINE"
+assert_clean "negative control: a committed .shell-team/runs/ citation stays clean" \
+  "$NC_RUNS_REPO" "$NC_RUNS_BASE"
+
+NC_TEMP_REPO="$(new_repo)"; NC_TEMP_BASE="$(git -C "$NC_TEMP_REPO" rev-parse HEAD)"
+add_fixture_line "$NC_TEMP_REPO" "temp.txt" "$NC_TEMP_LINE"
+assert_clean "negative control: a UUID-free machine-local temp citation stays clean" \
+  "$NC_TEMP_REPO" "$NC_TEMP_BASE"
+
+assert_reaches_temp_root "runs-citation" "$NC_RUNS_LINE"
+assert_reaches_temp_root "worktree-name" "$NC_TEMP_LINE"
+
+# =============================================================================
 # POS/NEG pair: email-nonnoreply
 #
 # DP-9: the noreply exclusion is a domain match, end-anchored, never a
@@ -572,9 +798,11 @@ fi
 rm -f "$TOKEN_PREFIX_MUT"
 
 # =============================================================================
-# placeholder forms are not findings (AC9) — a permanent false-positive
-# regression case: all four documented placeholder forms in one change,
-# clean.
+# placeholder forms are not findings (AC9, T-1101-extended) — a permanent
+# false-positive regression case: the four documented placeholder forms
+# T-111 already ships, together with the two this task introduces
+# (-Users-<name>-, _home_<name>_) and a temp path whose session segment is
+# written <session-uuid> — all six documented forms, one change, clean.
 # =============================================================================
 printf '\n--- placeholder forms are not findings ---\n'
 
@@ -584,11 +812,14 @@ PH_REPO="$(new_repo)"; PH_BASE="$(git -C "$PH_REPO" rev-parse HEAD)"
   printf '%s\n' 'example: /home/<name>/Documents'
   printf '%s\n' 'example: C:\Users\<name>\AppData'
   printf '%s\n' 'example: <id>+<login>@users.noreply.github.com'
+  printf '%s\n' 'example: -Users-<name>-Documents'
+  printf '%s\n' 'example: _home_<name>_Documents'
+  printf '%s\n' 'example: /private/tmp/claude-502/<session-uuid>-scratch'
 } > "$PH_REPO/placeholders.md"
 git -C "$PH_REPO" add placeholders.md
 git -C "$PH_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
   commit -q -m "fixture: placeholders.md"
-assert_clean "placeholder forms are not findings (all four documented forms, one change, clean)" \
+assert_clean "placeholder forms are not findings (all six documented forms, one change, clean)" \
   "$PH_REPO" "$PH_BASE"
 
 # =============================================================================
@@ -778,6 +1009,12 @@ assert_neutralised_pattern_unreported RE_PRIVATE_KEY \
 assert_neutralised_pattern_unreported RE_TOKEN \
   "mutation: pattern is load-bearing (token neutralised -> its own positive fixture reports nothing)" \
   "$TK_POS_REPO" "$TK_POS_BASE"
+assert_neutralised_pattern_unreported RE_HOME_ENCODED \
+  "mutation: pattern is load-bearing (home-encoded neutralised -> its own positive fixture reports nothing)" \
+  "$HE_POS_REPO" "$HE_POS_BASE"
+assert_neutralised_pattern_unreported RE_TEMP_SESSION_ROOT \
+  "mutation: pattern is load-bearing (temp-session neutralised -> its own positive fixture reports nothing)" \
+  "$TS_POS_REPO" "$TS_POS_BASE"
 
 # =============================================================================
 # mutation: each exclusion is load-bearing (AC10, vacuity guard / detector
@@ -891,6 +1128,10 @@ assert_meta_fails private-key "$PK_NEG_REPO" "$PK_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (private-key)"
 assert_meta_fails token "$TK_NEG_REPO" "$TK_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (token)"
+assert_meta_fails home-encoded "$HE_NEG_REPO" "$HE_NEG_BASE" \
+  "meta: neutralised positive fixture makes the assertion FAIL (home-encoded)"
+assert_meta_fails temp-session "$TS_NEG_REPO" "$TS_NEG_BASE" \
+  "meta: neutralised positive fixture makes the assertion FAIL (temp-session)"
 
 # =============================================================================
 # no-allowlist: finding reported even for the checker own path (AC13)

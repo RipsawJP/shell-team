@@ -16,7 +16,7 @@ never change the verdict.
 
 ## What it checks for
 
-Five generic, publishable shapes, each identified by a stable pattern id:
+Generic, publishable shapes, each identified by a stable pattern id:
 
 - `home-path` — a POSIX home-directory absolute path with a real name segment
   (the placeholder form `/Users/<name>/` is deliberately not a match; see
@@ -24,6 +24,18 @@ Five generic, publishable shapes, each identified by a stable pattern id:
   documentation URL is not a false positive).
 - `home-path-win` — the Windows `C:` user-directory form (`C:\Users\<name>\`,
   same placeholder convention).
+- `home-encoded` — a home-directory path whose separators have been replaced
+  by a repeated hyphen or underscore, so the literal `/Users/` or `/home/`
+  the two shapes above require never appears (the placeholder forms
+  `-Users-<name>-` and `_home_<name>_` are deliberately not a match, same
+  convention). Both separators and both roots fire. Not boundary-guarded —
+  an encoded segment has no URL-authority false-positive class to close, so
+  this rule's bias toward firing applies with no narrowing at all.
+- `temp-session` — a machine-local temp or session root (`/private/tmp/`,
+  `/tmp/`, `/var/folders/`) carrying a dashed 8-4-4-4-12 hex UUID-shaped
+  segment, in any case spelling. A temp/session citation with no
+  UUID-shaped segment is not a match, and the placeholder form (a session
+  segment written `<session-uuid>`) is deliberately not a match either.
 - `email-nonnoreply` — a mailbox-shaped string at a domain that can hold a
   real, deliverable mailbox. Excluded by domain, never by the shape of the
   local part: both GitHub noreply identity shapes —
@@ -78,6 +90,9 @@ change.
 - A PII shape in a filename or a path is not inspected; this gate reads file content only.
 - Some URL-adjacent and log-prefixed forms may be reported even though they carry no personal data: a file scheme URL, a path wrapped in markdown link syntax, and a path following an IPv6 authority. That noise is accepted deliberately, because a one-character lookbehind cannot tell those apart from a real path in prose; the resolution is to write the placeholder form, never to widen the suppression.
 - The home-path shapes match a conservative ASCII name segment only; a name written in non-ASCII characters, and unusual case spellings of the Windows form, are not covered.
+- A bare UUID outside a machine-local temp or session path is not covered; the shape this gate matches is a path, not a UUID on its own.
+- An embedded whitespace character in the path segment between a temp/session root and its UUID is not covered (an embedded `=` is covered). Not chased, because admitting a bare space would let the match span across unrelated words on the same line before it ever reaches a UUID — a materially larger false-positive surface than one more literal character — and no generator in this repository's own reach emits a space there.
+- A hyphen- or underscore-delimited English compound that happens to spell the `home` root (for example inside a longer kebab-case or snake-case identifier) may be reported even though it carries no personal data; the resolution is the placeholder form at the authoring site, never a wider suppression.
 - A mailbox shape is not reported when its domain cannot hold a deliverable mailbox: a domain reserved for documentation and testing, or the GitHub noreply domain used for pseudonymous identities. The excluded domains are listed in the checker source.
 - The gate reads the committed content of each path the change touches, resolved against the base ref; a change that exists only in the working tree is not scanned, and --all is the mode that reads the working tree.
 - A short list of paths that deliberately carry shapes, as fixtures another guard needs, is excluded by name; the list lives in the checker source and its exact contents are asserted by the test suite.

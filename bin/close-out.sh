@@ -257,6 +257,8 @@ fi
 # #274's depth axis) is added; nothing below hardcodes a count of axes.
 DISPATCH_AXIS_TABLE="implement:serial|tier2|tier3
 verify:serial|tier1-fanout
+verify-fixture:serial|tier1-fanout
+verify-mechanism:serial|tier1-fanout
 specify:pm-authored|operator-authored
 spec-review:none|cross-provider"
 
@@ -327,6 +329,25 @@ if [ -n "$DISPATCH_LINES" ]; then
       SPEC_REVIEW_ELECTION="$d_value"
     fi
   done <<< "$DISPATCH_LINES"
+
+  # T-1100 (#365): parent-vs-refinement exclusivity. An entry records EITHER
+  # the parent `verify` axis OR one or more of its refinements
+  # (`verify-fixture` / `verify-mechanism`), never both — two records
+  # covering the same phase leave no fact about what was chosen, the same
+  # reason a repeated axis key is already refused above. This is only
+  # knowable after the WHOLE entry has been scanned (DISPATCH_SEEN_AXES),
+  # so it deliberately sits AFTER the loop rather than inside it — the loop
+  # above still refuses on the first malformed record it finds, exactly as
+  # before this task.
+  case "$DISPATCH_SEEN_AXES" in
+    *" verify "*)
+      case "$DISPATCH_SEEN_AXES" in
+        *" verify-fixture "*|*" verify-mechanism "*)
+          fail "$TASK has a malformed dispatch record (the parent axis 'verify' and a refinement axis 'verify-fixture'/'verify-mechanism' both appear on this entry — record either the parent 'verify' row or one or more of its refinements, never both)"
+          ;;
+      esac
+      ;;
+  esac
 fi
 
 # --- fail-closed gate: the task's interventions record exists and conforms ----
@@ -498,6 +519,81 @@ if [ "$SPEC_REVIEW_ELECTION" = "cross-provider" ]; then
         ;;
     esac
   fi
+fi
+
+# --- fail-closed gate: the oversight-profile pre-merge seam (T-1103, #343) --
+# Deliberately NOT election-scoped, unlike the spec-review gate immediately
+# above: there is no per-task election to read here, the oversight profile
+# is a per-repository property, and the checker's own resolution is what
+# makes the shipped `autonomous` default silent — so this call runs
+# unconditionally, and the checker's occupancy lattice is what keeps an
+# unenrolled repository's close-out free. Wiring mirrors the spec-review
+# gate above line for line: the sibling screen (a missing/unreadable
+# sibling is an install problem, never a board defect), stderr re-printed
+# verbatim, `1` mapped to `fail` (a board-content refusal, board left
+# byte-untouched) and every other non-zero mapped to `die` (an environment
+# the operator repairs — `enrollment-vanished` included, since an enrolled
+# repository whose declaration has gone missing is the operator's to
+# restore or to de-enrol explicitly, never the task author's to fix by
+# editing their entry). This call never passes `--base` or `--config`: the
+# checker's own resolver ($TEAM_OVERSIGHT_BASE, a testing affordance, else
+# the sibling team-paths.sh) decides what it reads.
+OVERSIGHT_CHECKER="$SCRIPT_DIR/check-oversight.sh"
+if [ ! -f "$OVERSIGHT_CHECKER" ] || [ ! -r "$OVERSIGHT_CHECKER" ]; then
+  die "cannot verify the oversight profile (check-oversight.sh missing or unreadable next to close-out.sh)"
+fi
+
+OV_ERR="$(bash "$OVERSIGHT_CHECKER" --seam pre-merge --task "$TASK" --board "$BOARD" 2>&1 >/dev/null)" && OV_RC=0 || OV_RC=$?
+if [ "$OV_RC" -ne 0 ]; then
+  if [ -n "$OV_ERR" ]; then
+    printf '%s\n' "$OV_ERR" >&2 || true
+  fi
+  case "$OV_RC" in
+    1)
+      fail "$TASK's oversight-profile pre-merge approval is missing or non-conformant"
+      ;;
+    *)
+      die "cannot verify the oversight profile ($TASK: check-oversight.sh exited $OV_RC)"
+      ;;
+  esac
+fi
+
+# --- fail-closed gate: review-input fidelity (T-1104, #335) ----------------
+# Deliberately NOT election-scoped, like the oversight gate immediately
+# above: there is no per-task election to read here either, and the
+# checker's own per-record opt-in verdict (a record carrying zero
+# input-fidelity fields exits 0 — DP-3) is what keeps every
+# already-committed record, and every task whose review hasn't been
+# instrumented with this grammar yet, conformant. Wiring mirrors the two
+# gates above line for line: the sibling screen (a missing/unreadable
+# sibling is an install problem, never a board defect), stderr re-printed
+# verbatim, `1` mapped to `fail` (a board-content refusal, board left
+# byte-untouched) and every other non-zero mapped to `die`. This call
+# passes only `--task "$TASK"`: the checker resolves the record's own path
+# from that task id ($TEAM_REVIEWS_DIR when set, else the sibling
+# team-paths.sh, no guessing fallback), exactly as check-spec-review.sh
+# already does — and, unlike that gate, treats an unresolvable reviews
+# directory or an absent per-task record as "nothing to check yet" rather
+# than a refusal, which is what keeps this unconditional call cheap for
+# every task this grammar has not yet reached.
+REVIEW_INPUT_CHECKER="$SCRIPT_DIR/check-review-input.sh"
+if [ ! -f "$REVIEW_INPUT_CHECKER" ] || [ ! -r "$REVIEW_INPUT_CHECKER" ]; then
+  die "cannot verify the review record (check-review-input.sh missing or unreadable next to close-out.sh)"
+fi
+
+RI_ERR="$(bash "$REVIEW_INPUT_CHECKER" --task "$TASK" 2>&1 >/dev/null)" && RI_RC=0 || RI_RC=$?
+if [ "$RI_RC" -ne 0 ]; then
+  if [ -n "$RI_ERR" ]; then
+    printf '%s\n' "$RI_ERR" >&2 || true
+  fi
+  case "$RI_RC" in
+    1)
+      fail "$TASK's review record fails the input-fidelity grammar"
+      ;;
+    *)
+      die "cannot verify the review record ($TASK: check-review-input.sh exited $RI_RC)"
+      ;;
+  esac
 fi
 
 # --- sibling screen (T-1022 D5/#101): ahead of the FIRST check-handoff.sh

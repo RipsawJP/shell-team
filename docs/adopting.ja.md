@@ -602,6 +602,117 @@ reading judgment 以上の何かにすることもない。この軸はまだ一
 end-to-end で発火していないため、間違って world について誤った spec の
 実装をどれだけ防げるかは `undetermined`（未測定）である。
 
+## oversight profile を選ぶ
+
+host repo は host が自ら作成する `<base>/oversight.conf` で **oversight
+profile**（監督プロファイル）を選択し、`bin/check-oversight.sh`（T-1103・
+issue #343）が解決・検証する。profile は `autonomous` と
+`governance-controlled` の 2 値に閉じ、`specify-seam`（Specify seam の
+freeze）と `pre-merge`（`bin/close-out.sh` 自身の exit status）という 2 つの
+閉じた **seam** 値を統制する。`- dispatch:` record も環境変数もタスクごとの
+board field も、1 task だけ別の profile を選ぶことはできない——この宣言は
+1 ファイルが持つ repository 単位のプロパティである。
+
+**`autonomous` が出荷時デフォルト。** `<base>/oversight.conf` が一切無ければ
+これに解決され、何も変わらない: 既存の seam に要件は増えず、既存 gate の
+verdict も動かず、今日 conformant な board・spec・record は byte 単位で
+conformant のまま。
+
+**組織の IT governance が segregation of duties（職務分離）を課す時、
+`governance-controlled` を宣言する**——変更は、それを作った当事者自身の
+承認では前へ進めない、というルール。`<base>/oversight.conf` に `schema 1`・
+`profile governance-controlled`・gate したい seam ごとの `seam` 行を書く。
+宣言した seam はそれぞれ、task 自身の board entry 上に記録された conformant
+な `- oversight-approval (<seam>): approver=<handle> — producer=<handle>
+— approves=<anchor> — date=<YYYY-MM-DD> — record=<locator>` sub-bullet を
+要求する。`approver` handle は ASCII normalization 後に `producer` handle と
+異なっていなければならず、`approves=` anchor は gate 対象の artifact を
+今なお指していなければならない——古くなった anchor も膨張した anchor も、
+黙って受理されず refuse する。
+
+**enrollment は蒸発しない。** board のどこかに——`## Active` でも `## Done`
+でも、どの task でも、どちらの seam でも——過去の approval record が
+1 つでも存在すれば、宣言が消えたことは `autonomous` へ黙って戻ることを
+意味せず、`enrollment-vanished` として refuse する。governance から
+抜ける唯一の正規の手段（**de-enrollment**）は、明示的な `profile
+autonomous` 宣言——削除ではなく、diff で見える 1 ファイルの追加——である。
+その根拠が意図的に **board 全体** であるのは、それが守っている profile が
+1 task ではなく repository 全体のプロパティだからだ。
+
+**この機構が保証すること・しないこと。** これは content anchor つきの
+**self-declared conflict check** を出荷するのであって——git 管理された
+workflow evidence として記録されるが、認証済みの segregation-of-duties
+統制ではない。いかなる handle も **does not authenticate**（認証しない）:
+署名も SSO/OIDC binding も directory lookup も無く、`producer=` に
+記された当事者が実際の producer である保証も、`approver` が承認対象を
+実際に読んだ保証も無い。board 記録は現行スナップショットにおける
+best-effort な workflow evidence であって、tamper-evident でも独立して
+retain された監査保管庫でもない——そうした保証が組織に必要なら、自前の
+branch protection・commit signing・retention・削除監視という
+**compensating controls**（補完的統制）と組み合わせること。2 つの seam は
+この loop 自身の **callable transitions**（呼び出し可能な遷移点）であって、
+組織の release や deployment の認可境界ではない: どちらの seam も
+通らない直接 merge・cherry-pick・hotfix は gate されない。class-M の
+mechanics-repair re-freeze も例外ではない——gate は version ベースで
+class-blind なので、enroll すれば **mechanics-repair re-freeze** を含む
+すべての freeze が record を要求される。opaque handle の比較が実際の
+segregation-of-duties 統制を満たすかどうかは `undetermined`（未測定）で
+あり、この repository のどの checker もそれを測定しない。
+
+**自分の CI に何かを組み込む要件は無い。** `pre-merge` seam の実効性は
+`bin/close-out.sh` 自身の exit status にあり、adopter は既にそこで
+実行している——`check-oversight.sh --seam pre-merge` はここで、追加で
+自前の CI にも組み込みたい host 向けのオプションとして文書化されているに
+過ぎず、profile が機能するための前提条件では決してない。この checker の
+`governance-controlled` arm は **fixture-exercised only**（fixture での
+み検証済み）として出荷され、この repository では意図的に live run で
+行使しない——ここで enroll すれば、coordinating session がその分離を
+監査する機構自身の producer と approver を兼ねることになってしまう。
+`qa-verifier` の PASS と `codex-reviewer` の APPROVE という **both gates**
+はどちらの profile でも変わらず必須であり、oversight-profile approval
+record がその代わりになることはどちらの向きにも無い。
+
+## review-input fidelity を記録する
+
+review record の verdict section が名指す各 executor pass は、1 つの
+opaque な pass id の下に 4 つの情報を持ち、`bin/check-review-input.sh`
+（T-1104・issue #335）がその grammar を fail-closed に検証する: pass の
+**executor-invocation**（1 行に rendered された verbatim な argv）、
+closed set `generation` / `confirmation` から選ぶ **pass-role**、先頭
+token が `carried` / `not-carried` / `not-applicable` のいずれかで後に
+非空の説明が続く **briefing-fidelity**、そしてその pass が publish した
+**raw-capture** stem。1 つもこれらの field を持たない record — 今日
+すでに commit されている全 record がこれに当たる — は exit 0 になる:
+この要件は forward-only である。
+
+**verbatim field が決して持ってはならないもの。** `executor-invocation`
+の値は実際の argv であり、永続的に tracked な git history に残る。
+environment dump や変数の展開値、credential・token・key・認証 header、
+repository 外の absolute path outside the repository（特に
+home-directory path や `$TMPDIR` session root）、あるいは operator や
+account の identity を決して含んではならない。実際の argv が invoker の
+home directory 配下の absolute path（特に `--cd` 引数）を含む場合は、
+その path を repository root からの相対パスとして `<repo-root>` と記録
+する——flag・他の引数・その順序はすべて verbatim のまま保つ。これは
+recording convention であって checker が強制するものではない: checker
+はこの field の内容を判定しないので、どちらの書き方でも record は
+conformant である。`bin/check-pii-shapes.sh`
+の diff-scoped CI step は現実の、しかし同じく有限な backstop であり
+——named prefix・named root・長さの下限に基づく
+**finite known-shape screen** であって、網羅的な secret 検出ではない
+——ゆえに上記の field contract こそが、書く瞬間（それが安く済む唯一の瞬間）に適用
+される一次的な統制である。
+
+**この機構が閉じないもの。** 記録するのは what was invoked（何が
+invoke されたか）であって、model が実際に何を受け取ったかでは決してない
+——committed byte に対するいかなる判定も、briefing が executor の
+context に届いた invocation と届かなかった invocation を見分けられない。
+`pass-role` label の真偽も、記録された argv が実際に走った argv で
+あることも検証しない。そして `raw-capture` field が名指す raw file が
+**not present on disk**（disk 上に存在しない）ことも見抜けない——
+`raw-capture` の値は構造上 untracked（`/.gitignore`）なので、何も指さ
+ない stem もこの checker には conformant である。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。

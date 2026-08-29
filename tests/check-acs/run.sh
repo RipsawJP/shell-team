@@ -423,4 +423,170 @@ bash "$ACS" "$control_spec" >/dev/null 2>&1 || fail "T-110-recognized-executed-c
   || fail "T-110-recognized-executed-control: a well-formed AC's check: should have created its sentinel — the touch-based non-execution proof above would be vacuous otherwise"
 pass "T-110-recognized-executed-control: a well-formed AC's check: does create its sentinel, proving the sentinel mechanism is non-vacuous"
 
+# --- T-1102: backtick fence tracking ----------------------------------------
+# A line inside a backtick-fenced code block contributes nothing to the
+# parse. Each shape below is proven with a positive control: the same
+# fixture, or an equivalent built inline, with only its fence lines removed
+# — so a "nothing was parsed" false pass cannot satisfy any of these.
+
+# AC1: a fenced column-0 AC label is inert; its unfenced twin IS parsed.
+rc=0
+out="$( bash "$ACS" "$FIX/fence-ac-label.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC1: fence-ac-label.md expected exit 0, got $rc (out: $out)"
+grep -qF 'AC1: PASS' <<< "$out" || fail "T-1102 AC1: fence-ac-label.md AC1 should PASS, got: $out"
+if grep -qF 'AC9' <<< "$out"; then
+  fail "T-1102 AC1: fence-ac-label.md must report ZERO occurrences of the fenced AC9 label, got: $out"
+fi
+pass "T-1102 AC1: a fenced column-0 AC label is inert"
+
+rc=0
+out="$( bash "$ACS" "$FIX/fence-ac-label-unfenced.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 1 ] || fail "T-1102 AC1 control: fence-ac-label-unfenced.md expected exit 1, got $rc (out: $out)"
+grep -qF 'AC9' <<< "$out" || fail "T-1102 AC1 control: the formerly-fenced AC9 must be reported once fences are removed, got: $out"
+pass "T-1102 AC1 (positive control): the unfenced twin genuinely IS parsed, proving AC1's PASS is not a parse failure"
+
+# AC2: a fenced malformed AC label raises no unrecognized diagnostic; its
+# unfenced twin exits 2 and emits the diagnostic.
+rc=0
+out="$( bash "$ACS" "$FIX/fence-candidate-label.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC2: fence-candidate-label.md expected exit 0, got $rc (out: $out)"
+if grep -qF 'unrecognized AC label' <<< "$out"; then
+  fail "T-1102 AC2: fence-candidate-label.md must emit NO 'unrecognized AC label' diagnostic, got: $out"
+fi
+grep -qE '0 unrecognized' <<< "$out" || fail "T-1102 AC2: fence-candidate-label.md summary should report '0 unrecognized', got: $out"
+pass "T-1102 AC2: a fenced malformed AC label raises no unrecognized diagnostic"
+
+rc=0
+out="$( bash "$ACS" "$FIX/fence-candidate-label-unfenced.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 2 ] || fail "T-1102 AC2 control: fence-candidate-label-unfenced.md expected exit 2, got $rc (out: $out)"
+grep -qF 'unrecognized AC label' <<< "$out" || fail "T-1102 AC2 control: expected an 'unrecognized AC label' diagnostic once fences are removed, got: $out"
+pass "T-1102 AC2 (positive control): the unfenced twin genuinely triggers the unrecognized-label diagnostic"
+
+# AC3(a): a criterion whose ONLY check: line is fenced is SKIP and the
+# sentinel that check would have created does not exist; its unfenced twin
+# PASSes and the sentinel DOES exist.
+export T1102_FENCE_CHECK_SENTINEL="$TMP/t1102-fence-check-sentinel"
+rm -f "$T1102_FENCE_CHECK_SENTINEL"
+rc=0
+out="$( bash "$ACS" "$FIX/fence-check-only.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC3a: fence-check-only.md expected exit 0, got $rc (out: $out)"
+grep -qF 'AC1: SKIP' <<< "$out" || fail "T-1102 AC3a: fence-check-only.md AC1 should SKIP, got: $out"
+[ ! -e "$T1102_FENCE_CHECK_SENTINEL" ] \
+  || fail "T-1102 AC3a: the fenced check: line's sentinel WAS created — it was executed, not suppressed"
+pass "T-1102 AC3a: a criterion whose only check: line is fenced is SKIP and its check never runs"
+
+rm -f "$T1102_FENCE_CHECK_SENTINEL"
+rc=0
+out="$( bash "$ACS" "$FIX/fence-check-only-unfenced.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC3a control: fence-check-only-unfenced.md expected exit 0, got $rc (out: $out)"
+grep -qF 'AC1: PASS' <<< "$out" || fail "T-1102 AC3a control: fence-check-only-unfenced.md AC1 should PASS, got: $out"
+[ -e "$T1102_FENCE_CHECK_SENTINEL" ] \
+  || fail "T-1102 AC3a control: the unfenced check: line's sentinel should have been created"
+pass "T-1102 AC3a (positive control): the unfenced twin's check: line genuinely does run"
+
+# AC3(b): a fenced "## " heading no longer severs an attribution; the
+# unfenced twin still severs it (pre-change behaviour for unfenced headings).
+rc=0
+out="$( bash "$ACS" "$FIX/fence-heading-reset.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC3b: fence-heading-reset.md expected exit 0, got $rc (out: $out)"
+grep -qF 'AC1: PASS' <<< "$out" || fail "T-1102 AC3b: fence-heading-reset.md AC1 should PASS (fenced heading must not sever attribution), got: $out"
+pass "T-1102 AC3b: a fenced heading no longer severs an AC's attribution to its check: line"
+
+rc=0
+out="$( bash "$ACS" "$FIX/fence-heading-reset-unfenced.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC3b control: fence-heading-reset-unfenced.md expected exit 0, got $rc (out: $out)"
+grep -qF 'AC1: SKIP' <<< "$out" || fail "T-1102 AC3b control: fence-heading-reset-unfenced.md AC1 should stay SKIP (unfenced heading still severs), got: $out"
+pass "T-1102 AC3b (positive control): an UNFENCED heading still severs the attribution"
+
+# AC6: an unterminated fence fails in the closed direction (exit 2, the
+# existing "no acceptance criteria" refusal) and adds no new exit class.
+rc=0
+out="$( bash "$ACS" "$FIX/fence-unterminated.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 2 ] || fail "T-1102 AC6: fence-unterminated.md expected exit 2, got $rc (out: $out)"
+grep -qF 'no acceptance criteria' <<< "$out" || fail "T-1102 AC6: fence-unterminated.md should report 'no acceptance criteria', got: $out"
+pass "T-1102 AC6: an unterminated fence suppresses to EOF and fails closed via the existing refusal"
+
+# AC7: tilde (~~~) fences are NOT tracked — a tilde-fenced AC label IS
+# recognized (and, per this fixture, fails).
+rc=0
+out="$( bash "$ACS" "$FIX/fence-tilde.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 1 ] || fail "T-1102 AC7: fence-tilde.md expected exit 1, got $rc (out: $out)"
+grep -qF 'AC1: PASS' <<< "$out" || fail "T-1102 AC7: fence-tilde.md AC1 should PASS, got: $out"
+grep -qF 'AC9' <<< "$out" || fail "T-1102 AC7: fence-tilde.md must report the tilde-fenced AC9 (tildes are not tracked), got: $out"
+pass "T-1102 AC7: a tilde-fenced AC label IS recognized (tilde fences are not tracked)"
+
+grep -qF -- 'Tilde (~~~) fences are intentionally NOT tracked' "$ACS" \
+  || fail "T-1102 AC7: bin/check-acs.sh must carry the tilde boundary sentence on one physical line"
+pass "T-1102 AC7: the tilde-untracked boundary sentence is stated in bin/check-acs.sh"
+
+# AC9: the opener's indentation bound is CommonMark columns, not characters.
+assert_rc "T-1102 AC9: a four-space-indented backtick run opens no fence" 0 \
+  "$FIX/fence-indent-four-space.md" 'AC1: PASS'
+assert_rc "T-1102 AC9: a tab-indented backtick run opens no fence" 0 \
+  "$FIX/fence-indent-tab.md" 'AC1: PASS'
+rc=0
+out="$( bash "$ACS" "$FIX/fence-indent-three-space.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC9: fence-indent-three-space.md expected exit 0, got $rc (out: $out)"
+if grep -qF 'AC1' <<< "$out"; then
+  fail "T-1102 AC9: fence-indent-three-space.md's AC1 must stay inert (a three-space-indented run DOES open a fence), got: $out"
+fi
+grep -qF 'AC2: PASS' <<< "$out" || fail "T-1102 AC9: fence-indent-three-space.md's AC2 should PASS, got: $out"
+pass "T-1102 AC9 (positive control): a three-space-indented backtick run DOES open a fence"
+
+# AC10: the closer is strict — trailing content and a too-short run do not
+# close; a whitespace-only closer does.
+rc=0
+out="$( bash "$ACS" "$FIX/fence-closer-trailing.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC10: fence-closer-trailing.md expected exit 0, got $rc (out: $out)"
+if grep -qF 'AC1' <<< "$out"; then
+  fail "T-1102 AC10: fence-closer-trailing.md's AC1 must stay inert (a closer with trailing text does not close), got: $out"
+fi
+grep -qF 'AC2: PASS' <<< "$out" || fail "T-1102 AC10: fence-closer-trailing.md's AC2 should PASS, got: $out"
+pass "T-1102 AC10: a closer with trailing text does not close a fence"
+
+rc=0
+out="$( bash "$ACS" "$FIX/fence-closer-short.md" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC10: fence-closer-short.md expected exit 0, got $rc (out: $out)"
+if grep -qF 'AC1' <<< "$out"; then
+  fail "T-1102 AC10: fence-closer-short.md's AC1 must stay inert (a three-backtick run does not close a four-backtick opener), got: $out"
+fi
+grep -qF 'AC2: PASS' <<< "$out" || fail "T-1102 AC10: fence-closer-short.md's AC2 should PASS, got: $out"
+pass "T-1102 AC10: a three-backtick run does not close a four-backtick opener"
+
+# Positive control for AC10, built at run time rather than committed: a
+# static fixture would carry the closer's literal trailing whitespace bytes,
+# which an editor save or pre-commit hook could silently strip (same
+# fragility class as the T-048 rework1 trailing-whitespace fixtures above).
+closer_ws_spec="$TMP/fence-closer-whitespace.md"
+{
+  printf '# Fixture — a whitespace-only closer DOES close (T-1102 AC10)\n\n'
+  printf '## Acceptance criteria\n\n'
+  printf '```\n'
+  printf 'fenced content\n'
+  printf '```  \n'   # closer with trailing whitespace (space space) after the run
+  printf -- '- [ ] **AC1** recognized: a whitespace-only closer does close *(scriptable)*\n'
+  printf '  - check: true\n'
+} > "$closer_ws_spec"
+assert_rc "T-1102 AC10 (positive control): a whitespace-only closer DOES close" 0 \
+  "$closer_ws_spec" 'AC1: PASS'
+
+# AC8: a carriage return does not defeat the fence tracker. Built at run
+# time (not a static committed .md) because a CRLF fixture is fragile under
+# possible line-ending normalization.
+crlf_fence="$TMP/fence-crlf.md"
+{
+  printf '# Fixture\r\n\r\n## Acceptance criteria\r\n\r\n'
+  printf -- '- [ ] **AC1** real criterion\r\n  - check: true\r\n\r\n## Notes\r\n\r\n'
+  # shellcheck disable=SC2016  # backticks are literal fixture content, not command substitution
+  printf '```\r\n- [ ] **AC9** fenced illustration\r\n  - check: exit 43\r\n```\r\n'
+} > "$crlf_fence"
+rc=0
+out="$( bash "$ACS" "$crlf_fence" 2>&1 )" || rc=$?
+[ "$rc" -eq 0 ] || fail "T-1102 AC8: CRLF fence fixture expected exit 0, got $rc (out: $out)"
+grep -qF 'AC1: PASS' <<< "$out" || fail "T-1102 AC8: CRLF fence fixture AC1 should PASS, got: $out"
+if grep -qF 'AC9' <<< "$out"; then
+  fail "T-1102 AC8: CRLF fence fixture must report ZERO occurrences of the fenced AC9 label, got: $out"
+fi
+pass "T-1102 AC8: a CRLF line ending does not defeat the fence tracker"
+
 printf '\nAll check-acs assertions passed.\n'

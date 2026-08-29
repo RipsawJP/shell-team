@@ -1803,3 +1803,270 @@ that file's order.
   rule applies to every level-2 heading except level 3 (`### Local test
   result`, deliberately out of scope, since this board legitimately
   repeats that one many times inside entries).
+- T-1100: two new `DISPATCH_AXIS_TABLE` rows (`verify-fixture`,
+  `verify-mechanism`) plus a parent-vs-refinement exclusivity refusal in
+  `bin/close-out.sh` — same suite, same invocation as T-1084/T-1091/T-1092,
+  no new prerequisite. `bash tests/close-out/run.sh` measured `exit=0`,
+  `grep -c '^PASS' <log>` = 116, `grep -c '^FAIL' <log>` = 0, `grep -c
+  '^PASS: T-1100' <log>` = 7 (the seven new fixtures, one per AC3 shape) on
+  this machine. `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh
+  .shell-team/specs/T-1100-verify-axis-split.md` (AC1–AC16 have
+  `- check:` lines; AC17 is `SKIP` by design) — several criteria re-run
+  this whole suite plus `bin/check-prompt-sync.sh`, so raise the timeout
+  rather than assuming the default is enough, same guidance every prior
+  entry in this file gives. **A genuine spec-vs-board conflict surfaced
+  here, not an environment quirk**: AC5 (byte-identical two-arm back-compat
+  verdict over every distinct `- dispatch:` line on the resolved board) and
+  AC12 (this task's own entry must carry the split-form rows by
+  close-out) are mutually exclusive once this task's board substitution
+  (DP-5, committed at the Specify-to-Implement seam before the engineer
+  phase) is on the board — AC5's population is read from the CURRENT
+  board at check time and necessarily includes the two new rows AC12
+  requires, and those rows cannot agree between the base-ref and HEAD
+  gates by construction. Recorded as an interventions entry
+  (`.shell-team/interventions/T-1100.md`) and a provenance entry
+  (`.shell-team/provenance/T-1100.md`, fourth decision) rather than forced
+  green by editing the frozen intent block or reverting the committed
+  board substitution. A future axis-refinement task that dogfoods its own
+  split form onto its board entry before its own AC5-shaped criterion is
+  measured should expect the same conflict and route it back rather than
+  patch around it.
+
+  **Update (2026-08-26, review round 1 rework)**: the paragraph above
+  describes the conflict as it stood at the v1 freeze, when AC5 read the
+  population from the CURRENT board at check time. It was resolved, not
+  worked around: a host-ratified class-B re-freeze (intent v1→v2, commit
+  `d352e3a`) repaired AC5 itself to read the population from **the base
+  ref's committed board blob** (`git show <base ref>:<board path>`, never
+  the working tree) instead of the resolved board — which by construction
+  excludes any row this task's own board entry introduces, closing the
+  conflict at the instrument rather than at the board. The original
+  observation above is left as written (it was true of v1, and is why the
+  re-freeze exists); a future axis-refinement task that follows the
+  base-ref-scoped population definition from the start, as AC5 v2 now
+  does, should not hit this conflict at all. Cross-provider review round 1
+  (`.shell-team/reviews/T-1100.md`) independently reproduced the repair by
+  direct execution and confirmed it protects the same back-compat intent.
+- T-1101: before writing a NEW pattern's `RE_*=` literal into
+  `bin/check-pii-shapes.sh`, verify the self-reference trap by hand: write
+  the candidate regex (and its own defining source line, verbatim) to a
+  scratch file under `$TMPDIR`, then `grep -nE -- "$re" "$scratchfile"` and
+  confirm no match — do this BEFORE editing the real file, not after,
+  since the failure mode is the defining line matching the very shape it
+  defines (T-111's own documented trap, `.shell-team/specs/T-111-pii-
+  shape-checker.md` DP-1). After editing the real file, `bash
+  bin/check-pii-shapes.sh --all` against the whole tree is the second,
+  authoritative check (never trust the scratch-file check alone — the
+  real file's surrounding comment prose can independently trip the new
+  rule even when the bare regex literal itself does not). Separately:
+  when a new pattern id needs a fixture-side "reaches the rule but is
+  excluded by one specific requirement" precondition (the
+  `assert_reaches_email_candidates` idiom, for a rule that has no
+  candidate-enumeration or exclusion machinery of its own), decompose the
+  new pattern into two top-level variables — a base/root sub-shape,
+  extractable and testable on its own, and a composed full pattern that
+  adds the one extra requirement — mirroring the pre-existing
+  `RE_HOME_PATH = RE_HOME_PATH_BOUNDARY + RE_HOME_PATH_RAW` composition,
+  rather than trying to derive the "reaches" half by string-slicing the
+  full pattern's own source text inside the test file (fragile, and not
+  needed — the checker source is already the single source of truth for
+  both halves once decomposed).
+- T-1101 (rework 1, round-1 review): widening a pattern's own character
+  class to close a reproduced coverage gap can itself CREATE a new
+  self-reference trip against a DIFFERENT tracked file than the one the
+  original widening was aimed at — specifically, the cross-provider
+  review's own round-1 record (`.shell-team/reviews/<task>.md`) quoting
+  the gap's reproduction examples as literal (non-placeholder) text, which
+  the now-wider rule correctly starts reporting. Check `bash
+  bin/check-pii-shapes.sh --all` (and, once the widening is committed,
+  `--base develop`/`--base <branch base>`) against the WHOLE tree
+  immediately after any character-class widening, not just against the
+  file being widened for — a clean run on the target file alone is not
+  sufficient. Where the newly-tripped file is prose that must legitimately
+  DISCUSS the shape (a review record, same as T-111's own frozen AC15
+  names for a spec/provenance/board note), the fix is the same documented
+  angle-bracket placeholder convention (AC9) applied to that file's own
+  example spellings — verify the diff touches ONLY the shape literals
+  (nothing about a verdict, a severity or the surrounding prose) via a
+  before/after `diff` and a before/after token count of the verdict/
+  severity vocabulary (`APPROVE`/`REQUEST_CHANGES`/`Blockers`/`Major`/
+  `Minor`) over that one file. Separately: when a character class's
+  widening decision hinges on avoiding a false-positive-surface increase
+  (here, whether to admit bare whitespace into an already-unbounded `*`-
+  quantified prefix class), decompose the reviewer's example into what was
+  actually LIVE-REPRODUCED (here, only `=`) versus what was offered as a
+  hypothetical illustration (here, whitespace) — widen for the reproduced
+  part (cheap, self-reference-safe, directly closes a confirmed gap) and
+  disclose the hypothetical part as a declared limitation in both docs
+  mirrors, rather than treating the reviewer's one combined example as one
+  monolithic go/no-go decision.
+- T-1101 (rework 2, round-2 review): when a character class repair
+  introduces an "anchor character at both ends" shape to keep a
+  separator-run negative clean, check whether any character in the
+  anchor alphabet is ALSO a member of the separator alphabet used to
+  delimit the shape. If one is (here, `_`, present in both `[-_]` and
+  `[A-Za-z0-9_.]`), an anchor-based design is insufficient on its own —
+  a captured span consisting ENTIRELY of that overloaded character
+  satisfies "non-separator anchor at both ends" using nothing but the
+  overloaded character itself, which is exactly the false positive a
+  round of review found (`_Users___`, `_home___`, and — the shape that
+  proves it's about the character and not the separator flavour —
+  `-Users-_-`, a lone `_` between *hyphen* separators). The robust
+  design requires at least one character from the OVERLAP-FREE subset
+  (here, `[A-Za-z0-9.]`, excluding both `-` and `_`) to exist SOMEWHERE
+  in the captured span, with the full permissive class free on both
+  sides of it — not an "anchor at the edges" shape, which inherits
+  whatever overlap the anchor alphabet has with the separator alphabet.
+  Separately: an adopter-facing claim in a header comment (anything
+  `--help` derives text from) about what a regression-lock fixture
+  proves must be reworded and RE-VERIFIED against the actual shipped
+  regex line whenever that regex changes — a claim that was accurate at
+  an earlier revision can silently go stale (true for one flavour, false
+  for another) without the fixture itself failing, since the fixture
+  only proves what it was written to prove, not what the prose claims
+  in general.
+- T-1102: `bash tests/check-acs/run.sh` gained a "T-1102: ..." block covering
+  `bin/check-acs.sh`'s new backtick-fence state machine (copied from
+  `bin/check-board-headings.sh`'s hardened opener/closer tracker, DP-1/DP-2).
+  Each fenced-line class this task added a lock for has an unfenced positive
+  control committed alongside it under `tests/check-acs/fixtures/` (paired
+  `fence-*.md` / `fence-*-unfenced.md` files: AC1 the label match, AC2 the
+  candidate/unrecognized-label match, AC3a the check: capture, AC3b the `## `
+  heading reset, AC7 tilde fences staying untracked, AC9 the 0-3-space /
+  tab-excluded indent bound, AC10 the closer's run-length-and-no-trailing-
+  content strictness) — so a false pass from "nothing was parsed" cannot
+  satisfy any of them. Two shapes are deliberately built at RUN TIME in
+  `tests/check-acs/run.sh` rather than committed as static fixtures, both for
+  literal-byte fragility reasons already established by this file's T-048
+  rework1 entry: the CRLF case (AC8; a committed CRLF `.md` risks silent
+  normalization) and the whitespace-only-closer positive control (AC10; a
+  committed fixture's trailing-whitespace bytes risk being stripped by an
+  editor save or pre-commit hook). The detector's own blind spots enumerated
+  during this task (AC17(b) — probe at least three before trusting the
+  design): an HTML-comment-embedded fence opener, an inline-code-span-
+  embedded one, and a block-quote (`> `) prefixed one are none of them
+  tracked, by construction — the opener regex admits only leading SPACE
+  characters, so a `>` or any non-space/non-backtick prefix cannot open a
+  fence at all; a fence spanning across the frozen intent-block markers is
+  likewise not special-cased (the state machine has no notion of those
+  markers); and a spec whose entire `## Acceptance criteria` section is
+  fenced correctly hits the pre-existing zero-criteria refusal (exit 2), not
+  a new failure mode. `bash tests/errexit-safe/run.sh`'s completeness self-
+  audit is unaffected — this task adds no new `>&2` write site to
+  `bin/check-acs.sh` (measured: the base-vs-HEAD `>&2` count in that file is
+  equal, re-derived at both refs rather than compared to a literal).
+- T-1103: `bash tests/check-oversight/run.sh` is the new checker's own
+  suite (45+ `PASS:` lines, 0 `FAIL:`) covering the occupancy lattice
+  (absent/regular/live-symlink/unreadable/FIFO, with a capability probe and
+  a reported skip for the unreadable and FIFO arms when the running
+  environment cannot exercise them — root defeats `chmod 000`, and `mkfifo`
+  is not universally available), the ten grammar/vocabulary refusals, the
+  five approval-record refusals, the case/padding/non-ASCII handle
+  evasions, the two-seam plural case, the sticky-enrollment scan in both
+  directions plus its repository-wide and seam-agnostic reach, both
+  per-seam anchor comparisons (including a genuine non-ancestor commit
+  built with a real second commit graph via `git init` in a scratch
+  directory), and the class-M mechanics-repair re-freeze pair. Exercise the
+  `governance-controlled` arm against a temp base directory with
+  `--base DIR` (never `$TEAM_RUN_BASE`, which `bin/team-paths.sh`'s
+  `validate_base()` rejects for any absolute path) or `$TEAM_OVERSIGHT_BASE`
+  — the same env-override precedence `$TEAM_TODO`/`$TEAM_INTERVENTIONS_DIR`
+  already have — never the real `<base>/oversight.conf`, since this
+  repository's own profile stays `autonomous` (no `oversight.conf` exists
+  under its resolved base at any commit; any line anywhere in this
+  repository's own tree that *begins* with the record grammar — quoted
+  here mid-line rather than at a line's own start, precisely to avoid
+  being such a line: `- oversight-approval (` — would make this
+  repository's own board refuse at every seam, per the sticky scan's
+  repository-wide reach, so an illustrative record belongs inside a
+  fixture, a quoted example or this parenthetical, never as a leading
+  sub-bullet in a file the scan can reach). `bin/close-out.sh`
+  gained a new unconditional `--seam pre-merge` gate (T-1103's own pre-merge
+  teeth); its wiring is proven end to end through the real script in
+  `tests/close-out/run.sh`'s `oversight_case` block (four cases: the
+  shipped default silent, a governance-controlled declaration with no
+  record refusing, a conformant record with `approves=` set to `HEAD`'s own
+  commit id passing and moving the entry to Done, and a declaration naming
+  only the other seam imposing nothing) — that block deliberately does NOT
+  `cd` into its scratch fixture root, unlike its `spec_review_case` sibling,
+  because the `pre-merge` anchor's `git` plumbing needs a real working
+  tree. One pre-existing fixture in that same suite
+  ("interventions-resolver-failure-exit2 positive control", a scratch
+  `bin/` copy with `team-paths.sh` deleted) needed `TEAM_OVERSIGHT_BASE`
+  added to its invocation, because the new gate is unconditional and
+  therefore also needs an oversight-base resolution path even in a crippled
+  `bin/` copy that has none.
+- T-1104: `bash tests/check-review-input/run.sh` is the new review-input
+  fidelity checker's own fixture suite (`bin/check-review-input.sh`, T-1104,
+  issue #335). No new prerequisite: pure bash + coreutils, the same
+  synthetic-fixture-in-a-temp-dir convention as `tests/check-spec-review/run.sh`
+  and `tests/check-oversight/run.sh` (no static `fixtures/` directory). It
+  covers usage/environment refusals (`usage`, `record-unreadable`,
+  `reviews-dir-unresolvable`), the two deliberate `--task`-only leniencies
+  (an absent reviews directory, an absent per-task record file — never for
+  an explicit `--record`), the forward-only zero-field pass, per-section
+  completeness (`section-incomplete`), per-pass field completeness and
+  non-duplication (`field-missing`/`field-duplicate`, including the
+  same-id-two-distinct-blocks shape), the pass-id charset
+  (`pass-id-charset`), both closed vocabularies
+  (`pass-role-vocabulary`/`briefing-fidelity-vocabulary`), the
+  never-judges-content property (a hostile-but-well-formed invocation
+  string still passes; an empty one, or one masked by a bare continuation
+  line, still refuses `field-grammar`), the raw-capture stem's task-id
+  prefix and cross-round/cross-section collision refusal
+  (`raw-capture-stem-mismatch`/`raw-capture-collision`), the task-id
+  precedence (the `--task` argument is the sole authority when given, else
+  the record path's basename — an internal `- Task:` line is never read),
+  and the no-echo discipline (a distinctive marker embedded in a
+  non-conformant `executor-invocation` value never appears in the
+  checker's own output). `bin/close-out.sh` gained a new unconditional
+  gate invoking this checker with `--task "$TASK"` only, wired in the same
+  five-part chain (sibling-path assignment, sibling screen, invocation
+  capturing status, `case` on that status, `1`→`fail`/other→`die`) the
+  spec-review and oversight gates already use; its wiring is proven end to
+  end through the real script in `tests/close-out/run.sh`'s
+  `review_input_case` block (five cases: no record file at all passing
+  silently, a zero-field record passing, a conformant single-pass record
+  passing and moving the entry to Done, a `field-missing` record refusing,
+  and a `raw-capture-stem-mismatch` record refusing). Because this new
+  gate is unconditional, it also needed `TEAM_REVIEWS_DIR` added to the
+  same pre-existing "interventions-resolver-failure-exit2 positive
+  control" fixture T-1103's entry above already widened for
+  `TEAM_OVERSIGHT_BASE` — but, unlike that override, the pointed-at
+  directory need not exist or carry a record at all, since the new gate's
+  own `--task`-only leniency treats an unresolvable-by-absence reviews
+  directory as "nothing to check yet" rather than a resolver failure.
+- T-1104 rework round 2 (v2 re-freeze, codex round-1 implementation review
+  fixes): the completeness trigger is now **per verdict-heading section**,
+  not per record — a section opts in the moment it carries any of the
+  four fields, and a section carrying none is conformant regardless of
+  the rest of the record (this is what makes `AC3`/`AC21` and the
+  anti-retrofit Non-goals hold jointly against this task's own
+  multi-round review record). Section ownership is **section-scoped**: a
+  pass id is credited to a section only when all four of its field lines
+  resolve to that same section, never from its earliest field line
+  alone. Two dangling-symlink fail-open sites were closed (the
+  auto-resolved reviews directory and the auto-resolved per-task record
+  path each now fail closed — `reviews-dir-unresolvable` /
+  `record-unreadable` — on a broken occupant rather than taking the
+  absent-path leniency); a literal tab in a captured id or value is now
+  rejected outright (`field-grammar`) before it reaches the internal
+  tab-delimited work file, closing a vocabulary-check bypass; and the
+  `raw-capture-collision` refusal no longer echoes the colliding stem's
+  own value, naming only the two colliding pass ids. `LC_ALL=C` is now
+  exported at the top of the script (bracket-class charset checks), and
+  the internal `2>/dev/null || true` field/heading scans now distinguish
+  a real scan failure (`grep` exit > 1) from a clean no-match (exit 1).
+  `tests/check-review-input/run.sh` grew from 58 to 64 `PASS:` lines
+  (`grep -c '^PASS:'` on its own output): new fixtures for the mixed
+  record (a bare, pre-mechanism section beside an instrumented one — the
+  corpus's own shape, Input space class 12), the section-scoped-ownership
+  split reproduction, both dangling-symlink cases, the tab-injection case
+  (id and value), and the pre-existing no-echo collision test corrected
+  to embed its marker in the `raw-capture` value the refusal actually
+  interpolates rather than in the unrelated `executor-invocation` field.
+  Mutation self-check for all five fixes plus the two v2-specific AC4
+  probes (earliest-field-line credit; per-record re-arm) run against a
+  scratch `git worktree add --detach` at the round's own commit, never in
+  the working tree — each observed red on the reintroduced defect,
+  restored via `git checkout --`, observed green again.

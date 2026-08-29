@@ -106,3 +106,109 @@ own promotion is what fires that trigger**, and it is owed at the next
 retro following this task; the trigger counts obligations, not scripts, so
 reusing an existing arm-A script for this third promotion makes the
 promotion cheap, not absent.
+
+## The fourth obligation promoted into arm A (T-1103, issue #343, 2026-08-28)
+
+Selectable oversight profiles (T-1103) name three duties, and the rule
+sends them to two different arms. **Duty A** — does a conformant
+`- oversight-approval (<seam>):` record exist for a declared seam, and is
+its `approver` handle distinct from its `producer` handle — applies the
+rule directly: its verdict gates a freeze (`specify-seam`) and a close-out
+(`pre-merge`), two of the three loop transitions this note's own
+parenthetical names, and its judgment (a line match, a field extraction, a
+charset test and a string inequality over committed bytes) is mechanically
+executable from committed bytes. Both conjuncts hold, so this duty takes
+**arm-A-tested-primitive**: `bin/check-oversight.sh`, a named `bin/` script
+with its own `tests/check-oversight/run.sh` suite and its own step in
+`.github/workflows/check-handoff.yml`, invoked by every caller as a
+subprocess rather than re-implemented inline.
+
+**Duty B** — profile resolution (which profile is in force, and which
+seams it declares) — looks at first glance like configuration reading
+rather than a gated judgment. The **reclassification clause** applies
+directly, exactly as it does above: a resolution that silently answered
+`autonomous` for an unreadable or malformed declaration would let duty A's
+verdict pass vacuously at every declared seam at once, so duty B
+**reclassifies** into arm A, with fail-closed refusal on every occupancy
+and grammar case the declaration can present.
+
+**Duty C** — the approval's substance (did the approver actually read and
+approve the artifact) and the handle's ownership (is the handle theirs) —
+fails conjunct 2 outright: no judgment over committed bytes distinguishes a
+substantive approval from a waved-through one, and nothing in a git
+repository binds an opaque handle to a person. This duty takes
+**arm-B-enumerated-instrument**: a `disclosed, not closed` eleven-item
+enumeration in the task's own spec Goal section, never a check line.
+
+This is the **fourth** obligation promoted into arm A, after **#341**
+(`bin/check-entry-mode.sh`), **#344** (`bin/check-spec-review.sh`) and the
+third promotion above (T-1099, inside `bin/check-board-headings.sh`). The
+re-evaluation trigger already fired on the third promotion, so this fourth
+one does not fire it again; discharging it stays owed at a retro.
+
+## The fifth obligation promoted into arm A (T-1104, issue #335, 2026-08-29)
+
+Review-input fidelity (T-1104) names four duties over a review record's
+per-pass grammar, and the rule sends two of them to arm A and two to arm
+B. **Duty A** — the record-grammar gate (does every executor pass a record
+declares carry all four of its fields exactly once, with each
+closed-vocabulary field's value inside its vocabulary and each pass id
+inside its charset) — applies the rule directly: its verdict gates a
+close-out, one of the three loop transitions this note's own parenthetical
+names, reached through the sibling-checker wiring `bin/close-out.sh`
+already establishes for every other arm-A obligation, and the judgment is
+a set of anchored line matches, a field extraction, a membership test over
+two closed token sets and a charset test, all over committed record bytes.
+Both conjuncts hold, so this duty takes **arm-A-tested-primitive**:
+`bin/check-review-input.sh`, a named script under `bin/` with its own
+`tests/check-review-input/run.sh` suite and its own step in
+`.github/workflows/check-handoff.yml`, invoked by every caller as a
+subprocess rather than re-implemented inline.
+
+**Duty B** — the cross-round raw-basename collision (do two executor
+passes anywhere in one record name the same raw-capture stem) — shares
+duty A's first conjunct (the same close-out gate) and its second conjunct
+is likewise a duplicate test over the values of one anchored field family,
+read from the record's own committed text, never a file on disk. Both hold
+→ **arm A**, and its structural form is satisfied inside the same new
+script rather than by a second one — the shape the third promotion above
+(T-1099, landed inside the existing `bin/check-board-headings.sh`)
+established.
+
+**Duty C** — the raw capture's presence on disk (does the file a record's
+`raw-capture` field names actually exist beside the canonical target) —
+fails conjunct 2 outright: `/.gitignore` ignores a review record's raw
+`.txt`/`.json`/`.jsonl` captures, locked by
+`tests/gitignore-raw-dumps/run.sh`, so a raw is untracked by construction
+and no judgment over committed bytes can see it. This duty takes
+**arm-B-enumerated-instrument**: a `disclosed, not closed` enumeration in
+the task's own spec Goal section, never a check line. A local-only opt-in
+read (a flag whose verdict is never wired into a CI step) was considered
+and declined, because it would ship a second reading surface — a
+filesystem read — into a checker whose entire value is one fail-closed
+grammar read over text, for a verdict no gate may ever consult.
+
+**Duty D** — whether the briefing content genuinely reached the executor
+(did the round's verdict-scope and severity-calibration briefing actually
+land in the model's context, and did it act on it) — also fails conjunct
+2: the record can state which channel carried the briefing into a given
+invocation, but no judgment over committed bytes distinguishes a briefing
+that reached a model's context from one that was written and never
+delivered, and for the primary pass there is provably no prompt channel to
+carry it at all (`agents/codex-reviewer.md`'s primary-pass invocation
+carries no prompt argument of any kind). This duty likewise takes
+**arm-B-enumerated-instrument**, a `disclosed, not closed` enumeration in
+the same frozen Goal section, in the duty-C shape the fourth promotion
+above established.
+
+This is the **fifth** obligation promoted into arm A (duties A and B are
+one promotion in this note's own counting, which counts obligations
+rather than scripts, and duty B reuses this task's own new script exactly
+as the third promotion reused an existing one), after **#341**
+(`bin/check-entry-mode.sh`), **#344** (`bin/check-spec-review.sh`), the
+third promotion (T-1099, inside `bin/check-board-headings.sh`) and the
+fourth promotion above (T-1103, `bin/check-oversight.sh`). The
+re-evaluation trigger fires on "the promotion of a third obligation into
+arm A" and already fired on the third promotion; it was explicitly not
+re-fired by the fourth, and a fifth promotion likewise does not re-fire
+it — discharging it stays owed at a retro rather than here.

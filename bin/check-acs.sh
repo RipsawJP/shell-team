@@ -54,6 +54,30 @@
 #   1  at least one AC check failed
 #   2  argument / usage error, spec unreadable, or an unrecognized AC label
 #      line was found (T-110, fail-closed — see CANDIDATE_RE below)
+#
+# Fenced code blocks (T-1102): a line inside a backtick-fenced code block is
+# ignored by every line class the parse loop below tests — AC_RE (the
+# AC-label match), CANDIDATE_RE (the broader unrecognized-label candidate
+# match), the `## ` heading reset, and CHECK_RE (the check: capture) — so an
+# illustrative `- [ ] **ACn**` line printed inside a fenced code block (as a
+# skeleton example in a spec's prose) contributes nothing to the parse. The
+# fence gate sits BEFORE that if/elif chain rather than inside any one
+# branch of it, because the four are branches of a single chain over a
+# single line and a per-branch guard would have to be written four times.
+# The state machine is copied from bin/check-board-headings.sh's hardened
+# one rather than re-invented: an opener is 0-3 literal space characters
+# (tabs excluded — a leading tab is CommonMark column 4, not 1) followed by
+# a run of 3 or more backticks; the opener's run length is recorded, and a
+# closer must be likewise indented, carry a run at least as long as the
+# opener's, and have nothing but trailing whitespace after the run — so a
+# shorter or longer run, or one with trailing text, does not close.
+# Tilde (~~~) fences are intentionally NOT tracked. That is the same
+# boundary bin/check-board-headings.sh's DECISION 3 already declares for
+# the same state machine: this is an honest-error tool, not an
+# adversarial-input parser. An unterminated fence suppresses every line to
+# end of file, which is what CommonMark says those bytes are; where that
+# swallows a spec's whole criteria section, the existing "no acceptance
+# criteria" refusal below still exits 2 — no new exit class is introduced.
 
 set -euo pipefail
 
@@ -77,6 +101,12 @@ Run the machine-checkable acceptance criteria of a spec. Each scriptable AC
 carries a `- check: <command>` sub-bullet; the command runs from the current
 working directory (or --root <dir>) and exit 0 means the AC passes. Runtime ACs
 (no `check:`) are reported SKIP.
+
+A line inside a fenced code block (a backtick-delimited fence of 3 or more
+backticks) is ignored entirely — it contributes no AC label, no check:, and
+no `## ` heading reset, so a spec may safely print an illustrative AC-shaped
+line inside a fenced code block without it being parsed as a real criterion.
+Tilde (~~~) fences are not tracked by this rule.
 
 Options:
   --dry-run    List the commands that WOULD run, without executing any of them.
@@ -160,16 +190,52 @@ CANDIDATE_RE='^- \[[ xX]\] \*\*AC'
 # whitespace is stripped manually below (mirrors the old regex's `[[:space:]]*`).
 # shellcheck disable=SC2016
 CHECK_RE='^[[:space:]]+- check:(.*)$'
+# FENCE_OPEN_RE (T-1102, DP-1/DP-2): the sibling checker's fence-opener
+# pattern, copied rather than re-invented (see the header comment above for
+# the full rationale and bin/check-board-headings.sh:268-281 for the
+# source). Capture group 1 is the opener's own backtick run, whose length
+# becomes fence_len below. 0-3 LITERAL SPACE characters only (tabs
+# deliberately excluded — CommonMark counts a leading tab as column 4, so a
+# character-count bound would wrongly admit it) followed by a run of >=3
+# backticks.
+# shellcheck disable=SC2016
+FENCE_OPEN_RE='^[ ]{0,3}(`{3,})'
 
 acnums=(); accmds=(); acseen=()
 cur=""; curcmd=""; curseen=0
 unrecognized=0
 lineno=0
+in_fence=0; fence_len=0
 flush() { [ -n "$cur" ] && { acnums+=("$cur"); accmds+=("$curcmd"); acseen+=("$curseen"); }; return 0; }
 
 while IFS= read -r line || [ -n "$line" ]; do
   lineno=$((lineno + 1))
-  line="${line%$'\r'}"   # tolerate CRLF
+  line="${line%$'\r'}"   # tolerate CRLF — MUST precede the fence test below,
+                          # or a CRLF closer's trailing \r defeats the
+                          # closer's "nothing but whitespace after the run"
+                          # clause (T-1102 gotcha 1).
+  # T-1102 fence gate: placed BEFORE the if/elif chain below so the
+  # suppression is uniform across all four line classes (DP-2) rather than
+  # guarded per-branch. While a fence is open every line — including the
+  # opener and closer lines themselves — is suppressed via `continue` and
+  # never reaches AC_RE / CANDIDATE_RE / the `## ` reset / CHECK_RE.
+  if [ "$in_fence" -eq 0 ]; then
+    if [[ "$line" =~ $FENCE_OPEN_RE ]]; then
+      fence_len="${#BASH_REMATCH[1]}"
+      in_fence=1
+      continue
+    fi
+  else
+    # The closer pattern is rebuilt each fenced line because fence_len is a
+    # runtime value (the awk source does the same: bin/check-board-headings.sh
+    # rebuilds close_pat per line too). Built from single-quoted literal
+    # fragments so the backtick and `$` need no escaping.
+    close_pat='^[ ]{0,3}`{'"$fence_len"',}[[:space:]]*$'
+    if [[ "$line" =~ $close_pat ]]; then
+      in_fence=0
+    fi
+    continue
+  fi
   if [[ "$line" =~ $AC_RE ]]; then
     flush; cur="${BASH_REMATCH[1]}"; curcmd=""; curseen=0
   elif [[ "$line" =~ $CANDIDATE_RE ]]; then
