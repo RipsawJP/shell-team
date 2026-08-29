@@ -1925,3 +1925,33 @@ that file's order.
   for another) without the fixture itself failing, since the fixture
   only proves what it was written to prove, not what the prose claims
   in general.
+- T-1102: `bash tests/check-acs/run.sh` gained a "T-1102: ..." block covering
+  `bin/check-acs.sh`'s new backtick-fence state machine (copied from
+  `bin/check-board-headings.sh`'s hardened opener/closer tracker, DP-1/DP-2).
+  Each fenced-line class this task added a lock for has an unfenced positive
+  control committed alongside it under `tests/check-acs/fixtures/` (paired
+  `fence-*.md` / `fence-*-unfenced.md` files: AC1 the label match, AC2 the
+  candidate/unrecognized-label match, AC3a the check: capture, AC3b the `## `
+  heading reset, AC7 tilde fences staying untracked, AC9 the 0-3-space /
+  tab-excluded indent bound, AC10 the closer's run-length-and-no-trailing-
+  content strictness) — so a false pass from "nothing was parsed" cannot
+  satisfy any of them. Two shapes are deliberately built at RUN TIME in
+  `tests/check-acs/run.sh` rather than committed as static fixtures, both for
+  literal-byte fragility reasons already established by this file's T-048
+  rework1 entry: the CRLF case (AC8; a committed CRLF `.md` risks silent
+  normalization) and the whitespace-only-closer positive control (AC10; a
+  committed fixture's trailing-whitespace bytes risk being stripped by an
+  editor save or pre-commit hook). The detector's own blind spots enumerated
+  during this task (AC17(b) — probe at least three before trusting the
+  design): an HTML-comment-embedded fence opener, an inline-code-span-
+  embedded one, and a block-quote (`> `) prefixed one are none of them
+  tracked, by construction — the opener regex admits only leading SPACE
+  characters, so a `>` or any non-space/non-backtick prefix cannot open a
+  fence at all; a fence spanning across the frozen intent-block markers is
+  likewise not special-cased (the state machine has no notion of those
+  markers); and a spec whose entire `## Acceptance criteria` section is
+  fenced correctly hits the pre-existing zero-criteria refusal (exit 2), not
+  a new failure mode. `bash tests/errexit-safe/run.sh`'s completeness self-
+  audit is unaffected — this task adds no new `>&2` write site to
+  `bin/check-acs.sh` (measured: the base-vs-HEAD `>&2` count in that file is
+  equal, re-derived at both refs rather than compared to a literal).
