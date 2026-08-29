@@ -4,6 +4,12 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.3.0**
+  - **リポジトリが oversight プロファイルを宣言し、宣言したループ継ぎ目で記録済みの人間承認を必須にできるようになった。** ホストは `oversight.conf` で `autonomous`（出荷既定 — どこも変えない）か `governance-controlled` を選ぶ。後者は宣言した各継ぎ目で、成果物の producer と別人の approver による board 記録済み承認（承認対象を今も指す anchor つき）を要求し、評価できないものは fail-closed で拒否する。加入済みリポジトリは宣言ファイルが消えただけでは離脱にならない: board に承認記録が 1 つでもあれば、宣言消失は silent 復帰でなく拒否になる。出荷ドキュメントは機構を誠実に命名し（認証つき職務分掌統制ではなく、content anchor つきの自己申告型 conflict check）、閉じていない残余を列挙する。
+  - **レビュー記録の全 executor pass が検証可能な input-fidelity ブロックを持つようになった。** レビュアーは executor 起動コマンドの verbatim 記録（ホーム配下の絶対パスはプレースホルダに正規化）、finding 生成と confirmation を区別する閉集合の pass-role ラベル、その pass に届いた briefing-fidelity 値、ラウンド間で上書きされない per-round raw-capture stem を記録する。新しい fail-closed checker が presence と文法を検証し（プロンプトの内容は決して判定しない）、close-out ゲートは評価できない記録を拒否する。
+  - **バッククォートのフェンス内コードブロックが受け入れ条件パーサに対して不活性になった。** フェンス内に引用された AC 形の行が実行されたり phantom criterion として報告されたりしなくなった。
+  - **verify 軸の dispatch 選択が作業種別で分割され**、fixture スイート半分と mechanism クラスの全数 diff 半分が独立の根拠つき記録を持つようになった。
+  - **マシンローカルなセッション・scratchpad パス形状が、既存の PII 形状と並んでコミット記録から遮蔽されるようになった。**
 - **v2.2.1**
   - **記録された entry mode が 2 つの記録源で食い違うタスクを、凍結時にループが拒否するようになりました。** 新しい fail-closed checker が、独立に書かれた 2 つのコミット済み記録 — planning 役の board サブ箇条と orchestrator の dispatch 転記 — を読み、どちらかが欠けているか食い違う場合は、読者がたまたま目にした側の記述を信用する代わりに進行を拒否します。初のライブ発火で、実際の二者間転記衝突を凍結前に捕捉しました。
   - **選出された spec review が承認 verdict に到達していないタスクの close-out を拒否するようになりました。** 新しい backstop checker が、review 記録の最終アンカー行を閉じた 4 形式文法で特定し、承認と読めない限り close-out をブロックします — 従来方式への敵対的レビューが列挙した散文パース系の敗北クラスに構造的に免疫です。
