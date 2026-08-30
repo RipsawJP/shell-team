@@ -473,6 +473,66 @@ refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
   -- "$D_SPECIFY"
 chk901 "doubled-space-after-bullet on the dispatch-reflection stem: collected then refused as malformed, never silently read as the zero-rows case" 1
 
+# --- codex review round 1 rework: four Majors + one Minor ------------------
+
+# Major 1: reverse coverage — a reflection row for an axis this entry never
+# elected must refuse, not slip through on a trivially-satisfiable verdict.
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-900 — differs — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_PRED"
+chk901 "a dispatch-reflection row naming an axis this entry's own dispatch rows never recorded refuses (reverse coverage, Major 1)" 1
+
+# Major 2: single-shared-predecessor + no-self-reference.
+refl_board none "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: specify — T-901 — repeat — ground"
+chk901 "a dispatch-reflection row naming the current task itself as predecessor refuses (self-reference, Major 2)" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-899 — repeat — ground" \
+  -- "$D_SPECIFY"
+# T-899 needs to resolve too, or the "unresolvable predecessor" refusal
+# fires first — add it as a second, separate ## Done predecessor.
+awk -v add="$D_VERIFY_SELF" '
+  { print }
+  /^## Done/ { print ""; print "- [x] **T-899** other-old-task"; print "  " add }
+' "$T/refl.md" > "$T/refl2.md"
+mv "$T/refl2.md" "$T/refl.md"
+chk901 "a dispatch-reflection family naming two different predecessors across axes refuses (single-shared-predecessor, Major 2)" 1
+
+# Major 3: silent head-1 first-match on duplicate/conflicting dispatch rows.
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" "$D_VERIFY_PRED" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_SELF" "$D_VERIFY_PRED"
+chk901 "a predecessor entry carrying two conflicting dispatch rows for the same axis refuses (silent first-match, Major 3, predecessor side)" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" "$D_VERIFY_PRED" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_SELF"
+chk901 "the current entry carrying two conflicting dispatch rows for the same axis refuses (silent first-match, Major 3, current-entry side)" 1
+
+# Major 4: colon-spacing invisible variant (a space before the colon).
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection : specify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY"
+chk901 "a space before the dispatch-reflection colon refuses as malformed rather than reading as the zero-rows case (colon-spacing variant, Major 4)" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection  :  specify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY"
+chk901 "whitespace on BOTH sides of the dispatch-reflection colon refuses as malformed (colon-spacing variant, Major 4)" 1
+
+# Minor: a malformed current-entry `- dispatch:` row must not be silently
+# invisible to the coverage axis set.
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "-  dispatch: verify — serial — unconditional — recommendation: r" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY"
+chk901 "a malformed (doubled-space) current-entry dispatch row refuses rather than silently escaping coverage (Minor)" 1
+
 # --- comment-stripped flattened form carries the two shipped limits --------
 fc() { sed 's/^[[:space:]]*#[[:space:]]*//' "$1" | tr '\n' ' ' | tr -s ' '; }
 fc "$SCRIPT" > "$T/flat"

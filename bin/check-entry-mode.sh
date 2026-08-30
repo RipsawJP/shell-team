@@ -294,7 +294,19 @@ fi
 # one of them requires the literal colon immediately after the bare word
 # `dispatch`, never after `-reflection` — AC7 byte-pins this), so this scan
 # is additive and cannot collide with source 2's own reading.
-refl_stem_re='^[[:space:]]*-[[:space:]]+dispatch-reflection:'
+#
+# Codex review round 1, Major 4: the stem net above widened only the gap
+# between the bullet dash and the field name, never the gap between the
+# field name and its colon — `- dispatch-reflection : ...` (a space
+# BEFORE the colon) matched neither this stem nor the full grammar below,
+# so the whole line was invisible to the family scan and a genuinely
+# malformed reflection line read as the conformant empty-family case. The
+# stem now tolerates whitespace on BOTH sides of the colon too, the same
+# collect-wide discipline already applied to the dash-to-fieldname gap;
+# the full grammar below stays strict (colon immediately after the bare
+# field name, exactly one space after it), so any such variant is
+# COLLECTED here and REFUSED as malformed below, never silently dropped.
+refl_stem_re='^[[:space:]]*-[[:space:]]+dispatch-reflection[[:space:]]*:[[:space:]]*'
 refl_full_re='^[[:space:]]*- dispatch-reflection: ([a-z-]+) — ([A-Za-z0-9-]+) — ([a-z-]+) — (.*)$'
 
 # This entry's own `- dispatch:` axis -> value map, read the same anchored
@@ -303,11 +315,37 @@ refl_full_re='^[[:space:]]*- dispatch-reflection: ([a-z-]+) — ([A-Za-z0-9-]+) 
 # entry itself records must carry a reflection row, ## Assumptions A-8's
 # subject) and duty B (this entry's own recorded value for an axis,
 # compared against the predecessor's).
+#
+# Codex review round 1, Minor: a malformed (e.g. doubled-space-after-dash)
+# `- dispatch:` row on the CURRENT entry was silently invisible to this
+# axis set, letting that axis escape the "no cherry-picking" coverage
+# requirement entirely. Collect wide (tolerating extra space after the
+# bullet dash) and refuse if that widens the count beyond the strict
+# single-space read below — the same collect-wide/parse-strict discipline
+# already applied to the reflection stem, now applied here too, since a
+# fail-closed coverage judgment depends on reading this line correctly.
+ENTRY_DISPATCH_WIDE="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*-[[:space:]]+dispatch: ' || true)"
 ENTRY_DISPATCH_LINES="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*- dispatch: ' || true)"
+if [ "$(printf '%s\n' "$ENTRY_DISPATCH_WIDE" | grep -c . || true)" != "$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | grep -c . || true)" ]; then
+  fail "$TASK has a malformed \`- dispatch:\` sub-bullet — its spacing does not match the canonical single-space grammar, so this entry's dispatch-reflection coverage cannot be judged against it cleanly"
+fi
 ENTRY_DISPATCH_AXES="$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | sed -nE 's/^[[:space:]]*- dispatch: ([a-z0-9-]+) — .*$/\1/p')"
 
-dispatch_value_for_axis() {  # $1 = a `- dispatch:`-line block, $2 = axis key
-  printf '%s\n' "$1" | sed -nE "s/^[[:space:]]*- dispatch: ${2} — ([a-z0-9-]+) — .*\$/\\1/p" | head -1
+dispatch_value_for_axis() {  # $1 = a `- dispatch:`-line block, $2 = axis key, $3 = who this block belongs to (for the refusal message)
+  local block="$1" axis="$2" who="$3" matches n
+  matches="$(printf '%s\n' "$block" | grep -E -- "^[[:space:]]*- dispatch: ${axis} — " || true)"
+  n="$(printf '%s\n' "$matches" | grep -c . || true)"
+  if [ "$n" -gt 1 ]; then
+    # Codex review round 1, Major 3: a silent `head -1` first-match on
+    # duplicate/conflicting `- dispatch:` rows for the same axis — on
+    # EITHER the predecessor's entry or the current entry — masked a
+    # genuinely inconsistent record instead of refusing it. Duty B now
+    # requires exactly one matching row per axis before extracting a
+    # value; more than one refuses (fail-closed), regardless of whether
+    # the conflicting rows happen to agree.
+    fail "$TASK's \`- dispatch-reflection:\` duty B cannot resolve a single value for axis '$axis' on $who — it carries $n \`- dispatch: $axis\` rows instead of exactly one"
+  fi
+  printf '%s\n' "$matches" | sed -nE "s/^[[:space:]]*- dispatch: ${axis} — ([a-z0-9-]+) — .*\$/\\1/p"
 }
 
 # Resolve a predecessor task id to exactly one top-level board entry,
@@ -392,15 +430,56 @@ if [ "$REFL_ROW_COUNT" -gt 0 ]; then
   fi
 
   if [ "$REFL_HAS_ALL" -eq 0 ]; then
-    # Coverage: every axis this entry's own `- dispatch:` rows record must
-    # carry a matching `- dispatch-reflection:` row — no cherry-picking.
+    # Coverage, BOTH directions (Codex review round 1, Major 1: the check
+    # was one-directional — dispatch-axes subset-of reflection-axes was
+    # enforced, but reflection-axes subset-of dispatch-axes never was, so
+    # a spurious reflection row for an axis this entry never elected slips
+    # through — duty B's own comparison alone cannot catch it, since an
+    # empty own_value makes "differs" a trivially-satisfiable "expected"
+    # verdict against any non-empty predecessor value). ENTRY_DISPATCH_AXES
+    # and REFL_AXES must name the SAME axis set, checked as two membership
+    # tests rather than one.
+    ENTRY_DISPATCH_AXES_PADDED=" "
     while IFS= read -r d_axis; do
       [ -n "$d_axis" ] || continue
+      ENTRY_DISPATCH_AXES_PADDED="${ENTRY_DISPATCH_AXES_PADDED}${d_axis} "
       case "$REFL_AXES" in
         *" $d_axis "*) : ;;
         *) fail "$TASK's \`- dispatch-reflection:\` family does not cover axis '$d_axis', which this entry's own \`- dispatch:\` rows record" ;;
       esac
     done <<< "$ENTRY_DISPATCH_AXES"
+
+    while IFS= read -r r_axis; do
+      [ -n "$r_axis" ] || continue
+      case "$ENTRY_DISPATCH_AXES_PADDED" in
+        *" $r_axis "*) : ;;
+        *) fail "$TASK's \`- dispatch-reflection:\` family names axis '$r_axis', which this entry's own \`- dispatch:\` rows do not record" ;;
+      esac
+    done <<< "$(printf '%s' "$REFL_AXES" | tr ' ' '\n')"
+
+    # Single-predecessor + no-self-reference invariant (Codex review
+    # round 1, Major 2): nothing enforced that every reflection row on one
+    # entry names the SAME predecessor id, and nothing rejected the
+    # current task naming itself — either gap lets an entry trivially
+    # satisfy duty B (an entry's own value always equals itself) while
+    # providing zero real cross-checking. Collect every row's predecessor
+    # id first; require exactly one distinct value across the whole
+    # family, and refuse a self-reference outright, before any per-row
+    # resolution below ever runs.
+    REFL_PRED=""
+    while IFS= read -r row; do
+      [ -n "$row" ] || continue
+      r_axis="${row%%|*}"; rest="${row#*|}"
+      r_pred="${rest%%|*}"
+      if [ "$r_pred" = "$TASK" ]; then
+        fail "$TASK's \`- dispatch-reflection: $r_axis\` sub-bullet names itself ('$r_pred') as its own predecessor — a task can never be its own predecessor"
+      fi
+      if [ -z "$REFL_PRED" ]; then
+        REFL_PRED="$r_pred"
+      elif [ "$r_pred" != "$REFL_PRED" ]; then
+        fail "$TASK's \`- dispatch-reflection:\` family names more than one predecessor ('$REFL_PRED' and '$r_pred') — every row must name the same immediately preceding task"
+      fi
+    done <<< "$REFL_ROWS"
 
     # Duty B: the stated verdict must agree with the predecessor's own
     # recorded value for that axis.
@@ -412,8 +491,8 @@ if [ "$REFL_ROW_COUNT" -gt 0 ]; then
       pred_entry_text="$(resolve_predecessor_entry "$r_pred")" \
         || fail "$TASK's \`- dispatch-reflection: $r_axis\` sub-bullet names predecessor '$r_pred', which does not resolve to exactly one top-level board entry in ## Active or ## Done"
 
-      own_value="$(dispatch_value_for_axis "$ENTRY_DISPATCH_LINES" "$r_axis")"
-      pred_value="$(dispatch_value_for_axis "$pred_entry_text" "$r_axis")"
+      own_value="$(dispatch_value_for_axis "$ENTRY_DISPATCH_LINES" "$r_axis" "$TASK's own entry")"
+      pred_value="$(dispatch_value_for_axis "$pred_entry_text" "$r_axis" "predecessor '$r_pred'")"
 
       if [ -z "$pred_value" ]; then
         if [ "$r_verdict" != "no-predecessor-row" ]; then
