@@ -69,7 +69,7 @@ shell-team の既定の使い方は**会話駆動 — やりたいことをそ�
 build sha と uptime を返す /healthz を shell-team で追加して
 ```
 
-メインの Claude セッションが非自明な依頼を認識し、チームのループ（Plan → Specify → Implement → Validate → Review）を回して、マージ前には必ず一時停止してあなたを待つ — スラッシュコマンドを打たずに Codex による別プロバイダレビューが得られるのと同じ経路です。会話モデルの詳細・追加の会話例・チャットから**フルループ**を確実に発火させるための唯一の opt-in ステップは [docs/usage-conversational.md](docs/usage-conversational.md) を参照。
+メインの Claude セッションが非自明な依頼を認識し、チームのループ（Plan → Specify → Implement → Validate → Review）を回して、マージ前には必ず一時停止してあなたを待ちます。スラッシュコマンドを打たずに Codex による別プロバイダレビューが得られるのと同じ経路です。会話モデルの詳細・追加の会話例・チャットから**フルループ**を確実に発火させるための唯一の opt-in ステップは [docs/usage-conversational.md](docs/usage-conversational.md) を参照。
 
 明示的に使いたいときは、エージェントやスキルを単体でも起動できます:
 
@@ -189,27 +189,28 @@ build sha と uptime を返す /healthz を shell-team で追加して
 それぞれ executor（provider + model + effort + adapter）を host が個別に
 割り当てられる。host 設定が無い場合は、プラグイン**出荷時の既定**
 `templates/binding-default.conf` が使われる。手順・設定の文法・
-fail-closed な refusal・各 adapter 自身の effort 値は
-[docs/adopting.ja.md](docs/adopting.ja.md)——この機構について唯一の
-正典となる詳細面——と `bash resolve-executor.sh --help`（スクリプト
-自身のヘッダであり、そこから乖離しえない）にある。**正直な境界線**には
-2 つの軸がある: binding は、それを参照するループにおいて呼び出しが
-**行われるかどうか**を制御する——`/shell-team:run` と `/shell-team:goal`
-では resolution が先に走り、refusal はフォールバックせずフェーズを停止
-させるので、rebind によって呼び出しを完全に止めることができる。一方、
-`/shell-team:review` は binding を一切参照せず、
-`/shell-team:review-response` は run ループへ引き渡す rework 経由でのみ
-参照する（issue **#245**）——そして、行われる呼び出しが**どう実行される
-か**は決して変えない。そちらで動くの
-は resolution が報告する値と**テレメトリ**が記録する値だけ（provider・
-model・effort・adapter のいずれも同じ）であり、別 executor への
-**呼び出し経路**は配線されない。第 2 軸の例示として、model は今なお
-役割自身の `agents/<role>.md` の pin から来る（issue **#236** はその
-pin の退役を追跡するが対象は `claude-cli` に紐付く 5 役割のみ・
-`codex-reviewer` は除外）。宣言された effort は記録されるがどの呼び出し
-にも適用されず、executor レベルの経路は resolution が制御していない。
-紐付けられた値はすべて宣言された値であって、実行されたものの観測では
-ない。reviewer 行自身の出荷時の既定とその理由は
+fail-closed な refusal・各 adapter 自身の effort 値は、
+[docs/adopting.ja.md](docs/adopting.ja.md)（この機構について唯一の
+正典となる詳細面）と `bash resolve-executor.sh --help`（スクリプト
+自身のヘッダであり、そこから乖離しえない）にある。
+
+**正直な境界線**には 2 つの軸がある。第 1 の軸は、呼び出しが**行われる
+かどうか**。binding は、それを参照するループにおいてこれを制御する。
+`/shell-team:run` と `/shell-team:goal` では resolution が先に走り、
+refusal はフォールバックせずフェーズを停止させるので、rebind によって
+呼び出しを完全に止められる。一方、`/shell-team:review` は binding を
+一切参照せず、`/shell-team:review-response` は run ループへ引き渡す
+rework 経由でのみ参照する（issue **#245**）。第 2 の軸は、行われる
+呼び出しが**どう実行されるか**で、binding はこれを決して変えない。
+そちらで動くのは resolution が報告する値と**テレメトリ**が記録する値
+だけ（provider・model・effort・adapter のいずれも同じ）であり、別
+executor への**呼び出し経路**は配線されない。第 2 軸の例示として、
+model は今なお役割自身の `agents/<role>.md` の pin から来る（issue
+**#236** はその pin の退役を追跡するが、対象は `claude-cli` に紐付く
+5 役割のみで `codex-reviewer` は除外）。宣言された effort は記録される
+がどの呼び出しにも適用されず、executor レベルの経路は resolution が
+制御していない。紐付けられた値はすべて宣言された値であって、実行された
+ものの観測ではない。reviewer 行自身の出荷時の既定とその理由は
 [設計上の選択](#設計上の選択) を参照。
 
 ## run のリプレイ
