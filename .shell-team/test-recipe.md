@@ -2201,3 +2201,45 @@ that file's order.
   is a real regression from the current commit's own prior state; only
   dropping below the base-ref's declared value reddens it. Worth knowing
   before assuming "I lowered a floor, the check will catch it."
+
+- T-1108: staging the untracked `runs corpus` into a two-arm sweep's base
+  worktree, so a criterion resolving it through `bin/team-paths.sh --get
+  runs` at run time stops reading a base-arm false FAIL. **The symlink
+  measurement, actually run rather than predicted**: in a scratch repo with
+  only `.shell-team/.gitignore` containing `runs/` (trailing slash) and
+  `core.excludesfile=/dev/null` (a contributor's own global excludes must
+  not leak into this measurement — see the excludes-file quirk above), a
+  symlink named `.shell-team/runs` pointing at a populated directory is
+  reported by `git status --porcelain` as `?? .shell-team/runs` — an
+  **untracked** stray — and `git check-ignore -v .shell-team/runs` exits
+  `1` with no match, i.e. **not ignored**. The `runs/` rule's trailing
+  slash matches directories only; a symlink is a file to git, so it falls
+  straight through the rule. This is the measured ground for staging as a
+  **real directory, copied, never a symlink**: a symlinked snapshot is
+  invisible to the fix and visible to every scope-lock criterion as a new
+  untracked path.
+  - Staging command shape settled on: snapshot the corpus **once**, before
+    either arm runs, `cp -R "$(bash bin/team-paths.sh --get runs)"
+    "$snap"`; then, into the base worktree, `mkdir -p
+    "$W/.shell-team/runs"` and copy the snapshot in **member by member**
+    (`find "$snap" -type f`, skipping `.gitkeep`), `mkdir -p` each member's
+    parent directory first, and — the already-exists trap — skip any
+    member `git -C "$W" ls-files --error-unmatch` already tracks at that
+    path rather than overwriting it. Never delete anything already in the
+    worktree. This handles both states of `.shell-team/runs/` in a fresh
+    base worktree (absent/empty at this freeze — measured **0** tracked
+    members via `git ls-files -- '.shell-team/runs/*'` — or containing a
+    force-added tracked member, reachable at any later date) without a
+    special case for either.
+  - Timeout needed: `CHECK_ACS_TIMEOUT=900` for a full-spec run of
+    `T-1108-sweep-corpus-isolation.md` — **AC4** runs ten criterion bodies
+    (five, twice) plus five live-arm runs and **AC13** runs a live-derived
+    read set at two arms, each creating a `git worktree add --detach`; the
+    300 s floor this recipe records elsewhere for base-versus-head re-runs
+    of heavy merged specs is not enough here.
+  - `bin/team-paths.sh --get runs` ignores an incoming `TEAM_RUNS_DIR`
+    (`RUNS="$BASE/runs"` is computed from `TEAM_RUN_BASE` alone; the
+    variable is only emitted, at `bin/team-paths.sh:174`, never read) while
+    `bin/log-run.sh:490-491` honours it for writes — the read side and the
+    write side disagree on purpose, and a future author reaching for
+    `TEAM_RUNS_DIR` to relocate what a sweep *reads* will find it inert.

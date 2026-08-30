@@ -117,6 +117,12 @@ full-population な sweep も、CI 相当ステップ全体の再実行も、こ
 変更しないメカニズムの挙動検証も行わないことを、明示的な non-goal として
 宣言する。
 
+2 アーム構成の sweep はこれに加えて、両アームが走る前に一度だけ
+（sweep ごとに一度）、gitignore 対象の `.shell-team/runs` corpus の
+snapshot を base アームへステージングする。これを行わないと、この
+corpus を読む criterion は diff とは無関係な理由で base アーム側の
+FAIL を報告する。
+
 現時点の強制は**チェッカーではなく duty** である。この宣言は spec 完成時に
 著者役割が行い、両方の review gate と人間がそれを読む。**機械的なチェッカーは
 出荷されない**。あるタスクが自ら宣言したクラスに正直に属しているかどうかは
