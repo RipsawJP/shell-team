@@ -2201,3 +2201,71 @@ that file's order.
   is a real regression from the current commit's own prior state; only
   dropping below the base-ref's declared value reddens it. Worth knowing
   before assuming "I lowered a floor, the check will catch it."
+
+- T-1108: staging the untracked `runs corpus` into a two-arm sweep's base
+  worktree, so a criterion resolving it through `bin/team-paths.sh --get
+  runs` at run time stops reading a base-arm false FAIL. **The symlink
+  measurement, actually run rather than predicted**: in a scratch repo with
+  only `.shell-team/.gitignore` containing `runs/` (trailing slash) and
+  `core.excludesfile=/dev/null` (a contributor's own global excludes must
+  not leak into this measurement — see the excludes-file quirk above), a
+  symlink named `.shell-team/runs` pointing at a populated directory is
+  reported by `git status --porcelain` as `?? .shell-team/runs` — an
+  **untracked** stray — and `git check-ignore -v .shell-team/runs` exits
+  `1` with no match, i.e. **not ignored**. The `runs/` rule's trailing
+  slash matches directories only; a symlink is a file to git, so it falls
+  straight through the rule. This is the measured ground for staging as a
+  **real directory, copied, never a symlink**: a symlinked snapshot is
+  invisible to the fix and visible to every scope-lock criterion as a new
+  untracked path.
+  - Staging command shape settled on (repaired from an earlier hardcoded
+    draft during a rework round — see below): snapshot the corpus
+    **once**, before either arm runs, `cp -R "$(bash bin/team-paths.sh
+    --get runs)" "$snap"`; then, inside the base worktree, resolve the
+    destination through the **same resolver rather than a hardcoded
+    path** — `D=$( cd "$W" && bash bin/team-paths.sh --get runs )`,
+    failing closed (tear down the worktree, exit non-zero) on an empty
+    or absolute `$D`, since `--get runs` returns a ROOT-relative path
+    and this is what makes the destination correct on the legacy layout
+    and a custom `TEAM_RUN_BASE`, and not only on this repository's own
+    `.shell-team/runs`. `mkdir -p "$W/$D"` and copy the snapshot in
+    **member by member**, reading the file list from a NUL-delimited
+    temp file (`find "$snap" -type f -print0 > "$list"`, then `while …
+    read -r -d '' … done < "$list"`) rather than piping `find` straight
+    into the `while` — the redirected form runs the loop body in the
+    **current** shell, so a per-member `mkdir`/`cp` failure sets the
+    outer `rc` instead of dying inside a pipe subshell that discards it
+    silently. `mkdir -p` each member's parent directory first, and —
+    the already-exists trap — skip any member git tracks at **either**
+    ref: the base worktree's index (`git -C "$W" ls-files
+    --error-unmatch`) **or** the live/`HEAD` side (`git ls-files
+    --error-unmatch` against the live index, or `git cat-file -e
+    "HEAD:…"` against `HEAD`'s tree) — a member force-added as tracked
+    only at `HEAD` has no base-ref bytes at all, so copying it in would
+    inject a file the base arm must not see. Never delete anything
+    already in the worktree. This handles both states of the resolved
+    corpus path in a fresh base worktree (absent/empty at this freeze —
+    measured **0** members tracked at either ref via `git ls-files --
+    '.shell-team/runs/*'` in this checkout and in the live index — or
+    containing a member tracked at either ref, reachable at any later
+    date) without a special case for either.
+  - **Rework note**: the first draft of this entry hardcoded the
+    destination as `$W/.shell-team/runs` and skipped only members the
+    base worktree itself tracked — both measured wrong for an adopter on
+    the legacy layout or a custom `TEAM_RUN_BASE`, and for a corpus
+    member force-added as tracked only at `HEAD`, by a cross-provider
+    review round (`.shell-team/reviews/T-1108.md`, `#### Major` rows 1-2).
+    The shape above is the repaired one; do not reintroduce the literal
+    path or the base-worktree-only skip filter.
+  - Timeout needed: `CHECK_ACS_TIMEOUT=900` for a full-spec run of
+    `T-1108-sweep-corpus-isolation.md` — **AC4** runs ten criterion bodies
+    (five, twice) plus five live-arm runs and **AC13** runs a live-derived
+    read set at two arms, each creating a `git worktree add --detach`; the
+    300 s floor this recipe records elsewhere for base-versus-head re-runs
+    of heavy merged specs is not enough here.
+  - `bin/team-paths.sh --get runs` ignores an incoming `TEAM_RUNS_DIR`
+    (`RUNS="$BASE/runs"` is computed from `TEAM_RUN_BASE` alone; the
+    variable is only emitted, at `bin/team-paths.sh:174`, never read) while
+    `bin/log-run.sh:490-491` honours it for writes — the read side and the
+    write side disagree on purpose, and a future author reaching for
+    `TEAM_RUNS_DIR` to relocate what a sweep *reads* will find it inert.

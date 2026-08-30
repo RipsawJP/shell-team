@@ -110,6 +110,11 @@ correspondingly declares as an explicit non-goal that it runs no
 full-population sweep, no whole CI-equivalent re-run and no behaviour
 verification of a mechanism it does not touch.
 
+A two-arm sweep additionally stages a single snapshot of the gitignored
+`.shell-team/runs` corpus into its base arm before either arm runs
+(once per sweep) — without that staging step, a criterion reading the
+corpus reports a base-arm FAIL that the diff never caused.
+
 Enforcement today is a **duty, not a checker**: the declaration is
 performed by the authoring role at spec-completion time and read by both
 review gates and by the human — **no mechanical checker ships for this**,
