@@ -736,7 +736,17 @@ else
   # candidate under tests/errexit-safe/run.sh and owe its own registry
   # entry), and exactly one line so it cannot drift out of sync with the
   # branch above.
-  printf 'close-out: note: no --issue given — if this task closes a GitHub issue, develop merges do NOT auto-close it; run close-out.sh again with --issue N (or close it by hand) once you have the number.\n'
+  #
+  # Round-2 rework (Codex review): the board write above (this task's own
+  # entry move to ## Done) has ALREADY happened by the time this note
+  # prints, so "run close-out.sh again" can never succeed — a second
+  # invocation with the same --task always hits the pre-existing "already
+  # in ## Done" refusal first. The note now names the manual recovery
+  # instead (CONTRIBUTING.md's close-out command, or the GitHub MCP
+  # issue_write method, the same mechanism the branch above prints) —
+  # deliberately not the literal `gh issue close`, which AC4's
+  # no-`--issue` cases assert is absent.
+  printf 'close-out: note: no --issue given — this task has already moved to ## Done; develop merges do NOT auto-close a GitHub issue, so close it by hand once you have the number (see CONTRIBUTING.md'\''s close-out command, or update it via the GitHub MCP issue_write method).\n'
 fi
 
 # --- best-effort telemetry (never fails the close-out) -------------------------
