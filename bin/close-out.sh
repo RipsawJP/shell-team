@@ -741,12 +741,21 @@ else
   # entry move to ## Done) has ALREADY happened by the time this note
   # prints, so "run close-out.sh again" can never succeed — a second
   # invocation with the same --task always hits the pre-existing "already
-  # in ## Done" refusal first. The note now names the manual recovery
-  # instead (CONTRIBUTING.md's close-out command, or the GitHub MCP
-  # issue_write method, the same mechanism the branch above prints) —
-  # deliberately not the literal `gh issue close`, which AC4's
-  # no-`--issue` cases assert is absent.
-  printf 'close-out: note: no --issue given — this task has already moved to ## Done; develop merges do NOT auto-close a GitHub issue, so close it by hand once you have the number (see CONTRIBUTING.md'\''s close-out command, or update it via the GitHub MCP issue_write method).\n'
+  # in ## Done" refusal first.
+  #
+  # Round-3 rework (Codex review): round 2's fix pointed at CONTRIBUTING.md
+  # (non-portable to an adopter checkout without that file) and, one level
+  # indirect, back at the same `close-out.sh --issue N` re-invocation round
+  # 1 already flagged — and it dropped the original conditional ("if this
+  # task closes a GitHub issue"), presuming an issue exists on every
+  # no-`--issue` run. Fixed by REMOVAL rather than a further decorated
+  # pointer: no document reference, no command reference, nothing left to
+  # be non-portable or indirectly recursive. The conditional is restored;
+  # the note states only the two facts it can state unconditionally (the
+  # board fact, and the always-true auto-close fact) and asks the operator
+  # to act, without naming HOW — deliberately not the literal
+  # `gh issue close`, which AC4's no-`--issue` cases assert is absent.
+  printf 'close-out: note: no --issue given — if this task closes a GitHub issue, close it by hand now: develop merges do NOT auto-close, and this entry has already moved to ## Done.\n'
 fi
 
 # --- best-effort telemetry (never fails the close-out) -------------------------
