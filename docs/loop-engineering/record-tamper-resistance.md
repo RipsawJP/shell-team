@@ -212,3 +212,63 @@ re-evaluation trigger fires on "the promotion of a third obligation into
 arm A" and already fired on the third promotion; it was explicitly not
 re-fired by the fourth, and a fifth promotion likewise does not re-fire
 it — discharging it stays owed at a retro rather than here.
+
+## The sixth obligation promoted into arm A (T-1109, issue #365, 2026-08-30)
+
+Cross-task dispatch reflection (T-1109, Proposal 3 of #365) names a new
+`- dispatch-reflection:` sub-bullet family — one row per dispatch axis a
+task's board entry itself records, stating whether that task repeats or
+diverges from the immediately preceding task's own recorded value for the
+same axis, or the single `all — no-predecessor` line where no predecessor
+exists — and splits its own verdict into two duties, the same shape the
+fifth promotion above already applies.
+
+**Duty A** — the record's own grammar and per-axis coverage (does every
+row parse into its four ` — `-separated fields, is every axis field inside
+the closed dispatch-axis vocabulary or the reserved `all` token, does no
+axis appear twice, and does the family cover every axis the entry's own
+`- dispatch:` rows record) — applies the rule directly: its verdict gates
+a freeze, one of the three loop transitions this note's own parenthetical
+names, reached through the sibling-checker wiring `bin/close-out.sh`'s own
+gate already establishes the pattern for, and the judgment is a set of
+anchored line matches, a field extraction, closed-vocabulary membership
+tests and a duplicate-axis test, all over committed record bytes. Both
+conjuncts hold, so this duty takes **arm-A-tested-primitive**: extended
+into `bin/check-entry-mode.sh`, the arm-A script that already owns this
+exact pre-freeze seam (invoked at `skills/run/SKILL.md`'s Specify-to-
+Implement window), with its own `tests/check-entry-mode/run.sh` suite and
+its own step in `.github/workflows/check-handoff.yml` — the shape the
+third promotion above (T-1099, inside `bin/check-board-headings.sh`)
+established, reused rather than a new script added.
+
+**Duty B** — the cross-entry verdict agreement (does a stated `repeat` /
+`differs` / `no-predecessor-row` verdict match what the predecessor
+entry's own recorded `- dispatch:` value for that axis actually was) —
+shares duty A's first conjunct (the same freeze-gating seam) and its
+second conjunct is likewise a judgment over committed record bytes: the
+predecessor is resolved to exactly one top-level board entry by a SECOND
+scan spanning both `## Active` and `## Done` (## Assumptions row **A-8**
+of the task's own spec — a genuinely new scan, since the pre-existing
+`--task` entry resolution stays `## Active`-only by design), and the
+comparison itself is a string equality between two anchored field
+extractions. Both hold → **arm A**, and its structural form is satisfied
+inside the same script rather than by a second one, exactly as duty A
+above and the third promotion's own precedent.
+
+No duty here is sent to arm B: unlike the fourth and fifth promotions
+above, this task's own substantive judgment — *whether a recorded
+repetition is actually sound, not merely stated* — is never claimed
+closed by either duty, and is disclosed as staying a human-or-agent
+reading in the task's own spec Goal section rather than being priced as a
+third duty. Nothing here is a `disclosed, not closed` arm-B enumeration,
+because nothing here attempts to mechanize that judgment at all.
+
+This is the **sixth** obligation promoted into arm A, after **#341**
+(`bin/check-entry-mode.sh`), **#344** (`bin/check-spec-review.sh`), the
+third promotion (T-1099, inside `bin/check-board-headings.sh`), the
+fourth promotion (T-1103, `bin/check-oversight.sh`) and the fifth
+promotion above (T-1104, `bin/check-review-input.sh`). The re-evaluation
+trigger fires on "the promotion of a third obligation into arm A" and
+already fired on the third promotion; it was explicitly not re-fired by
+the fourth or the fifth, and a sixth promotion likewise does not re-fire
+it — discharging it stays owed at a retro rather than here.

@@ -2269,3 +2269,93 @@ that file's order.
     `bin/log-run.sh:490-491` honours it for writes — the read side and the
     write side disagree on purpose, and a future author reaching for
     `TEAM_RUNS_DIR` to relocate what a sweep *reads* will find it inert.
+
+- T-1109: extends `bin/check-entry-mode.sh` with a THIRD, independent
+  duty at the same pre-freeze seam — `- dispatch-reflection:` grammar
+  (duty A) plus cross-entry verdict agreement against the predecessor's
+  own recorded `- dispatch:` value (duty B). **Predecessor-lookup shape
+  settled on**: a SECOND `awk` scan, structurally identical to the
+  existing `--task` entry-extent scan but with two differences — it is
+  never restricted to `sec ~ /^## Active/` (it matches `- \[ \] \*\*<id>\*\*
+  ` inside `## Active` OR `- \[x\] \*\*<id>\*\* ` inside `## Done`), and an
+  unresolvable or ambiguous match returns from a bash function (`return 1`)
+  rather than calling `die` — the caller turns that into `fail` (exit 1,
+  a content refusal), never `die` (exit 2), because a predecessor
+  reference is part of the board's own record, not part of the
+  invocation's environment (## Assumptions row A-8; the `--task` entry's
+  own resolution keeps its original exit-2 contract, untouched). **Axis
+  extraction, longer-stem-first is automatic, not manual**: every general
+  `- dispatch: <axis> — ` scan requires the literal colon immediately
+  after the bare word `dispatch`, so a `- dispatch-reflection: ` line
+  (colon after `-reflection`, never after `dispatch`) fails to match by
+  construction — no explicit "test the longer stem first" ordering trick
+  was needed here, unlike the flagged-gap/flagged-gap-resolution pair
+  this same file already handles with an explicit stem-priority `if`/
+  `elif`, because gap/gap-resolution's ambiguity is genuinely a shared
+  prefix with no disambiguating character while dispatch/dispatch-
+  reflection's is not (measured directly: `printf '%s\n' '  - dispatch-
+  reflection: specify — T-900 — repeat — g' | grep -cE '^[[:space:]]*-
+  dispatch: '` → `0`). **CRLF and doubled-space fixtures**: built the same
+  way the pre-existing gap/resolution fixtures already are — a doubled-
+  space fixture is one literal board line with two spaces after the
+  bullet dash (`'-  dispatch-reflection: …'`), and a CRLF fixture is a
+  conformant LF board piped through `awk '{printf "%s\r\n", $0}'` — no new
+  fixture-construction technique was needed. **Timeout**:
+  `CHECK_ACS_TIMEOUT=900` (## Assumptions row A-9), inherited from
+  T-1108's own recorded value for the same class of sweep (**AC14**'s
+  full-population two-arm diff and `tests/close-out/run.sh` re-run inside
+  **AC7**). **Measured anchor behaviour**: all three shipped `- dispatch:`
+  anchors (`bin/close-out.sh`'s `'^[[:space:]]*- dispatch:'`, and
+  `bin/check-entry-mode.sh`'s `'^[[:space:]]*- dispatch: specify — '` and
+  `'^[[:space:]]*-[[:space:]]+dispatch:[[:space:]]+specify[[:space:]]+—'`)
+  match **zero** times against a `- dispatch-reflection:` line and at
+  least once against a genuine `- dispatch:` line, confirmed live (**AC7**'s
+  own check line, which builds exactly this pair of fixture files and
+  asserts both counts).
+  - **New environment quirk this task discovered while attempting AC14's
+    full-population sweep: `bin/log-run.sh`'s directory lock contends
+    severely across CONCURRENT `bin/check-acs.sh` invocations of
+    DIFFERENT specs, not only within one spec's own run.** The T-1084/
+    T-1083 recipe entries above document an `xargs -P <cores>` fan-out for
+    a full-population Blast-radius sweep; applying that same pattern to a
+    fan-out of *whole-spec* `check-acs.sh` runs (one process per spec,
+    several specs in flight at once) stalled an 8-way batch for several
+    minutes on this machine when the batch happened to contain a spec
+    whose own criteria call `bin/log-run.sh` more than once (measured:
+    `T-1058-telemetry-binding.md`'s **AC1** alone calls it three times) —
+    each concurrent invocation waits out the lock's own bounded retry
+    window, and with several contenders the waits compound. A **serial**,
+    one-spec-at-a-time driver avoids this entirely (only one process ever
+    holds or waits on the lock at a time), at the cost of session
+    wall-clock time (roughly 40-50s per spec observed once contention was
+    removed, versus multi-minute stalls under contention). Separately:
+    this machine carries **no `timeout`/`gtimeout` binary on `PATH`**, so
+    `bin/check-acs.sh`'s own `CHECK_ACS_TIMEOUT` wrapping is inert here
+    (its own documented fallback — "back to a plain run" — silently takes
+    over) and cannot bound a spec whose check genuinely never returns; a
+    driver attempting a bounded sweep on such a machine needs its own
+    external wall-clock bound (a hand-rolled `sleep N && kill` watcher
+    around each spec's process, since the `timeout` command cannot be
+    assumed present) rather than trusting the script's own internal
+    timeout to fire.
+  - **Mutation self-check technique for the predecessor-lookup/duty-B
+    logic**: line-number-targeted `awk 'NR==n{print r; next}{print}'`
+    substitutions against a scratch copy (never `sed` pattern-matching the
+    live source text, which is fragile against em-dashes and nested
+    quoting in this file) — locate the target line once with `grep -n`,
+    then mutate by line number. Two authoring traps worth inheriting:
+    (1) a fixture built to isolate ONE duty (e.g. the axis-vocabulary
+    check) from a SIBLING duty that shares the same board shape (e.g. the
+    coverage check) must give the sibling duty nothing to catch on its
+    own — a "bogus axis" fixture that also leaves an entry's own dispatch
+    axis uncovered gets caught by the coverage check even after the
+    axis-vocabulary check is neutered, silently defeating the probe's own
+    purpose (confirmed by constructing a probe, seeing it fail to
+    reproduce the defect, and re-deriving a fixture with a superfluous,
+    coverage-neutral extra row instead); (2) a fixture exercising ONLY the
+    predecessor-resolution duty must still carry every OTHER
+    unconditionally-required source this script's own pre-existing duties
+    demand (`- entry-mode:` and `- dispatch: specify — …`, T-1096) — a
+    fixture missing one of those refuses for the wrong reason before the
+    predecessor logic is ever reached, again defeating the probe silently
+    rather than loudly.
