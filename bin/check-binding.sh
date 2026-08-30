@@ -34,15 +34,28 @@
 #   check-binding.sh --verify --lock PATH --config PATH [--adapters PATH]
 #     Re-derive the named config's canonical binding and compare it to a
 #     lock's recorded hash and path, without writing anything anywhere.
+#     The lock's own embedded body is also cross-checked against its
+#     recorded hash (a `lock-structural` refusal on disagreement), so a
+#     lock whose printed rows have been hand-edited independently of the
+#     hash they sit beside is caught, not just trusted as a human display.
 #   check-binding.sh --adapters PATH   (a testing affordance; the adapter
 #     allowlist otherwise resolves next to this script's own installation)
 #   check-binding.sh --help
 #
+# Every value-taking flag (--config, --adapters, --lock) requires a
+# non-empty value: an explicit empty string ('') is refused `usage`, the
+# same as an omitted operand. That is distinct from leaving the flag off
+# entirely — with no --config at all, <base>/binding.conf is still what
+# gets validated (see above), and with no --adapters at all, the registry
+# next to this script's own installation is still what gets loaded;
+# neither of those omitted-flag paths is affected by this refusal.
+#
 # Exit codes: 0 = valid/verified. 1 = a content refusal (an unknown or
 # duplicated role, a malformed row, a value that changed since a lock was
 # taken, ...). 2 = the input could not be evaluated at all (a missing
-# file, a bad flag, a malformed registry or lock). Every refusal prints
-# exactly one token, from a closed set, to stderr.
+# file, a bad flag, an explicit empty flag value, a malformed registry or
+# lock). Every refusal prints exactly one token, from a closed set, to
+# stderr.
 
 set -euo pipefail
 
@@ -197,9 +210,15 @@ set_mode() {  # $1 = the new mode; refuses if a mode flag was already given
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h)       print_help; exit 0 ;;
-    --config)        [ "$#" -ge 2 ] || fail_usage "--config requires a value"; CONFIG_ARG="$2"; shift 2 ;;
-    --adapters)      [ "$#" -ge 2 ] || fail_usage "--adapters requires a value"; ADAPTERS_ARG="$2"; shift 2 ;;
-    --lock)          [ "$#" -ge 2 ] || fail_usage "--lock requires a value"; LOCK_ARG="$2"; shift 2 ;;
+    --config)        [ "$#" -ge 2 ] || fail_usage "--config requires a value"
+                     [ -n "$2" ] || fail_usage "--config requires a non-empty value"
+                     CONFIG_ARG="$2"; shift 2 ;;
+    --adapters)      [ "$#" -ge 2 ] || fail_usage "--adapters requires a value"
+                     [ -n "$2" ] || fail_usage "--adapters requires a non-empty value"
+                     ADAPTERS_ARG="$2"; shift 2 ;;
+    --lock)          [ "$#" -ge 2 ] || fail_usage "--lock requires a value"
+                     [ -n "$2" ] || fail_usage "--lock requires a non-empty value"
+                     LOCK_ARG="$2"; shift 2 ;;
     --print-binding) set_mode print-binding; shift ;;
     --print-lock)    set_mode print-lock; shift ;;
     --verify)        set_mode verify; shift ;;
@@ -445,24 +464,66 @@ read_lock() {  # $1 = lock path (already confirmed readable by the caller)
   [ "$last" = "binding-lock-end" ] \
     || refuse lock-structural 2 "lock file does not terminate with 'binding-lock-end': $lockpath"
 
-  local cp_count=0 bh_count=0 l
+  local cp_count=0 bh_count=0 l cp_index=-1 bh_index=-1 idx=0
   LOCK_CONFIG_PATH="" LOCK_HASH=""
   for l in "${lock_lines[@]}"; do
     case "$l" in
       config-path\ *)
         cp_count=$((cp_count + 1))
+        cp_index="$idx"
         LOCK_CONFIG_PATH="${l#config-path }"
         ;;
     esac
     if [[ "$l" =~ ^binding-hash\ ([0-9a-f]{40})$ ]]; then
       bh_count=$((bh_count + 1))
+      bh_index="$idx"
       LOCK_HASH="${BASH_REMATCH[1]}"
     fi
+    idx=$((idx + 1))
   done
   [ "$cp_count" -eq 1 ] \
     || refuse lock-structural 2 "lock file must carry exactly one config-path line (found $cp_count): $lockpath"
   [ "$bh_count" -eq 1 ] \
     || refuse lock-structural 2 "lock file must carry exactly one well-formed binding-hash line (found $bh_count): $lockpath"
+
+  # --- embedded-body cross-check (T-1106, issue #219) ------------------------
+  # The body is defined BY EXCLUSION — every lock line minus the first line,
+  # minus the located config-path line, minus the located binding-hash line
+  # and minus the terminator, order preserved — never positionally (e.g.
+  # "everything after binding-hash"), because the two header fields can
+  # appear in either order (cb-lock-fields-reordered) and a positional
+  # definition would swallow config-path into the body when it follows
+  # binding-hash. Placed here, after the cp_count/bh_count assertions above
+  # and before this function returns to the mode dispatch's own
+  # path-mismatch/binding-changed comparisons, so token precedence is
+  # untouched (Non-goals; spec AC3).
+  local -a body_lines=()
+  local i
+  for ((i = 0; i < n; i++)); do
+    if [ "$i" -eq 0 ] || [ "$i" -eq "$((n - 1))" ] || [ "$i" -eq "$cp_index" ] || [ "$i" -eq "$bh_index" ]; then
+      continue
+    fi
+    body_lines+=("${lock_lines[$i]}")
+  done
+  local body_hash
+  if [ "${#body_lines[@]}" -gt 0 ]; then
+    body_hash="$(printf '%s\n' "${body_lines[@]}" | git hash-object --stdin)" \
+      || fail_usage "git hash-object failed while hashing the lock's embedded body: $lockpath"
+  else
+    body_hash="$(git hash-object --stdin < /dev/null)" \
+      || fail_usage "git hash-object failed while hashing the lock's embedded body: $lockpath"
+  fi
+  # Gate the computed body hash to 40 lowercase hex characters BEFORE it is
+  # compared, mirroring bin/check-intent.sh:392-394's own HEX40_RE gate —
+  # defence-in-depth against a future edit to this reconstruction pipeline,
+  # never against git itself (Non-goals); this gate's own refusal path is
+  # provable only by mutation, exactly as that file's comment records for
+  # the same gate.
+  HEX40_RE='^[0-9a-f]{40}$'
+  [[ "$body_hash" =~ $HEX40_RE ]] \
+    || fail_usage "git hash-object produced a value that is not 40 lowercase hex characters while hashing the lock's embedded body, refusing before comparison: $body_hash"
+  [ "$body_hash" = "$LOCK_HASH" ] \
+    || refuse lock-structural 2 "lock file's embedded body does not match its own recorded binding-hash (the dump was edited independently of the hash beside it): $lockpath"
 }
 
 # --- mode dispatch ------------------------------------------------------------

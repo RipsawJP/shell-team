@@ -83,6 +83,41 @@
 #   cb-lock-fields-reordered  — config-path/binding-hash swapped in a
 #                                hand-built lock -> --verify still succeeds
 #   cb-lock-duplicate-hash    — a lock with two binding-hash lines -> lock-structural
+#   cb-empty-config           — --config "" -> usage (2), 'requires a
+#                                non-empty value', names --config (T-1106 #220)
+#   cb-empty-adapters         — --adapters "" beside a valid --config ->
+#                                usage (2), 'requires a non-empty value',
+#                                names --adapters
+#   cb-empty-lock-verify      — --verify --lock "" --config <valid> -> usage
+#                                (2), 'requires a non-empty value', names --lock
+#   cb-empty-lock-no-verify   — --lock "" WITHOUT --verify, beside a valid
+#                                --config -> usage (2), 'requires a
+#                                non-empty value', names --lock — the row
+#                                that is silently accepted and ignored today
+#   cb-empty-config-verify    — --verify --lock <valid-lock> --config "" ->
+#                                usage (2), 'requires a non-empty value',
+#                                names --config
+#   cb-lock-body-garbage      — a hand-built lock whose body is replaced by
+#                                a single 'GARBAGE' line -> lock-structural,
+#                                the lock's own git hash-object unchanged
+#                                across the invocation (T-1106 #219)
+#   cb-lock-body-reordered    — a hand-built lock whose body rows are
+#                                reordered (bound rows reverse-sorted, then
+#                                schema) -> lock-structural
+#   cb-lock-body-empty        — a hand-built lock whose body is emptied
+#                                entirely -> lock-structural
+#   cb-lock-body-identical    — a byte-identical copy of a real --print-lock
+#                                document still verifies (regression control
+#                                for the three mutation cases above)
+#   cb-lock-body-crlf         — a CRLF-converted copy of a real --print-lock
+#                                document still verifies (the CR-strip must
+#                                survive the new body reconstruction)
+#   cb-adapters-not-forwarded-population — the production call-site
+#                                population (every bin/*.sh and
+#                                .github/workflows/*.yml path naming
+#                                check-binding.sh, self excluded) is
+#                                enumerated LIVE and every member spells
+#                                --adapters zero times (T-1106 #221)
 
 set -euo pipefail
 
@@ -521,5 +556,137 @@ dupehash="$TMP/dupehash-lock.txt"
   printf 'binding-lock-end\n'
 } > "$dupehash"
 assert_case cb-lock-duplicate-hash 2 'lock-structural' --verify --lock "$dupehash" --config "$base"
+
+# =============================================================================
+# explicit-empty-value refusals (T-1106, issue #220): an explicit empty
+# value ('') is refused `usage` distinctly from an omitted flag, at the
+# single site where the value enters — closes all five measured rows,
+# including the row silently accepted and ignored today (--lock "" WITHOUT
+# --verify)
+# =============================================================================
+empty_value_case() {  # <id> <flag-substring-expected-in-message> -- <checker args...>
+  local id="$1" flag="$2" out rc
+  shift 2
+  [ "$1" = "--" ] || fail "$id: empty_value_case called without a -- separator"
+  shift
+  set +e
+  out="$(bash "$CHECKER" "$@" 2>&1)"
+  rc=$?
+  set -e
+  [ "$rc" -eq 2 ] || fail "$id: expected exit 2, got $rc — output: $out"
+  printf '%s\n' "$out" | grep -qF -- 'usage' \
+    || fail "$id: expected the 'usage' token, got: $out"
+  printf '%s\n' "$out" | grep -qF -- 'requires a non-empty value' \
+    || fail "$id: expected the literal 'requires a non-empty value', got: $out"
+  printf '%s\n' "$out" | grep -qF -- "$flag" \
+    || fail "$id: expected the offending flag '$flag' named in the message, got: $out"
+  pass "$id"
+}
+
+empty_value_case cb-empty-config           '--config'  -- --config ""
+empty_value_case cb-empty-adapters         '--adapters' -- --config "$base" --adapters ""
+empty_value_case cb-empty-lock-verify      '--lock'    -- --verify --lock "" --config "$base"
+empty_value_case cb-empty-config-verify    '--config'  -- --verify --lock "$lock1" --config ""
+empty_value_case cb-empty-lock-no-verify   '--lock'    -- --lock "" --config "$base"
+
+# =============================================================================
+# embedded-body cross-check (T-1106, issue #219): a lock's dump is
+# cross-checked against its own recorded binding-hash rather than merely
+# trusted as a human display — three mutation shapes refused
+# lock-structural with the lock's own git hash-object value unchanged
+# across the invocation, plus two regression controls that must still
+# verify (byte-identical copy, CRLF conversion)
+# =============================================================================
+bodyconfig="$TMP/body-base.conf"
+mk_valid "$bodyconfig"
+bodycanon="$TMP/body-canon.txt"
+bash "$CHECKER" --config "$bodyconfig" --print-binding > "$bodycanon" || fail "cb-lock-body-garbage: --print-binding failed"
+bodylock="$TMP/body-lock.txt"
+bash "$CHECKER" --config "$bodyconfig" --print-lock > "$bodylock" || fail "cb-lock-body-garbage: --print-lock failed"
+[ -s "$bodylock" ] || fail "cb-lock-body-garbage: pristine lock is empty"
+bcp="$(grep -m1 '^config-path ' "$bodylock")"
+bbh="$(grep -m1 '^binding-hash ' "$bodylock")"
+[ -n "$bcp" ] || fail "cb-lock-body-garbage: pristine lock has no config-path line"
+[ -n "$bbh" ] || fail "cb-lock-body-garbage: pristine lock has no binding-hash line"
+
+garbagelock="$TMP/garbage-lock.txt"
+{ printf '%s\n' 'binding-lock 1' "$bcp" "$bbh" 'GARBAGE' 'binding-lock-end'; } > "$garbagelock"
+cmp -s "$bodylock" "$garbagelock" && fail "cb-lock-body-garbage: mutated lock is byte-identical to the pristine lock"
+before_hash_g="$(git hash-object "$garbagelock")"
+assert_case cb-lock-body-garbage 2 'lock-structural' --verify --lock "$garbagelock" --config "$bodyconfig"
+after_hash_g="$(git hash-object "$garbagelock")"
+[ "$before_hash_g" = "$after_hash_g" ] || fail "cb-lock-body-garbage: the lock's own git hash-object value changed across --verify"
+
+reorderedbody="$TMP/reorderedbody-lock.txt"
+{
+  printf '%s\n' 'binding-lock 1' "$bcp" "$bbh"
+  grep '^bound ' "$bodycanon" | LC_ALL=C sort -r
+  grep '^schema ' "$bodycanon"
+  printf '%s\n' 'binding-lock-end'
+} > "$reorderedbody"
+cmp -s "$bodylock" "$reorderedbody" && fail "cb-lock-body-reordered: mutated lock is byte-identical to the pristine lock"
+before_hash_r="$(git hash-object "$reorderedbody")"
+assert_case cb-lock-body-reordered 2 'lock-structural' --verify --lock "$reorderedbody" --config "$bodyconfig"
+after_hash_r="$(git hash-object "$reorderedbody")"
+[ "$before_hash_r" = "$after_hash_r" ] || fail "cb-lock-body-reordered: the lock's own git hash-object value changed across --verify"
+
+emptybody="$TMP/emptybody-lock.txt"
+{ printf '%s\n' 'binding-lock 1' "$bcp" "$bbh" 'binding-lock-end'; } > "$emptybody"
+cmp -s "$bodylock" "$emptybody" && fail "cb-lock-body-empty: mutated lock is byte-identical to the pristine lock"
+before_hash_e="$(git hash-object "$emptybody")"
+assert_case cb-lock-body-empty 2 'lock-structural' --verify --lock "$emptybody" --config "$bodyconfig"
+after_hash_e="$(git hash-object "$emptybody")"
+[ "$before_hash_e" = "$after_hash_e" ] || fail "cb-lock-body-empty: the lock's own git hash-object value changed across --verify"
+
+# regression controls: byte-identical and CRLF shapes must still verify
+identicalcopy="$TMP/identical-lock.txt"
+cp "$bodylock" "$identicalcopy"
+cmp -s "$bodylock" "$identicalcopy" || fail "cb-lock-body-identical: copy is not byte-identical to the pristine lock"
+assert_case cb-lock-body-identical 0 'verified' --verify --lock "$identicalcopy" --config "$bodyconfig"
+
+crlfcopy="$TMP/crlf-lock.txt"
+awk '{printf "%s\r\n", $0}' "$bodylock" > "$crlfcopy"
+[ -s "$crlfcopy" ] || fail "cb-lock-body-crlf: CRLF copy is empty"
+cmp -s "$bodylock" "$crlfcopy" && fail "cb-lock-body-crlf: CRLF copy is byte-identical to the pristine lock"
+assert_case cb-lock-body-crlf 0 'verified' --verify --lock "$crlfcopy" --config "$bodyconfig"
+
+# =============================================================================
+# production call-site population guard (T-1106, issue #221): enumerated
+# LIVE, never transcribed — every bin/*.sh and .github/workflows/*.yml path
+# naming check-binding.sh (self excluded) must spell --adapters zero times
+# =============================================================================
+popall="$TMP/cb-pop-all.txt"
+# `git grep -l` exits 1 (no diagnostic) on a genuinely empty match set; under
+# this suite's own `set -e`, an unguarded non-zero here would abort the whole
+# script with no FAIL: line at all (T-1016 test-recipe entry). But a bare
+# `|| true` absorbs EVERY non-zero status, not only that documented "no
+# match" case — git's own convention is 0 = match, 1 = no match, >=2 =
+# fatal error, and a fatal error that emitted a partial match list before
+# dying would then be judged as a complete population (Codex round-2
+# Major). Capture the exit status explicitly and absorb ONLY exit 1; any
+# other non-zero status fails loudly instead of being silently swallowed.
+set +e
+(cd "$REPO_ROOT" && git grep -l -e 'check-binding.sh' -- 'bin/*.sh' '.github/workflows/*.yml') > "$popall"
+grc=$?
+set -e
+[ "$grc" -eq 0 ] || [ "$grc" -eq 1 ] || fail "cb-adapters-not-forwarded-population: git grep exited $grc (not a clean no-match)"
+[ -s "$popall" ] || fail "cb-adapters-not-forwarded-population: the live enumeration returned nothing"
+pop="$TMP/cb-pop.txt"
+grep -vxF -- 'bin/check-binding.sh' "$popall" > "$pop"
+[ "$(grep -c . "$pop" || true)" -ge 1 ] || fail "cb-adapters-not-forwarded-population: population is empty after excluding bin/check-binding.sh"
+grep -qxF -- 'bin/resolve-executor.sh' "$pop" \
+  || fail "cb-adapters-not-forwarded-population: expected population member bin/resolve-executor.sh absent"
+grep -qxF -- '.github/workflows/check-handoff.yml' "$pop" \
+  || fail "cb-adapters-not-forwarded-population: expected population member .github/workflows/check-handoff.yml absent"
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  [ -r "$REPO_ROOT/$p" ] || fail "cb-adapters-not-forwarded-population: population member unreadable: $p"
+  n_member="$(grep -cF -- '--adapters' "$REPO_ROOT/$p" || true)"
+  [ "$n_member" = "0" ] || fail "cb-adapters-not-forwarded-population: $p forwards --adapters"
+done < "$pop"
+n_self="$(grep -cF -- '--adapters' "$CHECKER" || true)"
+[ "$n_self" -ge 1 ] \
+  || fail "cb-adapters-not-forwarded-population: the search form finds zero occurrences of --adapters in bin/check-binding.sh itself — self-exclusion would be decorative, not load-bearing"
+pass "cb-adapters-not-forwarded-population"
 
 printf 'check-binding suite: all cases passed\n'

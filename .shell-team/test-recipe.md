@@ -2097,3 +2097,31 @@ that file's order.
   `TEAM_RUN_BASE` at an absolute scratch path fails at `validate_base`
   before the resolver's own fail-closed refusal logic is ever reached,
   which silently tests the wrong failure mode.
+- T-1106: extends `tests/check-binding/run.sh` (T-1054's suite, entry
+  above) with eleven new cases — no new prerequisite. Two authoring traps
+  worth inheriting for the next task that touches this checker's `--help`
+  header or `read_lock()`. **(1)** the merged `cb-help-sane` case asserts
+  `grep -cE 'fallback|alternate|retry|default'` is `0` over `--help`'s
+  whole output, so any new header prose describing a refusal or a
+  fallback path must be phrased without any of those four words — verify
+  with `awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}'
+  bin/check-binding.sh | grep -cE 'fallback|alternate|retry|default'`
+  (must print `0`) before committing new header text, not after. **(2)**
+  a lock's embedded body is defined BY EXCLUSION (every line minus the
+  first, minus the located `config-path` line, minus the located
+  `binding-hash` line, minus the terminator) and the located lines are
+  excluded by the ARRAY INDEX recorded during the same pass that already
+  counts `cp_count`/`bh_count`, never by re-matching the `config-path
+  `/`binding-hash ` patterns a second time against candidate body lines —
+  the latter would silently swallow a body row that happens to collide
+  with one of those patterns even though the earlier pass already fixed
+  which single line is the real header field (T-1106 provenance decision
+  1). The production call-site population guard
+  (`cb-adapters-not-forwarded-population`) enumerates
+  `git grep -l -e 'check-binding.sh' -- 'bin/*.sh'
+  '.github/workflows/*.yml'` LIVE inside a `(cd "$REPO_ROOT" && ...)`
+  subshell so its output paths are always repo-root-relative regardless of
+  the suite's own invocation cwd — do not run that `git grep` without
+  first `cd`-ing into `$REPO_ROOT` (or the equivalent `-C`), or its output
+  paths become relative to the wrong directory and every subsequent
+  `grep -qxF` membership check silently fails to match.
