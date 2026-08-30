@@ -4,6 +4,13 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.4.0**
+  - **stacked train のタスクは、直前タスクが各 dispatch 軸で何を選んだかの記録（dispatch-reflection）を board エントリに持てるようになり、凍結前に fail-closed で検証されます。** コーディネーティングセッションが、エントリ自身が記録する dispatch 軸ごとに 1 行 — 直前タスク名・判定（`repeat`/`differs`/`no-predecessor-row`）・根拠 — を dispatch 転記と同じ窓のその前に書くため、繰り返された誤選定が operator の質問を待たずループ内で表面化します。entry-mode チェッカーは記録がある場合にのみ全面検証します: 文法と軸カバレッジの双方向一致、直前エントリ自身の記録値との判定照合（直前エントリは Done セクションにあっても解決）、単一 predecessor 不変条件と自己参照ガード、どちら側の重複 dispatch 行も拒否、no-predecessor 形式の区別。記録を持たないエントリは従来どおり通過するため、既存の board や未採用リポジトリには影響しません。
+  - **review / review-response スキルが executor を同梱リゾルバとホストの `binding.conf` 経由で解決するようになり**、設定に記録した rebind がレビュー経路で実際に効くようになりました。同梱の既定バインディングは不変です。
+  - **binding 整合チェッカーが宣言本文の突合・空値の拒否・自身の母集団ガードを行うようになり**、形だけの宣言が技術的な抜け道で通過しなくなりました。
+  - **close-out スクリプトは、エントリ自身のフラグがマージ可でない board エントリの移動を拒否し、issue クローズの帰結を常に明示します** — issue 指定がない場合も、統合ブランチへのマージでは issue が自動クローズされない旨を明示的に出力します。
+  - **正規の two-arm 検証スイープが、未追跡テレメトリコーパスの凍結スナップショットを base arm に staging するようになりました。** レイアウトリゾルバ経由で解決し実ディレクトリとしてメンバー単位でコピーするため、コーパスを読む基準が base arm で偽の失敗を出し、スイープのたびに手で再分類する必要がなくなりました。
+  - **日本語ドキュメント一式に読みやすさの改稿を実施し**、機械翻訳調の文を自然な文章に書き直しました（機械検査対象のトークンは不変）。
 - **v2.3.0**
   - **リポジトリが oversight プロファイルを宣言し、宣言したループ継ぎ目で記録済みの人間承認を必須にできるようになった。** ホストは `oversight.conf` で `autonomous`（出荷既定 — どこも変えない）か `governance-controlled` を選ぶ。後者は宣言した各継ぎ目で、成果物の producer と別人の approver による board 記録済み承認（承認対象を今も指す anchor つき）を要求し、評価できないものは fail-closed で拒否する。加入済みリポジトリは宣言ファイルが消えただけでは離脱にならない: board に承認記録が 1 つでもあれば、宣言消失は silent 復帰でなく拒否になる。出荷ドキュメントは機構を誠実に命名し（認証つき職務分掌統制ではなく、content anchor つきの自己申告型 conflict check）、閉じていない残余を列挙する。
   - **レビュー記録の全 executor pass が検証可能な input-fidelity ブロックを持つようになった。** レビュアーは executor 起動コマンドの verbatim 記録（ホーム配下の絶対パスはプレースホルダに正規化）、finding 生成と confirmation を区別する閉集合の pass-role ラベル、その pass に届いた briefing-fidelity 値、ラウンド間で上書きされない per-round raw-capture stem を記録する。新しい fail-closed checker が presence と文法を検証し（プロンプトの内容は決して判定しない）、close-out ゲートは評価できない記録を拒否する。
