@@ -110,6 +110,11 @@ correspondingly declares as an explicit non-goal that it runs no
 full-population sweep, no whole CI-equivalent re-run and no behaviour
 verification of a mechanism it does not touch.
 
+A two-arm sweep additionally stages a single snapshot of the gitignored
+`.shell-team/runs` corpus into its base arm before either arm runs
+(once per sweep) — without that staging step, a criterion reading the
+corpus reports a base-arm FAIL that the diff never caused.
+
 Enforcement today is a **duty, not a checker**: the declaration is
 performed by the authoring role at spec-completion time and read by both
 review gates and by the human — **no mechanical checker ships for this**,
@@ -243,16 +248,17 @@ role's executor is resolved before any invocation, and a refusal is a
 blocker that stops the phase rather than falling back to anything: an
 ordinary edit can reach `binding-unresolved`, `capability-unsupported`
 and `executor-unavailable`, each described above. The two standalone
-review commands are not the same case, and the difference is one
-delegated step. `/shell-team:review` invokes the reviewer directly and
-**never consults the binding** — a rebind changes nothing about it, in
-either direction. `/shell-team:review-response` does not consult the
-binding **for its own review step** either, but its last step hands the
-findings you accept to `/shell-team:run`, and that pipeline consults
-resolution like any other run — so a rebind **does** reach
-`review-response`, through that step and only through it, including by
-refusing and stopping it. Issue **#245** tracks wiring resolution into
-the review steps themselves. **How a proceeding call is
+review commands consult the binding too, in their own review step.
+`/shell-team:review` resolves `codex-reviewer`'s executor immediately
+before it invokes the reviewer, and `/shell-team:review-response` does
+the same before its own cross-evaluation step; in both, a refusal is a
+blocker that stops the command rather than falling back, so a rebind
+reaches them exactly as it reaches a run. `/shell-team:review-response`
+additionally reaches resolution a second way, through the last step
+that hands the findings you accept to `/shell-team:run`. The two
+remaining commands, `/shell-team:loop-triage` and
+`/shell-team:team-init`, invoke no bound role at all, so there is
+nothing for resolution to resolve in them. **How a proceeding call is
 executed** — there the binding changes
 **only** what `resolve-executor.sh` resolves and reports and what
 **telemetry** records, provider, model, effort and adapter alike, and
@@ -585,6 +591,26 @@ checker still does not verify that the conformance read itself
 happened — only that a conformant record of it exists and agrees with
 what Plan decided.
 
+**The same checker also gates a cross-task dispatch reflection (T-1109,
+issue #365).** Before transcribing the situational dispatch record above,
+the coordinating session skims the immediately preceding task's own board
+entry and records, per axis, whether this task repeats or diverges from
+what that predecessor elected: `- dispatch-reflection: <axis> —
+<predecessor> — <repeat|differs|no-predecessor-row> — <ground>`, or the
+single `- dispatch-reflection: all — no-predecessor — no-predecessor-row
+— <ground>` line where the task has no predecessor at all.
+`bin/check-entry-mode.sh` refuses the freeze when this family is present
+but malformed, when it does not cover every axis the entry's own
+`- dispatch:` rows record, when it mixes the no-predecessor form with a
+per-axis row, when a named predecessor id does not resolve to exactly one
+top-level board entry in either the active or the done section of the
+board, or when a stated verdict disagrees with the predecessor entry's
+own recorded value for that axis — the same validate-if-present shape as
+the dispatch record itself: an entry carrying no reflection line at all
+still passes. The substantive judgment the record exists to provoke —
+whether a repeated election is actually sound — stays a reading a human
+or an agent performs; the checker never claims to close it.
+
 ## Electing a spec review at the Specify seam (T-1092)
 
 Alongside `specify`, a fourth dispatch axis elects whether an extra
@@ -703,6 +729,28 @@ never as a precondition for the profile working. This checker's
 not exercised by a live run in this repository — enrolling this repository
 would make the coordinating session both the producer and the approver of
 the very mechanism auditing that separation.
+
+## The close-out pre-flip gate
+
+`bin/close-out.sh` reads the task's Active flag before it ever writes to the
+board (T-1107, issue #53). Unless that flag already reads `READY_FOR_MERGE`
+— the one state `codex-reviewer` writes on APPROVE — the close-out refuses
+at exit 1, naming the board path, the source line and the flag it found,
+and the board file is left byte-untouched. A task still at
+`READY_FOR_ARCH`, `READY_FOR_ENG`, `READY_FOR_QA`, `READY_FOR_REVIEW`,
+`BLOCKED` or `REWORK` is refused rather than silently promoted; the fix is
+a single flag edit on the board once the review that should have set
+`READY_FOR_MERGE` has actually run.
+
+Separately, `close-out.sh --issue N` prints the manual GitHub issue-close
+procedure (`develop` merges do **not** auto-close an issue). When `--issue`
+is omitted — or passed as an empty string — the script instead prints a
+one-line note (`close-out: note: no --issue given`) so the operator learns
+the procedure exists rather than seeing nothing; the note and the procedure
+are exact complements of one condition, so they can never both fire or both
+stay silent on the same run. A printed note is disclosure, not a gate: it
+does not refuse the close-out, and an operator who does not read stdout
+learns nothing from it either way.
 
 ## Recording review-input fidelity
 

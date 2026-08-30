@@ -9,7 +9,7 @@ This is the team's shared task board. The PM creates entries, every agent update
 
 ## Active
 
-- [ ] **T-100** クローズ対象のサンプルタスク（fixture） — `READY_FOR_REVIEW` — spec: docs/specs/t-100.md
+- [ ] **T-100** クローズ対象のサンプルタスク（fixture） — `READY_FOR_MERGE` — spec: docs/specs/t-100.md
   - existing engineering note
 - [ ] **T-101** 残留するサンプルタスク（fixture） — `READY_FOR_ARCH` — spec: docs/specs/t-101.md
 

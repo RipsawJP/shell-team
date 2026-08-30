@@ -2070,3 +2070,292 @@ that file's order.
   scratch `git worktree add --detach` at the round's own commit, never in
   the working tree — each observed red on the reintroduced defect,
   restored via `git checkout --`, observed green again.
+- T-1105: two techniques worth writing down once, both reused from
+  `tests/check-prompt-sync/run.sh`'s own `T-040 AC5` section and from
+  `bin/team-paths.sh`'s `validate_base` header. (1) **Scratch-root,
+  single-row `contain` mutation probe** — to prove a new registry
+  `contain` consumer is non-vacuous without touching the working tree:
+  build a scratch dir under `$TMPDIR`; `grep` exactly one registry row
+  out of the real `templates/prompt-blocks/registry.txt` into a
+  from-scratch `registry.txt`; copy only that row's block file and its
+  consumer files into matching paths under the scratch root; run
+  `bin/check-prompt-sync.sh --root <scratch>` and confirm exit `0` on the
+  pristine copy (a positive control that proves the scratch tree runs at
+  all, not just that a mutation makes it fail); then, in a **separate**
+  copy per consumer, delete the canonical anchor line from exactly one
+  consumer and re-run — it must exit `1` and name that consumer's path on
+  stderr. Never reuse one scratch copy across the pristine run and a
+  mutation; each mutation gets its own copy so the mutated one differs
+  from the pristine one by construction (`cmp` the two apart before
+  trusting the "detected" verdict). (2) **`bin/resolve-executor.sh`
+  refusal fixture needs a repo-relative `TEAM_RUN_BASE`, never an
+  absolute one** — `bin/team-paths.sh`'s `validate_base` rejects an
+  absolute path outright, so a scratch-base fixture for this script must
+  `cd` into the scratch directory first and set `TEAM_RUN_BASE` to a
+  path relative to that directory (e.g. `TEAM_RUN_BASE=base`), never to
+  the scratch directory's own absolute `mktemp -d` path. Pointing
+  `TEAM_RUN_BASE` at an absolute scratch path fails at `validate_base`
+  before the resolver's own fail-closed refusal logic is ever reached,
+  which silently tests the wrong failure mode.
+- T-1106: extends `tests/check-binding/run.sh` (T-1054's suite, entry
+  above) with eleven new cases — no new prerequisite. Two authoring traps
+  worth inheriting for the next task that touches this checker's `--help`
+  header or `read_lock()`. **(1)** the merged `cb-help-sane` case asserts
+  `grep -cE 'fallback|alternate|retry|default'` is `0` over `--help`'s
+  whole output, so any new header prose describing a refusal or a
+  fallback path must be phrased without any of those four words — verify
+  with `awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next}{exit}'
+  bin/check-binding.sh | grep -cE 'fallback|alternate|retry|default'`
+  (must print `0`) before committing new header text, not after. **(2)**
+  a lock's embedded body is defined BY EXCLUSION (every line minus the
+  first, minus the located `config-path` line, minus the located
+  `binding-hash` line, minus the terminator) and the located lines are
+  excluded by the ARRAY INDEX recorded during the same pass that already
+  counts `cp_count`/`bh_count`, never by re-matching the `config-path
+  `/`binding-hash ` patterns a second time against candidate body lines —
+  the latter would silently swallow a body row that happens to collide
+  with one of those patterns even though the earlier pass already fixed
+  which single line is the real header field (T-1106 provenance decision
+  1). The production call-site population guard
+  (`cb-adapters-not-forwarded-population`) enumerates
+  `git grep -l -e 'check-binding.sh' -- 'bin/*.sh'
+  '.github/workflows/*.yml'` LIVE inside a `(cd "$REPO_ROOT" && ...)`
+  subshell so its output paths are always repo-root-relative regardless of
+  the suite's own invocation cwd — do not run that `git grep` without
+  first `cd`-ing into `$REPO_ROOT` (or the equivalent `-C`), or its output
+  paths become relative to the wrong directory and every subsequent
+  `grep -qxF` membership check silently fails to match.
+- T-1107: when a new fail-closed gate is added to `bin/close-out.sh` and its
+  own fixture suite (`tests/close-out/run.sh`) has dozens of inline boards
+  that hardcode a valid-but-arbitrary flag token as an incidental "some
+  valid flag" choice while testing an unrelated property, do not try to
+  enumerate the affected sites by hand — two prior spec-review rounds each
+  found sites a careful, purpose-read table had missed. Convert the
+  guidance into a RULE with a small EXCEPTION ROSTER instead: every
+  incidental flag token defaults to the new gate's own accepted value, and
+  only the roster (the differential corpus's own flag-axis rows, the
+  out-of-vocabulary negatives, and any loop whose own job is to enumerate
+  the flag vocabulary) keeps a different value. After converting, run
+  `grep -nE 'READY_FOR_[A-Z]+|BLOCKED|REWORK' tests/close-out/run.sh` and
+  confirm every hit outside the roster reads the new gate's accepted
+  value — this re-derives the population from the file itself instead of
+  trusting any list, and is cheap enough to re-run after every edit.
+  Composing a differential harness's oracle with a second conjunct (here,
+  `bin/check-handoff.sh`'s exit code AND a live-extracted flag equal to
+  the accepted value) needs a corpus that can actually falsify the wrong
+  extraction rule: a single title-embedded decoy backtick pair is not
+  enough if both a correct and a buggy extraction reach the same
+  accept/refuse verdict on it (traced live: the pre-existing
+  `tests/close-out/run.sh:997`-shaped decoy does not, because both
+  readings refuse there) — add two rows that swap which side (first vs.
+  rightmost) carries the accepted value, so a first-match bug diverges
+  from a rightmost-slot implementation on the accept/refuse decision
+  itself, in both directions. When raising a differential harness's own
+  floor assertions after such a change, do not hand-derive the new
+  post-conversion bucket sizes: run the suite once, read its own printed
+  `corpus=/refused=/accepted=/notlocated=` line, and set each new floor
+  below that measured value with a safety margin (verified live this
+  round: measured `corpus=34 refused=20 accepted=10 notlocated=4
+  mismatches=0`, floors raised to `30/16/9/3`, base-ref values were
+  `24/6/8/3`). Separately: this task's own AC10 (re-run every merged
+  spec's `- check:` line that drives `close-out.sh` against a
+  `READY_FOR_MERGE` fixture) surfaced two FAILs that are demonstrably
+  **pre-existing and unrelated to this task's diff**, confirmed by
+  reproducing each one against the base-ref-committed `bin/close-out.sh`
+  with no T-1107 changes applied at all: (1) `T-1092-specify-seam-review.md`
+  AC5/AC6 assert the spec-review-election backstop and its refusal
+  sentinel are absent from `bin/close-out.sh` (a 2026-08-23 carve-out,
+  issue #344), but `T-1096`'s later spec re-added that exact backstop
+  under a redesigned reader — the sentinel is present in `bin/close-out.sh`
+  at the true base ref already, so T-1092's own check line already fails
+  there, independent of anything T-1107 touches. (2)
+  `T-1100-verify-axis-split.md`'s AC at line 69 builds a scratch `bin/`
+  copy (`cp -R bin/. "$T/binbase/"`) to run the base-ref close-out.sh
+  against every board dispatch row, but never copies a sibling
+  `templates/` next to that scratch copy — so once `check-oversight.sh`'s
+  unconditional gate (T-1103) reaches far enough to resolve the shipped
+  `oversight-default.conf`, the scratch-copy arm dies `exit 2` with
+  `declaration-unreadable` while the check line's own "head" arm (which
+  calls the REAL `bin/close-out.sh`, whose real `templates/` sibling
+  resolves fine) does not — a staleness bug in T-1100's own check line
+  exposed by T-1103 landing after T-1100 was frozen, reproducible against
+  the base-ref script with zero T-1107 changes present. Both are disclosed
+  in the hand-off rather than repaired (repairing another task's frozen
+  criterion is out of this task's scope); the two isolating repro scripts
+  used to confirm this are not part of the shipped diff. A THIRD, separate
+  finding from this task's own AC15(a) mutation self-check: mutation 8
+  ("re-flag the fixture file's residency line to the new gate's accepted
+  value should redden the fixture suite's own residency assertion") does
+  NOT reproduce — traced live, no assertion in `tests/close-out/run.sh`
+  reads that specific fixture line's flag value at all (it is used only as
+  a textual `awk` anchor for injecting two unrelated fixtures later in the
+  file), so the mutation is silently invisible to the whole suite (125
+  PASS, 0 FAIL, exit 0 on the mutated fixture). Disclosed rather than
+  quietly "fixed" by inventing a new assertion this task was never asked
+  to add. Also measured this round: a differential harness's own
+  base-relative floor check (`AC3(i)`-shaped: "every floor >= its
+  branch-point value, at least one strictly greater") is relative to the
+  BASE REF's declared value, not to whatever value the current commit
+  happens to carry — lowering a floor back down to a value still >= the
+  base-ref's own declared floor does NOT redden that check, even though it
+  is a real regression from the current commit's own prior state; only
+  dropping below the base-ref's declared value reddens it. Worth knowing
+  before assuming "I lowered a floor, the check will catch it."
+
+- T-1108: staging the untracked `runs corpus` into a two-arm sweep's base
+  worktree, so a criterion resolving it through `bin/team-paths.sh --get
+  runs` at run time stops reading a base-arm false FAIL. **The symlink
+  measurement, actually run rather than predicted**: in a scratch repo with
+  only `.shell-team/.gitignore` containing `runs/` (trailing slash) and
+  `core.excludesfile=/dev/null` (a contributor's own global excludes must
+  not leak into this measurement — see the excludes-file quirk above), a
+  symlink named `.shell-team/runs` pointing at a populated directory is
+  reported by `git status --porcelain` as `?? .shell-team/runs` — an
+  **untracked** stray — and `git check-ignore -v .shell-team/runs` exits
+  `1` with no match, i.e. **not ignored**. The `runs/` rule's trailing
+  slash matches directories only; a symlink is a file to git, so it falls
+  straight through the rule. This is the measured ground for staging as a
+  **real directory, copied, never a symlink**: a symlinked snapshot is
+  invisible to the fix and visible to every scope-lock criterion as a new
+  untracked path.
+  - Staging command shape settled on (repaired from an earlier hardcoded
+    draft during a rework round — see below): snapshot the corpus
+    **once**, before either arm runs, `cp -R "$(bash bin/team-paths.sh
+    --get runs)" "$snap"`; then, inside the base worktree, resolve the
+    destination through the **same resolver rather than a hardcoded
+    path** — `D=$( cd "$W" && bash bin/team-paths.sh --get runs )`,
+    failing closed (tear down the worktree, exit non-zero) on an empty
+    or absolute `$D`, since `--get runs` returns a ROOT-relative path
+    and this is what makes the destination correct on the legacy layout
+    and a custom `TEAM_RUN_BASE`, and not only on this repository's own
+    `.shell-team/runs`. `mkdir -p "$W/$D"` and copy the snapshot in
+    **member by member**, reading the file list from a NUL-delimited
+    temp file (`find "$snap" -type f -print0 > "$list"`, then `while …
+    read -r -d '' … done < "$list"`) rather than piping `find` straight
+    into the `while` — the redirected form runs the loop body in the
+    **current** shell, so a per-member `mkdir`/`cp` failure sets the
+    outer `rc` instead of dying inside a pipe subshell that discards it
+    silently. `mkdir -p` each member's parent directory first, and —
+    the already-exists trap — skip any member git tracks at **either**
+    ref: the base worktree's index (`git -C "$W" ls-files
+    --error-unmatch`) **or** the live/`HEAD` side (`git ls-files
+    --error-unmatch` against the live index, or `git cat-file -e
+    "HEAD:…"` against `HEAD`'s tree) — a member force-added as tracked
+    only at `HEAD` has no base-ref bytes at all, so copying it in would
+    inject a file the base arm must not see. Never delete anything
+    already in the worktree. This handles both states of the resolved
+    corpus path in a fresh base worktree (absent/empty at this freeze —
+    measured **0** members tracked at either ref via `git ls-files --
+    '.shell-team/runs/*'` in this checkout and in the live index — or
+    containing a member tracked at either ref, reachable at any later
+    date) without a special case for either.
+  - **Rework note**: the first draft of this entry hardcoded the
+    destination as `$W/.shell-team/runs` and skipped only members the
+    base worktree itself tracked — both measured wrong for an adopter on
+    the legacy layout or a custom `TEAM_RUN_BASE`, and for a corpus
+    member force-added as tracked only at `HEAD`, by a cross-provider
+    review round (`.shell-team/reviews/T-1108.md`, `#### Major` rows 1-2).
+    The shape above is the repaired one; do not reintroduce the literal
+    path or the base-worktree-only skip filter.
+  - Timeout needed: `CHECK_ACS_TIMEOUT=900` for a full-spec run of
+    `T-1108-sweep-corpus-isolation.md` — **AC4** runs ten criterion bodies
+    (five, twice) plus five live-arm runs and **AC13** runs a live-derived
+    read set at two arms, each creating a `git worktree add --detach`; the
+    300 s floor this recipe records elsewhere for base-versus-head re-runs
+    of heavy merged specs is not enough here.
+  - `bin/team-paths.sh --get runs` ignores an incoming `TEAM_RUNS_DIR`
+    (`RUNS="$BASE/runs"` is computed from `TEAM_RUN_BASE` alone; the
+    variable is only emitted, at `bin/team-paths.sh:174`, never read) while
+    `bin/log-run.sh:490-491` honours it for writes — the read side and the
+    write side disagree on purpose, and a future author reaching for
+    `TEAM_RUNS_DIR` to relocate what a sweep *reads* will find it inert.
+
+- T-1109: extends `bin/check-entry-mode.sh` with a THIRD, independent
+  duty at the same pre-freeze seam — `- dispatch-reflection:` grammar
+  (duty A) plus cross-entry verdict agreement against the predecessor's
+  own recorded `- dispatch:` value (duty B). **Predecessor-lookup shape
+  settled on**: a SECOND `awk` scan, structurally identical to the
+  existing `--task` entry-extent scan but with two differences — it is
+  never restricted to `sec ~ /^## Active/` (it matches `- \[ \] \*\*<id>\*\*
+  ` inside `## Active` OR `- \[x\] \*\*<id>\*\* ` inside `## Done`), and an
+  unresolvable or ambiguous match returns from a bash function (`return 1`)
+  rather than calling `die` — the caller turns that into `fail` (exit 1,
+  a content refusal), never `die` (exit 2), because a predecessor
+  reference is part of the board's own record, not part of the
+  invocation's environment (## Assumptions row A-8; the `--task` entry's
+  own resolution keeps its original exit-2 contract, untouched). **Axis
+  extraction, longer-stem-first is automatic, not manual**: every general
+  `- dispatch: <axis> — ` scan requires the literal colon immediately
+  after the bare word `dispatch`, so a `- dispatch-reflection: ` line
+  (colon after `-reflection`, never after `dispatch`) fails to match by
+  construction — no explicit "test the longer stem first" ordering trick
+  was needed here, unlike the flagged-gap/flagged-gap-resolution pair
+  this same file already handles with an explicit stem-priority `if`/
+  `elif`, because gap/gap-resolution's ambiguity is genuinely a shared
+  prefix with no disambiguating character while dispatch/dispatch-
+  reflection's is not (measured directly: `printf '%s\n' '  - dispatch-
+  reflection: specify — T-900 — repeat — g' | grep -cE '^[[:space:]]*-
+  dispatch: '` → `0`). **CRLF and doubled-space fixtures**: built the same
+  way the pre-existing gap/resolution fixtures already are — a doubled-
+  space fixture is one literal board line with two spaces after the
+  bullet dash (`'-  dispatch-reflection: …'`), and a CRLF fixture is a
+  conformant LF board piped through `awk '{printf "%s\r\n", $0}'` — no new
+  fixture-construction technique was needed. **Timeout**:
+  `CHECK_ACS_TIMEOUT=900` (## Assumptions row A-9), inherited from
+  T-1108's own recorded value for the same class of sweep (**AC14**'s
+  full-population two-arm diff and `tests/close-out/run.sh` re-run inside
+  **AC7**). **Measured anchor behaviour**: all three shipped `- dispatch:`
+  anchors (`bin/close-out.sh`'s `'^[[:space:]]*- dispatch:'`, and
+  `bin/check-entry-mode.sh`'s `'^[[:space:]]*- dispatch: specify — '` and
+  `'^[[:space:]]*-[[:space:]]+dispatch:[[:space:]]+specify[[:space:]]+—'`)
+  match **zero** times against a `- dispatch-reflection:` line and at
+  least once against a genuine `- dispatch:` line, confirmed live (**AC7**'s
+  own check line, which builds exactly this pair of fixture files and
+  asserts both counts).
+  - **New environment quirk this task discovered while attempting AC14's
+    full-population sweep: `bin/log-run.sh`'s directory lock contends
+    severely across CONCURRENT `bin/check-acs.sh` invocations of
+    DIFFERENT specs, not only within one spec's own run.** The T-1084/
+    T-1083 recipe entries above document an `xargs -P <cores>` fan-out for
+    a full-population Blast-radius sweep; applying that same pattern to a
+    fan-out of *whole-spec* `check-acs.sh` runs (one process per spec,
+    several specs in flight at once) stalled an 8-way batch for several
+    minutes on this machine when the batch happened to contain a spec
+    whose own criteria call `bin/log-run.sh` more than once (measured:
+    `T-1058-telemetry-binding.md`'s **AC1** alone calls it three times) —
+    each concurrent invocation waits out the lock's own bounded retry
+    window, and with several contenders the waits compound. A **serial**,
+    one-spec-at-a-time driver avoids this entirely (only one process ever
+    holds or waits on the lock at a time), at the cost of session
+    wall-clock time (roughly 40-50s per spec observed once contention was
+    removed, versus multi-minute stalls under contention). Separately:
+    this machine carries **no `timeout`/`gtimeout` binary on `PATH`**, so
+    `bin/check-acs.sh`'s own `CHECK_ACS_TIMEOUT` wrapping is inert here
+    (its own documented fallback — "back to a plain run" — silently takes
+    over) and cannot bound a spec whose check genuinely never returns; a
+    driver attempting a bounded sweep on such a machine needs its own
+    external wall-clock bound (a hand-rolled `sleep N && kill` watcher
+    around each spec's process, since the `timeout` command cannot be
+    assumed present) rather than trusting the script's own internal
+    timeout to fire.
+  - **Mutation self-check technique for the predecessor-lookup/duty-B
+    logic**: line-number-targeted `awk 'NR==n{print r; next}{print}'`
+    substitutions against a scratch copy (never `sed` pattern-matching the
+    live source text, which is fragile against em-dashes and nested
+    quoting in this file) — locate the target line once with `grep -n`,
+    then mutate by line number. Two authoring traps worth inheriting:
+    (1) a fixture built to isolate ONE duty (e.g. the axis-vocabulary
+    check) from a SIBLING duty that shares the same board shape (e.g. the
+    coverage check) must give the sibling duty nothing to catch on its
+    own — a "bogus axis" fixture that also leaves an entry's own dispatch
+    axis uncovered gets caught by the coverage check even after the
+    axis-vocabulary check is neutered, silently defeating the probe's own
+    purpose (confirmed by constructing a probe, seeing it fail to
+    reproduce the defect, and re-deriving a fixture with a superfluous,
+    coverage-neutral extra row instead); (2) a fixture exercising ONLY the
+    predecessor-resolution duty must still carry every OTHER
+    unconditionally-required source this script's own pre-existing duties
+    demand (`- entry-mode:` and `- dispatch: specify — …`, T-1096) — a
+    fixture missing one of those refuses for the wrong reason before the
+    predecessor logic is ever reached, again defeating the probe silently
+    rather than loudly.

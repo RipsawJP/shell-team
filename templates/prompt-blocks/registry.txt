@@ -40,8 +40,8 @@ contain retro-inputs.md                   bin/retro-inputs.sh bin/check-retro.sh
 contain retro-sections.md                 bin/check-retro.sh agents/scrum-master.md docs/templates/retro-template.md
 contain interventions-classes.md          bin/check-interventions.sh skills/run/SKILL.md
 contain liveness-declaration.md           skills/run/SKILL.md skills/goal/SKILL.md
-contain executor-resolution.md            skills/run/SKILL.md skills/goal/SKILL.md
-contain telemetry-binding.md              skills/run/SKILL.md skills/goal/SKILL.md
+contain executor-resolution.md            skills/run/SKILL.md skills/goal/SKILL.md skills/review/SKILL.md skills/review-response/SKILL.md
+contain telemetry-binding.md              skills/run/SKILL.md skills/goal/SKILL.md skills/review-response/SKILL.md
 contain adopter-docs-declaration.md       agents/pm-spec.md skills/run/SKILL.md
 contain derived-populations.md            agents/pm-spec.md agents/tech-lead.md agents/engineer.md agents/qa-verifier.md agents/codex-reviewer.md
 marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
