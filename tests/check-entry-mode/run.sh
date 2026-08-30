@@ -533,6 +533,16 @@ refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
   -- "$D_SPECIFY"
 chk901 "a malformed (doubled-space) current-entry dispatch row refuses rather than silently escaping coverage (Minor)" 1
 
+# Codex review round 2 regression: the Minor fix above must stay scoped to
+# when a reflection family actually exists — an entry with ZERO
+# `- dispatch-reflection:` rows AND a malformed `- dispatch:` line has no
+# coverage judgment to make at all, so it must still pass (AC6's
+# validate-if-present guarantee, unconditionally, not only for
+# well-formed dispatch lines).
+refl_board none "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "-  dispatch: verify — serial — unconditional — recommendation: r"
+chk901 "zero dispatch-reflection rows with a malformed dispatch line still passes (round-2 regression fix, AC6 validate-if-present)" 0
+
 # --- comment-stripped flattened form carries the two shipped limits --------
 fc() { sed 's/^[[:space:]]*#[[:space:]]*//' "$1" | tr '\n' ' ' | tr -s ' '; }
 fc "$SCRIPT" > "$T/flat"

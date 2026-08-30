@@ -309,27 +309,10 @@ fi
 refl_stem_re='^[[:space:]]*-[[:space:]]+dispatch-reflection[[:space:]]*:[[:space:]]*'
 refl_full_re='^[[:space:]]*- dispatch-reflection: ([a-z-]+) — ([A-Za-z0-9-]+) — ([a-z-]+) — (.*)$'
 
-# This entry's own `- dispatch:` axis -> value map, read the same anchored
-# way `bin/close-out.sh`'s `DISPATCH_LINES` loop already does (T-1084/
-# T-1100's grammar), used for two purposes below: coverage (every axis this
-# entry itself records must carry a reflection row, ## Assumptions A-8's
-# subject) and duty B (this entry's own recorded value for an axis,
-# compared against the predecessor's).
-#
-# Codex review round 1, Minor: a malformed (e.g. doubled-space-after-dash)
-# `- dispatch:` row on the CURRENT entry was silently invisible to this
-# axis set, letting that axis escape the "no cherry-picking" coverage
-# requirement entirely. Collect wide (tolerating extra space after the
-# bullet dash) and refuse if that widens the count beyond the strict
-# single-space read below — the same collect-wide/parse-strict discipline
-# already applied to the reflection stem, now applied here too, since a
-# fail-closed coverage judgment depends on reading this line correctly.
-ENTRY_DISPATCH_WIDE="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*-[[:space:]]+dispatch: ' || true)"
-ENTRY_DISPATCH_LINES="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*- dispatch: ' || true)"
-if [ "$(printf '%s\n' "$ENTRY_DISPATCH_WIDE" | grep -c . || true)" != "$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | grep -c . || true)" ]; then
-  fail "$TASK has a malformed \`- dispatch:\` sub-bullet — its spacing does not match the canonical single-space grammar, so this entry's dispatch-reflection coverage cannot be judged against it cleanly"
-fi
-ENTRY_DISPATCH_AXES="$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | sed -nE 's/^[[:space:]]*- dispatch: ([a-z0-9-]+) — .*$/\1/p')"
+# This entry's own `- dispatch:` axis -> value map is computed further
+# below, scoped inside the reflection-family-present gate — see the
+# "Codex review round 2, Major (regression)" comment there for why it is
+# NOT computed here unconditionally.
 
 dispatch_value_for_axis() {  # $1 = a `- dispatch:`-line block, $2 = axis key, $3 = who this block belongs to (for the refusal message)
   local block="$1" axis="$2" who="$3" matches n
@@ -430,6 +413,40 @@ if [ "$REFL_ROW_COUNT" -gt 0 ]; then
   fi
 
   if [ "$REFL_HAS_ALL" -eq 0 ]; then
+    # This entry's own `- dispatch:` axis -> value map, read the same
+    # anchored way `bin/close-out.sh`'s `DISPATCH_LINES` loop already does
+    # (T-1084/T-1100's grammar), used for two purposes below: coverage
+    # (every axis this entry itself records must carry a reflection row,
+    # ## Assumptions A-8's subject) and duty B (this entry's own recorded
+    # value for an axis, compared against the predecessor's).
+    #
+    # Codex review round 1, Minor: a malformed (e.g. doubled-space-after-
+    # dash) `- dispatch:` row on the CURRENT entry was silently invisible
+    # to this axis set, letting that axis escape the "no cherry-picking"
+    # coverage requirement entirely. Collect wide (tolerating extra space
+    # after the bullet dash) and refuse if that widens the count beyond
+    # the strict single-space read below — the same collect-wide/parse-
+    # strict discipline already applied to the reflection stem, now
+    # applied here too, since a fail-closed coverage judgment depends on
+    # reading this line correctly.
+    #
+    # Codex review round 2, Major (regression): this whole block used to
+    # sit ABOVE the `$REFL_ROW_COUNT` gate and ran unconditionally, so an
+    # entry with ZERO `- dispatch-reflection:` rows whose pre-existing
+    # `- dispatch:` lines merely carried a spacing quirk was refused with
+    # no reflection family to judge at all — breaking AC6's validate-if-
+    # present guarantee for every non-adopting task. There is no coverage
+    # or duty-B judgment to protect unless a reflection family actually
+    # exists, so this whole read now lives inside the same
+    # `$REFL_HAS_ALL -eq 0` gate the coverage/duty-B logic below already
+    # runs under, never above it.
+    ENTRY_DISPATCH_WIDE="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*-[[:space:]]+dispatch: ' || true)"
+    ENTRY_DISPATCH_LINES="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*- dispatch: ' || true)"
+    if [ "$(printf '%s\n' "$ENTRY_DISPATCH_WIDE" | grep -c . || true)" != "$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | grep -c . || true)" ]; then
+      fail "$TASK has a malformed \`- dispatch:\` sub-bullet — its spacing does not match the canonical single-space grammar, so this entry's dispatch-reflection coverage cannot be judged against it cleanly"
+    fi
+    ENTRY_DISPATCH_AXES="$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | sed -nE 's/^[[:space:]]*- dispatch: ([a-z0-9-]+) — .*$/\1/p')"
+
     # Coverage, BOTH directions (Codex review round 1, Major 1: the check
     # was one-directional — dispatch-axes subset-of reflection-axes was
     # enforced, but reflection-axes subset-of dispatch-axes never was, so
