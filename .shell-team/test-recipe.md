@@ -2182,4 +2182,22 @@ that file's order.
   the base-ref script with zero T-1107 changes present. Both are disclosed
   in the hand-off rather than repaired (repairing another task's frozen
   criterion is out of this task's scope); the two isolating repro scripts
-  used to confirm this are not part of the shipped diff.
+  used to confirm this are not part of the shipped diff. A THIRD, separate
+  finding from this task's own AC15(a) mutation self-check: mutation 8
+  ("re-flag the fixture file's residency line to the new gate's accepted
+  value should redden the fixture suite's own residency assertion") does
+  NOT reproduce — traced live, no assertion in `tests/close-out/run.sh`
+  reads that specific fixture line's flag value at all (it is used only as
+  a textual `awk` anchor for injecting two unrelated fixtures later in the
+  file), so the mutation is silently invisible to the whole suite (125
+  PASS, 0 FAIL, exit 0 on the mutated fixture). Disclosed rather than
+  quietly "fixed" by inventing a new assertion this task was never asked
+  to add. Also measured this round: a differential harness's own
+  base-relative floor check (`AC3(i)`-shaped: "every floor >= its
+  branch-point value, at least one strictly greater") is relative to the
+  BASE REF's declared value, not to whatever value the current commit
+  happens to carry — lowering a floor back down to a value still >= the
+  base-ref's own declared floor does NOT redden that check, even though it
+  is a real regression from the current commit's own prior state; only
+  dropping below the base-ref's declared value reddens it. Worth knowing
+  before assuming "I lowered a floor, the check will catch it."
