@@ -16,6 +16,22 @@
 #             coordinating session, from the decision `tech-lead` printed
 #             at Plan.
 #
+# T-1109 (issue #365, Proposal 3) adds a THIRD, independent duty at this
+# same seam: `- dispatch-reflection: <axis> — <predecessor> — <verdict> —
+# <ground>`, one sub-bullet per dispatch axis the entry itself records
+# (or the single `all — no-predecessor — no-predecessor-row — <ground>`
+# line where the task has no predecessor at all), transcribed by the
+# coordinating session BEFORE the `- dispatch:` rows in the same window.
+# Duty A validates the record's own grammar and per-axis coverage; duty B
+# validates that a stated verdict agrees with the predecessor entry's own
+# recorded `- dispatch:` value for that axis, the predecessor resolved by
+# a SECOND scan spanning BOTH `## Active` and `## Done` (never a widening
+# of this entry's own `## Active`-only resolution above). Like the
+# `- dispatch:` family itself, this is validate-if-present at the family
+# level: an entry carrying no `- dispatch-reflection:` line at all still
+# passes — presence is `templates/prompt-blocks/dispatch-record.md`'s own
+# requirement, never this script's.
+#
 # The verdict is "both present, and agreeing" — a MISSING source is a
 # refusal, never a silently-false condition, which is what makes the
 # verdict order-independent (the shipped condition does not read as false
@@ -55,13 +71,16 @@
 # Usage:
 #   check-entry-mode.sh --board PATH --task T-NNN
 #
-# Exit codes: 0 = both sources present and agreeing, and every flagged gap
-# is resolved (or none were flagged); 1 = a refusal about the board entry's
+# Exit codes: 0 = both sources present and agreeing, every flagged gap is
+# resolved (or none were flagged), and the dispatch-reflection family (if
+# present) is well-formed, covers every axis and agrees with the
+# predecessor's own recorded values; 1 = a refusal about the board entry's
 # content (a source missing, duplicated, or outside its closed vocabulary;
-# the two sources disagree; a malformed or unresolved flagged-gap marker);
-# 2 = a usage error or an unresolvable environment (bad invocation, an
-# unreadable board, or the task not found as exactly one top-level
-# ## Active entry).
+# the two sources disagree; a malformed or unresolved flagged-gap marker;
+# a malformed, incomplete, mixed, mismatched or unresolved
+# `- dispatch-reflection:` row — T-1109); 2 = a usage error or an
+# unresolvable environment (bad invocation, an unreadable board, or the
+# task not found as exactly one top-level ## Active entry).
 
 set -euo pipefail
 
@@ -258,6 +277,157 @@ R_SORTED="$(printf '%s' "$RES_IDS" | tr ' ' '\n' | sed '/^$/d' | sort)"
 
 if [ "$G_SORTED" != "$R_SORTED" ]; then
   fail "$TASK's \`- flagged-gap\` and \`- flagged-gap-resolution\` id sets disagree (gaps: [$(printf '%s' "$G_SORTED" | tr '\n' ' ')] resolutions: [$(printf '%s' "$R_SORTED" | tr '\n' ' ')]) — never that the resolution is adequate, only that every flagged id was answered; the never-flagged case is undetectable and is the conformant nothing-to-answer shape"
+fi
+
+# --- source 3: `- dispatch-reflection:` (T-1109, issue #365) -------------
+# Validate-if-present at the family level, the same shape and the same
+# reason `bin/close-out.sh`'s own `- dispatch:` gate already uses: an
+# entry carrying none of these sub-bullets still passes — presence is
+# `templates/prompt-blocks/dispatch-record.md`'s own requirement, not this
+# script's. The stem net below widens only the whitespace between the
+# bullet dash and the field name, never the colon, so a genuinely
+# malformed spacing variant is COLLECTED (never rendered invisible, the
+# T-1096 Blocker-2 class reopened at a third marker family — ## Notes for
+# engineer trap 3) and then REFUSED against the strict full grammar below,
+# rather than silently read as the conformant zero-rows case. `- dispatch-
+# reflection:` matches none of the `- dispatch:`-anchored scans above (every
+# one of them requires the literal colon immediately after the bare word
+# `dispatch`, never after `-reflection` — AC7 byte-pins this), so this scan
+# is additive and cannot collide with source 2's own reading.
+refl_stem_re='^[[:space:]]*-[[:space:]]+dispatch-reflection:'
+refl_full_re='^[[:space:]]*- dispatch-reflection: ([a-z-]+) — ([A-Za-z0-9-]+) — ([a-z-]+) — (.*)$'
+
+# This entry's own `- dispatch:` axis -> value map, read the same anchored
+# way `bin/close-out.sh`'s `DISPATCH_LINES` loop already does (T-1084/
+# T-1100's grammar), used for two purposes below: coverage (every axis this
+# entry itself records must carry a reflection row, ## Assumptions A-8's
+# subject) and duty B (this entry's own recorded value for an axis,
+# compared against the predecessor's).
+ENTRY_DISPATCH_LINES="$(printf '%s\n' "$ENTRY" | grep -E -- '^[[:space:]]*- dispatch: ' || true)"
+ENTRY_DISPATCH_AXES="$(printf '%s\n' "$ENTRY_DISPATCH_LINES" | sed -nE 's/^[[:space:]]*- dispatch: ([a-z0-9-]+) — .*$/\1/p')"
+
+dispatch_value_for_axis() {  # $1 = a `- dispatch:`-line block, $2 = axis key
+  printf '%s\n' "$1" | sed -nE "s/^[[:space:]]*- dispatch: ${2} — ([a-z0-9-]+) — .*\$/\\1/p" | head -1
+}
+
+# Resolve a predecessor task id to exactly one top-level board entry,
+# searching BOTH `## Active` (`- [ ] **T-NNN** `) and `## Done`
+# (`- [x] **T-NNN** `) — a SECOND scan, distinct from and never a widening
+# of the --task entry's own ## Active-only resolution above (## Assumptions
+# row A-8: that resolution keeps its forward-only scoping and its own
+# exit-2-on-failure contract unchanged). An unresolvable or ambiguous
+# PREDECESSOR reference is a content refusal about the board's own record
+# (exit 1 via the caller's `fail`), never a usage error. Prints the
+# resolved entry's text (CR stripped, same tolerance as `$ENTRY` above) on
+# stdout and returns 0 on exactly one match; returns 1 (prints nothing)
+# otherwise.
+resolve_predecessor_entry() {  # $1 = predecessor task id
+  local pid="$1" scan p_start p_end p_count
+  scan="$(awk -v pid="$pid" '
+    BEGIN { sec=""; p_start=0; p_end=0; p_count=0; capturing=0 }
+    /^## /  { sec=$0; capturing=0 }
+    {
+      if (sec ~ /^## Active/ && $0 ~ ("^- \\[ \\] \\*\\*" pid "\\*\\* ")) {
+        p_count++; p_start=NR; p_end=NR; capturing=1; next
+      }
+      if (sec ~ /^## Done/ && $0 ~ ("^- \\[x\\] \\*\\*" pid "\\*\\* ")) {
+        p_count++; p_start=NR; p_end=NR; capturing=1; next
+      }
+      if (capturing) {
+        if ($0 ~ /^[[:space:]]*$/) { next }
+        if ($0 ~ /^[[:space:]]+[^[:space:]]/) { p_end=NR; next }
+        capturing=0
+      }
+    }
+    END { print p_start, p_end, p_count }
+  ' "$BOARD")"
+  read -r p_start p_end p_count <<< "$scan"
+  [ "$p_count" -eq 1 ] || return 1
+  sed -n "${p_start},${p_end}p" "$BOARD" | sed 's/\r$//'
+}
+
+REFL_AXES=" "
+REFL_HAS_ALL=0
+REFL_ROW_COUNT=0
+REFL_ROWS=""
+
+while IFS= read -r line || [ -n "$line" ]; do
+  [ -n "$line" ] || continue
+  if [[ "$line" =~ $refl_stem_re ]]; then
+    if [[ "$line" =~ $refl_full_re ]]; then
+      r_axis="${BASH_REMATCH[1]}"
+      r_pred="${BASH_REMATCH[2]}"
+      r_verdict="${BASH_REMATCH[3]}"
+      r_ground="${BASH_REMATCH[4]}"
+      [ -n "$r_ground" ] || fail "$TASK has a \`- dispatch-reflection:\` sub-bullet with an empty ground field: $line"
+      case "$r_axis" in
+        all)
+          REFL_HAS_ALL=1
+          if [ "$r_pred" != "no-predecessor" ] || [ "$r_verdict" != "no-predecessor-row" ]; then
+            fail "$TASK has a malformed \`- dispatch-reflection: all\` sub-bullet — the no-predecessor form requires exactly \`all — no-predecessor — no-predecessor-row — <ground>\`: $line"
+          fi
+          ;;
+        implement|verify|verify-fixture|verify-mechanism|specify|spec-review) : ;;
+        *)
+          fail "$TASK has a malformed \`- dispatch-reflection:\` sub-bullet (axis '$r_axis' is not one of the closed dispatch-axis keys, and is not 'all'): $line"
+          ;;
+      esac
+      case "$REFL_AXES" in
+        *" $r_axis "*) fail "$TASK has a malformed \`- dispatch-reflection:\` sub-bullet (axis '$r_axis' appears more than once on this entry): $line" ;;
+      esac
+      REFL_AXES="${REFL_AXES}${r_axis} "
+      REFL_ROW_COUNT=$((REFL_ROW_COUNT + 1))
+      REFL_ROWS="${REFL_ROWS}${r_axis}|${r_pred}|${r_verdict}"$'\n'
+    else
+      fail "$TASK has a malformed \`- dispatch-reflection:\` sub-bullet (does not parse into '<axis> — <predecessor> — <verdict> — <ground>'): $line"
+    fi
+  fi
+done <<< "$ENTRY"
+
+if [ "$REFL_ROW_COUNT" -gt 0 ]; then
+  # T-1109 Goal: the no-predecessor form and a per-axis row are mutually
+  # exclusive on one entry — never mixed.
+  if [ "$REFL_HAS_ALL" -eq 1 ] && [ "$REFL_ROW_COUNT" -gt 1 ]; then
+    fail "$TASK mixes the \`- dispatch-reflection: all — no-predecessor\` form with a per-axis \`- dispatch-reflection:\` row — record either the single no-predecessor line or one row per axis, never both"
+  fi
+
+  if [ "$REFL_HAS_ALL" -eq 0 ]; then
+    # Coverage: every axis this entry's own `- dispatch:` rows record must
+    # carry a matching `- dispatch-reflection:` row — no cherry-picking.
+    while IFS= read -r d_axis; do
+      [ -n "$d_axis" ] || continue
+      case "$REFL_AXES" in
+        *" $d_axis "*) : ;;
+        *) fail "$TASK's \`- dispatch-reflection:\` family does not cover axis '$d_axis', which this entry's own \`- dispatch:\` rows record" ;;
+      esac
+    done <<< "$ENTRY_DISPATCH_AXES"
+
+    # Duty B: the stated verdict must agree with the predecessor's own
+    # recorded value for that axis.
+    while IFS= read -r row; do
+      [ -n "$row" ] || continue
+      r_axis="${row%%|*}"; rest="${row#*|}"
+      r_pred="${rest%%|*}"; r_verdict="${rest#*|}"
+
+      pred_entry_text="$(resolve_predecessor_entry "$r_pred")" \
+        || fail "$TASK's \`- dispatch-reflection: $r_axis\` sub-bullet names predecessor '$r_pred', which does not resolve to exactly one top-level board entry in ## Active or ## Done"
+
+      own_value="$(dispatch_value_for_axis "$ENTRY_DISPATCH_LINES" "$r_axis")"
+      pred_value="$(dispatch_value_for_axis "$pred_entry_text" "$r_axis")"
+
+      if [ -z "$pred_value" ]; then
+        if [ "$r_verdict" != "no-predecessor-row" ]; then
+          fail "$TASK's \`- dispatch-reflection: $r_axis\` sub-bullet states verdict '$r_verdict', but predecessor '$r_pred' records no \`- dispatch: $r_axis\` row of its own — the only conformant verdict here is 'no-predecessor-row'"
+        fi
+      else
+        expected_verdict="differs"
+        [ "$own_value" = "$pred_value" ] && expected_verdict="repeat"
+        if [ "$r_verdict" != "$expected_verdict" ]; then
+          fail "$TASK's \`- dispatch-reflection: $r_axis\` sub-bullet states verdict '$r_verdict', but predecessor '$r_pred''s own recorded value ('$pred_value') and this entry's own recorded value ('$own_value') disagree with it — the correct verdict here is '$expected_verdict'"
+        fi
+      fi
+    done <<< "$REFL_ROWS"
+  fi
 fi
 
 exit 0

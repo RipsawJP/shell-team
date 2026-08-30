@@ -338,6 +338,141 @@ mk
 [ "$(invoke_rc bash "$SCRIPT" --board "$T/board.md" --task T-999)" = "2" ] || fail "a task not present in ## Active must exit 2"
 pass "a --task value not found as one top-level ## Active entry exits 2"
 
+# --- dispatch-reflection duty A/B (T-1109, issue #365) ---------------------
+# T-901 is the entry under test; T-900 is its predecessor, placed in
+# whichever section the case needs — this directly exercises ## Assumptions
+# row A-8 ("a SECOND scan, never a widening of the --task entry's own
+# ## Active-only resolution above").
+run901() {
+  bash "$SCRIPT" --board "$T/refl.md" --task T-901 >"$T/out" 2>"$T/err"
+  printf '%s' "$?"
+}
+chk901() {
+  local desc="$1" expect="$2"
+  [ "$(run901)" = "$expect" ] || fail "$desc (expected $expect, got $(run901); stderr: $(cat "$T/err"))"
+  pass "$desc"
+}
+
+# refl_board PRED_SECTION MAIN_LINE... -- PRED_LINE...
+# PRED_SECTION is "active" (T-900 stays open, alongside T-901) or "done"
+# (T-900 already closed) or "none" (no T-900 entry at all).
+refl_board() {
+  local pred_section="$1"; shift
+  local -a main_lines=() pred_lines=()
+  local cur=main a
+  for a in "$@"; do
+    if [ "$a" = "--" ]; then cur=pred; continue; fi
+    if [ "$cur" = "main" ]; then main_lines+=("$a"); else pred_lines+=("$a"); fi
+  done
+  {
+    printf '## Active\n\n- [ ] **T-901** fixture entry\n'
+    for a in "${main_lines[@]}"; do printf '  %s\n' "$a"; done
+    printf '\n'
+    if [ "$pred_section" = "active" ]; then
+      printf -- '- [ ] **T-900** predecessor entry\n'
+      for a in "${pred_lines[@]}"; do printf '  %s\n' "$a"; done
+      printf '\n'
+    fi
+    printf '## Done\n\n'
+    if [ "$pred_section" = "closed" ]; then
+      printf -- '- [x] **T-900** predecessor entry\n'
+      for a in "${pred_lines[@]}"; do printf '  %s\n' "$a"; done
+      printf '\n'
+    fi
+  } > "$T/refl.md"
+}
+
+D_SPECIFY="- dispatch: specify — pm-authored — unconditional — recommendation: r"
+D_VERIFY_SELF="- dispatch: verify — serial — unconditional — recommendation: r"
+D_VERIFY_PRED="- dispatch: verify — tier1-fanout — unconditional — recommendation: r"
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-900 — differs — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_PRED"
+chk901 "conformant dispatch-reflection family (predecessor in ## Done, one repeat + one differs) passes" 0
+
+refl_board active "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-900 — differs — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_PRED"
+chk901 "conformant dispatch-reflection family with predecessor still open in ## Active passes (A-8: not a widening of the --task entry's own ## Active-only scan)" 0
+
+refl_board none "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: all — no-predecessor — no-predecessor-row — first task of the train"
+chk901 "the no-predecessor form passes whatever axes the entry itself records" 0
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: all — no-predecessor — no-predecessor-row — g" \
+  "- dispatch-reflection: specify — T-900 — repeat — g" \
+  -- "$D_SPECIFY"
+chk901 "mixing the no-predecessor form with a per-axis row refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: bogus — T-900 — repeat — ground" \
+  "- dispatch-reflection: verify — T-900 — differs — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_PRED"
+chk901 "an axis outside the closed dispatch-axis keys (and not 'all') refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  "- dispatch-reflection: specify — T-900 — differs — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_PRED"
+chk901 "a duplicated dispatch-reflection axis refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: specify — T-900 —" \
+  -- "$D_SPECIFY"
+chk901 "a dispatch-reflection row not parsing into '<axis> — <predecessor> — <verdict> — <ground>' refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: specify — T-900 — repeat — " \
+  -- "$D_SPECIFY"
+chk901 "a dispatch-reflection row with an empty ground field refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY" "$D_VERIFY_PRED"
+chk901 "the family missing coverage for an axis the entry's own dispatch rows record refuses (no cherry-picking)" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: specify — T-900 — differs — ground" \
+  -- "$D_SPECIFY"
+chk901 "a stated verdict ('differs') that disagrees with the predecessor's own recorded value ('repeat' is correct) refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: verify — T-900 — repeat — ground" \
+  -- "$D_VERIFY_PRED"
+chk901 "a stated verdict ('repeat') that disagrees with the predecessor's own recorded value ('differs' is correct) refuses" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: verify — T-900 — no-predecessor-row — ground" \
+  -- "$D_SPECIFY"
+chk901 "a stated verdict of 'no-predecessor-row' refuses when the predecessor DOES record that axis" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_VERIFY_SELF" \
+  "- dispatch-reflection: verify — T-899 — repeat — ground" \
+  -- "$D_VERIFY_PRED"
+chk901 "a predecessor id resolving to zero top-level board entries refuses (unresolvable reference, never a false no-predecessor)" 1
+
+refl_board active "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "- dispatch-reflection: specify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY"
+# Duplicate T-900 into ## Done too, so the id is genuinely ambiguous.
+{
+  cat "$T/refl.md"
+} > "$T/refl-base.md"
+awk -v add="$D_SPECIFY" '
+  { print }
+  /^## Done/ { print ""; print "- [x] **T-900** predecessor entry"; print "  " add }
+' "$T/refl-base.md" > "$T/refl.md"
+chk901 "a predecessor id resolving to two top-level board entries (one in ## Active, one in ## Done) refuses (ambiguous reference)" 1
+
+refl_board closed "- entry-mode: pm-authored" "$D_SPECIFY" \
+  "-  dispatch-reflection: specify — T-900 — repeat — ground" \
+  -- "$D_SPECIFY"
+chk901 "doubled-space-after-bullet on the dispatch-reflection stem: collected then refused as malformed, never silently read as the zero-rows case" 1
+
 # --- comment-stripped flattened form carries the two shipped limits --------
 fc() { sed 's/^[[:space:]]*#[[:space:]]*//' "$1" | tr '\n' ' ' | tr -s ' '; }
 fc "$SCRIPT" > "$T/flat"

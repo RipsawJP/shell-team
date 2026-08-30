@@ -591,6 +591,26 @@ checker still does not verify that the conformance read itself
 happened — only that a conformant record of it exists and agrees with
 what Plan decided.
 
+**The same checker also gates a cross-task dispatch reflection (T-1109,
+issue #365).** Before transcribing the situational dispatch record above,
+the coordinating session skims the immediately preceding task's own board
+entry and records, per axis, whether this task repeats or diverges from
+what that predecessor elected: `- dispatch-reflection: <axis> —
+<predecessor> — <repeat|differs|no-predecessor-row> — <ground>`, or the
+single `- dispatch-reflection: all — no-predecessor — no-predecessor-row
+— <ground>` line where the task has no predecessor at all.
+`bin/check-entry-mode.sh` refuses the freeze when this family is present
+but malformed, when it does not cover every axis the entry's own
+`- dispatch:` rows record, when it mixes the no-predecessor form with a
+per-axis row, when a named predecessor id does not resolve to exactly one
+top-level board entry in either the active or the done section of the
+board, or when a stated verdict disagrees with the predecessor entry's
+own recorded value for that axis — the same validate-if-present shape as
+the dispatch record itself: an entry carrying no reflection line at all
+still passes. The substantive judgment the record exists to provoke —
+whether a repeated election is actually sound — stays a reading a human
+or an agent performs; the checker never claims to close it.
+
 ## Electing a spec review at the Specify seam (T-1092)
 
 Alongside `specify`, a fourth dispatch axis elects whether an extra

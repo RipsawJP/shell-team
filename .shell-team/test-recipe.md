@@ -2269,3 +2269,46 @@ that file's order.
     `bin/log-run.sh:490-491` honours it for writes — the read side and the
     write side disagree on purpose, and a future author reaching for
     `TEAM_RUNS_DIR` to relocate what a sweep *reads* will find it inert.
+
+- T-1109: extends `bin/check-entry-mode.sh` with a THIRD, independent
+  duty at the same pre-freeze seam — `- dispatch-reflection:` grammar
+  (duty A) plus cross-entry verdict agreement against the predecessor's
+  own recorded `- dispatch:` value (duty B). **Predecessor-lookup shape
+  settled on**: a SECOND `awk` scan, structurally identical to the
+  existing `--task` entry-extent scan but with two differences — it is
+  never restricted to `sec ~ /^## Active/` (it matches `- \[ \] \*\*<id>\*\*
+  ` inside `## Active` OR `- \[x\] \*\*<id>\*\* ` inside `## Done`), and an
+  unresolvable or ambiguous match returns from a bash function (`return 1`)
+  rather than calling `die` — the caller turns that into `fail` (exit 1,
+  a content refusal), never `die` (exit 2), because a predecessor
+  reference is part of the board's own record, not part of the
+  invocation's environment (## Assumptions row A-8; the `--task` entry's
+  own resolution keeps its original exit-2 contract, untouched). **Axis
+  extraction, longer-stem-first is automatic, not manual**: every general
+  `- dispatch: <axis> — ` scan requires the literal colon immediately
+  after the bare word `dispatch`, so a `- dispatch-reflection: ` line
+  (colon after `-reflection`, never after `dispatch`) fails to match by
+  construction — no explicit "test the longer stem first" ordering trick
+  was needed here, unlike the flagged-gap/flagged-gap-resolution pair
+  this same file already handles with an explicit stem-priority `if`/
+  `elif`, because gap/gap-resolution's ambiguity is genuinely a shared
+  prefix with no disambiguating character while dispatch/dispatch-
+  reflection's is not (measured directly: `printf '%s\n' '  - dispatch-
+  reflection: specify — T-900 — repeat — g' | grep -cE '^[[:space:]]*-
+  dispatch: '` → `0`). **CRLF and doubled-space fixtures**: built the same
+  way the pre-existing gap/resolution fixtures already are — a doubled-
+  space fixture is one literal board line with two spaces after the
+  bullet dash (`'-  dispatch-reflection: …'`), and a CRLF fixture is a
+  conformant LF board piped through `awk '{printf "%s\r\n", $0}'` — no new
+  fixture-construction technique was needed. **Timeout**:
+  `CHECK_ACS_TIMEOUT=900` (## Assumptions row A-9), inherited from
+  T-1108's own recorded value for the same class of sweep (**AC14**'s
+  full-population two-arm diff and `tests/close-out/run.sh` re-run inside
+  **AC7**). **Measured anchor behaviour**: all three shipped `- dispatch:`
+  anchors (`bin/close-out.sh`'s `'^[[:space:]]*- dispatch:'`, and
+  `bin/check-entry-mode.sh`'s `'^[[:space:]]*- dispatch: specify — '` and
+  `'^[[:space:]]*-[[:space:]]+dispatch:[[:space:]]+specify[[:space:]]+—'`)
+  match **zero** times against a `- dispatch-reflection:` line and at
+  least once against a genuine `- dispatch:` line, confirmed live (**AC7**'s
+  own check line, which builds exactly this pair of fixture files and
+  asserts both counts).
