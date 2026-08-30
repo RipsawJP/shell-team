@@ -242,7 +242,7 @@ The rows below are **predictions derived by shape, not by mention**, and every a
 
 - reproduce: bash bin/derive-populations.sh --label t1107specs --set tracked-specs="git ls-files -- '.shell-team/specs/*.md'" --set untracked-specs="git ls-files --others --exclude-standard -- '.shell-team/specs/*.md'"
 - population: 112 spec files — written by the freeze run from the `- reproduce:` line above (union item count of the two disjoint md-scoped sets: tracked 111 + untracked 1 = 112; the tool's block embedded verbatim between the markers below, matching the authoring-time placeholder). **AC14** compares the declared value against a live re-derivation. See `## Assumptions` row **A-4**.
-- predicted-red: 2 — the two criteria predicted to move from base `PASS` to head `FAIL` purely because this task's own files exist (T-1106 **AC13** and T-1106 **AC15**). The 26 close-out-driving candidates below are predicted red **as a class** but individually to-be-measured, and every one that measures `head: FAIL` at a `base: PASS` is added to this figure by the freeze run or by QA, with the arithmetic stated.
+- predicted-red: 14 — corrected by the engineer's own two-arm measurement (below) from the authoring-time prediction of 2. Two Class 2 criteria move from base `PASS` to head `FAIL` purely because this task's own files exist (T-1106 **AC13** and T-1106 **AC15**), plus **twelve** Class 3 criteria this task's diff to `bin/close-out.sh`/`tests/close-out/run.sh` newly reddens (T-1022 **AC1**/**AC4**/**AC5**/**AC10**/**AC16**/**AC17**; T-1017 **AC1**/**AC2**/**AC3**/**AC4**/**AC8**/**AC9**) = 14. The Class 3 table below additionally names **10** rows that measured `base: FAIL` already, independently confirmed unrelated to this task — the authoring-time claim that "every [Class 3] row is `base: PASS`" is corrected here to the measurement, per this criterion's own instruction that the prediction is never defended.
 
 <!-- BEGIN derivation: t1107specs -->
 - derived-by: bin/derive-populations.sh
@@ -370,28 +370,53 @@ The rows below are **predictions derived by shape, not by mention**, and every a
 
 | Row | Shape | base: | head: | Disposition |
 |---|---|---|---|---|
-| `.shell-team/specs/T-1084-dispatch-routing-record.md` **AC11** (`:90-91`) | `git diff --name-only <bp>...HEAD -- bin/` must name nothing except `bin/close-out.sh`; its own discriminator's predecessor branch is gone, so it falls back to `git merge-base develop HEAD`, a span that already includes T-1105's and T-1106's `bin/` edits | base: FAIL (to-be-measured) | head: FAIL (to-be-measured) | Disclosed, not repaired |
-| `.shell-team/specs/T-1105-review-executor-resolution.md` **AC15** (`:117-118`) | Byte-pins `bin/check-binding.sh` and requires zero paths under `bin/`, `tests/`, `agents/`, `.github/` in the changed-and-added set | base: FAIL (to-be-measured) | head: FAIL (to-be-measured) | Disclosed, not repaired |
-| `.shell-team/specs/T-1105-review-executor-resolution.md` **AC16** (`:120-121`) | Merge-point-scoped scope-lock allow-list naming none of this task's or T-1106's files | base: FAIL (to-be-measured) | head: FAIL (to-be-measured) | Disclosed, not repaired; the criterion's own prose already declares it expected to go stale after merge |
-| `.shell-team/specs/T-1105-review-executor-resolution.md` **AC18** (`:126-128`) | Declares `- population: 110 spec files` against a live re-derivation; the live count was already 111 at the base ref | base: FAIL (to-be-measured) | head: FAIL (to-be-measured) | Disclosed, not repaired |
+| `.shell-team/specs/T-1084-dispatch-routing-record.md` **AC11** (`:90-91`) | `git diff --name-only <bp>...HEAD -- bin/` must name nothing except `bin/close-out.sh`; its own discriminator's predecessor branch is gone, so it falls back to `git merge-base develop HEAD`, a span that already includes T-1105's and T-1106's `bin/` edits | base: FAIL | head: FAIL | Disclosed, not repaired |
+| `.shell-team/specs/T-1105-review-executor-resolution.md` **AC15** (`:117-118`) | Byte-pins `bin/check-binding.sh` and requires zero paths under `bin/`, `tests/`, `agents/`, `.github/` in the changed-and-added set | base: FAIL | head: FAIL | Disclosed, not repaired |
+| `.shell-team/specs/T-1105-review-executor-resolution.md` **AC16** (`:120-121`) | Merge-point-scoped scope-lock allow-list naming none of this task's or T-1106's files | base: FAIL | head: FAIL | Disclosed, not repaired; the criterion's own prose already declares it expected to go stale after merge |
+| `.shell-team/specs/T-1105-review-executor-resolution.md` **AC18** (`:126-128`) | Declares `- population: 110 spec files` against a live re-derivation; the live count was already 111 at the base ref | base: FAIL | head: FAIL | Disclosed, not repaired |
 
 **Class 2 — pin-class rows this task **newly** reddens (base `PASS` → head `FAIL`).**
 
 | Row | Shape | base: | head: | Disposition |
 |---|---|---|---|---|
-| `.shell-team/specs/T-1106-check-binding-consistency.md` **AC13** (`:111-112`) | Merge-point-scoped scope lock: allow-list is T-1106's own five paths plus its three records, and it requires **zero** paths under `docs/`; this task adds four documentation files and eleven allow-list-foreign paths | base: PASS (to-be-measured) | head: FAIL (to-be-measured) | Disclosed, not repaired — its own prose declares it expected to go stale after merge |
-| `.shell-team/specs/T-1106-check-binding-consistency.md` **AC15** (`:117-119`) | Declares `- population: 111 spec files` and requires **equality** with a live re-derivation; this spec makes the live count 112 | base: PASS (to-be-measured) | head: FAIL (to-be-measured) | Disclosed, not repaired — and it is the worked example of exactly the `- stale-at:` event that criterion's own sub-bullet names |
+| `.shell-team/specs/T-1106-check-binding-consistency.md` **AC13** (`:111-112`) | Merge-point-scoped scope lock: allow-list is T-1106's own five paths plus its three records, and it requires **zero** paths under `docs/`; this task adds four documentation files and eleven allow-list-foreign paths | base: PASS | head: FAIL | Disclosed, not repaired — its own prose declares it expected to go stale after merge |
+| `.shell-team/specs/T-1106-check-binding-consistency.md` **AC15** (`:117-119`) | Declares `- population: 111 spec files` and requires **equality** with a live re-derivation; this spec makes the live count 112 | base: PASS | head: FAIL | Disclosed, not repaired — and it is the worked example of exactly the `- stale-at:` event that criterion's own sub-bullet names |
 
-**Class 3 — the class specific to this task: a merged `- check:` line that drives `close-out.sh` against a board fixture carrying a valid non-`READY_FOR_MERGE` flag.** Membership below was derived by a scoped content search over `.shell-team/specs/*.md` for `- check:` lines naming both `close-out.sh` and one of the six non-`READY_FOR_MERGE` flags; **26** lines matched, in four specs. Membership is not the verdict: a matched line may name the flag inside a refusal fixture the new gate never reaches, or may assert only on stderr text, in which case it stays green. Every row is `base: PASS (to-be-measured) / head: to-be-measured`, and the two-arm run reports each **individually**, including the ones that measure green (**AC15**(c)).
+**Class 3 — the class specific to this task: a merged `- check:` line that drives `close-out.sh` against a board fixture carrying a valid non-`READY_FOR_MERGE` flag.** Membership below was derived by a scoped content search over `.shell-team/specs/*.md` for `- check:` lines naming both `close-out.sh` and one of the six non-`READY_FOR_MERGE` flags; **26** lines matched, in four specs. Membership is not the verdict: a matched line may name the flag inside a refusal fixture the new gate never reaches, or may assert only on stderr text, in which case it stays green — **and, measured, several matched lines are already red at the base ref for reasons unrelated to this task** (see below). Every row is measured **individually** at both arms via a two-arm `git worktree add --detach` pair at the base ref (`8a27308`) and at this task's own HEAD (`1790804`), by extracting and running that spec's own committed check line unmodified (**AC15**(c)):
 
-| Spec | Criteria matching the shape | Count |
-|---|---|---|
-| `.shell-team/specs/T-1022-close-out-gate-symmetry.md` | **AC1**, **AC2**, **AC3**, **AC4**, **AC5**, **AC6**, **AC7**, **AC8**, **AC10**, **AC16**, **AC17** | 11 |
-| `.shell-team/specs/T-1017-close-out-interventions-gate.md` | **AC1**, **AC2**, **AC3**, **AC4**, **AC5**, **AC6**, **AC7**, **AC8**, **AC9**, **AC10** | 10 |
-| `.shell-team/specs/T-1016-close-out-entry-boundary.md` | **AC7**, **AC8**, **AC9** | 3 |
-| `.shell-team/specs/T-1103-oversight-profiles.md` | **AC11**, **AC21** | 2 |
+| Spec | AC | Arm verdicts | Note |
+|---|---|---|---|
+| T-1022-close-out-gate-symmetry.md | AC1 | base: PASS, head: FAIL | newly reddened by this task (the seven-flags-succeed-unconditionally assumption T-1022's own AC1 makes no longer holds for six of the seven) |
+| T-1022-close-out-gate-symmetry.md | AC2 | base: FAIL, head: FAIL | already red at base — unrelated to this task |
+| T-1022-close-out-gate-symmetry.md | AC3 | base: FAIL, head: FAIL | already red at base — unrelated to this task |
+| T-1022-close-out-gate-symmetry.md | AC4 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1022-close-out-gate-symmetry.md | AC5 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1022-close-out-gate-symmetry.md | AC6 | base: PASS, head: PASS | unaffected |
+| T-1022-close-out-gate-symmetry.md | AC7 | base: FAIL, head: FAIL | already red at base — unrelated to this task |
+| T-1022-close-out-gate-symmetry.md | AC8 | base: PASS, head: PASS | unaffected |
+| T-1022-close-out-gate-symmetry.md | AC10 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1022-close-out-gate-symmetry.md | AC16 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1022-close-out-gate-symmetry.md | AC17 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC1 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC2 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC3 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC4 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC5 | base: FAIL, head: FAIL | already red at base — unrelated to this task |
+| T-1017-close-out-interventions-gate.md | AC6 | base: FAIL, head: FAIL | already red at base — unrelated to this task |
+| T-1017-close-out-interventions-gate.md | AC7 | base: FAIL, head: FAIL | already red at base — unrelated to this task |
+| T-1017-close-out-interventions-gate.md | AC8 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC9 | base: PASS, head: FAIL | newly reddened by this task |
+| T-1017-close-out-interventions-gate.md | AC10 | base: PASS, head: PASS | unaffected |
+| T-1016-close-out-entry-boundary.md | AC7 | base: FAIL, head: FAIL | already red at base — unrelated to this task (traced: its own check line invokes `close-out.sh` with no interventions record set up at all, so T-1017's interventions gate — merged after this criterion was frozen — refuses it regardless of anything this task touches) |
+| T-1016-close-out-entry-boundary.md | AC8 | base: FAIL, head: FAIL | already red at base — unrelated to this task, same cause as AC7 |
+| T-1016-close-out-entry-boundary.md | AC9 | base: FAIL, head: FAIL | already red at base — unrelated to this task, same cause as AC7 |
+| T-1103-oversight-profiles.md | AC11 | base: PASS, head: PASS | unaffected |
+| T-1103-oversight-profiles.md | AC21 | base: PASS, head: PASS | unaffected |
 
-Disposition for every Class 3 row that measures newly red: **disclosed, never repaired**. Editing another task's frozen criterion is a class-B re-freeze of intent this task does not own, and it is a stated Non-goal. The complement of this class — a close-out-driving criterion whose fixture is already at `READY_FOR_MERGE` — is not merely predicted green but **asserted** green, by **AC10**, which derives that population live.
+- reproduce: `git worktree add --detach <dir> 8a2730828bfecbb852f2d34a2c3aeb83a4d50b9e` (base) and `git worktree add --detach <dir> 1790804` (head, this task's own implementation commit); for each row, extract that spec's own `- check:` line for the named AC from the (untouched-by-this-task) spec file and run it via `bash -c "$cmd"` inside each worktree; `PASS` = exit 0, `FAIL` = otherwise.
+- **Ten of the 26 rows were already `FAIL` at the base ref, before any byte of this task's diff existed** — a materially larger pre-existing-breakage population than this section's own authoring-time prediction ("Every row is `base: PASS`") anticipated. All ten are independently confirmed unrelated to this task (traced live, not merely asserted): T-1016's entire three-row set shares one root cause (its check line never sets up an interventions record, so T-1017's interventions gate — merged after T-1016 was frozen — refuses it under ANY current `bin/close-out.sh`); T-1022's AC2/AC3/AC7 and T-1017's AC5/AC6/AC7 fail identically whether run against the base-ref script or this task's own script (confirmed: `base:FAIL` and `head:FAIL` are the same verdict, so this task's diff changes nothing about their outcome). This is disclosed here rather than silently folded into "26 candidates, verdicts to-be-measured" — the true count of criteria this task's own diff **newly** reddens in Class 3 is **12** (T-1022: AC1/AC4/AC5/AC10/AC16/AC17; T-1017: AC1/AC2/AC3/AC4/AC8/AC9), not 26.
+
+Disposition for every Class 3 row that measures newly red: **disclosed, never repaired**. Editing another task's frozen criterion is a class-B re-freeze of intent this task does not own, and it is a stated Non-goal — this applies equally to the 12 rows this task newly reddens and to the 10 rows already red at base for an unrelated reason. The complement of this class — a close-out-driving criterion whose fixture is already at `READY_FOR_MERGE` — is not merely predicted green but **asserted** green, by **AC10**, which derives that population live (measured: 7 of AC10's own live-derived population matched that filter; 2 of those 7 also fail, for two further unrelated pre-existing reasons disclosed in `.shell-team/test-recipe.md`'s T-1107 entry — a T-1092/T-1096 spec-review-backstop sentinel conflict, and a T-1100 check-line staleness bug that never copies `templates/` into its scratch `bin/` copy).
 
 **A fourth class is named and left unenumerated on purpose.** A merged criterion that reaches `bin/close-out.sh` or the board through indirection — a path built at run time from `bin/team-paths.sh --get todo`, a script named only through a variable — matches none of the searches above and cannot be enumerated by any of them. That is precisely the gap the full-population two-arm run closes, and it is why this section's completeness claim rests on that run rather than on the three enumerated classes.
 
