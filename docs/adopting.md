@@ -243,16 +243,17 @@ role's executor is resolved before any invocation, and a refusal is a
 blocker that stops the phase rather than falling back to anything: an
 ordinary edit can reach `binding-unresolved`, `capability-unsupported`
 and `executor-unavailable`, each described above. The two standalone
-review commands are not the same case, and the difference is one
-delegated step. `/shell-team:review` invokes the reviewer directly and
-**never consults the binding** — a rebind changes nothing about it, in
-either direction. `/shell-team:review-response` does not consult the
-binding **for its own review step** either, but its last step hands the
-findings you accept to `/shell-team:run`, and that pipeline consults
-resolution like any other run — so a rebind **does** reach
-`review-response`, through that step and only through it, including by
-refusing and stopping it. Issue **#245** tracks wiring resolution into
-the review steps themselves. **How a proceeding call is
+review commands consult the binding too, in their own review step.
+`/shell-team:review` resolves `codex-reviewer`'s executor immediately
+before it invokes the reviewer, and `/shell-team:review-response` does
+the same before its own cross-evaluation step; in both, a refusal is a
+blocker that stops the command rather than falling back, so a rebind
+reaches them exactly as it reaches a run. `/shell-team:review-response`
+additionally reaches resolution a second way, through the last step
+that hands the findings you accept to `/shell-team:run`. The two
+remaining commands, `/shell-team:loop-triage` and
+`/shell-team:team-init`, invoke no bound role at all, so there is
+nothing for resolution to resolve in them. **How a proceeding call is
 executed** — there the binding changes
 **only** what `resolve-executor.sh` resolves and reports and what
 **telemetry** records, provider, model, effort and adapter alike, and

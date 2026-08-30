@@ -2070,3 +2070,30 @@ that file's order.
   scratch `git worktree add --detach` at the round's own commit, never in
   the working tree — each observed red on the reintroduced defect,
   restored via `git checkout --`, observed green again.
+- T-1105: two techniques worth writing down once, both reused from
+  `tests/check-prompt-sync/run.sh`'s own `T-040 AC5` section and from
+  `bin/team-paths.sh`'s `validate_base` header. (1) **Scratch-root,
+  single-row `contain` mutation probe** — to prove a new registry
+  `contain` consumer is non-vacuous without touching the working tree:
+  build a scratch dir under `$TMPDIR`; `grep` exactly one registry row
+  out of the real `templates/prompt-blocks/registry.txt` into a
+  from-scratch `registry.txt`; copy only that row's block file and its
+  consumer files into matching paths under the scratch root; run
+  `bin/check-prompt-sync.sh --root <scratch>` and confirm exit `0` on the
+  pristine copy (a positive control that proves the scratch tree runs at
+  all, not just that a mutation makes it fail); then, in a **separate**
+  copy per consumer, delete the canonical anchor line from exactly one
+  consumer and re-run — it must exit `1` and name that consumer's path on
+  stderr. Never reuse one scratch copy across the pristine run and a
+  mutation; each mutation gets its own copy so the mutated one differs
+  from the pristine one by construction (`cmp` the two apart before
+  trusting the "detected" verdict). (2) **`bin/resolve-executor.sh`
+  refusal fixture needs a repo-relative `TEAM_RUN_BASE`, never an
+  absolute one** — `bin/team-paths.sh`'s `validate_base` rejects an
+  absolute path outright, so a scratch-base fixture for this script must
+  `cd` into the scratch directory first and set `TEAM_RUN_BASE` to a
+  path relative to that directory (e.g. `TEAM_RUN_BASE=base`), never to
+  the scratch directory's own absolute `mktemp -d` path. Pointing
+  `TEAM_RUN_BASE` at an absolute scratch path fails at `validate_base`
+  before the resolver's own fail-closed refusal logic is ever reached,
+  which silently tests the wrong failure mode.
