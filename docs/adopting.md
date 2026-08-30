@@ -705,6 +705,28 @@ not exercised by a live run in this repository — enrolling this repository
 would make the coordinating session both the producer and the approver of
 the very mechanism auditing that separation.
 
+## The close-out pre-flip gate
+
+`bin/close-out.sh` reads the task's Active flag before it ever writes to the
+board (T-1107, issue #53). Unless that flag already reads `READY_FOR_MERGE`
+— the one state `codex-reviewer` writes on APPROVE — the close-out refuses
+at exit 1, naming the board path, the source line and the flag it found,
+and the board file is left byte-untouched. A task still at
+`READY_FOR_ARCH`, `READY_FOR_ENG`, `READY_FOR_QA`, `READY_FOR_REVIEW`,
+`BLOCKED` or `REWORK` is refused rather than silently promoted; the fix is
+a single flag edit on the board once the review that should have set
+`READY_FOR_MERGE` has actually run.
+
+Separately, `close-out.sh --issue N` prints the manual GitHub issue-close
+procedure (`develop` merges do **not** auto-close an issue). When `--issue`
+is omitted — or passed as an empty string — the script instead prints a
+one-line note (`close-out: note: no --issue given`) so the operator learns
+the procedure exists rather than seeing nothing; the note and the procedure
+are exact complements of one condition, so they can never both fire or both
+stay silent on the same run. A printed note is disclosure, not a gate: it
+does not refuse the close-out, and an operator who does not read stdout
+learns nothing from it either way.
+
 ## Recording review-input fidelity
 
 Each executor pass a review record's verdict section names states four

@@ -9,10 +9,19 @@
 #      `READY_FOR_MERGE`. Keeps the hand-off grammar of check-handoff.sh's
 #      LINE_RE (flag backticks directly followed by ` — spec:`, NO
 #      parenthetical — T-030 rework); closure provenance (date/PR/issue)
-#      goes into a new sub-bullet instead of the title line.
-#   2. Prints the manual issue-close procedure to stdout. This script NEVER
-#      calls `gh` or the GitHub API (sandboxes can't; the human/orchestrator
-#      runs the printed command).
+#      goes into a new sub-bullet instead of the title line. T-1107's
+#      pre-flip gate (#53) refuses this whole step, before any board write,
+#      unless the entry's OWN current flag already reads `READY_FOR_MERGE`
+#      (the state `agents/codex-reviewer.md` writes on APPROVE) — a task
+#      still at `READY_FOR_QA`, `REWORK`, `BLOCKED`, `READY_FOR_ARCH`,
+#      `READY_FOR_ENG` or `READY_FOR_REVIEW` is refused, never silently
+#      promoted.
+#   2. Prints the manual issue-close procedure to stdout when `--issue` is
+#      given; when it is omitted (or empty), prints a one-line note instead
+#      (T-1107, #266) — `close-out: note: no --issue given` — so the
+#      operator learns the procedure exists rather than seeing nothing. This
+#      script NEVER calls `gh` or the GitHub API (sandboxes can't; the
+#      human/orchestrator runs the printed command).
 #   3. Emits ONE best-effort telemetry span via the sibling log-run.sh — a
 #      telemetry failure never fails the close-out and never rolls back the
 #      board write.
@@ -26,11 +35,13 @@
 # record gate (validate-if-present — silent when no `- dispatch:` sub-bullet
 # exists), then T-1017's interventions gate, then T-1096's close-out spec-
 # review backstop (#344, validate-if-present — silent when the task did not
-# elect `spec-review — cross-provider`), then T-1022's source-line gate —
+# elect `spec-review — cross-provider`), then T-1022's source-line gate, then
+# T-1107's pre-flip gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
 #   an elected spec review whose record's last verdict is not an approval refuses the close-out before any board write.
 #   a source line the hand-off lint would reject refuses the close-out before any board write.
 #   a malformed `- dispatch:` sub-bullet refuses the close-out before any board write.
+#   an Active flag other than `READY_FOR_MERGE` refuses the close-out before any board write (T-1107, #53).
 #
 # T-1096's backstop is deliberately NOT a general-purpose reader: it invokes
 # the sibling bin/check-spec-review.sh, which resolves its own reviews
@@ -77,8 +88,9 @@
 #
 # Exit: 0 = board updated; 1 = task not in Active (missing or already Done),
 #       board shape error, an unresolved fast-follow disposition, a
-#       missing/unreadable/non-conformant interventions record, or a source
-#       line the hand-off lint would reject; 2 = usage / validation /
+#       missing/unreadable/non-conformant interventions record, an Active
+#       flag other than `READY_FOR_MERGE` (T-1107, #53), or a source line
+#       the hand-off lint would reject; 2 = usage / validation /
 #       resolver error, or an unusable interventions checker,
 #       interventions-directory resolver, or check-handoff.sh sibling. On any
 #       non-zero exit the board file is byte-untouched. In one line:
@@ -460,8 +472,12 @@ MAIN_LINE="$(sed -n "${A_START}p" "$BOARD")"
 # The greedy prefix group anchors on the LAST ` — \`…\` — spec: ` separator, so
 # backticked tokens inside the title cannot be mistaken for the flag — the
 # same rightmost slot check-handoff.sh's line grammar resolves too (T-1031).
-if [[ "$MAIN_LINE" =~ ^(.+)\ —\ \`[^\`]+\`\ —\ spec:\ ([^[:space:]]+\.md)[[:space:]]*$ ]]; then
-  DONE_MAIN="${BASH_REMATCH[1]} — \`READY_FOR_MERGE\` — spec: ${BASH_REMATCH[2]}"
+# The flag itself is now CAPTURED (T-1107, #53) into BASH_REMATCH[2] — the
+# one place this rightmost-slot rule already lives — so the pre-flip gate
+# below can compare it without a second extraction regex.
+if [[ "$MAIN_LINE" =~ ^(.+)\ —\ \`([^\`]+)\`\ —\ spec:\ ([^[:space:]]+\.md)[[:space:]]*$ ]]; then
+  FOUND_FLAG="${BASH_REMATCH[2]}"
+  DONE_MAIN="${BASH_REMATCH[1]} — \`READY_FOR_MERGE\` — spec: ${BASH_REMATCH[3]}"
   DONE_MAIN="- [x] ${DONE_MAIN#- \[ \] }"
 else
   fail "Active line for $TASK does not match the hand-off grammar: $MAIN_LINE"
@@ -641,6 +657,24 @@ case "$SL_RC" in
     ;;
 esac
 
+# --- fail-closed gate: the Active entry must already be at READY_FOR_MERGE --
+# (T-1107, #53). Sits AFTER the source-line gate above (so a malformed line
+# still fails with THAT gate's own reason, and the two refusal reasons stay
+# distinguishable — never before, which would swallow a malformed line into
+# the wrong message) and BEFORE any board write. $FOUND_FLAG was extracted
+# above (:463-ish, the Done-entry build) by the same rightmost-slot rule the
+# rewrite already uses, so a decoy backticked token earlier in the title
+# cannot be mistaken for it. `agents/codex-reviewer.md`'s own APPROVE step
+# and `docs/adopting.md`'s own done-rule both name READY_FOR_MERGE as the
+# one legitimate pre-close-out state; every other allowed flag
+# (READY_FOR_ARCH, READY_FOR_ENG, READY_FOR_QA, READY_FOR_REVIEW, BLOCKED,
+# REWORK) means the task is not yet approved to close out. Refuses through
+# the existing fail() helper — no new stderr write site — with the real
+# board path and the real source-line number (never the synthesized one).
+if [ "$FOUND_FLAG" != "READY_FOR_MERGE" ]; then
+  fail "${BOARD}:${A_START}: $TASK's Active flag is \`$FOUND_FLAG\`, not \`READY_FOR_MERGE\` — a close-out only promotes an entry the Codex reviewer has already approved (found \`$FOUND_FLAG\`, expected \`READY_FOR_MERGE\`)"
+fi
+
 {
   printf '%s\n' "$DONE_MAIN"
   printf '%s\n' "$CLOSURE"
@@ -694,6 +728,34 @@ if [ -n "$ISSUE" ]; then
   if [ -n "$PR" ]; then printf ' (PR #%s merged to develop)' "$PR"; fi
   printf '"\n'
   printf '  (or via GitHub MCP: issue_write method=update issue_number=%s state=closed state_reason=completed)\n' "$ISSUE"
+else
+  # T-1107, #266: the exact complement of the branch above — an omitted (or
+  # empty-string) --issue skipped this whole procedure in silence three
+  # times before this note existed. Stdout, mirroring the procedure it
+  # stands in for (never `>&2` — a bare `>&2` line would become a new P2
+  # candidate under tests/errexit-safe/run.sh and owe its own registry
+  # entry), and exactly one line so it cannot drift out of sync with the
+  # branch above.
+  #
+  # Round-2 rework (Codex review): the board write above (this task's own
+  # entry move to ## Done) has ALREADY happened by the time this note
+  # prints, so "run close-out.sh again" can never succeed — a second
+  # invocation with the same --task always hits the pre-existing "already
+  # in ## Done" refusal first.
+  #
+  # Round-3 rework (Codex review): round 2's fix pointed at CONTRIBUTING.md
+  # (non-portable to an adopter checkout without that file) and, one level
+  # indirect, back at the same `close-out.sh --issue N` re-invocation round
+  # 1 already flagged — and it dropped the original conditional ("if this
+  # task closes a GitHub issue"), presuming an issue exists on every
+  # no-`--issue` run. Fixed by REMOVAL rather than a further decorated
+  # pointer: no document reference, no command reference, nothing left to
+  # be non-portable or indirectly recursive. The conditional is restored;
+  # the note states only the two facts it can state unconditionally (the
+  # board fact, and the always-true auto-close fact) and asks the operator
+  # to act, without naming HOW — deliberately not the literal
+  # `gh issue close`, which AC4's no-`--issue` cases assert is absent.
+  printf 'close-out: note: no --issue given — if this task closes a GitHub issue, close it by hand now: develop merges do NOT auto-close, and this entry has already moved to ## Done.\n'
 fi
 
 # --- best-effort telemetry (never fails the close-out) -------------------------

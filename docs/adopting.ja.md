@@ -689,6 +689,28 @@ segregation-of-duties 統制を満たすかどうかは `undetermined`（未測�
 oversight-profile approval record がその代わりになることはどちらの向き
 にも無い。
 
+## close-out の pre-flip gate
+
+`bin/close-out.sh` はボードへ書き込む前に、タスクの Active flag を読む
+（T-1107、issue #53）。その flag が既に `READY_FOR_MERGE`——
+`codex-reviewer` が APPROVE 時に書く唯一の状態——でない限り、close-out は
+exit 1 で refuse し、ボードのパス・ソース行・見つかった flag を名指しし、
+ボードファイルは byte 単位で無変更のまま残る。`READY_FOR_ARCH` /
+`READY_FOR_ENG` / `READY_FOR_QA` / `READY_FOR_REVIEW` / `BLOCKED` /
+`REWORK` のいずれかにまだあるタスクは、黙って昇格されるのではなく refuse
+される。修正は、本来 `READY_FOR_MERGE` を書くはずのレビューが実際に走っ
+た後に、ボード上の flag を 1 箇所書き換えるだけでよい。
+
+別件として、`close-out.sh --issue N` は手動での GitHub issue クローズ手順
+を出力する（`develop` へのマージは issue を自動クローズし**ない**ため）。
+`--issue` が省略された場合——あるいは空文字列で渡された場合——は、代わりに
+1 行のノート（`close-out: note: no --issue given`）を出力し、operator が
+その手順の存在を知れるようにする（何も出力しない代わりに）。ノートと手順
+は 1 つの条件の厳密な補集合であり、同じ実行で両方発火することも、両方
+沈黙することもない。出力されたノートは disclosure であって gate ではない
+——close-out を refuse せず、stdout を読まない operator には、どちらに
+せよ何も伝わらない。
+
 ## review-input fidelity を記録する
 
 review record の verdict section が名指す各 executor pass は、1 つの

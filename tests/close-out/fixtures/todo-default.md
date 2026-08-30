@@ -7,7 +7,7 @@
 
 ## Active
 
-- [ ] **T-200** default-layout のサンプルタスク（fixture） — `READY_FOR_REVIEW` — spec: .shell-team/specs/t-200.md
+- [ ] **T-200** default-layout のサンプルタスク（fixture） — `READY_FOR_MERGE` — spec: .shell-team/specs/t-200.md
 
 ## Done
 
