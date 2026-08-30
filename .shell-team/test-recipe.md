@@ -2218,19 +2218,45 @@ that file's order.
   **real directory, copied, never a symlink**: a symlinked snapshot is
   invisible to the fix and visible to every scope-lock criterion as a new
   untracked path.
-  - Staging command shape settled on: snapshot the corpus **once**, before
-    either arm runs, `cp -R "$(bash bin/team-paths.sh --get runs)"
-    "$snap"`; then, into the base worktree, `mkdir -p
-    "$W/.shell-team/runs"` and copy the snapshot in **member by member**
-    (`find "$snap" -type f`, skipping `.gitkeep`), `mkdir -p` each member's
-    parent directory first, and — the already-exists trap — skip any
-    member `git -C "$W" ls-files --error-unmatch` already tracks at that
-    path rather than overwriting it. Never delete anything already in the
-    worktree. This handles both states of `.shell-team/runs/` in a fresh
-    base worktree (absent/empty at this freeze — measured **0** tracked
-    members via `git ls-files -- '.shell-team/runs/*'` — or containing a
-    force-added tracked member, reachable at any later date) without a
-    special case for either.
+  - Staging command shape settled on (repaired from an earlier hardcoded
+    draft during a rework round — see below): snapshot the corpus
+    **once**, before either arm runs, `cp -R "$(bash bin/team-paths.sh
+    --get runs)" "$snap"`; then, inside the base worktree, resolve the
+    destination through the **same resolver rather than a hardcoded
+    path** — `D=$( cd "$W" && bash bin/team-paths.sh --get runs )`,
+    failing closed (tear down the worktree, exit non-zero) on an empty
+    or absolute `$D`, since `--get runs` returns a ROOT-relative path
+    and this is what makes the destination correct on the legacy layout
+    and a custom `TEAM_RUN_BASE`, and not only on this repository's own
+    `.shell-team/runs`. `mkdir -p "$W/$D"` and copy the snapshot in
+    **member by member**, reading the file list from a NUL-delimited
+    temp file (`find "$snap" -type f -print0 > "$list"`, then `while …
+    read -r -d '' … done < "$list"`) rather than piping `find` straight
+    into the `while` — the redirected form runs the loop body in the
+    **current** shell, so a per-member `mkdir`/`cp` failure sets the
+    outer `rc` instead of dying inside a pipe subshell that discards it
+    silently. `mkdir -p` each member's parent directory first, and —
+    the already-exists trap — skip any member git tracks at **either**
+    ref: the base worktree's index (`git -C "$W" ls-files
+    --error-unmatch`) **or** the live/`HEAD` side (`git ls-files
+    --error-unmatch` against the live index, or `git cat-file -e
+    "HEAD:…"` against `HEAD`'s tree) — a member force-added as tracked
+    only at `HEAD` has no base-ref bytes at all, so copying it in would
+    inject a file the base arm must not see. Never delete anything
+    already in the worktree. This handles both states of the resolved
+    corpus path in a fresh base worktree (absent/empty at this freeze —
+    measured **0** members tracked at either ref via `git ls-files --
+    '.shell-team/runs/*'` in this checkout and in the live index — or
+    containing a member tracked at either ref, reachable at any later
+    date) without a special case for either.
+  - **Rework note**: the first draft of this entry hardcoded the
+    destination as `$W/.shell-team/runs` and skipped only members the
+    base worktree itself tracked — both measured wrong for an adopter on
+    the legacy layout or a custom `TEAM_RUN_BASE`, and for a corpus
+    member force-added as tracked only at `HEAD`, by a cross-provider
+    review round (`.shell-team/reviews/T-1108.md`, `#### Major` rows 1-2).
+    The shape above is the repaired one; do not reintroduce the literal
+    path or the base-worktree-only skip filter.
   - Timeout needed: `CHECK_ACS_TIMEOUT=900` for a full-spec run of
     `T-1108-sweep-corpus-isolation.md` — **AC4** runs ten criterion bodies
     (five, twice) plus five live-arm runs and **AC13** runs a live-derived
