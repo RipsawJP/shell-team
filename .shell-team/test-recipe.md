@@ -2312,3 +2312,50 @@ that file's order.
   least once against a genuine `- dispatch:` line, confirmed live (**AC7**'s
   own check line, which builds exactly this pair of fixture files and
   asserts both counts).
+  - **New environment quirk this task discovered while attempting AC14's
+    full-population sweep: `bin/log-run.sh`'s directory lock contends
+    severely across CONCURRENT `bin/check-acs.sh` invocations of
+    DIFFERENT specs, not only within one spec's own run.** The T-1084/
+    T-1083 recipe entries above document an `xargs -P <cores>` fan-out for
+    a full-population Blast-radius sweep; applying that same pattern to a
+    fan-out of *whole-spec* `check-acs.sh` runs (one process per spec,
+    several specs in flight at once) stalled an 8-way batch for several
+    minutes on this machine when the batch happened to contain a spec
+    whose own criteria call `bin/log-run.sh` more than once (measured:
+    `T-1058-telemetry-binding.md`'s **AC1** alone calls it three times) —
+    each concurrent invocation waits out the lock's own bounded retry
+    window, and with several contenders the waits compound. A **serial**,
+    one-spec-at-a-time driver avoids this entirely (only one process ever
+    holds or waits on the lock at a time), at the cost of session
+    wall-clock time (roughly 40-50s per spec observed once contention was
+    removed, versus multi-minute stalls under contention). Separately:
+    this machine carries **no `timeout`/`gtimeout` binary on `PATH`**, so
+    `bin/check-acs.sh`'s own `CHECK_ACS_TIMEOUT` wrapping is inert here
+    (its own documented fallback — "back to a plain run" — silently takes
+    over) and cannot bound a spec whose check genuinely never returns; a
+    driver attempting a bounded sweep on such a machine needs its own
+    external wall-clock bound (a hand-rolled `sleep N && kill` watcher
+    around each spec's process, since the `timeout` command cannot be
+    assumed present) rather than trusting the script's own internal
+    timeout to fire.
+  - **Mutation self-check technique for the predecessor-lookup/duty-B
+    logic**: line-number-targeted `awk 'NR==n{print r; next}{print}'`
+    substitutions against a scratch copy (never `sed` pattern-matching the
+    live source text, which is fragile against em-dashes and nested
+    quoting in this file) — locate the target line once with `grep -n`,
+    then mutate by line number. Two authoring traps worth inheriting:
+    (1) a fixture built to isolate ONE duty (e.g. the axis-vocabulary
+    check) from a SIBLING duty that shares the same board shape (e.g. the
+    coverage check) must give the sibling duty nothing to catch on its
+    own — a "bogus axis" fixture that also leaves an entry's own dispatch
+    axis uncovered gets caught by the coverage check even after the
+    axis-vocabulary check is neutered, silently defeating the probe's own
+    purpose (confirmed by constructing a probe, seeing it fail to
+    reproduce the defect, and re-deriving a fixture with a superfluous,
+    coverage-neutral extra row instead); (2) a fixture exercising ONLY the
+    predecessor-resolution duty must still carry every OTHER
+    unconditionally-required source this script's own pre-existing duties
+    demand (`- entry-mode:` and `- dispatch: specify — …`, T-1096) — a
+    fixture missing one of those refuses for the wrong reason before the
+    predecessor logic is ever reached, again defeating the probe silently
+    rather than loudly.
