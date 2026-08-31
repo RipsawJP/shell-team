@@ -2394,3 +2394,33 @@ that file's order.
   idiom, was permitted and produced normal output — worth trying a
   single-line reformulation before concluding a multi-statement verification
   block is blocked outright.
+- T-1110 (coordinating-session fan-out procedure, promoted with fresh
+  measurements — the T-1109 session established this shape but never
+  appended it, which is how the hosting form drifted; operator ruling
+  2026-08-31, `.shell-team/interventions/T-1110.md`): a mechanism-class
+  full-population two-arm sweep is executed as **N harness-tracked
+  background shell slices launched by the coordinating session** — never
+  by a sub-agent hosting detached children (a sub-agent's shell tool caps
+  one call at 10 minutes, its detached children are harness-untracked,
+  and its own process is a single point of failure for every slice at
+  once; sub-agent-hosted fan-out has zero completed runs and is
+  prohibited until a dedicated pilot measures it). Shape: partition the
+  member list round-robin into N lists; per slice create ONE base
+  worktree (`git worktree add --detach` at the resolved base ref) and ONE
+  head worktree (pinned at a commit, never the live tree — a live tree is
+  concurrently written by other roles), stage the untracked runs corpus
+  into BOTH arms per the T-1108 entry above; each slice runs its members
+  serially (`bash bin/check-acs.sh <spec>` per member per arm), so the
+  `bin/log-run.sh` directory lock never sees two contenders in one tree
+  while the slices stay parallel across trees. Measured this task: 112
+  members x 2 arms = 224 runs, 6 slices, 132.8 min wall-clock under
+  competing CPU load (an orphaned second fan-out ran for part of the
+  window); T-1109's uncontended measurement of the same shape was ~92 min
+  for 113 x 2. Completion criterion: per-slice progress count equals its
+  list length AND every member has both arm rows — never a sentinel echo.
+  Two quirks: (a) `echo "SLICE_$i_DONE"` under `set -u` parses `$i_DONE`
+  as one variable and kills the slice's exit status after all work is
+  done — write `${i}_DONE`; the resulting `failed (exit 1)` task
+  notifications are cosmetic when the completion criterion above holds;
+  (b) flip tallies are derived from the results TSV by an awk join on
+  (member, arm), never read off individual logs by eye.
