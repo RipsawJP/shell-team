@@ -1,19 +1,23 @@
 # Plugin-role Agent-tool concurrency: the open question is not whether it overlaps — that is measured twice — but whether the declared `subagent_type` is the resolved one, so this task reconciles the prior measurements, repairs every stale surface they left behind, and probes the one residual with a tool-set discriminator
 
-**Status**: DRAFT
+**Status**: READY_FOR_ARCH
 **Owner**: pm-spec
 **Task ID**: T-1111
 
-> **This spec is DRAFT, not `READY_FOR_ARCH`, and the board entry is `BLOCKED` on purpose.**
+> **This spec was held at `DRAFT`/`BLOCKED` on authoring, and is released by an operator ruling.**
 > The task's originating premise — issue #398's "the Agent-level concurrency premise has never
 > been verified", and the Plan-time premise-correction table's row "Open residual … CONFIRMED —
 > this is what T-1111 measures" — is **measured false at its primary source**. Plugin-role
 > Agent-tool concurrency has already been measured twice in this repository, at N=2, N=4 and
 > N=8, with real overlap margins. What remains open is a strictly narrower question, and the
-> re-scope that follows from it is a scope change this role does not make on its own authority
+> re-scope that follows from it was a scope change this role did not make on its own authority
 > (`CLAUDE.local.md`, 承認ゲートの範囲: 停止して上げるのは … issue の意図との矛盾・スコープ変更).
-> `## Open questions` carries the single blocking decision. Everything below is written to the
-> measured reality so the disposition can be taken against a real artifact rather than a summary.
+> **The operator selected disposition (a) on 2026-08-31** — the reconciliation note, the
+> stale-surface repair, and the narrowed resolved-type probe exactly as written below — recorded
+> as the third entry (`intervention: human-correction`, 2026-08-31) of
+> `.shell-team/interventions/T-1111.md`. `## Open questions` records that resolution and is no
+> longer blocking; everything else below is unchanged from the version the ruling was taken
+> against, because this spec was authored for (a) already.
 
 **Base ref / branch point — one discriminator for the whole spec.** Every base-side blob read in
 this spec reads **the branch point**, resolved at check time by an explicit branch-existence test
@@ -305,22 +309,24 @@ One row per normative directive stated in the body prose, mapped to the criterio
 
 ## Open questions
 
-**One, and it is blocking. It is the reason this spec is `DRAFT` and the board entry is `BLOCKED`.**
+**None outstanding. The one question that was blocking is resolved — kept below as the record of what was decided and against what alternatives.**
 
-Given that the measurement issue #398 asked for has already been performed twice (**A-1**), which disposition does T-1111 take? The three options, each with its content rather than a bare label:
+**Resolution: disposition (a), operator-selected on 2026-08-31**, recorded as the third entry (`intervention: human-correction`, date 2026-08-31) of `.shell-team/interventions/T-1111.md`, which states the ruling and its ground: the probe "is the first verification that a plugin role's shipped tool restriction is actually enforced on concurrently launched instances", and the sprint's v2.4.1 PATCH premise is unaffected. This spec was authored for (a), so nothing in the Goal, the frozen protocol region, the Non-goals, the acceptance criteria or the Input space changed when the ruling landed; the spec's Status moved `DRAFT` → `READY_FOR_ARCH` and the board entry moved `BLOCKED` → `READY_FOR_ENG`.
 
-- **(a) Re-scoped as written above** — the reconciliation note, the stale-surface repair, and the narrowed live probe closing the declared-label-versus-resolved-type residual. Cost: two three-instance arms plus the repair round. Declarations stay as written (`real-environment` ceiling). This is **this role's recommendation**, on the ground that the repair is owed regardless (three merged notes carry follow-ups explicitly deferring it to "a later maintainer round", and this is that round), the residual is real and both T-1083 and T-1085 name it in their own words, and the probe as specified also satisfies issue #398's own literal `N >= 3` Scope sentence, so the issue closes honestly rather than being closed on a technicality.
+The question as it stood, and the three options it was decided among — retained verbatim so a later reader sees what was weighed rather than only what was chosen. Given that the measurement issue #398 asked for has already been performed twice (**A-1**), which disposition does T-1111 take?
+
+- **(a) Re-scoped as written above — CHOSEN** — the reconciliation note, the stale-surface repair, and the narrowed live probe closing the declared-label-versus-resolved-type residual. Cost: two three-instance arms plus the repair round. Declarations stay as written (`real-environment` ceiling). This is **this role's recommendation**, on the ground that the repair is owed regardless (three merged notes carry follow-ups explicitly deferring it to "a later maintainer round", and this is that round), the residual is real and both T-1083 and T-1085 name it in their own words, and the probe as specified also satisfies issue #398's own literal `N >= 3` Scope sentence, so the issue closes honestly rather than being closed on a technicality.
 - **(b) Repair-only** — drop the probe and **AC2**–**AC9**, drop the `real-environment` ceiling to `unit-and-static`, ship the reconciliation note and the stale-surface repair, and carry the resolved-type residual to issue #398 (or a successor) as its remaining requirement. Cost: no arms at all. This is the cheapest honest outcome and is exactly the pre-commitment's droppable-second disposition, executed up front rather than after two adverse rounds.
 - **(c) Cancel and re-plan** — close #398 as already-discharged, file the repair round and the resolved-type residual as separate issues, and return T-1111 to planning. Cost: the sprint loses a slot; the three stale surfaces stay stale until someone picks the repair issue up.
 
-Whichever is chosen, the choice is recorded in `.shell-team/interventions/T-1111.md` together with **A-1**'s exact text, because the premise that broke is the task's own justification and `CLAUDE.local.md`'s 承認ゲートの範囲 names「issue の意図との矛盾」and「スコープ変更」as the two classes that stop and rise rather than proceed on this role's own authority.
+The choice **is** recorded in `.shell-team/interventions/T-1111.md` together with **A-1**'s exact text (that file's first entry carries it verbatim), because the premise that broke is the task's own justification and `CLAUDE.local.md`'s 承認ゲートの範囲 names「issue の意図との矛盾」and「スコープ変更」as the two classes that stop and rise rather than proceed on this role's own authority. That same file's first entry additionally records the layered-relay accounting the coordinating session owns — three successive readers stopping at three different depths of one supersession-declared-but-not-performed chain — which is carried into this task's own repair scope and to the retro.
 
 ## Notes for engineer
 
 - **You cannot run the probe, and nothing here asks you to.** The `## Probe evidence (raw, orchestrator-produced)` section arrives already committed; treat it as read-only input. Your job is the other eight sections plus the three in-place repairs. If the evidence does not support a conclusion, the honest write-up is `undetermined` with the reason.
 - **The three repairs are the delicate part, and the delicacy is mechanical rather than editorial.** Each is an in-place replacement that must not change its file's total line count (**AC11**) and must not disturb the grammars **AC12** guards. In particular: `harness-agent-concurrency.md`'s `- unobserved:` line must **stay** a `- unobserved:` line and must **keep** the literal `plugin-role`, because T-1073's own merged **AC11** counts exactly that — narrow the line's content to the residual that genuinely remains (the resolved-type gap, and generalization beyond `qa-verifier`/sonnet) rather than deleting or re-prefixing it. `agent-concurrency.md:120` quotes that line **verbatim**; repair both in the same edit or the quote becomes a misquote.
 - **Measured-at-ref labels**: this task's deliverable prints no `measured at <ref>` label, no `**Base ref**:` header over a machine-local figure and no per-row `- measurement:` field tying a timing to a git ref — **not applicable, by construction**: every timing figure is machine-local and single-session, and the Non-goals bar attaching a git-ref label to one. The only ref-labelled reads are of committed blobs, made with `git show`.
-- **Files likely touched**: `docs/loop-engineering/plugin-role-agent-concurrency.md` (assembly), `docs/loop-engineering/harness-agent-concurrency.md`, `docs/loop-engineering/agent-concurrency.md`, `docs/loop-engineering/phase-multiplexing.md` (line-count-preserving repairs), `.shell-team/test-recipe.md` (append one line naming `T-1111` under `## Appended by tasks`), `.shell-team/provenance/T-1111.md`, the board entry, and nothing else. `.shell-team/interventions/T-1111.md` is the orchestrator's file; do not write it — the entry owed there is **A-1**'s exact text plus the `## Open questions` disposition.
+- **Files likely touched**: `docs/loop-engineering/plugin-role-agent-concurrency.md` (assembly), `docs/loop-engineering/harness-agent-concurrency.md`, `docs/loop-engineering/agent-concurrency.md`, `docs/loop-engineering/phase-multiplexing.md` (line-count-preserving repairs), `.shell-team/test-recipe.md` (append one line naming `T-1111` under `## Appended by tasks`), `.shell-team/provenance/T-1111.md`, the board entry, and nothing else. `.shell-team/interventions/T-1111.md` is the orchestrator's file; do not write it — it already exists and carries the three entries this task owed at authoring (**A-1**'s exact text, the Routing-Map relay omission, and the operator's disposition ruling), so **AC13**'s conformance clause has a real file to read; anything further owed there is the orchestrator's to append.
 - **The `10#` and `awk` gotchas are load-bearing.** Several criteria compare 19-digit integers. Use `$(( 10#$v ))`; do not reach for `awk` or `sort -n` when you reproduce these comparisons by hand, and do not "simplify" a check into one.
 - **`CHECK_ACS_TIMEOUT` is inert on this host** — `.shell-team/interventions/T-1109.md` entry 1 measured that neither `timeout` nor `gtimeout` resolves here, so the wrapper falls back to a plain run and cannot bound a stuck check. Raise the value anyway (at least 900) and record it, since **AC13** runs five checkers over a large board, but do not rely on it as a bound.
 - **Sandbox quirk worth inheriting** — `.shell-team/test-recipe.md`'s T-1110 entry: a multi-statement `bash` block with an inline `mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX"` was denied outright by this sandbox, while the identical logic as a single-line command was permitted. Every `- check:` line above is already a single line for that reason.
