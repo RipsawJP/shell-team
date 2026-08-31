@@ -2359,3 +2359,38 @@ that file's order.
     fixture missing one of those refuses for the wrong reason before the
     predecessor logic is ever reached, again defeating the probe silently
     rather than loudly.
+- T-1110: `CHECK_ACS_TIMEOUT=900 check-acs.sh
+  .shell-team/specs/T-1110-freeze-version-derivation.md` is the mechanical
+  per-AC gate for a spec whose criteria read committed base-ref blobs via a
+  `git merge-base` discriminator (AC6/AC9/AC11/AC12/AC14) — the 900s budget
+  is generous headroom for `bash tests/trial-recipe/run.sh` (AC12) running
+  inline inside one of the criteria's own `- check:` line rather than a
+  suite-runtime requirement in itself. Two traps worth inheriting for any
+  future task editing `docs/adopting.md` / `docs/adopting.ja.md` or
+  `skills/run/SKILL.md`'s freeze-sweep branch: **(1)** both adopting docs
+  are **hard-wrapped prose** (roughly 70-79 columns per line), and an
+  acceptance criterion that asserts a literal multi-word phrase with
+  `grep -qF` against an extracted section checks each PHYSICAL line
+  independently — a phrase that happens to fall across a hard-wrap line
+  break (e.g. "no mechanical checker ships\nfor it yet") silently fails
+  even though the words are all present and read correctly to a human.
+  Before trusting a docs edit carrying required literal tokens, re-run the
+  exact extraction-plus-grep the spec's own `- check:` line uses (an `awk`
+  section extraction into a scratch file, then `grep -qF` per token) rather
+  than eyeballing the rendered prose. **(2)** `skills/run/SKILL.md`'s
+  freeze-sweep gate bullets are each a SINGLE physical line of several
+  thousand characters; anchor an `Edit` on the full preceding sibling
+  gate's own complete line (never a fragment of it) and insert the new
+  bullet as one line immediately after, then confirm
+  `git diff --numstat -- skills/run/SKILL.md` reports zero deletions
+  before running any other check (T-1107 marker-corruption rule, same
+  discipline this file's own T-1041/T-1051 entries above already document
+  for other files). Separately, a multi-line `bash` command block piping
+  through several `&&`/`;`-joined statements with an inline
+  `mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX"` was denied outright by this
+  sandbox's write-allowlist on this task (no output, no partial run); the
+  same logic run as a SINGLE-LINE command, or using the session's own
+  scratchpad path directly instead of the `${TMPDIR:-/tmp}` fallback
+  idiom, was permitted and produced normal output — worth trying a
+  single-line reformulation before concluding a multi-statement verification
+  block is blocked outright.

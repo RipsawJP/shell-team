@@ -794,6 +794,45 @@ the argv that actually ran. And it cannot see whether the raw file a
 untracked by construction (`/.gitignore`), so a stem naming nothing is
 conformant to this checker.
 
+## Deriving the release version at freeze time
+
+At every freeze — a task's first freeze and any re-freeze, including a
+class-M mechanics-repair re-freeze — the coordinating session
+re-derives the release tier from the spec's own declarations, before
+that freeze's `- intent-hash` line is appended: a `- user-visible:`
+line and a `- verification-class:` line. The derivation applies
+`CONTRIBUTING.md`'s `## What a version number encodes` headline test
+and default-reachability test jointly: a `- user-visible: yes`
+declaration is the derivation's **trigger**, never its verdict, and the
+derived tier is one of `MAJOR`, `MINOR` or `PATCH`.
+
+The result is recorded on the task's own board entry as a
+`- version-derivation` sub-bullet, in the shape
+`- version-derivation (v<N>, YYYY-MM-DD):`, whose closed fields —
+`verdict=`, `derived=`, `headline=`, `default-reach=` — precede one
+free-form `grounds:` field, so a later checker can validate the family
+when it is present while an entry carrying none of this still passes.
+The `premise=` field between them is required to be self-contained: it
+carries the expected tier together with the ground the planning
+approval was given on, never a bare pointer to an approval a later
+reader has no way to open. Where the repository has no approved
+planning premise on record — the shipped default for an adopter who
+never configured one — there is nothing to derive against; this is
+never a reason to refuse the freeze, and the record is still written
+with `verdict=no-premise-on-record`.
+
+When the derived tier disagrees with the repository's approved planning
+premise, the freeze stops before any further work on the task and
+issues a deviation notice: stated in English, never a bare "proceed?",
+and carrying all three of its required elements — that the work now exceeds the approved estimate, the continue-or-stop question, and a
+recommendation with its rationale. This stop is not a fourth human gate: it re-enters the existing planning-approval gate, one of the
+three standing human gates this loop already declares, because a
+derived tier that disagrees with the approved premise means that
+approval has lapsed. No new status flag and no new phase are added.
+
+Enforcement today is a **duty, not a checker**: the coordinating
+session performs this derivation as a read, and no mechanical checker ships for it yet.
+
 ## Operating rules
 
 - Do not advance a phase until the previous phase's status flag is set in the board.
