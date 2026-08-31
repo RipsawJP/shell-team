@@ -83,34 +83,53 @@ The commands the frozen protocol names, reproduced here for this note's own gram
 Probe executed 2026-09-01 by the coordinating session per the frozen
 `<!-- BEGIN probe-protocol: T-1111 -->` region of
 `.shell-team/specs/T-1111-plugin-role-agent-concurrency.md` (intent-hash v1
-`5c9f7800939f24507d6dd25a08706fe2693dcb3a`, frozen before any arm ran). Venue:
-exactly one throwaway `git clone --local` under `$TMPDIR` (written here as
-`<probe-clone-root>`; its source is `<this-checkout-root>`), detached at the
+`5c9f7800939f24507d6dd25a08706fe2693dcb3a`, frozen before any arm ran).
+
+**Invalid-evidence event, recorded per the frozen rule (at most one re-probe).**
+This is the second and final permitted probe run. The first run's evidence
+(committed at `2fa4ccd0a69a8a0bd26cf48fc1f51d902911bed8`) was declared invalid
+for the recorded reason: the evidence section was drafted without **AC4**'s
+required `- command: ` line grammar — the freeze executor's own conformance
+omission, caught by the spec's own live check and ruled repair-the-work rather
+than repair-the-gate after the operator rejected a proposed criterion edit as
+result-fitting (`.shell-team/interventions/T-1111.md`, fifth entry). No frozen
+byte moved; this run re-executed the identical frozen protocol end to end in a
+fresh clone, and the first run's raw integers are superseded, never merged.
+
+Venue: exactly one throwaway `git clone --local` under `$TMPDIR` (written here
+as `<probe-clone-root>`; source `<this-checkout-root>`), detached at the
 resolved branch point. Launch order as frozen: `resolved-type-n3-rep1` →
 `control-gp-n3` → `resolved-type-n3-rep2`, three parallel `Agent` tool calls in
-one orchestrator message per arm, nine launches total. Every timestamp below is
-from `python3 -c 'import time; print(time.time_ns())'` (verified expanding to a
-19-digit integer before reliance), taken by the instance itself (`start_ns`/
-`end_ns`, transcribed 1:1 onto the `- agent-timestamp:` lines as `first`/`last`)
-or by the orchestrator (`- unit-timing:`, `- batch-timestamp:`).
+one orchestrator message per arm, nine launches total. Every timestamp is from
+`python3 -c 'import time; print(time.time_ns())'` (verified expanding to a
+19-digit integer before reliance: sample `1788193486828506000`), taken by the
+instance itself (`start_ns`/`end_ns`, transcribed 1:1 onto `- agent-timestamp:`
+lines as `first`/`last`) or by the orchestrator (`- unit-timing:`,
+`- batch-timestamp:`). Commands the orchestrator ran, tagged per the note
+grammar:
+
+- command: `git clone --local --no-checkout <this-checkout-root> <probe-clone-root> && git -C <probe-clone-root> checkout --detach e14898a5f0f56505f1bea2de23f046fabe590eee` — cut and pin the one shared venue.
+- command: `git -C <probe-clone-root> rev-parse HEAD` — produced the `- clone-ref:` value below.
+- command: `cd <probe-clone-root> && CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md` — the population-fixation unit-timing run (timestamps taken immediately before and after with the clock source above).
+- command: `git status --short` and `git ls-files --others --exclude-standard` — both read in the real checkout after every arm, and `git -C <probe-clone-root> status --short` read in the clone after all arms, producing the `- probe-writes:` result below.
 
 - clone-ref: shared — e14898a5f0f56505f1bea2de23f046fabe590eee — `git -C <probe-clone-root> rev-parse HEAD`, read after the detached checkout and equal to the resolved branch point (arm 1 of the base-ref discriminator).
 - probe-arm: resolved-type-n3-rep1 — executed — three shell-team:qa-verifier instances, one message, per the frozen order (first).
 - probe-arm: control-gp-n3 — executed — three general-purpose instances, one message, per the frozen order (second, between the subject arms).
 - probe-arm: resolved-type-n3-rep2 — executed — three shell-team:qa-verifier instances, one message, per the frozen order (third).
-- unit-timing: population-fixation — start=1788189989987830000 — end=1788190190451760000 — plain shell run of the unit in the clone before any arm: `cd <probe-clone-root> && CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1044-test-infra-bundle.md`; rc=1 (the unit is the run, never its verdict; its tail read `10 passed, 4 failed, 1 skipped`).
-- batch-timestamp: resolved-type-n3-rep1 — batch_start=1788190200723271000 — batch_end=1788190535863506000 — orchestrator timestamps immediately before the arm's one launch message and immediately after its last completion notification.
-- batch-timestamp: control-gp-n3 — batch_start=1788190535992907000 — batch_end=1788190893103623000 — same method.
-- batch-timestamp: resolved-type-n3-rep2 — batch_start=1788190893232586000 — batch_end=1788191236079383000 — same method.
-- agent-timestamp: resolved-type-n3-rep1 — qa-1 — first=1788190222808870000 — last=1788190503223358000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: resolved-type-n3-rep1 — qa-2 — first=1788190227189048000 — last=1788190507903021000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: resolved-type-n3-rep1 — qa-3 — first=1788190228618590000 — last=1788190508948474000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: control-gp-n3 — gp-1 — first=1788190564703988000 — last=1788190844603067000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: control-gp-n3 — gp-2 — first=1788190563273941000 — last=1788190861254169000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: control-gp-n3 — gp-3 — first=1788190568879956000 — last=1788190866588978000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: resolved-type-n3-rep2 — qa-1 — first=1788190920375605000 — last=1788191200989511000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: resolved-type-n3-rep2 — qa-2 — first=1788190918308554000 — last=1788191186978384000 — transcribed 1:1 from the instance's report line below.
-- agent-timestamp: resolved-type-n3-rep2 — qa-3 — first=1788190922588647000 — last=1788191190773925000 — transcribed 1:1 from the instance's report line below.
+- unit-timing: population-fixation — start=1788193497802411000 — end=1788193698146747000 — the tagged unit-timing command above, run in the clone before any arm; rc=1 (the unit is the run, never its verdict; its tail read `10 passed, 4 failed, 1 skipped`).
+- batch-timestamp: resolved-type-n3-rep1 — batch_start=1788193703737037000 — batch_end=1788194032285399000 — orchestrator timestamps immediately before the arm's one launch message and immediately after its last completion notification.
+- batch-timestamp: control-gp-n3 — batch_start=1788194032416344000 — batch_end=1788194372778813000 — same method.
+- batch-timestamp: resolved-type-n3-rep2 — batch_start=1788194372909625000 — batch_end=1788194715174306000 — same method.
+- agent-timestamp: resolved-type-n3-rep1 — qa-1 — first=1788193721661520000 — last=1788193993353037000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: resolved-type-n3-rep1 — qa-2 — first=1788193735793570000 — last=1788194009562454000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: resolved-type-n3-rep1 — qa-3 — first=1788193743667016000 — last=1788194008805197000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: control-gp-n3 — gp-1 — first=1788194056382851000 — last=1788194338195079000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: control-gp-n3 — gp-2 — first=1788194062368312000 — last=1788194343944549000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: control-gp-n3 — gp-3 — first=1788194068648163000 — last=1788194349818150000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: resolved-type-n3-rep2 — qa-1 — first=1788194409567870000 — last=1788194687310761000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: resolved-type-n3-rep2 — qa-2 — first=1788194399299375000 — last=1788194681193325000 — transcribed 1:1 from the instance's report line below.
+- agent-timestamp: resolved-type-n3-rep2 — qa-3 — first=1788194401706495000 — last=1788194680215343000 — transcribed 1:1 from the instance's report line below.
 - write-artifact: resolved-type-n3-rep1 — qa-1 — absent — orchestrator read of `<probe-clone-root>/probe-write-resolved-type-n3-rep1-qa-1.txt` after all three arms: no file.
 - write-artifact: resolved-type-n3-rep1 — qa-2 — absent — same read: no file.
 - write-artifact: resolved-type-n3-rep1 — qa-3 — absent — same read: no file.
@@ -128,33 +147,35 @@ or by the orchestrator (`- unit-timing:`, `- batch-timestamp:`).
 - tool-probe: control-gp-n3 — gp-3 — write_tool=available — same.
 - tool-probe: resolved-type-n3-rep2 — qa-1 — write_tool=absent — same.
 - tool-probe: resolved-type-n3-rep2 — qa-2 — write_tool=absent — same.
-- tool-probe: resolved-type-n3-rep2 — qa-3 — write_tool=refused — same; the one self-report differing from its arm-mates, conformant with its own absent artifact under the consistency coupling.
-- probe-writes: none — after every arm, `git status --short` and `git ls-files --others --exclude-standard` were read in the real checkout: clean, zero untracked strays; inside the clone the only untracked paths are the three sanctioned control artifacts (`git -C <probe-clone-root> status --short` count 3, all matching `probe-write-control-gp-n3-gp-[123].txt`), so `none` here means no write outside the clone and no unsanctioned write inside it.
+- tool-probe: resolved-type-n3-rep2 — qa-3 — write_tool=absent — same.
+- probe-writes: none — after every arm the tagged cleanliness commands above were read in the real checkout: zero untracked strays throughout (the one modified path was `.shell-team/interventions/T-1111.md`, the coordinating session's own uncommitted ledger edit, not a probe write); inside the clone the only untracked paths are the three sanctioned control artifacts (count 3, all matching `probe-write-control-gp-n3-gp-[123].txt`), so `none` means no write outside the clone and no unsanctioned write inside it.
 
 Verbatim instance report lines (channel source for the `- agent-timestamp:` and
 `- tool-probe:` families above, one line per instance as each completion
 notification delivered it):
 
 ```
-instance=qa-1 arm=resolved-type-n3-rep1 start_ns=1788190222808870000 end_ns=1788190503223358000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
-instance=qa-2 arm=resolved-type-n3-rep1 start_ns=1788190227189048000 end_ns=1788190507903021000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
-instance=qa-3 arm=resolved-type-n3-rep1 start_ns=1788190228618590000 end_ns=1788190508948474000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
-instance=gp-1 arm=control-gp-n3 start_ns=1788190564703988000 end_ns=1788190844603067000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=available
-instance=gp-2 arm=control-gp-n3 start_ns=1788190563273941000 end_ns=1788190861254169000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=available
-instance=gp-3 arm=control-gp-n3 start_ns=1788190568879956000 end_ns=1788190866588978000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=available
-instance=qa-1 arm=resolved-type-n3-rep2 start_ns=1788190920375605000 end_ns=1788191200989511000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
-instance=qa-2 arm=resolved-type-n3-rep2 start_ns=1788190918308554000 end_ns=1788191186978384000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
-instance=qa-3 arm=resolved-type-n3-rep2 start_ns=1788190922588647000 end_ns=1788191190773925000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=refused
+instance=qa-1 arm=resolved-type-n3-rep1 start_ns=1788193721661520000 end_ns=1788193993353037000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
+instance=qa-2 arm=resolved-type-n3-rep1 start_ns=1788193735793570000 end_ns=1788194009562454000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
+instance=qa-3 arm=resolved-type-n3-rep1 start_ns=1788193743667016000 end_ns=1788194008805197000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
+instance=gp-1 arm=control-gp-n3 start_ns=1788194056382851000 end_ns=1788194338195079000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=available
+instance=gp-2 arm=control-gp-n3 start_ns=1788194062368312000 end_ns=1788194343944549000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=available
+instance=gp-3 arm=control-gp-n3 start_ns=1788194068648163000 end_ns=1788194349818150000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=available
+instance=qa-1 arm=resolved-type-n3-rep2 start_ns=1788194409567870000 end_ns=1788194687310761000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
+instance=qa-2 arm=resolved-type-n3-rep2 start_ns=1788194399299375000 end_ns=1788194681193325000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
+instance=qa-3 arm=resolved-type-n3-rep2 start_ns=1788194401706495000 end_ns=1788194680215343000 clock_source=python3-time_ns unit_rc=1 foreground=true write_tool=absent
 ```
 
 Execution-detail findings, recorded for reuse: every one of the nine instances
 reported `foreground=true` under an explicit 400000 ms timeout parameter,
 consistent with T-1073's finding that only the 120 s default auto-backgrounds;
 the three completion notifications of each arm arrived within seconds of one
-another; and the `refused`-vs-`absent` split inside the subject self-reports is
-itself evidence the self-report channel is agent-authored interpretation rather
-than a harness fact — exactly why it is the corroborating channel and never the
-licensing one.
+another; the re-probe's per-instance self-reports were unanimous within each
+arm this time (the first run's single `refused`-vs-`absent` split did not
+recur), which is further evidence the self-report channel is agent-authored
+interpretation rather than a harness fact — exactly why it is the
+corroborating channel and never the licensing one.
+
 ## Overlap and discriminator analysis
 
 - channel: agent-self-timestamps — primary — each instance's own first and last timestamps (`- agent-timestamp:` lines above), the only channel measured from inside the instances; used for the concurrency question.
