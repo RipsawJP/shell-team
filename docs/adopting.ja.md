@@ -717,6 +717,22 @@ exit 1 で refuse し、ボードのパス・ソース行・見つかった flag
 ——close-out を refuse せず、stdout を読まない operator には、どちらに
 せよ何も伝わらない。
 
+## 中継される件数は自分の導出コマンドを伴う
+
+`bin/check-count-claims.sh`（T-1113、issue #397）はタスク自身の
+`## Active` board entry から `- count: <label> — <value> — command: <cmd>`
+sub-bullet を読み、malformed または重複した行を refuse し——`--no-exec`
+を付けない限り——conformant な各行のコマンドを再実行し、測定された出力が
+宣言値と食い違えば refuse する。`bin/close-out.sh` はこれを無条件に、
+`--no-exec` モードで delegate する: 文法検証のみなので、`- count:` 行を
+一切持たない entry はそのまま close-out でき、出荷時既定パスに新しい実行
+面はゼロのまま。`--no-exec` を付けずに実行するのは operator が明示的に
+選ぶ別の操作であり——このプロジェクト自身の凍結・レビュー済み spec とは
+違い、board entry はタスクのライフサイクル中いつでもどのロールからも
+編集され得るため——対象の board が index/HEAD に対する未コミット変更を
+持つ tracked path であれば stderr に警告を出す（refuse は決してせず、
+exit status も変えない）。
+
 ## review-input fidelity を記録する
 
 review record の verdict section が名指す各 executor pass は、1 つの

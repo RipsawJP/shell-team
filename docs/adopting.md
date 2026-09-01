@@ -752,6 +752,22 @@ stay silent on the same run. A printed note is disclosure, not a gate: it
 does not refuse the close-out, and an operator who does not read stdout
 learns nothing from it either way.
 
+## A relayed count carries its own derivation command
+
+`bin/check-count-claims.sh` (T-1113, issue #397) reads a task's own
+`## Active` board entry for `- count: <label> — <value> — command: <cmd>`
+sub-bullets, refuses a malformed or duplicated row, and — unless run with
+`--no-exec` — re-runs each conformant row's command and refuses when the
+measured output disagrees with the declared value. `bin/close-out.sh`
+delegates to it unconditionally, in `--no-exec` mode: grammar validation
+only, so an entry carrying no `- count:` row still closes out untouched
+and the shipped default path gains zero new execution surface. Running the
+checker without `--no-exec` is an explicit, separate operator choice — it
+warns on stderr (never refusing, never changing the exit status) when the
+board it reads is a tracked path carrying uncommitted modifications, since
+a board entry, unlike this project's own frozen and review-gated specs,
+can be edited by any role at any point in a task's life.
+
 ## Recording review-input fidelity
 
 Each executor pass a review record's verdict section names states four

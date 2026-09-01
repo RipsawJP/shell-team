@@ -1495,4 +1495,136 @@ review_input_case T-99903 '### Codex Review verdict: APPROVE\n- Task: T-99903\n 
 review_input_case T-99904 '### Codex Review verdict: APPROVE\n- Task: T-99904\n  - executor-invocation (p1): codex exec --sandbox read-only review --base develop\n  - pass-role (p1): generation\n  - raw-capture (p1): T-99904-codex-primary\n' 1 refuse "a record missing a required field (field-missing) refuses through close-out.sh"
 review_input_case T-99905 '### Codex Review verdict: APPROVE\n- Task: T-99905\n  - executor-invocation (p1): codex exec --sandbox read-only review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n' 1 refuse "a record whose raw-capture stem is not prefixed by this task's own id (raw-capture-stem-mismatch) refuses through close-out.sh"
 
+# ============================================================================
+# T-1113 (issue #397): the `- count:` claim grammar delegation, exercised
+# BEHAVIOURALLY through the real close-out.sh entry point — bin/close-out.sh
+# itself is verified statically by this spec's own AC10 check line; this
+# block's job is narrower and complementary, proving the WIRING (the exit-
+# code mapping's two arms, the missing-sibling install-problem screen, and
+# that structural-only mode really executes nothing end to end) the same
+# way tests/close-out/run.sh:1322-1369's spec_review_case block already
+# proves it for the adjacent spec-review delegation.
+# ============================================================================
+COUNT_CLAIMS_SENTINEL="has a malformed \`- count:\` claim"
+CC_ROOT="$TMP/count-claims-fixtures"
+mkdir -p "$CC_ROOT"
+
+count_claims_case() {
+  local task="$1" body="$2" expect_rc="$3" mode="$4" name="$5"
+  local root="$CC_ROOT/$task"
+  write_conformant_interventions_record "$root/.shell-team/interventions/$task.md" "$task"
+  # shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+  printf -- '# Tasks\n\n## Active\n\n- [ ] **%s** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n%b\n\n## Done\n' \
+    "$task" "$body" > "$root/todo.md"
+  cp "$root/todo.md" "$root/todo.orig"
+  local rc=0
+  ( cd "$root" && TEAM_TODO="$root/todo.md" TEAM_INTERVENTIONS_DIR="$root/.shell-team/interventions" \
+      bash "$CLOSEOUT" --task "$task" --date 2026-09-01 ) >"$root/out" 2>"$root/err" </dev/null || rc=$?
+  [ "$rc" -eq "$expect_rc" ] || fail "T-1113 $name: expected exit $expect_rc, got $rc (stderr: $(cat "$root/err"))"
+  if [ "$mode" = silent ]; then
+    grep -qF -- "$COUNT_CLAIMS_SENTINEL" "$root/err" \
+      && fail "T-1113 $name: the gate must say NOTHING here — found the refusal sentinel in stderr"
+    grep -qxF -- "- [x] **$task** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$root/todo.md" \
+      || fail "T-1113 $name: close-out should have moved the entry to Done"
+  else
+    cmp -s "$root/todo.orig" "$root/todo.md" \
+      || fail "T-1113 $name: a refused close-out must leave the board byte-untouched"
+    grep -qF -- "$COUNT_CLAIMS_SENTINEL" "$root/err" \
+      || fail "T-1113 $name: refusal stderr must carry the sentinel '$COUNT_CLAIMS_SENTINEL'"
+  fi
+  pass "T-1113 $name"
+}
+
+count_claims_case T-99701 '  - count: sites — six — command: printf 6' 1 refuse "delegation-malformed-row-refuses-exit1"
+
+# --- delegation-conformant-row-proceeds-no-execution: the delegation is
+# --no-exec, so a conformant row whose command would create an observable
+# marker file must let close-out proceed WITHOUT ever running it — proven
+# through the real wiring, not only at check-count-claims.sh's own boundary
+# (which AC7 already proves standalone).
+CC_MARK_ROOT="$CC_ROOT/T-99702"
+CC_MARKER="$CC_MARK_ROOT/fired"
+mkdir -p "$CC_MARK_ROOT/.shell-team/interventions"
+write_conformant_interventions_record "$CC_MARK_ROOT/.shell-team/interventions/T-99702.md" T-99702
+test ! -e "$CC_MARKER" || fail "T-1113 delegation-conformant-row-proceeds-no-execution: marker must not pre-exist"
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-99702** dispatch fixture — `READY_FOR_MERGE` — spec: docs/specs/fixture.md\n  - count: sideeffect — 1 — command: touch %s; printf 1\n\n## Done\n' \
+  "$CC_MARKER" > "$CC_MARK_ROOT/todo.md"
+( cd "$CC_MARK_ROOT" && TEAM_TODO="$CC_MARK_ROOT/todo.md" TEAM_INTERVENTIONS_DIR="$CC_MARK_ROOT/.shell-team/interventions" \
+    bash "$CLOSEOUT" --task T-99702 --date 2026-09-01 ) >"$CC_MARK_ROOT/out" 2>"$CC_MARK_ROOT/err" </dev/null \
+  || fail "T-1113 delegation-conformant-row-proceeds-no-execution: expected exit 0 (stderr: $(cat "$CC_MARK_ROOT/err"))"
+grep -qxF -- "- [x] **T-99702** dispatch fixture — \`READY_FOR_MERGE\` — spec: docs/specs/fixture.md" "$CC_MARK_ROOT/todo.md" \
+  || fail "T-1113 delegation-conformant-row-proceeds-no-execution: close-out should have moved the entry to Done"
+test ! -e "$CC_MARKER" \
+  || fail "T-1113 delegation-conformant-row-proceeds-no-execution: the marker file exists — the delegation executed a command it must not have"
+pass "T-1113 delegation-conformant-row-proceeds-no-execution"
+
+# --- delegation-sibling-missing-exit2: the scratch-bin/-copy technique
+# tests/close-out/run.sh already uses (:546-565) for exactly this shape —
+# cp -R this repository's bin/ into the case's own root, rm -f the sibling
+# INSIDE that copy, and invoke that copy's close-out.sh, so nothing in the
+# real checkout is moved or removed. templates/ is copied alongside bin/
+# too (Notes for engineer, Trap 12): the unconditional oversight-profile
+# gate this scratch close-out.sh also runs resolves its own shipped
+# default from the invoked checker's OWN installed directory one level up,
+# never the real repository's.
+CC_SIB_ROOT="$TMP/count-claims-sibling-missing"
+mkdir -p "$CC_SIB_ROOT/root"
+cp -R "$REPO_ROOT/bin" "$CC_SIB_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$CC_SIB_ROOT/templates"
+write_conformant_interventions_record "$CC_SIB_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$CC_SIB_ROOT/root/todo.md"
+cp "$CC_SIB_ROOT/root/todo.md" "$CC_SIB_ROOT/root/todo.orig"
+rm -f "$CC_SIB_ROOT/bin/check-count-claims.sh"
+set +e
+( cd "$CC_SIB_ROOT/root" && TEAM_TODO="$CC_SIB_ROOT/root/todo.md" bash "$CC_SIB_ROOT/bin/close-out.sh" --task T-901 --date 2026-09-01 ) \
+  >"$CC_SIB_ROOT/root/out" 2>"$CC_SIB_ROOT/root/err"
+cc_sib_rc=$?
+set -e
+[ "$cc_sib_rc" -eq 2 ] || fail "T-1113 delegation-sibling-missing-exit2: expected exit 2, got $cc_sib_rc (stderr: $(cat "$CC_SIB_ROOT/root/err"))"
+cmp -s "$CC_SIB_ROOT/root/todo.md" "$CC_SIB_ROOT/root/todo.orig" || fail "T-1113 delegation-sibling-missing-exit2: board must stay byte-identical"
+grep -qF -- 'check-count-claims.sh' "$CC_SIB_ROOT/root/err" || fail "T-1113 delegation-sibling-missing-exit2: reason must name check-count-claims.sh"
+grep -qE -- 'missing|unreadable' "$CC_SIB_ROOT/root/err" || fail "T-1113 delegation-sibling-missing-exit2: reason must classify this as missing/unreadable (install problem, not a board defect)"
+pass "T-1113 delegation-sibling-missing-exit2"
+
+# --- delegation-sibling-stub-exit3-dies-exit2 /
+# --- delegation-sibling-stub-exit0-positive-control: the stub form
+# tests/close-out/run.sh already uses (:568-613, :908-948) — a sibling
+# PRESENT at the delegated path, overwritten with a deterministic 3-line
+# stub. Case (d)'s exit-3 stub proves the `*` arm of the exit-code mapping
+# (a present sibling's non-1, non-zero status maps to `die`, never `fail`);
+# case (e)'s exit-0 stub is its own scratch-root positive control, proving
+# the scratch copy (bin/ AND templates/) is otherwise functional so case
+# (d)'s exit 2 is attributable to the stub's status, not to a broken copy.
+CC_STUB_ROOT="$TMP/count-claims-stub"
+mkdir -p "$CC_STUB_ROOT/root"
+cp -R "$REPO_ROOT/bin" "$CC_STUB_ROOT/bin"
+cp -R "$REPO_ROOT/templates" "$CC_STUB_ROOT/templates"
+write_conformant_interventions_record "$CC_STUB_ROOT/root/.shell-team/interventions/T-901.md" T-901
+# shellcheck disable=SC2016  # backtick-quoted flag is literal board grammar
+printf -- '# Tasks\n\n## Active\n\n- [ ] **T-901** demo — `READY_FOR_MERGE` — spec: x.md\n\n## Done\n' > "$CC_STUB_ROOT/root/todo.md"
+cp "$CC_STUB_ROOT/root/todo.md" "$CC_STUB_ROOT/root/todo.orig"
+CC_STUB="$CC_STUB_ROOT/bin/check-count-claims.sh"
+
+printf '#!/usr/bin/env bash\nprintf "stub odd status\\n" >&2\nexit 3\n' > "$CC_STUB"
+set +e
+( cd "$CC_STUB_ROOT/root" && TEAM_TODO="$CC_STUB_ROOT/root/todo.md" bash "$CC_STUB_ROOT/bin/close-out.sh" --task T-901 --date 2026-09-01 ) \
+  >"$CC_STUB_ROOT/root/out3" 2>"$CC_STUB_ROOT/root/err3"
+cc_stub3_rc=$?
+set -e
+[ "$cc_stub3_rc" -eq 2 ] || fail "T-1113 delegation-sibling-stub-exit3-dies-exit2: expected exit 2, got $cc_stub3_rc"
+cmp -s "$CC_STUB_ROOT/root/todo.md" "$CC_STUB_ROOT/root/todo.orig" || fail "T-1113 delegation-sibling-stub-exit3-dies-exit2: board must stay byte-identical"
+grep -qF -- 'check-count-claims.sh exited 3' "$CC_STUB_ROOT/root/err3" \
+  || fail "T-1113 delegation-sibling-stub-exit3-dies-exit2: stderr must name the child and its status"
+pass "T-1113 delegation-sibling-stub-exit3-dies-exit2"
+
+printf '#!/usr/bin/env bash\nexit 0\n' > "$CC_STUB"
+( cd "$CC_STUB_ROOT/root" && TEAM_TODO="$CC_STUB_ROOT/root/todo.md" bash "$CC_STUB_ROOT/bin/close-out.sh" --task T-901 --date 2026-09-01 ) \
+  >"$CC_STUB_ROOT/root/out0" 2>"$CC_STUB_ROOT/root/err0" \
+  || fail "T-1113 delegation-sibling-stub-exit0-positive-control: expected exit 0 (stderr: $(cat "$CC_STUB_ROOT/root/err0"))"
+grep -q '^- \[x\] \*\*T-901\*\*' "$CC_STUB_ROOT/root/todo.md" \
+  || fail "T-1113 delegation-sibling-stub-exit0-positive-control: T-901 must move to Done"
+pass "T-1113 delegation-sibling-stub-exit0-positive-control"
+
 printf '\nAll close-out assertions passed.\n'

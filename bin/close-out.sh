@@ -35,10 +35,15 @@
 # record gate (validate-if-present — silent when no `- dispatch:` sub-bullet
 # exists), then T-1017's interventions gate, then T-1096's close-out spec-
 # review backstop (#344, validate-if-present — silent when the task did not
-# elect `spec-review — cross-provider`), then T-1022's source-line gate, then
-# T-1107's pre-flip gate —
+# elect `spec-review — cross-provider`), then T-1103's oversight-profile
+# pre-merge gate (#343, unconditional), then T-1113's `- count:` claim
+# grammar gate (issue #397, validate-if-present, structural-only — the
+# sibling check-count-claims.sh --no-exec), then T-1104's review-input
+# fidelity gate (#335, validate-if-present), then T-1022's source-line
+# gate, then T-1107's pre-flip gate —
 #   a missing or non-conformant interventions record refuses the close-out before any board write.
 #   an elected spec review whose record's last verdict is not an approval refuses the close-out before any board write.
+#   a malformed `- count:` claim row refuses the close-out before any board write (grammar only — no command is ever executed by this gate).
 #   a source line the hand-off lint would reject refuses the close-out before any board write.
 #   a malformed `- dispatch:` sub-bullet refuses the close-out before any board write.
 #   an Active flag other than `READY_FOR_MERGE` refuses the close-out before any board write (T-1107, #53).
@@ -570,6 +575,40 @@ if [ "$OV_RC" -ne 0 ]; then
       ;;
     *)
       die "cannot verify the oversight profile ($TASK: check-oversight.sh exited $OV_RC)"
+      ;;
+  esac
+fi
+
+# --- fail-closed gate: the `- count:` claim grammar (T-1113, issue #397) ---
+# Deliberately NOT election-scoped, like the oversight gate immediately
+# above: there is no per-task election to read here either, and the
+# checker's own family-level validate-if-present rule (an entry carrying no
+# `- count:` sub-bullet at all still passes) is what keeps this call cheap
+# for every task that never adopted the grammar. Wiring mirrors the two
+# gates above line for line: the sibling screen (a missing/unreadable
+# sibling is an install problem, never a board defect), stderr re-printed
+# verbatim, `1` mapped to `fail` (a board-content refusal, board left
+# byte-untouched) and every other non-zero mapped to `die`. This call is
+# structural-only (`--no-exec`): close-out gains grammar validation and
+# ZERO new execution surface — the live re-derivation half of
+# check-count-claims.sh is an explicit human/QA invocation, never something
+# this unconditional gate runs.
+COUNT_CLAIMS_CHECKER="$SCRIPT_DIR/check-count-claims.sh"
+if [ ! -f "$COUNT_CLAIMS_CHECKER" ] || [ ! -r "$COUNT_CLAIMS_CHECKER" ]; then
+  die "cannot verify the count-claim grammar (check-count-claims.sh missing or unreadable next to close-out.sh)"
+fi
+
+CC_ERR="$(bash "$COUNT_CLAIMS_CHECKER" --board "$BOARD" --task "$TASK" --no-exec 2>&1 >/dev/null)" && CC_RC=0 || CC_RC=$?
+if [ "$CC_RC" -ne 0 ]; then
+  if [ -n "$CC_ERR" ]; then
+    printf '%s\n' "$CC_ERR" >&2 || true
+  fi
+  case "$CC_RC" in
+    1)
+      fail "$TASK has a malformed \`- count:\` claim (check-count-claims.sh)"
+      ;;
+    *)
+      die "cannot verify the count-claim grammar ($TASK: check-count-claims.sh exited $CC_RC)"
       ;;
   esac
 fi

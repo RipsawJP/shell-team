@@ -267,6 +267,133 @@ The disposition for everything this section finds is **not repaired**: a criteri
 
 The population and its derivation land here, produced by `bin/derive-populations.sh` and embedded verbatim under its own `- reproduce:` line, together with the sweep's own `- flips: <n>` line. Neither is written by this role: this role holds no shell, and a hand-derived population is precisely the defect this task exists to remove.
 
+- reproduce: bash bin/derive-populations.sh --label t1113-read-set --set "close-out=grep -lF -- 'bin/close-out.sh' .shell-team/specs/*.md" --set "derived-pop=grep -lE -- 'derived-populations\.md|check-prompt-sync\.sh' .shell-team/specs/*.md" --set "workflow=grep -lF -- 'check-handoff.yml' .shell-team/specs/*.md" --accept-status close-out=1 --accept-status derived-pop=1 --accept-status workflow=1
+
+<!-- BEGIN derivation: t1113-read-set -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: close-out — status: 0 — lines: 44 — items: 44 — command: grep -lF -- 'bin/close-out.sh' .shell-team/specs/*.md
+- set: derived-pop — status: 0 — lines: 70 — items: 70 — command: grep -lE -- 'derived-populations\.md|check-prompt-sync\.sh' .shell-team/specs/*.md
+- set: workflow — status: 0 — lines: 91 — items: 91 — command: grep -lF -- 'check-handoff.yml' .shell-team/specs/*.md
+- union: items: 107
+- bucket: close-out — items: 4
+  - .shell-team/specs/T-1087-judge-briefing.md
+  - .shell-team/specs/T-1088-tier2-firing.md
+  - .shell-team/specs/T-1094-trial-adoption.md
+  - .shell-team/specs/T-1111-plugin-role-agent-concurrency.md
+- bucket: close-out+derived-pop — items: 3
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1093-verification-ceiling.md
+  - .shell-team/specs/T-1095-means-ends-reflection.md
+- bucket: close-out+derived-pop+workflow — items: 21
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1091-operator-authored-entry.md
+  - .shell-team/specs/T-1092-specify-seam-review.md
+  - .shell-team/specs/T-1100-verify-axis-split.md
+  - .shell-team/specs/T-1103-oversight-profiles.md
+  - .shell-team/specs/T-1109-dispatch-reflection.md
+  - .shell-team/specs/T-1112-parallel-default-and-executor-hosting.md
+  - .shell-team/specs/T-1113-quantity-relay-checker.md
+- bucket: close-out+workflow — items: 16
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+  - .shell-team/specs/T-1032-audit-prose-accuracy.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-1096-selection-trust-gates.md
+  - .shell-team/specs/T-1099-board-heading-integrity.md
+  - .shell-team/specs/T-1104-review-input-fidelity.md
+  - .shell-team/specs/T-1107-close-out-gates.md
+- bucket: derived-pop — items: 9
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1108-sweep-corpus-isolation.md
+  - .shell-team/specs/T-1110-freeze-version-derivation.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
+- bucket: derived-pop+workflow — items: 37
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1102-check-acs-fence.md
+  - .shell-team/specs/T-1105-review-executor-resolution.md
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+- bucket: workflow — items: 17
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1086-subject-harness.md
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1097-trial-branch-flag.md
+  - .shell-team/specs/T-1098-trial-recipe-execution.md
+  - .shell-team/specs/T-1101-pii-path-shapes.md
+  - .shell-team/specs/T-1106-check-binding-consistency.md
+<!-- END derivation: t1113-read-set -->
+
+**Engineer-round disposition (recorded, not a re-freeze of the requirement above):** the union is corpus-scale — 107 of this corpus's 118 specs — the same hazard `.shell-team/test-recipe.md`'s T-1111/T-1112 entries already name for a generic-reachability `--set` built from a widely-referenced file (here, `.github/workflows/check-handoff.yml` and `templates/prompt-blocks/derived-populations.md`, both touched by nearly every task's own criteria). Per this task's own explicit instruction not to run the full sweep as a single engineer round, the two-arm base/HEAD diff over this population is **not run by this role** and the `- flips:` line below is left for the coordinating-session-hosted fan-out procedure T-1110/T-1111/T-1112 already established, rather than fabricated. **AC16 is therefore expected to fail at this hand-off** until that sweep completes and records its own `- flips: <n>` line here.
+
 ## Notes for engineer
 
 **Files likely touched** — the required set is **AC15**'s own allow-list; nothing here widens it.

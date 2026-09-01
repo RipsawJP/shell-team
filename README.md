@@ -254,6 +254,34 @@ Every structural identifier — `--label`, a `--set` name, an `--accept-status` 
 
 Exit codes: `0` the block was written to stdout; `1` a refusal about the input's *content* (an unaccepted set exit status — under `pipefail`, pair a legitimate mid-pipeline non-zero exit with `--accept-status` — or an item containing a control character; stdout stays empty, never a false empty set); `2` a usage error about the *invocation* (a missing `--label`, an identifier outside the grammar above, fewer than two or more than eight `--set` values, two sharing a name, or a `--set` command containing a control character). See `docs/loop-engineering/record-set-derivation.md` for this repository's own dogfooded derivations.
 
+## A relayed count carries its own derivation command
+
+A scalar count one hand-off relays to another role — a fixture tally, a
+provenance delta — stops being a transcribed literal on the task board:
+`bin/check-count-claims.sh` reads a task's own `## Active` board entry for
+`- count: <label> — <value> — command: <cmd>` sub-bullets (`<label>` closed
+to `^[A-Za-z0-9][A-Za-z0-9_-]*$`, `<value>` to `^[+-]?[0-9]+$`, `<cmd>` the
+free-form, always-last field) and, unless run with `--no-exec`, re-runs each
+row's command and refuses when its measured output disagrees with the
+declared value.
+
+```bash
+bash check-count-claims.sh --board .shell-team/todo.md --task T-1113 --no-exec
+```
+
+`bin/close-out.sh` delegates to `bin/check-count-claims.sh` unconditionally, in `--no-exec` mode: an
+entry carrying no `- count:` row still closes out untouched, and a
+malformed row refuses the close-out before any board write — grammar
+validation only, with zero new execution surface on the shipped default
+path. Running the checker **without** `--no-exec` is a separate, explicit
+choice an adopter makes: it executes every conformant row's command via
+`bash -c`, so it warns on stderr — never refusing, never changing the exit
+status — when the board it is about to run from is a tracked path carrying
+uncommitted modifications, since a board entry (unlike this project's own
+frozen, review-gated specs) can be edited by any role at any point in a
+task's life. `bash check-count-claims.sh --help` documents the full
+grammar and exit-code contract.
+
 ## Design choices
 
 - **Read-only Orchestrator**: `tech-lead` only plans — the main session executes the map.
