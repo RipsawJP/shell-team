@@ -2527,3 +2527,28 @@ that file's order.
   passed, 1 failed — AC13 — 1 skipped) until the coordinating-session-
   hosted, harness-tracked fan-out procedure completes and records its own
   measured count on that line, replacing `unmeasured`.
+- T-1114 (sweep completion addendum to the entry above; the fan-out's
+  kill-recovery pattern is now itself a measured procedure): the 118-member
+  two-arm sweep (base `61557b9` / head `97cda8f`) completed 2026-09-02 with
+  **4 flips, all measured staleness classes, zero regressions** — but the
+  6 harness-tracked background slices were externally killed in batches
+  THREE times mid-run (59/118 after round 1, 101/118 after round 2,
+  104/118 after round 3). The recovery that worked, each round: derive the
+  done-both set per slice from the results TSVs by an awk join
+  (`$3!="NO-SUMMARY" && count==2`), `comm -23` it against the slice's
+  sorted member list to get the catch-up list, and relaunch only that —
+  results accumulate across `results-$i*.tsv` files that are merged and
+  `sort -u`'d at tally time, so no completed member-arm is ever re-run.
+  When the remaining tail is small (≤ ~14 members), foreground chunks of
+  3–4 members per Bash call (explicit 590s timeout) finish more reliably
+  than yet another background round — but a single heavy member can
+  exceed even that (T-1050's head arm and the T-1108/T-1113 pair each
+  outran a 590s window; an uncapped background call for just that member
+  is the terminal fallback). Two members of this corpus
+  (`design-note-T-1012.md`, `T-1020-supersede-adjudication.md`) carry no
+  acceptance criteria at all: `check-acs` reports "no acceptance criteria
+  found" (exit 0) symmetrically on both arms — classify them as
+  non-evaluable rather than letting a NO-SUMMARY row look like a failure,
+  and never count them as flips. Completion criterion stays the T-1110
+  rule: every member has both arm rows in the merged TSV — never a
+  sentinel, never a task notification alone.
