@@ -172,6 +172,138 @@ The serial-by-default habit for mechanism-class sweeps — verification units wi
 
 **The emitted `<!-- BEGIN derivation: t1112-read-set -->` / `<!-- END derivation: t1112-read-set -->` block is embedded verbatim here by the implementing round, immediately below this paragraph, together with the sweep's measured result.** It is absent at freeze by construction — `pm-spec` holds no shell — and **AC11** is the criterion that makes its absence, or an authoring placeholder left in its place, mechanically visible rather than a thing a reader must notice.
 
+<!-- BEGIN derivation: t1112-read-set -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: all — status: 0 — lines: 117 — items: 117 — command: ls .shell-team/specs/*.md | LC_ALL=C sort
+- set: literal — status: 0 — lines: 106 — items: 106 — command: grep -lE -- '- check:.*(phase-multiplexing\.md|fanout-orchestration\.md|dispatch-record\.md|skills/run/SKILL\.md|agents/tech-lead\.md|README(\.ja)?\.md|test-recipe\.md)' .shell-team/specs/*.md | LC_ALL=C sort
+- set: indirect — status: 0 — lines: 106 — items: 106 — command: grep -lF -- 'team-paths.sh --get' .shell-team/specs/*.md | LC_ALL=C sort
+- union: items: 117
+- bucket: all — items: 4
+  - .shell-team/specs/T-1020-supersede-adjudication.md
+  - .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+  - .shell-team/specs/T-1032-audit-prose-accuracy.md
+  - .shell-team/specs/design-note-T-1012.md
+- bucket: all+indirect — items: 7
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1067-context-lifecycle.md
+- bucket: all+literal — items: 7
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1046-ignored-base-verdict.md
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
+- bucket: all+literal+indirect — items: 99
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-1086-subject-harness.md
+  - .shell-team/specs/T-1087-judge-briefing.md
+  - .shell-team/specs/T-1088-tier2-firing.md
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1090-sign-safety-close.md
+  - .shell-team/specs/T-1091-operator-authored-entry.md
+  - .shell-team/specs/T-1092-specify-seam-review.md
+  - .shell-team/specs/T-1093-verification-ceiling.md
+  - .shell-team/specs/T-1094-trial-adoption.md
+  - .shell-team/specs/T-1095-means-ends-reflection.md
+  - .shell-team/specs/T-1096-selection-trust-gates.md
+  - .shell-team/specs/T-1097-trial-branch-flag.md
+  - .shell-team/specs/T-1098-trial-recipe-execution.md
+  - .shell-team/specs/T-1099-board-heading-integrity.md
+  - .shell-team/specs/T-1100-verify-axis-split.md
+  - .shell-team/specs/T-1101-pii-path-shapes.md
+  - .shell-team/specs/T-1102-check-acs-fence.md
+  - .shell-team/specs/T-1103-oversight-profiles.md
+  - .shell-team/specs/T-1104-review-input-fidelity.md
+  - .shell-team/specs/T-1105-review-executor-resolution.md
+  - .shell-team/specs/T-1106-check-binding-consistency.md
+  - .shell-team/specs/T-1107-close-out-gates.md
+  - .shell-team/specs/T-1108-sweep-corpus-isolation.md
+  - .shell-team/specs/T-1109-dispatch-reflection.md
+  - .shell-team/specs/T-1110-freeze-version-derivation.md
+  - .shell-team/specs/T-1111-plugin-role-agent-concurrency.md
+  - .shell-team/specs/T-1112-parallel-default-and-executor-hosting.md
+<!-- END derivation: t1112-read-set -->
+
+**STOP-and-report (T-1111 hazard class reconfirmed).** The union resolved to corpus-scale (117 of 117 specs reachable; 99 of them in the `all+literal+indirect` bucket alone), the same generic-reachability-grep collapse `.shell-team/test-recipe.md`'s T-1111 entry names. Per that entry's own disposition this engineer round does **not** push the full base/head two-arm sweep through as a single round: the population and its size are derived and disclosed here, and the full sweep — the one that would produce the `- flips: <count>` line below — is deferred to the coordinating-session-hosted, harness-tracked background-shell-slice fan-out procedure (`.shell-team/test-recipe.md`'s T-1110 entry), never to a sub-agent-hosted one. No spot-check bucket here is "cheap": even the narrowest non-trivial buckets above (`all+indirect`, `all+literal`) are 7 members each, and the corpus-dominating bucket is 99 — so no partial sweep is run in this round either, and `- flips:` is left for the coordinating session's own round rather than filled with an uncomputed or fabricated value.
+
 **The completed sweep's own outcome is recorded here by the round that runs it, on one `- flips: <count> — <one clause per flip, each with its measured cause>` line** placed immediately below this paragraph's list. Every flip is disclosed and **not repaired** — repairing another task's frozen criterion is a class-B re-freeze of someone else's intent — and a flip outside the classes enumerated below is a finding to state plainly, not to fold silently into the expected set.
 
 **Expected flip classes, pre-measured by the predecessors and disclosed here:**

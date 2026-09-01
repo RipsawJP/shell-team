@@ -2448,3 +2448,19 @@ that file's order.
   evidence's own prose, in a section the task's own role does own, and
   disclose the frozen section's own gap in the note's Limits rather than
   silently working around it.
+- T-1112 (mechanism-class `verify-mechanism` sweeps flip to parallel by
+  default; the fan-out's `execution-host` stops being a free variable):
+  the population derivation (`bin/derive-populations.sh --label
+  t1112-read-set ...`) again resolved corpus-scale — 117 total specs, 99
+  of them in the `all+literal+indirect` bucket alone — the same T-1111
+  hazard class, reconfirmed rather than rediscovered. Per that entry's
+  own disposition, the engineer round derived and disclosed the
+  population and its size but did **not** run the full base/head sweep
+  itself; the full two-arm inventory (`- flips: <count>` on the spec's
+  own `## Blast radius`) is owed to the coordinating-session-hosted,
+  **harness-tracked** background-shell-slice fan-out procedure (T-1110
+  entry above), never to a sub-agent-hosted one. The `execution-host`
+  launch-record field (audit-only, `coordinating-session — <ground>`)
+  this task ships is exactly the field that fan-out's own launch record
+  writes for that run — the artifact and the recipe entry describing it
+  land together.
