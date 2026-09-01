@@ -2496,3 +2496,59 @@ that file's order.
   ever sees it. Prefer a command shape with no embedded backslash escape
   at all (e.g. `echo 6; echo 7` for a two-line measurement fixture) over
   chasing the correct backslash-multiplication count through a `%b` layer.
+- T-1114 (a fourth confirmation of the T-1111/T-1112/T-1113 corpus-scale
+  hazard, this time on `agents/pm-spec.md` itself as the read-set anchor):
+  `bin/derive-populations.sh --label t1114-read-set --set
+  "all=ls .shell-team/specs/*.md | LC_ALL=C sort" --set "pmspec=grep -lE --
+  '- check:.*agents/pm-spec\.md' .shell-team/specs/*.md | LC_ALL=C sort"
+  --set "adopting=grep -lE -- '- check:.*docs/adopting(\.ja)?\.md'
+  .shell-team/specs/*.md | LC_ALL=C sort" --set "indirect=grep -lF --
+  'team-paths.sh --get' .shell-team/specs/*.md | LC_ALL=C sort"
+  --accept-status pmspec=1 --accept-status adopting=1 --accept-status
+  indirect=1` resolved a union of 119 items out of this corpus's own 119
+  total spec files — every spec but the 9 pure-`all`-bucket members reads
+  at least one of the two edited surfaces or resolves a path indirectly
+  through `bin/team-paths.sh --get`, driven almost entirely by `indirect`
+  alone matching 108/119. Per the T-1111/T-1112/T-1113 disposition above,
+  and this task's own explicit briefing to report the `- union: items:`
+  count in the hand-off BEFORE running the sweep once it exceeds ~40
+  members rather than push a corpus-scale two-arm diff through as a single
+  engineer round: this round derived and embedded the population (spec's
+  own `## Blast radius`, under its `- reproduce:` line) but did **not** run
+  the full base/HEAD two-arm sweep, and did not run even the tightest
+  multi-set bucket as a partial substitute — a partial slice of a
+  corpus-scale population, run from inside a single engineer round, would
+  misrepresent partial coverage as the read-set-scoped inventory the
+  spec's own `- verification-class: no-mechanism` declaration actually
+  owes. The spec's own `- flips:` line is left `unmeasured (sweep not yet
+  run)` — never a fabricated leading digit, which would silently satisfy
+  **AC13**'s digit-run assertion despite the sweep never having run — so
+  **AC13 is expected red at this round's own `check-acs.sh` run** (15
+  passed, 1 failed — AC13 — 1 skipped) until the coordinating-session-
+  hosted, harness-tracked fan-out procedure completes and records its own
+  measured count on that line, replacing `unmeasured`.
+- T-1114 (sweep completion addendum to the entry above; the fan-out's
+  kill-recovery pattern is now itself a measured procedure): the 118-member
+  two-arm sweep (base `61557b9` / head `97cda8f`) completed 2026-09-02 with
+  **4 flips, all measured staleness classes, zero regressions** — but the
+  6 harness-tracked background slices were externally killed in batches
+  THREE times mid-run (59/118 after round 1, 101/118 after round 2,
+  104/118 after round 3). The recovery that worked, each round: derive the
+  done-both set per slice from the results TSVs by an awk join
+  (`$3!="NO-SUMMARY" && count==2`), `comm -23` it against the slice's
+  sorted member list to get the catch-up list, and relaunch only that —
+  results accumulate across `results-$i*.tsv` files that are merged and
+  `sort -u`'d at tally time, so no completed member-arm is ever re-run.
+  When the remaining tail is small (≤ ~14 members), foreground chunks of
+  3–4 members per Bash call (explicit 590s timeout) finish more reliably
+  than yet another background round — but a single heavy member can
+  exceed even that (T-1050's head arm and the T-1108/T-1113 pair each
+  outran a 590s window; an uncapped background call for just that member
+  is the terminal fallback). Two members of this corpus
+  (`design-note-T-1012.md`, `T-1020-supersede-adjudication.md`) carry no
+  acceptance criteria at all: `check-acs` reports "no acceptance criteria
+  found" (exit 0) symmetrically on both arms — classify them as
+  non-evaluable rather than letting a NO-SUMMARY row look like a failure,
+  and never count them as flips. Completion criterion stays the T-1110
+  rule: every member has both arm rows in the merged TSV — never a
+  sentinel, never a task notification alone.
