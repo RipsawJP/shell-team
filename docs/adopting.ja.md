@@ -757,6 +757,49 @@ committed byte に対するいかなる判定も、briefing が executor の con
 `raw-capture` の値は構造上 untracked（`/.gitignore`）なので、何も指さ
 ない stem もこの checker には conformant である。
 
+## freeze 時にリリースバージョンを導出する
+
+すべての freeze——タスクの最初の freeze も、class-M mechanics-repair
+re-freeze を含むあらゆる re-freeze も——で、coordinating session はその
+freeze の `- intent-hash` 行を追加する前に、spec 自身が持つ 2 つの宣言
+から release tier を re-derive する: `- user-visible:` 行と
+`- verification-class:` 行である。この derivation は `CONTRIBUTING.md`
+の `## What a version number encodes` が定める headline test と
+default-reachability test を jointly（両方同時に）適用する。
+`- user-visible: yes` という宣言は derivation の **trigger** であって
+verdict では決してなく、derived tier は `MAJOR` / `MINOR` / `PATCH` の
+いずれか 1 つである。
+
+結果はタスク自身の board entry 上に `- version-derivation` sub-bullet
+として、`- version-derivation (v<N>, YYYY-MM-DD):` という形で記録され
+る。その closed な field 群——`verdict=`・`derived=`・`headline=`・
+`default-reach=`——は 1 つの free-form な `grounds:` field より前に置か
+れ、後続の checker がこの family を present なときだけ検証できるように
+しつつ、この行を一切持たない entry も引き続き pass する。両者の間にある
+`premise=` field は self-contained であることが要求される: それは
+expected tier と、その planning approval が承認された根拠の両方を運び、
+後の読者が開けない approval への裸の pointer には決してならない。
+repository に承認済みの planning premise が記録されていない場合——
+adopter が一度も設定していない場合の既定の姿——比較対象がそもそも無く、
+これは freeze を拒否する理由には決してならず、record は
+`verdict=no-premise-on-record` として書かれ続ける。
+
+derived tier が repository の承認済み planning premise と一致しない場
+合、freeze はそのタスクへのそれ以上の作業の前に停止し、deviation
+notice を発行する: 英語で述べられ、裸の "proceed?" では決してなく、3 つ
+の必須要素——作業が exceeds the approved estimate（承認済みの見積りを
+超えたこと）、continue-or-stop の問い、そして根拠を伴う recommendation
+——のすべてを運ぶ。この停止は not a fourth human gate（第 4 の human
+gate ではない）: これは re-enters the existing planning-approval gate
+（既存の planning-approval gate に再突入する）——このループがすでに宣言
+している 3 つの standing human gate のうちの 1 つ——である。derived
+tier が承認済み premise と一致しないということは、その approval が
+lapse した（失効した）ことを意味するからである。新しい status flag も
+新しい phase も追加されない。
+
+現時点の強制は**チェッカーではなく duty** である: coordinating session
+がこの derivation を自ら読む行為として実行し、no mechanical checker ships for it yet（機械的なチェッカーはまだ出荷されていない）。
+
 ## 運用ルール
 
 - 前フェーズの status flag がボードに設定されるまで、次フェーズへ進めないこと。
