@@ -279,4 +279,42 @@ else
   pass "uncommitted-board-warning-four-arms — SKIPPED (no git on PATH; the checker's own guard treats this as no-warning-proceed, matching Trap 11)"
 fi
 
+# ---------------------------------------------------------------------------
+# Review round 1 (delivered-change), two Majors — reproduced and fixed:
+# Finding 1: live mode's `bash -c "$cmd"` did not propagate pipefail into the
+# fresh child shell, so a failing upstream pipeline stage was invisible when
+# the pipeline's final stage still exited 0 (`git show badref:path | wc -l`
+# prints 0 and exits 0). Finding 2: the strict grammar's `command: (.+)$`
+# capture accepted a whitespace-only command field, which passed the
+# unconditional `--no-exec` structural gate `close-out.sh` always runs.
+# ---------------------------------------------------------------------------
+PIPEUP="$T/pipeline-upstream-failure.md"
+mkboard "$PIPEUP" '  - count: sites — 6 — command: git show nonexistent-ref-t1113-review-r1:some/path | wc -l'
+test -s "$PIPEUP" || fail "pipeline-upstream-failure fixture is empty"
+rc=0
+bash "$CHECKER" --board "$PIPEUP" --task T-901 > "$T/pipeup-out" 2>&1 || rc=$?
+[ "$rc" = "1" ] || fail "pipeline-upstream-failure: expected live-mode exit 1 (a failing upstream git show must not be masked by wc -l's own exit 0), got $rc"
+grep -qF -- 'command exited' "$T/pipeup-out" || fail "pipeline-upstream-failure: refusal must name the non-zero exit"
+pass "pipeline-upstream-failure-refused-live — a failing upstream stage of a pipelined command (git show <badref> | wc -l) is refused in live mode, never masked by the final stage's own exit 0 (delivered-change review round 1, finding 1)"
+
+# Positive control: the corrected `|| true`-guarded wc -l remedy (no -c on
+# grep, since grep -c's own "0" text output would otherwise be double-
+# counted as one line by wc -l) still measures a genuine zero match cleanly
+# under the now-enabled pipefail.
+PIPEOK="$T/pipeline-legitimate-zero.md"
+mkboard "$PIPEOK" '  - count: sites — 0 — command: (grep zzz /dev/null || true) | wc -l'
+bash "$CHECKER" --board "$PIPEOK" --task T-901 >/dev/null 2>&1 \
+  || fail "pipeline-legitimate-zero: the || true-guarded remedy pattern must still pass under the now-enabled pipefail"
+pass "pipeline-legitimate-zero-positive-control — (grep zzz file || true) | wc -l still measures a genuine zero match cleanly now that pipefail is enabled in the child shell"
+
+WSCMD="$T/whitespace-only-command.md"
+mkboard "$WSCMD" '  - count: sites — 6 — command:    '
+test -s "$WSCMD" || fail "whitespace-only-command fixture is empty"
+grep -qE -- 'command:[[:space:]]+$' "$WSCMD" || fail "whitespace-only-command fixture must carry a command: field followed only by whitespace"
+rc=0
+bash "$CHECKER" --board "$WSCMD" --task T-901 --no-exec >/dev/null 2>"$T/wscmd-err" || rc=$?
+[ "$rc" = "1" ] || fail "whitespace-only-command: expected --no-exec (structural) exit 1, got $rc — this must be caught structurally so close-out.sh's unconditional --no-exec gate refuses it before any board write, never deferred to live mode alone"
+grep -qF -- 'empty or whitespace-only' "$T/wscmd-err" || fail "whitespace-only-command: refusal must name the empty/whitespace-only command field"
+pass "whitespace-only-command-refused-structurally — a command: field that is empty once trimmed refuses under --no-exec (exit 1), never silently promoted to Done through close-out.sh's structural-only delegation (delivered-change review round 1, finding 2)"
+
 printf '\nAll check-count-claims assertions passed.\n'

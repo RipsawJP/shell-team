@@ -62,7 +62,15 @@
 # never octal. A non-zero command exit always refuses, even when its
 # stdout would otherwise have matched — the named trap `grep -c` sets (it
 # exits 1 on no match, printing `0`) — with a remedy naming the `| wc -l`
-# idiom instead.
+# idiom instead. Each recorded command runs under `set -o pipefail` inside
+# its own fresh child shell (never inherited from this script's own shell
+# options), so a pipeline's failing upstream stage is never masked by a
+# succeeding final stage; a command that legitimately wants a `| wc -l`
+# zero-count reading must itself guard the upstream stage with `|| true`
+# (e.g. `(grep zzz file || true) | wc -l` — note: NO `-c` on grep, since
+# `grep -c`'s own "0" text output would then itself be counted as one line
+# by `wc -l`, double-counting a zero match as one) so pipefail does not turn a
+# real zero-match measurement into a refusal.
 #
 # `command -v timeout` guards an optional wrapper (GNU coreutils; absent on
 # some hosts, notably macOS without it installed — commands then run
@@ -156,9 +164,24 @@ while IFS= read -r line || [ -n "$line" ]; do
   [ -n "$line" ] || continue
   if [[ "$line" =~ $COLLECT_RE ]]; then
     if [[ "$line" =~ $STRICT_RE ]]; then
+      row_cmd="${BASH_REMATCH[3]}"
+      # The strict grammar's `command: (.+)$` capture is not byte-pinned by
+      # any acceptance criterion (unlike the collect-wide stem, which is),
+      # so a whitespace-only command field is refused here as an additional
+      # post-parse content check rather than by tightening the pinned
+      # regex: a row whose `command:` field is empty once trimmed is a
+      # structural defect, not a legitimate zero-length command, and must
+      # be caught here so `close-out.sh`'s unconditional `--no-exec` gate
+      # refuses it before any board write — never deferred to live mode
+      # alone, which would report it too late as "empty output".
+      row_cmd_trimmed="${row_cmd#"${row_cmd%%[![:space:]]*}"}"
+      row_cmd_trimmed="${row_cmd_trimmed%"${row_cmd_trimmed##*[![:space:]]}"}"
+      if [ -z "$row_cmd_trimmed" ]; then
+        fail "$TASK has a malformed \`- count:\` sub-bullet — the \`command:\` field is empty or whitespace-only: $line"
+      fi
       ROW_LABELS+=("${BASH_REMATCH[1]}")
       ROW_VALUES+=("${BASH_REMATCH[2]}")
-      ROW_CMDS+=("${BASH_REMATCH[3]}")
+      ROW_CMDS+=("$row_cmd")
     else
       fail "$TASK has a malformed \`- count:\` sub-bullet — collected by the wide stem but does not match the strict grammar \`- count: <label> — <value> — command: <cmd>\`: $line"
     fi
@@ -262,12 +285,17 @@ while [ "$ridx" -lt "$ROW_COUNT" ]; do
 
   set +e
   # shellcheck disable=SC2086  # TIMEOUT_PREFIX is "timeout N" or empty — intentional split.
-  out="$( $TIMEOUT_PREFIX bash -c "$cmd" )"
+  # `set -o pipefail;` runs INSIDE the fresh child shell, never inherited from
+  # this script's own `pipefail` (a fresh `bash -c` always starts with default
+  # shell options) — without it, a failing upstream stage of a pipelined
+  # command (`git show badref:path | wc -l`) is invisible: only the last
+  # stage's own exit status would be observed, and `wc -l` always exits 0.
+  out="$( $TIMEOUT_PREFIX bash -c "set -o pipefail; $cmd" )"
   rc=$?
   set -e
 
   if [ "$rc" -ne 0 ]; then
-    fail "$TASK's \`- count: $label\` command exited $rc — a non-zero exit (e.g. \`grep -c\` finding zero matches, exit 1) is refused rather than read as zero; pipe through \`| wc -l\` instead: $cmd"
+    fail "$TASK's \`- count: $label\` command exited $rc — a non-zero exit (e.g. \`grep -c\` finding zero matches, exit 1) is refused rather than read as zero; pipe through \`| wc -l\` instead (drop \`-c\`: \`grep zzz file | wc -l\`, never \`grep -c zzz file | wc -l\`, which double-counts a zero match as one line): $cmd — and because the command now runs under \`set -o pipefail\`, guard a LEGITIMATE non-zero upstream exit with \`|| true\` before the pipe so only \`wc -l\`'s own status is reported, e.g. \`(grep zzz file || true) | wc -l\`"
   fi
 
   measured="$(trim "$out")"

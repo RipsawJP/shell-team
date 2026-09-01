@@ -1537,6 +1537,15 @@ count_claims_case() {
 
 count_claims_case T-99701 '  - count: sites — six — command: printf 6' 1 refuse "delegation-malformed-row-refuses-exit1"
 
+# --- delegation-refuses-whitespace-only-command: delivered-change review
+# round 1, finding 2 — end-to-end close-out coverage. A `command:` field
+# that is empty once trimmed must refuse THROUGH the real, unconditional
+# `--no-exec` delegation (never silently promoted straight to `## Done`,
+# which is exactly what the review's own trailing-space fixture proved
+# happened before bin/check-count-claims.sh's structural parse was fixed
+# to reject it).
+count_claims_case T-99703 '  - count: sites — 6 — command:    ' 1 refuse "delegation-refuses-whitespace-only-command"
+
 # --- delegation-conformant-row-proceeds-no-execution: the delegation is
 # --no-exec, so a conformant row whose command would create an observable
 # marker file must let close-out proceed WITHOUT ever running it — proven
