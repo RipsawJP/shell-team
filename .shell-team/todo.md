@@ -14,7 +14,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1113** A relayed count carries its own derivation command on the board entry, validated and re-run by a fail-closed checker — `READY_FOR_QA` — spec: .shell-team/specs/T-1113-quantity-relay-checker.md
+- [ ] **T-1113** A relayed count carries its own derivation command on the board entry, validated and re-run by a fail-closed checker — `READY_FOR_ENG` — spec: .shell-team/specs/T-1113-quantity-relay-checker.md
   - source: GitHub issue **#397**, whose full body reached `pm-spec` as text pasted into its launch prompt (recorded as **RELAYED** in the spec's `## Assumptions` row **A-1**; the freeze run measures the issue's live state and confirms the wording). **No separate issue filed**: #397 is the canonical home for this work and this task ships its Proposal arm 2. The issue's own open qualifier — verbatim, "Design question to settle first: which surfaces are in scope (board hand-offs, QA verdicts, review records, retro inputs), and what grammar marks a claim as derivable vs. free prose" — is carried into the spec verbatim and is what **DP-1** and **DP-2** are resolved against, per the active lesson requiring a requester's scope qualifier to survive every relay leg. The issue body duplicates its own `## Proposal` block; both copies are identical and the duplication carries no second meaning. The rule being mechanized is `.shell-team/lessons.md:1360` (the 2026-08-31 `Extended by` clause), read first-hand rather than accepted as relayed; this task mints no new norm.
   - branch: `feature/1113-quantity-relay-checker` — stacked behind `feature/1112-parallel-default-and-executor-hosting`; PR base stays `develop`, merges at the sprint batch GO. Measured first-hand at authoring time: `.git/HEAD` reads `ref: refs/heads/feature/1113-quantity-relay-checker`, and both that branch's ref file and `.git/refs/heads/feature/1112-parallel-default-and-executor-hosting` read `05e214916187544636af7f4260ef47234bfca972` — so the predecessor resolves as a **local branch**, arm 1 of the spec's three-branch `- base-ref-discriminator:` is what this checkout selects, and this branch carries no commits of its own yet. That the predecessor's PR (**#408**) is still open is a **relayed** premise held by the coordinating session, recorded as **A-2**.
   - entry-mode: pm-authored
@@ -48,6 +48,49 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - count: check-count-claims-suite-pass — 11 — command: bash tests/check-count-claims/run.sh 2>&1 | grep -c '^PASS:'
   - count: close-out-suite-t1113-pass — 5 — command: bash tests/close-out/run.sh 2>&1 | grep -c '^PASS: T-1113'
   - count: close-out-suite-total-pass — 130 — command: bash tests/close-out/run.sh 2>&1 | grep -c '^PASS:'
+
+### QA verification — T-1113 (qa-verifier)
+
+**Verdict: FAIL.** AC17's mandatory item-by-item reporting duty is not discharged — see Duty 4 below. Everything else checked out; this is the sole blocking finding.
+
+**Duty 1 — mechanical sweep.** `CHECK_ACS_TIMEOUT=900 check-acs.sh .shell-team/specs/T-1113-quantity-relay-checker.md 2>&1 | tail -1` → `check-acs: 18 passed, 0 failed, 1 skipped, 0 unrecognized`. 18/18 checkable ACs PASS (AC17 SKIP by design, no `- check:` line).
+
+**Duty 2 — dogfood the checker beyond its own fixtures.** `bash bin/check-count-claims.sh --board .shell-team/todo.md --task T-1113` → exit 0; all 6 live `- count:` rows re-derived and matched (`grep -c '^  - count: ' .shell-team/todo.md` scoped to the T-1113 entry = 6). On a scratch copy of the board (`cp .shell-team/todo.md "$T/board.md"`): (1) corrupted `acceptance-criteria`'s declared value `19`→`20` → exit **1**, stderr names both values (`declares 20 but the command measured 19`); (2) near-miss field name `- Count:` in place of `- count:` → exit **1**, "collected by the wide stem but does not match the strict grammar" — never silently ignored as the zero-row case; (3) `--no-exec` on the unmodified scratch copy → exit **0** (structural pass, no execution); (4) advisory warning: fresh scratch git repo, board tracked+committed → no `uncommitted` line, exit 0; same board modified (still tracked) → `uncommitted` warning on stderr, exit stays **0** — matches AC18's semantics exactly (warn, never refuse).
+
+**Duty 3 — suites and static checks.**
+- `bash tests/check-count-claims/run.sh 2>&1 | grep -c '^PASS:'` → **11**, matches the board's own `check-count-claims-suite-pass` row.
+- `bash tests/close-out/run.sh 2>&1 | grep -c '^PASS:'` → **130**; `bash tests/close-out/run.sh 2>&1 | grep -c '^PASS: T-1113'` → **5** — both match the board's own `close-out-suite-total-pass`/`close-out-suite-t1113-pass` rows exactly.
+- `shellcheck bin/check-count-claims.sh bin/close-out.sh tests/check-count-claims/run.sh tests/close-out/run.sh` → exit 0 (shellcheck 0.11.0).
+- `bash bin/check-prompt-sync.sh` → exit 0; `bash tests/check-prompt-sync/run.sh` → exit 0.
+
+**Duty 4 — re-derive the engineer's quantitative claims (FAIL driver).** AC17 requires the hand-off to report items (a)–(h) individually ("a compressed summary does not discharge it"). The board's own `engineer hand-off` bullet ends with the sentence "AC17's items are reported in the engineer hand-off below" — but nothing itemized follows it, on this bullet or anywhere else in the record (checked: the same bullet, the `blast-radius full sweep` bullet, `.shell-team/provenance/T-1113.md`, `.shell-team/interventions/T-1113.md`, and the T-1113 entry of `.shell-team/test-recipe.md:2467`–`:2498`, plus both commits `87b9c26` and `2a08a68`). Audited item by item:
+- **(a) mutation self-check per lock** — not reported anywhere. No `before=0 after=1 restored=0` transition is recorded for any of the ~19 named mutations (AC1 dynamic-help; AC3's 3 stem axes; AC5 dup-label; AC6's 3 refusal/comparison mutations; AC7 `--no-exec` suppression; AC8 1-vs-2 split; AC9's 2 echo-ordering mutations; AC10's 2 delegation mutations; AC19's 2 exit-mapping mutations; AC11 bound-rule split; AC18's 2 warning mutations). **Not confirmed.**
+- **(b) execution-context matrix** — not reported. **Not confirmed.**
+- **(c) CI-equivalence over the reached-steps set** — not reported (no `grep -rl` derivation, no per-step applicability list). **Not confirmed.**
+- **(d) full-population two-arm blast-radius inventory** — reported: the `blast-radius full sweep` board bullet and the spec's `## Blast radius` section carry the population, the command, both arms' verdicts, completion counts and all 7 flips with measured causes. **Confirmed** — spot-reproduced two flips plus one oscillation live at HEAD myself: `CHECK_ACS_TIMEOUT=300 check-acs.sh .shell-team/specs/T-1110-freeze-version-derivation.md | grep '^AC9:'` → `AC9: FAIL` (matches the disclosed cause — its own `- stale-at:` note); `CHECK_ACS_TIMEOUT=300 check-acs.sh .shell-team/specs/T-1104-review-input-fidelity.md | grep '^AC11:'` → `AC11: FAIL` (matches — codex-reviewer.md consumer-mirror byte lock); `CHECK_ACS_TIMEOUT=300 check-acs.sh .shell-team/specs/T-1103-oversight-profiles.md | grep '^AC14:'` → `AC14: PASS` (matches the disclosed board-entry-count oscillation, now-PASS).
+- **(e) measured 40-hex values consolidated in one place with `git branch --show-current`** — not reported as a consolidated block; the hex (`05e214916187544636af7f4260ef47234bfca972`) appears scattered across the spec's Goal section and the board's `branch:` bullet, never alongside `git branch --show-current`'s own output. **Not confirmed** (partial credit for the scattered mentions, but the criterion asks for consolidation).
+- **(f) `## Assumptions` relayed premises re-measured** — reported, inside the spec itself: A-1, A-2 and A-6 each carry a "**Measured by the freeze run (2026-09-01)**" clause with the measured value beside the row. **Confirmed**, though this landed via the freeze-attestation step rather than a discrete engineer-hand-off report.
+- **(g) per-source report against `## Summarized sources`** — not reported by the engineer hand-off (this QA round performed its own pass instead — see below). **Not confirmed as an engineer-hand-off item.**
+- **(h) `- count:` rows named individually with their commands** — reported, implicitly: the six `- count:` sub-bullets on the board (`acceptance-criteria`, `bash-token-agents`, `derived-populations-consumers`, `check-count-claims-suite-pass`, `close-out-suite-t1113-pass`, `close-out-suite-total-pass`) each carry a `— command:` clause. **Confirmed.**
+
+Net: 3 of 8 items confirmed (d, f, h), 4 not reported at all (a, b, c, g), 1 reported but not in the consolidated shape the criterion asks for (e). This is a hand-off gap per this repo's own audit discipline ("An item the hand-off does not report is a gap you name rather than a silence you fill"), not a mechanical `check-acs.sh` FAIL (AC17 has no `- check:` line by design) — but it is mandatory and not exempt under the input-space or out-of-ceiling carve-outs.
+
+**Duty 5 — record gates.**
+- `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0.
+- `bash bin/check-entry-mode.sh --board .shell-team/todo.md --task T-1113` → exit 0.
+- `bash bin/check-board-headings.sh .shell-team/todo.md --base 05e2149` → exit 0.
+- `bash bin/check-pii-shapes.sh --base 05e2149` → clean, exit 0.
+- `bash bin/check-intent.sh .shell-team/specs/T-1113-quantity-relay-checker.md .shell-team/todo.md` → `aligned`, exit 0.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1113.md` → `conformant (4 decision entries, 0 sentinel)`, exit 0.
+- `bash bin/check-interventions.sh --task T-1113 .shell-team/interventions/T-1113.md` → `conformant (1 entries, 0 sentinel)`, exit 0.
+
+All seven record gates green. `git status --short` on this checkout carries only this board edit.
+
+### QA verdict: FAIL
+- Task: T-1113 → READY_FOR_ENG (rework)
+- Failure: **AC17** — the hand-off's own reporting duty for items (a) mutation self-check tally, (b) execution-context matrix, (c) CI-equivalence set and (g) per-source Summarized-sources report is not discharged anywhere in the record (board, provenance, interventions or test-recipe). The board's `engineer hand-off` bullet promises "AC17's items are reported in the engineer hand-off below" and nothing itemized follows.
+- Reproduction: `grep -n "AC17's items are reported in the engineer hand-off below" .shell-team/todo.md` → matches the dangling promise (the `engineer hand-off` bullet); `sed -n '17,50p' .shell-team/todo.md | grep -n 'mutation\|AC17(\|CI-equival\|reached-steps'` → no output, nothing itemized follows the promise anywhere in the T-1113 entry. Expected: a report naming each of AC17(a)–(h) individually, per the spec's own text ("a compressed summary does not discharge it").
+- Suggested next step: add the missing items to the board hand-off (a new bullet is fine) — (a) run the ~19 pre-committed mutation self-checks on a `git worktree add --detach` scratch tree and report each `before=0 after=1 restored=0`; (b) run every adopter-documented command in both execution-context-matrix cells; (c) derive the CI-equivalence reached-steps set mechanically (`grep -rl` each edited path against `tests/*/run.sh` and the workflow's step list) and name every inapplicable step with its reason; (e) consolidate the measured 40-hex values in one place alongside `git branch --show-current`; (g) add a per-source Summarized-sources report (opened this round? distinction still matches?). Items (d), (f) and (h) are already adequately covered and need no rework.
 
 ### QA verification — T-1112 (qa-verifier)
 
