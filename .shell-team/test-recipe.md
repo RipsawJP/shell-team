@@ -2359,3 +2359,196 @@ that file's order.
     fixture missing one of those refuses for the wrong reason before the
     predecessor logic is ever reached, again defeating the probe silently
     rather than loudly.
+- T-1110: `CHECK_ACS_TIMEOUT=900 check-acs.sh
+  .shell-team/specs/T-1110-freeze-version-derivation.md` is the mechanical
+  per-AC gate for a spec whose criteria read committed base-ref blobs via a
+  `git merge-base` discriminator (AC6/AC9/AC11/AC12/AC14) — the 900s budget
+  is generous headroom for `bash tests/trial-recipe/run.sh` (AC12) running
+  inline inside one of the criteria's own `- check:` line rather than a
+  suite-runtime requirement in itself. Two traps worth inheriting for any
+  future task editing `docs/adopting.md` / `docs/adopting.ja.md` or
+  `skills/run/SKILL.md`'s freeze-sweep branch: **(1)** both adopting docs
+  are **hard-wrapped prose** (roughly 70-79 columns per line), and an
+  acceptance criterion that asserts a literal multi-word phrase with
+  `grep -qF` against an extracted section checks each PHYSICAL line
+  independently — a phrase that happens to fall across a hard-wrap line
+  break (e.g. "no mechanical checker ships\nfor it yet") silently fails
+  even though the words are all present and read correctly to a human.
+  Before trusting a docs edit carrying required literal tokens, re-run the
+  exact extraction-plus-grep the spec's own `- check:` line uses (an `awk`
+  section extraction into a scratch file, then `grep -qF` per token) rather
+  than eyeballing the rendered prose. **(2)** `skills/run/SKILL.md`'s
+  freeze-sweep gate bullets are each a SINGLE physical line of several
+  thousand characters; anchor an `Edit` on the full preceding sibling
+  gate's own complete line (never a fragment of it) and insert the new
+  bullet as one line immediately after, then confirm
+  `git diff --numstat -- skills/run/SKILL.md` reports zero deletions
+  before running any other check (T-1107 marker-corruption rule, same
+  discipline this file's own T-1041/T-1051 entries above already document
+  for other files). Separately, a multi-line `bash` command block piping
+  through several `&&`/`;`-joined statements with an inline
+  `mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX"` was denied outright by this
+  sandbox's write-allowlist on this task (no output, no partial run); the
+  same logic run as a SINGLE-LINE command, or using the session's own
+  scratchpad path directly instead of the `${TMPDIR:-/tmp}` fallback
+  idiom, was permitted and produced normal output — worth trying a
+  single-line reformulation before concluding a multi-statement verification
+  block is blocked outright.
+- T-1110 (coordinating-session fan-out procedure, promoted with fresh
+  measurements — the T-1109 session established this shape but never
+  appended it, which is how the hosting form drifted; operator ruling
+  2026-08-31, `.shell-team/interventions/T-1110.md`): a mechanism-class
+  full-population two-arm sweep is executed as **N harness-tracked
+  background shell slices launched by the coordinating session** — never
+  by a sub-agent hosting detached children (a sub-agent's shell tool caps
+  one call at 10 minutes, its detached children are harness-untracked,
+  and its own process is a single point of failure for every slice at
+  once; sub-agent-hosted fan-out has zero completed runs and is
+  prohibited until a dedicated pilot measures it). Shape: partition the
+  member list round-robin into N lists; per slice create ONE base
+  worktree (`git worktree add --detach` at the resolved base ref) and ONE
+  head worktree (pinned at a commit, never the live tree — a live tree is
+  concurrently written by other roles), stage the untracked runs corpus
+  into BOTH arms per the T-1108 entry above; each slice runs its members
+  serially (`bash bin/check-acs.sh <spec>` per member per arm), so the
+  `bin/log-run.sh` directory lock never sees two contenders in one tree
+  while the slices stay parallel across trees. Measured this task: 112
+  members x 2 arms = 224 runs, 6 slices, 132.8 min wall-clock under
+  competing CPU load (an orphaned second fan-out ran for part of the
+  window); T-1109's uncontended measurement of the same shape was ~92 min
+  for 113 x 2. Completion criterion: per-slice progress count equals its
+  list length AND every member has both arm rows — never a sentinel echo.
+  Two quirks: (a) `echo "SLICE_$i_DONE"` under `set -u` parses `$i_DONE`
+  as one variable and kills the slice's exit status after all work is
+  done — write `${i}_DONE`; the resulting `failed (exit 1)` task
+  notifications are cosmetic when the completion criterion above holds;
+  (b) flip tallies are derived from the results TSV by an awk join on
+  (member, arm), never read off individual logs by eye.
+- T-1111 (`bin/derive-populations.sh --set ... --set ...` union can resolve
+  to corpus-scale rather than the tighter subset a task's Blast radius
+  method was priced for — a STOP-and-report condition, not an execution
+  procedure to push through): the `indirect` set (`grep -lF -- 'team-paths.sh
+  --get' .shell-team/specs/*.md`) alone matched 105 of this corpus's 116
+  specs on this task's own read set — any `--set` built from a generic
+  reachability grep (a resolver invocation, a shared checker name) should
+  be treated as a hazard for corpus-scale collapse before it is declared,
+  not discovered after running it. When a derivation's `- union: items:`
+  count is corpus-scale, do not run the full base/head sweep as a single
+  engineer round: measure only the tightest multi-set-membership bucket
+  (the specs whose criteria read every edited path together — 7 of the 105
+  members on this task) directly, name the rest as unrun explicitly, and
+  defer the full sweep to the coordinating-session-hosted fan-out procedure
+  (T-1110 entry above), per `.shell-team/interventions/T-1110.md` entry 3's
+  executor-hosting ruling. Separately, when a spec's own frozen/byte-locked
+  evidence section is missing a grammar element a later criterion assumes
+  it carries (here: `- command: ` lines the check expects inside the
+  evidence section specifically, which the committed evidence recorded only
+  as untagged prose), do not add the missing grammar inside the frozen
+  section to force a pass — restate the same facts, already present in the
+  evidence's own prose, in a section the task's own role does own, and
+  disclose the frozen section's own gap in the note's Limits rather than
+  silently working around it.
+- T-1112 (mechanism-class `verify-mechanism` sweeps flip to parallel by
+  default; the fan-out's `execution-host` stops being a free variable):
+  the population derivation (`bin/derive-populations.sh --label
+  t1112-read-set ...`) again resolved corpus-scale — 117 total specs, 99
+  of them in the `all+literal+indirect` bucket alone — the same T-1111
+  hazard class, reconfirmed rather than rediscovered. Per that entry's
+  own disposition, the engineer round derived and disclosed the
+  population and its size but did **not** run the full base/head sweep
+  itself; the full two-arm inventory (`- flips: <count>` on the spec's
+  own `## Blast radius`) is owed to the coordinating-session-hosted,
+  **harness-tracked** background-shell-slice fan-out procedure (T-1110
+  entry above), never to a sub-agent-hosted one. The `execution-host`
+  launch-record field (audit-only, `coordinating-session — <ground>`)
+  this task ships is exactly the field that fan-out's own launch record
+  writes for that run — the artifact and the recipe entry describing it
+  land together.
+- T-1113 (a relayed count carries its own derivation command; the
+  `bin/check-count-claims.sh` checker plus its `bin/close-out.sh`
+  delegation): the same corpus-scale hazard T-1111/T-1112 name recurs on a
+  different axis. A `--set` built from "which specs mention
+  `.github/workflows/check-handoff.yml`" or "which specs mention
+  `templates/prompt-blocks/derived-populations.md` /
+  `bin/check-prompt-sync.sh`" is not a targeted read-set query at all —
+  both files are referenced by nearly every task's own criteria, since
+  almost every mechanism-class task's fixture suite gets wired into that
+  workflow and almost every task that states a count touches the
+  derived-populations prompt block. Measured for this task:
+  `bin/derive-populations.sh --label t1113-read-set` resolved a union of
+  107 items out of this corpus's 118 specs — reconfirmed, not
+  rediscovered. Per the same disposition T-1111/T-1112 record, the
+  engineer round derived and embedded the population (in the spec's own
+  `## Blast radius` section, under its own `- reproduce:` line) but did
+  **not** run the full base/HEAD two-arm sweep itself, per this task's own
+  explicit instruction not to run it as a single engineer round; the
+  `- flips: <n>` line the spec's AC16 also requires is left for the
+  coordinating-session-hosted fan-out procedure the T-1110/T-1111/T-1112
+  entries above already establish, so **AC16 is expected red at this
+  round's own `check-acs.sh` run** (16 passed, 1 failed — AC16 — plus
+  AC15's scope lock passing only once this round's own files are
+  committed, 1 skipped) until that sweep completes and records its own
+  count here. Separately: a `bash -c "$cmd"`-based checker whose own
+  fixture suite embeds a literal `\n` inside a board row built through a
+  `printf '...%b...'` helper is a live double-interpretation trap — `%b`
+  interprets the escape a second time, silently turning an intended
+  single-line row into a multi-line one before the checker's own grammar
+  ever sees it. Prefer a command shape with no embedded backslash escape
+  at all (e.g. `echo 6; echo 7` for a two-line measurement fixture) over
+  chasing the correct backslash-multiplication count through a `%b` layer.
+- T-1114 (a fourth confirmation of the T-1111/T-1112/T-1113 corpus-scale
+  hazard, this time on `agents/pm-spec.md` itself as the read-set anchor):
+  `bin/derive-populations.sh --label t1114-read-set --set
+  "all=ls .shell-team/specs/*.md | LC_ALL=C sort" --set "pmspec=grep -lE --
+  '- check:.*agents/pm-spec\.md' .shell-team/specs/*.md | LC_ALL=C sort"
+  --set "adopting=grep -lE -- '- check:.*docs/adopting(\.ja)?\.md'
+  .shell-team/specs/*.md | LC_ALL=C sort" --set "indirect=grep -lF --
+  'team-paths.sh --get' .shell-team/specs/*.md | LC_ALL=C sort"
+  --accept-status pmspec=1 --accept-status adopting=1 --accept-status
+  indirect=1` resolved a union of 119 items out of this corpus's own 119
+  total spec files — every spec but the 9 pure-`all`-bucket members reads
+  at least one of the two edited surfaces or resolves a path indirectly
+  through `bin/team-paths.sh --get`, driven almost entirely by `indirect`
+  alone matching 108/119. Per the T-1111/T-1112/T-1113 disposition above,
+  and this task's own explicit briefing to report the `- union: items:`
+  count in the hand-off BEFORE running the sweep once it exceeds ~40
+  members rather than push a corpus-scale two-arm diff through as a single
+  engineer round: this round derived and embedded the population (spec's
+  own `## Blast radius`, under its `- reproduce:` line) but did **not** run
+  the full base/HEAD two-arm sweep, and did not run even the tightest
+  multi-set bucket as a partial substitute — a partial slice of a
+  corpus-scale population, run from inside a single engineer round, would
+  misrepresent partial coverage as the read-set-scoped inventory the
+  spec's own `- verification-class: no-mechanism` declaration actually
+  owes. The spec's own `- flips:` line is left `unmeasured (sweep not yet
+  run)` — never a fabricated leading digit, which would silently satisfy
+  **AC13**'s digit-run assertion despite the sweep never having run — so
+  **AC13 is expected red at this round's own `check-acs.sh` run** (15
+  passed, 1 failed — AC13 — 1 skipped) until the coordinating-session-
+  hosted, harness-tracked fan-out procedure completes and records its own
+  measured count on that line, replacing `unmeasured`.
+- T-1114 (sweep completion addendum to the entry above; the fan-out's
+  kill-recovery pattern is now itself a measured procedure): the 118-member
+  two-arm sweep (base `61557b9` / head `97cda8f`) completed 2026-09-02 with
+  **4 flips, all measured staleness classes, zero regressions** — but the
+  6 harness-tracked background slices were externally killed in batches
+  THREE times mid-run (59/118 after round 1, 101/118 after round 2,
+  104/118 after round 3). The recovery that worked, each round: derive the
+  done-both set per slice from the results TSVs by an awk join
+  (`$3!="NO-SUMMARY" && count==2`), `comm -23` it against the slice's
+  sorted member list to get the catch-up list, and relaunch only that —
+  results accumulate across `results-$i*.tsv` files that are merged and
+  `sort -u`'d at tally time, so no completed member-arm is ever re-run.
+  When the remaining tail is small (≤ ~14 members), foreground chunks of
+  3–4 members per Bash call (explicit 590s timeout) finish more reliably
+  than yet another background round — but a single heavy member can
+  exceed even that (T-1050's head arm and the T-1108/T-1113 pair each
+  outran a 590s window; an uncapped background call for just that member
+  is the terminal fallback). Two members of this corpus
+  (`design-note-T-1012.md`, `T-1020-supersede-adjudication.md`) carry no
+  acceptance criteria at all: `check-acs` reports "no acceptance criteria
+  found" (exit 0) symmetrically on both arms — classify them as
+  non-evaluable rather than letting a NO-SUMMARY row look like a failure,
+  and never count them as flips. Completion criterion stays the T-1110
+  rule: every member has both arm rows in the merged TSV — never a
+  sentinel, never a task notification alone.

@@ -58,6 +58,8 @@ excludes exist. Pin it explicitly (`git -c core.excludesFile=/dev/null …`) in
 any assertion about ignore behavior rather than inheriting whatever the operator
 has configured.
 
+A scope-lock `- check:` line inherits this consequence unchanged: `agents/pm-spec.md`'s hand-written `## Rules` teaches a scope-lock's measured set as the union of the committed range, the index and the working tree rather than the committed range alone, and its untracked half is still `git ls-files --others --exclude-standard`, so a path this global file hides stays invisible to that union exactly as it always has.
+
 How often the session stops to check with you is your call too, and it is set
 per-checkout rather than shipped: see
 [tuning-oversight.md](tuning-oversight.md).
@@ -752,6 +754,22 @@ stay silent on the same run. A printed note is disclosure, not a gate: it
 does not refuse the close-out, and an operator who does not read stdout
 learns nothing from it either way.
 
+## A relayed count carries its own derivation command
+
+`bin/check-count-claims.sh` (T-1113, issue #397) reads a task's own
+`## Active` board entry for `- count: <label> — <value> — command: <cmd>`
+sub-bullets, refuses a malformed or duplicated row, and — unless run with
+`--no-exec` — re-runs each conformant row's command and refuses when the
+measured output disagrees with the declared value. `bin/close-out.sh`
+delegates to it unconditionally, in `--no-exec` mode: grammar validation
+only, so an entry carrying no `- count:` row still closes out untouched
+and the shipped default path gains zero new execution surface. Running the
+checker without `--no-exec` is an explicit, separate operator choice — it
+warns on stderr (never refusing, never changing the exit status) when the
+board it reads is a tracked path carrying uncommitted modifications, since
+a board entry, unlike this project's own frozen and review-gated specs,
+can be edited by any role at any point in a task's life.
+
 ## Recording review-input fidelity
 
 Each executor pass a review record's verdict section names states four
@@ -793,6 +811,45 @@ the argv that actually ran. And it cannot see whether the raw file a
 `raw-capture` field names is **not present on disk** — raw captures are
 untracked by construction (`/.gitignore`), so a stem naming nothing is
 conformant to this checker.
+
+## Deriving the release version at freeze time
+
+At every freeze — a task's first freeze and any re-freeze, including a
+class-M mechanics-repair re-freeze — the coordinating session
+re-derives the release tier from the spec's own declarations, before
+that freeze's `- intent-hash` line is appended: a `- user-visible:`
+line and a `- verification-class:` line. The derivation applies
+`CONTRIBUTING.md`'s `## What a version number encodes` headline test
+and default-reachability test jointly: a `- user-visible: yes`
+declaration is the derivation's **trigger**, never its verdict, and the
+derived tier is one of `MAJOR`, `MINOR` or `PATCH`.
+
+The result is recorded on the task's own board entry as a
+`- version-derivation` sub-bullet, in the shape
+`- version-derivation (v<N>, YYYY-MM-DD):`, whose closed fields —
+`verdict=`, `derived=`, `headline=`, `default-reach=` — precede one
+free-form `grounds:` field, so a later checker can validate the family
+when it is present while an entry carrying none of this still passes.
+The `premise=` field between them is required to be self-contained: it
+carries the expected tier together with the ground the planning
+approval was given on, never a bare pointer to an approval a later
+reader has no way to open. Where the repository has no approved
+planning premise on record — the shipped default for an adopter who
+never configured one — there is nothing to derive against; this is
+never a reason to refuse the freeze, and the record is still written
+with `verdict=no-premise-on-record`.
+
+When the derived tier disagrees with the repository's approved planning
+premise, the freeze stops before any further work on the task and
+issues a deviation notice: stated in English, never a bare "proceed?",
+and carrying all three of its required elements — that the work now exceeds the approved estimate, the continue-or-stop question, and a
+recommendation with its rationale. This stop is not a fourth human gate: it re-enters the existing planning-approval gate, one of the
+three standing human gates this loop already declares, because a
+derived tier that disagrees with the approved premise means that
+approval has lapsed. No new status flag and no new phase are added.
+
+Enforcement today is a **duty, not a checker**: the coordinating
+session performs this derivation as a read, and no mechanical checker ships for it yet.
 
 ## Operating rules
 
