@@ -2424,3 +2424,27 @@ that file's order.
   notifications are cosmetic when the completion criterion above holds;
   (b) flip tallies are derived from the results TSV by an awk join on
   (member, arm), never read off individual logs by eye.
+- T-1111 (`bin/derive-populations.sh --set ... --set ...` union can resolve
+  to corpus-scale rather than the tighter subset a task's Blast radius
+  method was priced for — a STOP-and-report condition, not an execution
+  procedure to push through): the `indirect` set (`grep -lF -- 'team-paths.sh
+  --get' .shell-team/specs/*.md`) alone matched 105 of this corpus's 116
+  specs on this task's own read set — any `--set` built from a generic
+  reachability grep (a resolver invocation, a shared checker name) should
+  be treated as a hazard for corpus-scale collapse before it is declared,
+  not discovered after running it. When a derivation's `- union: items:`
+  count is corpus-scale, do not run the full base/head sweep as a single
+  engineer round: measure only the tightest multi-set-membership bucket
+  (the specs whose criteria read every edited path together — 7 of the 105
+  members on this task) directly, name the rest as unrun explicitly, and
+  defer the full sweep to the coordinating-session-hosted fan-out procedure
+  (T-1110 entry above), per `.shell-team/interventions/T-1110.md` entry 3's
+  executor-hosting ruling. Separately, when a spec's own frozen/byte-locked
+  evidence section is missing a grammar element a later criterion assumes
+  it carries (here: `- command: ` lines the check expects inside the
+  evidence section specifically, which the committed evidence recorded only
+  as untagged prose), do not add the missing grammar inside the frozen
+  section to force a pass — restate the same facts, already present in the
+  evidence's own prose, in a section the task's own role does own, and
+  disclose the frozen section's own gap in the note's Limits rather than
+  silently working around it.
