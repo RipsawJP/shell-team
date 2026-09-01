@@ -62,6 +62,8 @@ global ファイルにはもう 1 つ影響があります。あるパスが無�
 設定を継承せず、`git -c core.excludesFile=/dev/null …` のように明示的に
 pin してください。
 
+scope-lock 系の `- check:` 行もこの影響を同じく受けます: `agents/pm-spec.md` の手書き `## Rules` は、scope-lock が測定する集合をコミット範囲だけでなく index と working tree も含む union として教えており、その untracked 側は今も `git ls-files --others --exclude-standard` のままなので、この global ファイルが隠すパスはこの union からも同じように見えなくなります。
+
 セッションがどれくらい確認で止まるかも、同じくあなたの判断です。出荷物では
 なく作業コピーごとに設定します。詳細は
 [tuning-oversight.ja.md](tuning-oversight.ja.md) を参照してください。

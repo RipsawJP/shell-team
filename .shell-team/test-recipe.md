@@ -2496,3 +2496,34 @@ that file's order.
   ever sees it. Prefer a command shape with no embedded backslash escape
   at all (e.g. `echo 6; echo 7` for a two-line measurement fixture) over
   chasing the correct backslash-multiplication count through a `%b` layer.
+- T-1114 (a fourth confirmation of the T-1111/T-1112/T-1113 corpus-scale
+  hazard, this time on `agents/pm-spec.md` itself as the read-set anchor):
+  `bin/derive-populations.sh --label t1114-read-set --set
+  "all=ls .shell-team/specs/*.md | LC_ALL=C sort" --set "pmspec=grep -lE --
+  '- check:.*agents/pm-spec\.md' .shell-team/specs/*.md | LC_ALL=C sort"
+  --set "adopting=grep -lE -- '- check:.*docs/adopting(\.ja)?\.md'
+  .shell-team/specs/*.md | LC_ALL=C sort" --set "indirect=grep -lF --
+  'team-paths.sh --get' .shell-team/specs/*.md | LC_ALL=C sort"
+  --accept-status pmspec=1 --accept-status adopting=1 --accept-status
+  indirect=1` resolved a union of 119 items out of this corpus's own 119
+  total spec files — every spec but the 9 pure-`all`-bucket members reads
+  at least one of the two edited surfaces or resolves a path indirectly
+  through `bin/team-paths.sh --get`, driven almost entirely by `indirect`
+  alone matching 108/119. Per the T-1111/T-1112/T-1113 disposition above,
+  and this task's own explicit briefing to report the `- union: items:`
+  count in the hand-off BEFORE running the sweep once it exceeds ~40
+  members rather than push a corpus-scale two-arm diff through as a single
+  engineer round: this round derived and embedded the population (spec's
+  own `## Blast radius`, under its `- reproduce:` line) but did **not** run
+  the full base/HEAD two-arm sweep, and did not run even the tightest
+  multi-set bucket as a partial substitute — a partial slice of a
+  corpus-scale population, run from inside a single engineer round, would
+  misrepresent partial coverage as the read-set-scoped inventory the
+  spec's own `- verification-class: no-mechanism` declaration actually
+  owes. The spec's own `- flips:` line is left `unmeasured (sweep not yet
+  run)` — never a fabricated leading digit, which would silently satisfy
+  **AC13**'s digit-run assertion despite the sweep never having run — so
+  **AC13 is expected red at this round's own `check-acs.sh` run** (15
+  passed, 1 failed — AC13 — 1 skipped) until the coordinating-session-
+  hosted, harness-tracked fan-out procedure completes and records its own
+  measured count on that line, replacing `unmeasured`.

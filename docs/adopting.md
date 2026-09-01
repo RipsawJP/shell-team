@@ -58,6 +58,8 @@ excludes exist. Pin it explicitly (`git -c core.excludesFile=/dev/null …`) in
 any assertion about ignore behavior rather than inheriting whatever the operator
 has configured.
 
+A scope-lock `- check:` line inherits this consequence unchanged: `agents/pm-spec.md`'s hand-written `## Rules` teaches a scope-lock's measured set as the union of the committed range, the index and the working tree rather than the committed range alone, and its untracked half is still `git ls-files --others --exclude-standard`, so a path this global file hides stays invisible to that union exactly as it always has.
+
 How often the session stops to check with you is your call too, and it is set
 per-checkout rather than shipped: see
 [tuning-oversight.md](tuning-oversight.md).
