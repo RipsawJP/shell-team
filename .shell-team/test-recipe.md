@@ -2464,3 +2464,35 @@ that file's order.
   this task ships is exactly the field that fan-out's own launch record
   writes for that run — the artifact and the recipe entry describing it
   land together.
+- T-1113 (a relayed count carries its own derivation command; the
+  `bin/check-count-claims.sh` checker plus its `bin/close-out.sh`
+  delegation): the same corpus-scale hazard T-1111/T-1112 name recurs on a
+  different axis. A `--set` built from "which specs mention
+  `.github/workflows/check-handoff.yml`" or "which specs mention
+  `templates/prompt-blocks/derived-populations.md` /
+  `bin/check-prompt-sync.sh`" is not a targeted read-set query at all —
+  both files are referenced by nearly every task's own criteria, since
+  almost every mechanism-class task's fixture suite gets wired into that
+  workflow and almost every task that states a count touches the
+  derived-populations prompt block. Measured for this task:
+  `bin/derive-populations.sh --label t1113-read-set` resolved a union of
+  107 items out of this corpus's 118 specs — reconfirmed, not
+  rediscovered. Per the same disposition T-1111/T-1112 record, the
+  engineer round derived and embedded the population (in the spec's own
+  `## Blast radius` section, under its own `- reproduce:` line) but did
+  **not** run the full base/HEAD two-arm sweep itself, per this task's own
+  explicit instruction not to run it as a single engineer round; the
+  `- flips: <n>` line the spec's AC16 also requires is left for the
+  coordinating-session-hosted fan-out procedure the T-1110/T-1111/T-1112
+  entries above already establish, so **AC16 is expected red at this
+  round's own `check-acs.sh` run** (16 passed, 1 failed — AC16 — plus
+  AC15's scope lock passing only once this round's own files are
+  committed, 1 skipped) until that sweep completes and records its own
+  count here. Separately: a `bash -c "$cmd"`-based checker whose own
+  fixture suite embeds a literal `\n` inside a board row built through a
+  `printf '...%b...'` helper is a live double-interpretation trap — `%b`
+  interprets the escape a second time, silently turning an intended
+  single-line row into a multi-line one before the checker's own grammar
+  ever sees it. Prefer a command shape with no embedded backslash escape
+  at all (e.g. `echo 6; echo 7` for a two-line measurement fixture) over
+  chasing the correct backslash-multiplication count through a `%b` layer.

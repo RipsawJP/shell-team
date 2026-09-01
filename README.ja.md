@@ -253,6 +253,32 @@ bash derive-populations.sh --label agents --set "registered=git ls-files -- agen
 
 Exit code: `0` ブロックが stdout に書かれた。`1` 入力の*内容*に関する refusal（受理されていない集合の exit status——`pipefail` の下では、パイプライン途中の正当な非ゼロ exit は `--accept-status` と組み合わせる——または制御文字を含むアイテム——stdout は空のまま、決して偽の空集合として扱わない）。`2` 呼び出しに関する usage error（`--label` 欠落、上記文法から外れた識別子、`--set` が 2 未満または 8 超、同名の重複、制御文字を含む `--set` コマンド）。このリポジトリ自身の dogfood された導出例は `docs/loop-engineering/record-set-derivation.md` を参照。
 
+## 中継される件数は自分の導出コマンドを伴う
+
+ある hand-off が別のロールへ中継する数値（fixture の件数・provenance の
+差分など）は、タスクボード上で転記された literal のままでは終わらない:
+`bin/check-count-claims.sh` はタスク自身の `## Active` board entry から
+`- count: <label> — <value> — command: <cmd>` sub-bullet（`<label>` は
+`^[A-Za-z0-9][A-Za-z0-9_-]*$`、`<value>` は `^[+-]?[0-9]+$` に閉じ、
+`<cmd>` は自由記述で常に最後のフィールド）を読み、`--no-exec` を付けない
+限り各行のコマンドを再実行し、測定された出力が宣言値と食い違えば refuse する。
+
+```bash
+bash check-count-claims.sh --board .shell-team/todo.md --task T-1113 --no-exec
+```
+
+`bin/close-out.sh` は `bin/check-count-claims.sh` を無条件に、`--no-exec` モードで delegate する:
+`- count:` 行を一切持たない entry はそのまま close-out でき、malformed な
+行はボード書き込み前に close-out を refuse する——文法検証のみで、出荷時
+既定パス上に新しい実行面はゼロ。`--no-exec` を**付けずに**実行するのは
+adopter が明示的に選ぶ別の操作であり、conformant な各行のコマンドを
+`bash -c` 経由で実行する——そのためこのチェッカーの対象はこのプロジェクト
+自身の凍結・レビュー済み spec とは違い、タスクのライフサイクル中いつでも
+どのロールからも編集され得る board entry であるという理由から、対象の
+board が index/HEAD に対する未コミット変更を持つ tracked path であれば
+stderr に警告を出す（refuse は決してせず、exit status も変えない）。
+完全な文法と exit code の契約は `bash check-count-claims.sh --help` を参照。
+
 ## 設計上の選択
 
 - **read-only オーケストレーター**：`tech-lead` は計画のみ。実行はメインセッションが Routing Map に従って行う。
