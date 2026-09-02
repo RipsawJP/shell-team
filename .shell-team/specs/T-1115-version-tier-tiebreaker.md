@@ -114,7 +114,181 @@
 
 ## Blast radius
 
-*Written by the freeze run: the base-ref line, the method line, the `bin/derive-populations.sh` derivation block with its `- reproduce:` command, the `- population:` line and one `- row:` line per criterion whose verdict this diff moves. Required shape is fixed by **AC13**.*
+**Record (freeze run, 2026-09-02, coordinating session).**
+
+- base-ref: 6b60585a9d398d31a617586ddd8a8061554b4252 — resolved by arm 1 of the declared discriminator (`git merge-base "chore/lesson-promotion-2026-09-02" HEAD`); every base-side verdict below was produced in a detached worktree checked out at that commit, never from this working tree.
+- method: git grep -l -E '^[[:space:]]+- check:.*CONTRIBUTING\.md' -- '.shell-team/specs/*.md' | grep -v 'T-1115-version-tier-tiebreaker\.md' — each member's own `- check:` lines are run as themselves with `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh <spec>`, once in the base worktree (base arm) and once in a detached worktree at the implementation commit (HEAD arm), and the two FAILED sets are differenced per criterion label.
+- reproduce: bash bin/derive-populations.sh --label t1115-read-set --set "all=ls .shell-team/specs/*.md | LC_ALL=C sort" --set "direct=grep -lE -- '^[[:space:]]+- check:.*CONTRIBUTING\.md' .shell-team/specs/*.md | grep -v 'T-1115-version-tier-tiebreaker\.md' | LC_ALL=C sort" --set "mention=grep -lF -- 'CONTRIBUTING.md' .shell-team/specs/*.md | grep -v 'T-1115-version-tier-tiebreaker\.md' | LC_ALL=C sort"
+- population: 30 — the `direct` set of the derivation below; **AC13** re-derives the live count and requires equality.
+
+<!-- BEGIN derivation: t1115-read-set -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: all — status: 0 — lines: 120 — items: 120 — command: ls .shell-team/specs/*.md | LC_ALL=C sort
+- set: direct — status: 0 — lines: 30 — items: 30 — command: grep -lE -- '^[[:space:]]+- check:.*CONTRIBUTING\.md' .shell-team/specs/*.md | grep -v 'T-1115-version-tier-tiebreaker\.md' | LC_ALL=C sort
+- set: mention — status: 0 — lines: 69 — items: 69 — command: grep -lF -- 'CONTRIBUTING.md' .shell-team/specs/*.md | grep -v 'T-1115-version-tier-tiebreaker\.md' | LC_ALL=C sort
+- union: items: 120
+- bucket: all — items: 51
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1020-supersede-adjudication.md
+  - .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+  - .shell-team/specs/T-1032-audit-prose-accuracy.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-1086-subject-harness.md
+  - .shell-team/specs/T-1087-judge-briefing.md
+  - .shell-team/specs/T-1088-tier2-firing.md
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1090-sign-safety-close.md
+  - .shell-team/specs/T-1092-specify-seam-review.md
+  - .shell-team/specs/T-1093-verification-ceiling.md
+  - .shell-team/specs/T-1094-trial-adoption.md
+  - .shell-team/specs/T-1095-means-ends-reflection.md
+  - .shell-team/specs/T-1096-selection-trust-gates.md
+  - .shell-team/specs/T-1097-trial-branch-flag.md
+  - .shell-team/specs/T-1098-trial-recipe-execution.md
+  - .shell-team/specs/T-1101-pii-path-shapes.md
+  - .shell-team/specs/T-1103-oversight-profiles.md
+  - .shell-team/specs/T-1104-review-input-fidelity.md
+  - .shell-team/specs/T-1106-check-binding-consistency.md
+  - .shell-team/specs/T-1108-sweep-corpus-isolation.md
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-1111-plugin-role-agent-concurrency.md
+  - .shell-team/specs/T-1115-version-tier-tiebreaker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
+  - .shell-team/specs/design-note-T-1012.md
+- bucket: all+direct+mention — items: 30
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1099-board-heading-integrity.md
+  - .shell-team/specs/T-1102-check-acs-fence.md
+  - .shell-team/specs/T-1105-review-executor-resolution.md
+  - .shell-team/specs/T-1110-freeze-version-derivation.md
+- bucket: all+mention — items: 39
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1046-ignored-base-verdict.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1067-context-lifecycle.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1091-operator-authored-entry.md
+  - .shell-team/specs/T-1100-verify-axis-split.md
+  - .shell-team/specs/T-1107-close-out-gates.md
+  - .shell-team/specs/T-1109-dispatch-reflection.md
+  - .shell-team/specs/T-1112-parallel-default-and-executor-hosting.md
+  - .shell-team/specs/T-1113-quantity-relay-checker.md
+  - .shell-team/specs/T-1114-scope-lock-worktree-deltas.md
+<!-- END derivation: t1115-read-set -->
+
+- indirection-class: **discharged by disclosure, not by running** — the `mention` set (69) minus the `direct` set (30) leaves 39 specs that name `CONTRIBUTING.md` in prose but on no `- check:` line; a criterion reaching the file through a run-time-built path would, in this corpus, still name the file in its own prose, so `mention` bounds the class and those 39 were **not run**. The `bin/team-paths.sh --get` route is closed by construction: its keys resolve operating directories and the board (`--print` lists ten keys), none of them a top-level markdown file, so no criterion can reach `CONTRIBUTING.md` through the resolver.
+- base-arm verdicts (30/30 run, 2026-09-02): the FAILED set per member at the base ref, kept so the HEAD arm is a diff rather than a fresh reading —
+- base-arm: `.shell-team/specs/T-1000-operating-conventions.md` — FAILED: AC2 AC12 AC14 AC17 AC18 AC22 AC23 AC24
+- base-arm: `.shell-team/specs/T-1007-scope-typed-ledger.md` — FAILED: AC13 AC15 AC16 AC17 AC19
+- base-arm: `.shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md` — FAILED: AC9 AC13 AC16 AC18 AC19
+- base-arm: `.shell-team/specs/T-1015-cutting-a-release.md` — FAILED: AC4 AC5 AC6 AC9 AC10
+- base-arm: `.shell-team/specs/T-1017-close-out-interventions-gate.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC6 AC7 AC8 AC9 AC16 AC17
+- base-arm: `.shell-team/specs/T-1018-freeze-attestation-gate.md` — FAILED: AC21 AC22
+- base-arm: `.shell-team/specs/T-1020-lessons-supersede-sweep.md` — FAILED: AC1 AC2 AC4 AC5 AC6 AC8 AC9 AC11 AC15
+- base-arm: `.shell-team/specs/T-1022-close-out-gate-symmetry.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC7 AC10 AC11 AC15 AC16 AC17 AC18
+- base-arm: `.shell-team/specs/T-1023-block-size-deferral-record.md` — FAILED: AC8 AC9 AC10 AC12 AC13
+- base-arm: `.shell-team/specs/T-1024-check-line-mktemp-guard.md` — FAILED: AC7 AC8 AC9 AC10
+- base-arm: `.shell-team/specs/T-1026-skill-md-doc-completeness.md` — FAILED: AC5 AC6 AC7 AC8
+- base-arm: `.shell-team/specs/T-1028-class-m-refreeze.md` — FAILED: AC10 AC11 AC14 AC15
+- base-arm: `.shell-team/specs/T-1034-refreeze-hardening-execbit.md` — FAILED: AC5 AC15 AC16
+- base-arm: `.shell-team/specs/T-1035-spec-template-staleness-locks.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC7 AC10 AC11 AC12 AC13
+- base-arm: `.shell-team/specs/T-1041-freeze-ux.md` — FAILED: AC14 AC15 AC16 AC17 AC21
+- base-arm: `.shell-team/specs/T-1044-test-infra-bundle.md` — FAILED: AC7 AC13 AC14 AC15
+- base-arm: `.shell-team/specs/T-1045-codex-version-provenance.md` — FAILED: AC6 AC7 AC8 AC9
+- base-arm: `.shell-team/specs/T-1051-inspection-ux-polish.md` — FAILED: AC2 AC5 AC7 AC12 AC14 AC16
+- base-arm: `.shell-team/specs/T-1053-retro-mechanization.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC6 AC8 AC9
+- base-arm: `.shell-team/specs/T-1059-docs-release-notes.md` — FAILED: AC6 AC7 AC8 AC10
+- base-arm: `.shell-team/specs/T-1060-adopter-binding-docs.md` — FAILED: AC5 AC8 AC9 AC11
+- base-arm: `.shell-team/specs/T-1061-adopter-docs-gate.md` — FAILED: AC1 AC2 AC3 AC11 AC12 AC13
+- base-arm: `.shell-team/specs/T-1062-release-notes-compare-link.md` — FAILED: AC5
+- base-arm: `.shell-team/specs/T-1063-editorial-batch.md` — FAILED: AC4 AC5 AC10
+- base-arm: `.shell-team/specs/T-1064-shipped-docs-accuracy.md` — FAILED: AC3 AC4 AC6 AC11
+- base-arm: `.shell-team/specs/T-1075-fanout-adoption-versioning.md` — FAILED: AC3 AC4 AC5 AC14 AC15 AC17
+- base-arm: `.shell-team/specs/T-1099-board-heading-integrity.md` — FAILED: AC12 AC17 AC18
+- base-arm: `.shell-team/specs/T-1102-check-acs-fence.md` — FAILED: AC11 AC15
+- base-arm: `.shell-team/specs/T-1105-review-executor-resolution.md` — FAILED: AC13 AC15 AC16 AC17 AC18
+- base-arm: `.shell-team/specs/T-1110-freeze-version-derivation.md` — FAILED: AC6 AC9 AC11 AC12
+- head-arm: run at the Implement-to-Validate seam against the engineer's `READY_FOR_QA` commit; rows below are updated from the measured diff at that point, and until then carry the authoring-time expectation with its status marked.
+- row: `.shell-team/specs/T-1110-freeze-version-derivation.md` **AC12** — base arm: **red** (already in T-1110's FAILED set at `6b60585`: AC6 AC9 AC11 AC12), so this criterion was stale before this task and this diff cannot redden it; authoring-time expectation "reddens" is corrected to **red on both arms, unchanged** — pending HEAD-arm confirmation.
+- row: `.shell-team/specs/T-1075-fanout-adoption-versioning.md` **AC7** **AC8** **AC9** **AC10** **AC12** — base arm: **pass** (T-1075's FAILED set at base is AC3 AC4 AC5 AC14 AC15 AC17, none of these five); expected **pass on both arms**; this spec's **AC8** runs them live as the HEAD-side evidence — pending HEAD-arm confirmation.
+- row: `.shell-team/specs/T-1000-operating-conventions.md` and `.shell-team/specs/T-1051-inspection-ux-polish.md` — base arm: **red** on their CONTRIBUTING-comparing criteria (T-1000: AC2 AC12 AC14 AC17 AC18 AC22 AC23 AC24; T-1051: AC2 AC5 AC7 AC12 AC14 AC16), stale before this task; expected **red on both arms, unchanged** — pending HEAD-arm confirmation.
 
 The read set is the specs whose own `- check:` lines name `CONTRIBUTING.md`; the enumeration command is
 
