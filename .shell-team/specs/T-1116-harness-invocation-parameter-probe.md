@@ -328,27 +328,273 @@ The record is `.shell-team/reviews/T-1116.md`'s round-2 section: one Major and o
 
 **Method: read-set-scoped** — this task's declared `- verification-class: no-mechanism` prices the downstream-impact inventory as an analysis over the merged criteria that read any path this task edits, rather than as a full-population diff over every merged spec. The edited paths are closed by **AC16**'s allow-list: this spec (new), the board, `docs/loop-engineering/harness-invocation-parameters.md` (new), `.shell-team/test-recipe.md`, and this task's three records. A new file can be read by no merged criterion, and this task edits **no merged note, checker, template or agent definition**, so the real read set is the board and the recipe — and the dominant class is every merged spec whose `- check:` lines reach the board, either by literal path or through `bin/team-paths.sh --get todo`, since this task appends one entry to it.
 
-- base-ref: to be recorded by the freeze run — the branch point resolved by arm 1 of the declared discriminator (`git merge-base "feature/1115-version-tier-tiebreaker" HEAD`), which at authoring time is the commit both branch ref files carry. Every base-side verdict below is produced by reading that ref's committed blobs, in detached worktrees checked out at that commit, never from this working tree.
+**Record (freeze run, 2026-09-02, coordinating session).**
+
+- base-ref: d056359035e17214c470cf044be592fbc39266e5 — resolved by arm 1 of the declared discriminator (`git merge-base "feature/1115-version-tier-tiebreaker" HEAD`); every base-side verdict below was produced in eight detached worktrees checked out at that commit (`git worktree add --detach`), never from this working tree.
 - method: git grep -l -E '^[[:space:]]+- check:.*(team-paths\.sh --get todo|\.shell-team/todo\.md|test-recipe\.md)' -- '.shell-team/specs/*.md' — each member's own `- check:` lines are then run as themselves with `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh <spec>`, once in a detached worktree at the branch point (base arm) and once at the implementation commit (HEAD arm), and the two FAILED sets are differenced per criterion label. Before either arm is read, one snapshot of the runs corpus resolved through `bin/team-paths.sh --get runs` is copied into the base arm's worktree as a real directory, member by member, never a symlink, so a corpus-reading criterion does not produce a base-arm false FAIL for a reason this diff never caused.
 - reproduce: bash bin/derive-populations.sh --label t1116-read-set --set "all=ls .shell-team/specs/*.md | LC_ALL=C sort" --set "direct=grep -lE -- '^[[:space:]]+- check:.*(team-paths\.sh --get todo|\.shell-team/todo\.md|test-recipe\.md)' .shell-team/specs/*.md | grep -v 'T-1116-harness-invocation-parameter-probe\.md' | LC_ALL=C sort" --set "mention=grep -lF -- '.shell-team/todo.md' .shell-team/specs/*.md | grep -v 'T-1116-harness-invocation-parameter-probe\.md' | LC_ALL=C sort" --accept-status direct=1 --accept-status mention=1
-- population: 0 — **authoring-time scaffold, not a measurement.** `pm-spec` holds no shell and cannot enumerate this set; the freeze run replaces this value with the `direct` set's measured total, at which point **AC17**'s equality against the live re-derivation becomes satisfiable. Until then **AC17** is expected red, and the zero here is a placeholder that fails loudly rather than a count anybody derived.
+- population: 115 — the `direct` set of the derivation below (115 of 121 specs); **AC17** re-derives the live count and requires equality. Corpus-scale, as the `- verification-class:` declaration disclosed, so the `verify-mechanism — tier1-fanout` election stands (no flip to `serial`): N = min(115, 8) = 8 slices, cap-ground measured-cores=8 (`TEAM_FANOUT_MAX` unset), launch record `.shell-team/runs/fanout-t1116-base.launch`, aggregation `.shell-team/runs/fanout-t1116-base.aggregation` (units 115 — verdicts 1902 — sentinels 0), `bin/check-fanout-instances.sh` ok (run-id `20260902T0458Z-r3b-1116`, phase validate, rows=8 parts=8).
 
 <!-- BEGIN derivation: t1116-read-set -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
-- union: items: 0
+- set: all — status: 0 — lines: 121 — items: 121 — command: ls .shell-team/specs/*.md | LC_ALL=C sort
+- set: direct — status: 0 — lines: 115 — items: 115 — command: grep -lE -- '^[[:space:]]+- check:.*(team-paths\.sh --get todo|\.shell-team/todo\.md|test-recipe\.md)' .shell-team/specs/*.md | grep -v 'T-1116-harness-invocation-parameter-probe\.md' | LC_ALL=C sort
+- set: mention — status: 0 — lines: 106 — items: 106 — command: grep -lF -- '.shell-team/todo.md' .shell-team/specs/*.md | grep -v 'T-1116-harness-invocation-parameter-probe\.md' | LC_ALL=C sort
+- union: items: 121
+- bucket: all — items: 3
+  - .shell-team/specs/T-1020-supersede-adjudication.md
+  - .shell-team/specs/T-1116-harness-invocation-parameter-probe.md
+  - .shell-team/specs/design-note-T-1012.md
+- bucket: all+direct — items: 12
+  - .shell-team/specs/T-1001-retro-input-acquisition.md
+  - .shell-team/specs/T-1003-retro-reads-interventions.md
+  - .shell-team/specs/T-1005-tuning-oversight-merge-consequence.md
+  - .shell-team/specs/T-1007-scope-typed-ledger.md
+  - .shell-team/specs/T-1008-lessons-corpus-import.md
+  - .shell-team/specs/T-1061-adopter-docs-gate.md
+  - .shell-team/specs/T-1062-release-notes-compare-link.md
+  - .shell-team/specs/T-1072-telemetry-span-discriminator.md
+  - .shell-team/specs/T-1080-depth-axis-contract.md
+  - .shell-team/specs/T-1102-check-acs-fence.md
+  - .shell-team/specs/T-1111-plugin-role-agent-concurrency.md
+  - .shell-team/specs/T-1112-parallel-default-and-executor-hosting.md
+- bucket: all+direct+mention — items: 103
+  - .shell-team/specs/T-1000-operating-conventions.md
+  - .shell-team/specs/T-1002-intervention-capture-channel.md
+  - .shell-team/specs/T-1004-optin-hook-sample.md
+  - .shell-team/specs/T-1006-lessons-resolver-key.md
+  - .shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md
+  - .shell-team/specs/T-1010-operator-language-boundary.md
+  - .shell-team/specs/T-1011-telemetry-event-rows.md
+  - .shell-team/specs/T-1012-loop-replay-generator.md
+  - .shell-team/specs/T-1013-loop-replay-docs-wiring.md
+  - .shell-team/specs/T-1014-flag-rail-data-path.md
+  - .shell-team/specs/T-1015-cutting-a-release.md
+  - .shell-team/specs/T-1016-close-out-entry-boundary.md
+  - .shell-team/specs/T-1017-close-out-interventions-gate.md
+  - .shell-team/specs/T-1018-freeze-attestation-gate.md
+  - .shell-team/specs/T-1019-is-span-row-parity.md
+  - .shell-team/specs/T-1020-lessons-supersede-sweep.md
+  - .shell-team/specs/T-1021-arith-base10-audit.md
+  - .shell-team/specs/T-1022-close-out-gate-symmetry.md
+  - .shell-team/specs/T-1023-block-size-deferral-record.md
+  - .shell-team/specs/T-1024-check-line-mktemp-guard.md
+  - .shell-team/specs/T-1025-assert-parity-dead-comparison.md
+  - .shell-team/specs/T-1026-skill-md-doc-completeness.md
+  - .shell-team/specs/T-1027-promote-retro-2026-08-04.md
+  - .shell-team/specs/T-1028-class-m-refreeze.md
+  - .shell-team/specs/T-1029-claim-fidelity-qa-step.md
+  - .shell-team/specs/T-1030-reviewer-board-write-boundary.md
+  - .shell-team/specs/T-1031-check-handoff-flag-anchor.md
+  - .shell-team/specs/T-1032-audit-prose-accuracy.md
+  - .shell-team/specs/T-1033-promote-retro-2026-08-05.md
+  - .shell-team/specs/T-1034-refreeze-hardening-execbit.md
+  - .shell-team/specs/T-1035-spec-template-staleness-locks.md
+  - .shell-team/specs/T-1036-wording-batch-141-143-144.md
+  - .shell-team/specs/T-1037-checker-retro-precision.md
+  - .shell-team/specs/T-1038-errexit-safe-pin-keying.md
+  - .shell-team/specs/T-1039-promote-retro-2026-08-06.md
+  - .shell-team/specs/T-1040-frozen-repair-batch.md
+  - .shell-team/specs/T-1041-freeze-ux.md
+  - .shell-team/specs/T-1042-ignored-base-and-retro-ledger.md
+  - .shell-team/specs/T-1043-pm-spec-check-conventions.md
+  - .shell-team/specs/T-1044-test-infra-bundle.md
+  - .shell-team/specs/T-1045-codex-version-provenance.md
+  - .shell-team/specs/T-1046-ignored-base-verdict.md
+  - .shell-team/specs/T-1047-promote-retro-2026-08-08.md
+  - .shell-team/specs/T-1048-handoff-durability-barrier.md
+  - .shell-team/specs/T-1050-check-layer-fast-follow.md
+  - .shell-team/specs/T-1051-inspection-ux-polish.md
+  - .shell-team/specs/T-1052-records-editorial.md
+  - .shell-team/specs/T-1053-retro-mechanization.md
+  - .shell-team/specs/T-1054-binding-config.md
+  - .shell-team/specs/T-1055-adapter-envelope.md
+  - .shell-team/specs/T-1056-loop-liveness.md
+  - .shell-team/specs/T-1057-loop-integration.md
+  - .shell-team/specs/T-1058-telemetry-binding.md
+  - .shell-team/specs/T-1059-docs-release-notes.md
+  - .shell-team/specs/T-1060-adopter-binding-docs.md
+  - .shell-team/specs/T-1063-editorial-batch.md
+  - .shell-team/specs/T-1064-shipped-docs-accuracy.md
+  - .shell-team/specs/T-1065-task-class-verification-pricing.md
+  - .shell-team/specs/T-1066-effort-time-telemetry.md
+  - .shell-team/specs/T-1067-context-lifecycle.md
+  - .shell-team/specs/T-1068-agent-concurrency.md
+  - .shell-team/specs/T-1069-phase-multiplexing.md
+  - .shell-team/specs/T-1070-check-handoff-scaling.md
+  - .shell-team/specs/T-1071-record-set-derivation.md
+  - .shell-team/specs/T-1073-harness-agent-concurrency.md
+  - .shell-team/specs/T-1074-fanout-orchestration.md
+  - .shell-team/specs/T-1075-fanout-adoption-versioning.md
+  - .shell-team/specs/T-1076-log-run-locking.md
+  - .shell-team/specs/T-1077-worktree-reconcile.md
+  - .shell-team/specs/T-1078-tier3-pilot.md
+  - .shell-team/specs/T-1079-tier2-judge.md
+  - .shell-team/specs/T-1081-freeze-sweep-hardening.md
+  - .shell-team/specs/T-1082-telemetry-discriminator.md
+  - .shell-team/specs/T-1083-agent-launch-fanout.md
+  - .shell-team/specs/T-1084-dispatch-routing-record.md
+  - .shell-team/specs/T-1085-default-path-firing.md
+  - .shell-team/specs/T-1086-subject-harness.md
+  - .shell-team/specs/T-1087-judge-briefing.md
+  - .shell-team/specs/T-1088-tier2-firing.md
+  - .shell-team/specs/T-1089-harness-recut.md
+  - .shell-team/specs/T-1090-sign-safety-close.md
+  - .shell-team/specs/T-1091-operator-authored-entry.md
+  - .shell-team/specs/T-1092-specify-seam-review.md
+  - .shell-team/specs/T-1093-verification-ceiling.md
+  - .shell-team/specs/T-1094-trial-adoption.md
+  - .shell-team/specs/T-1095-means-ends-reflection.md
+  - .shell-team/specs/T-1096-selection-trust-gates.md
+  - .shell-team/specs/T-1097-trial-branch-flag.md
+  - .shell-team/specs/T-1098-trial-recipe-execution.md
+  - .shell-team/specs/T-1099-board-heading-integrity.md
+  - .shell-team/specs/T-1100-verify-axis-split.md
+  - .shell-team/specs/T-1101-pii-path-shapes.md
+  - .shell-team/specs/T-1103-oversight-profiles.md
+  - .shell-team/specs/T-1104-review-input-fidelity.md
+  - .shell-team/specs/T-1105-review-executor-resolution.md
+  - .shell-team/specs/T-1106-check-binding-consistency.md
+  - .shell-team/specs/T-1107-close-out-gates.md
+  - .shell-team/specs/T-1108-sweep-corpus-isolation.md
+  - .shell-team/specs/T-1109-dispatch-reflection.md
+  - .shell-team/specs/T-1110-freeze-version-derivation.md
+  - .shell-team/specs/T-1113-quantity-relay-checker.md
+  - .shell-team/specs/T-1114-scope-lock-worktree-deltas.md
+  - .shell-team/specs/T-1115-version-tier-tiebreaker.md
+- bucket: all+mention — items: 3
+  - .shell-team/specs/T-111-pii-shape-checker.md
+  - .shell-team/specs/T-112-commit-identity-and-ignore-lock.md
+  - .shell-team/specs/T-113-lessons-deidentification.md
 <!-- END derivation: t1116-read-set -->
-
-*(This derivation block is an authoring-time scaffold. The coordinating session replaces it, before the probe-evidence commit, with the real emitted block — the `- set:` lines with their measured statuses, line and item totals and commands, the measured `- union: items:` total and the `- bucket:` membership — and fills the table below with the measured base and HEAD verdicts and the true `- predicted-red:` count. The rows below are authoring-time predictions, corrected to the measurement at the sweep and never defended against it.)*
 
 - base-side reading target: the branch point's **committed blobs**, read through `git show <branch-point>:<spec>` into a scratch tree under `$TMPDIR`, or through per-slice `git worktree add --detach` trees staged per `.shell-team/test-recipe.md`'s corpus-staging entry; never the working tree, whose bytes at read time are not that ref's.
 - executor form: coordinating-session-hosted, harness-tracked background shell slices, serial within a slice — the `verify-mechanism — tier1-fanout` election on this task's board entry, with the pre-stated flip to `serial` if the freeze-time population lands below the fan-out authoring threshold. Never a sub-agent hosting detached children.
 - **indirection** — the class a byte-literal derivation cannot see: a criterion that reaches the board through `bin/team-paths.sh --get todo` at run time, or names an edited path only through a variable, matches no search for that path's literal bytes. Disposition, to be stated as measurement rather than prediction: the `direct` set's own pattern already includes the `team-paths.sh --get todo` spelling alongside the literal path, so the resolver route is inside the enumerated population rather than outside it; what remains outside is a criterion naming an edited path through a variable built from something else entirely, and the freeze run discharges that in exactly one of the two permitted ways — by running those criteria too, or by disclosing here what stays unmeasured — and says which it did.
-- predicted-red: 3
+- indirection disposition (measured, not predicted): the `direct` set's own pattern already includes the `team-paths.sh --get todo` spelling, so the unquoted resolver route is inside the population. The derivation's `all+mention` bucket holds 3 specs that name `.shell-team/todo.md` in prose only. The five specs outside `direct` other than this one (`T-1020-supersede-adjudication.md`, `T-111-pii-shape-checker.md`, `T-112-commit-identity-and-ignore-lock.md`, `T-113-lessons-deidentification.md`, `design-note-T-1012.md`) were grepped on their `- check:` lines for `todo|recipe|team-paths|board`: **`T-111` reaches the board through `bin/team-paths.sh --get 'todo'` — a quoted spelling the population pattern misses — and is therefore a real indirection member; it is run additionally in both arms** (base arm at `d056359`: `29 passed, 0 failed`; HEAD arm recorded with the sweep) while the recorded `- population:` stays the criterion's own 115; `T-112` references the resolver script and its fixture suite, not the board; the other three carry no such read. The residual class — a path assembled from parts that never spell the file name — is disclosed as unmeasured.
+- predicted-red: 3 (to be confirmed at the HEAD arm, which runs against the engineer's `READY_FOR_QA` commit with the same population file and the same eight-slice shape)
 
-- row: `.shell-team/specs/T-1100-verify-axis-split.md` — its board-entry-count criterion (AC label to be named from the measured arm) — reads an absolute board-entry count over the live board — base: PASS — head: FAIL — **predicted, to be confirmed or corrected at the sweep**: this task adds one board entry, so any merged criterion asserting an absolute board-entry count goes stale — the merge-point board-entry-count staleness class prior sweeps in this repository have already recorded. Disclosed, not repaired.
-- row: `.shell-team/specs/T-1103-oversight-profiles.md` — its board-entry-count criterion (AC label to be named from the measured arm) — reads an absolute board-entry count over the live board — base: PASS — head: FAIL — **predicted**: same class as the row above.
-- row: `.shell-team/specs/T-1104-review-input-fidelity.md` — its board-entry-count criterion (AC label to be named from the measured arm) — reads an absolute board-entry count over the live board — base: PASS — head: FAIL — **predicted**: same class as the rows above.
+- row: `.shell-team/specs/T-1100-verify-axis-split.md` — its board-entry-count criterion (AC label to be named from the measured HEAD arm) — reads an absolute board-entry count over the live board — base arm (measured, `d056359`): FAILED set = AC5 AC6 AC7 AC9 AC11 AC14 AC15 — head: **predicted** to add the count criterion to that set, to be confirmed or corrected at the HEAD arm: this task adds one board entry, so any merged criterion asserting an absolute board-entry count goes stale — the merge-point-scoped lifetime such a criterion is written with, disclosed and not repaired.
+- row: `.shell-team/specs/T-1103-oversight-profiles.md` — its board-entry-count criterion (AC label to be named from the measured HEAD arm) — reads an absolute board-entry count over the live board — base arm (measured, `d056359`): FAILED set = AC2 AC7 AC8 AC9 AC14 AC18 — head: **predicted** to add the count criterion to that set, to be confirmed or corrected at the HEAD arm: this task adds one board entry, so any merged criterion asserting an absolute board-entry count goes stale — the merge-point-scoped lifetime such a criterion is written with, disclosed and not repaired.
+- row: `.shell-team/specs/T-1104-review-input-fidelity.md` — its board-entry-count criterion (AC label to be named from the measured HEAD arm) — reads an absolute board-entry count over the live board — base arm (measured, `d056359`): FAILED set = AC1 AC10 AC11 AC12 AC13 AC14 AC17 AC18 — head: **predicted** to add the count criterion to that set, to be confirmed or corrected at the HEAD arm: this task adds one board entry, so any merged criterion asserting an absolute board-entry count goes stale — the merge-point-scoped lifetime such a criterion is written with, disclosed and not repaired.
+
+- base-arm verdicts (115/115 run, 2026-09-02): the FAILED set per member at `d056359`, kept so the HEAD arm is a diff rather than a fresh reading —
+- base-arm: `.shell-team/specs/T-1000-operating-conventions.md` — FAILED: AC2 AC12 AC14 AC17 AC18 AC22 AC23 AC24
+- base-arm: `.shell-team/specs/T-1001-retro-input-acquisition.md` — FAILED: AC2 AC3 AC6 AC10 AC13 AC14 AC16 AC18 AC21 AC23 AC25 AC26
+- base-arm: `.shell-team/specs/T-1002-intervention-capture-channel.md` — FAILED: AC15 AC23 AC26 AC27
+- base-arm: `.shell-team/specs/T-1003-retro-reads-interventions.md` — FAILED: AC12 AC20
+- base-arm: `.shell-team/specs/T-1004-optin-hook-sample.md` — FAILED: AC13 AC14 AC17 AC18
+- base-arm: `.shell-team/specs/T-1005-tuning-oversight-merge-consequence.md` — FAILED: AC5 AC6 AC7 AC9 AC13 AC14
+- base-arm: `.shell-team/specs/T-1006-lessons-resolver-key.md` — FAILED: AC8 AC9 AC10 AC11 AC17 AC18
+- base-arm: `.shell-team/specs/T-1007-scope-typed-ledger.md` — FAILED: AC13 AC15 AC16 AC17 AC19
+- base-arm: `.shell-team/specs/T-1008-lessons-corpus-import.md` — FAILED: AC3 AC6 AC8 AC10 AC24 AC26 AC27
+- base-arm: `.shell-team/specs/T-1009-doc-drift-and-false-ci-claim.md` — FAILED: AC9 AC13 AC16 AC18 AC19
+- base-arm: `.shell-team/specs/T-1010-operator-language-boundary.md` — FAILED: AC26 AC27
+- base-arm: `.shell-team/specs/T-1011-telemetry-event-rows.md` — FAILED: AC6 AC28 AC33 AC35
+- base-arm: `.shell-team/specs/T-1012-loop-replay-generator.md` — FAILED: AC25 AC28
+- base-arm: `.shell-team/specs/T-1013-loop-replay-docs-wiring.md` — FAILED: AC10 AC11 AC13
+- base-arm: `.shell-team/specs/T-1014-flag-rail-data-path.md` — FAILED: AC6 AC8 AC16 AC19
+- base-arm: `.shell-team/specs/T-1015-cutting-a-release.md` — FAILED: AC4 AC5 AC6 AC9 AC10
+- base-arm: `.shell-team/specs/T-1016-close-out-entry-boundary.md` — FAILED: AC2 AC7 AC8 AC9 AC14 AC15 AC16
+- base-arm: `.shell-team/specs/T-1017-close-out-interventions-gate.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC6 AC7 AC8 AC9 AC16 AC17
+- base-arm: `.shell-team/specs/T-1018-freeze-attestation-gate.md` — FAILED: AC21 AC22
+- base-arm: `.shell-team/specs/T-1019-is-span-row-parity.md` — FAILED: AC11
+- base-arm: `.shell-team/specs/T-1020-lessons-supersede-sweep.md` — FAILED: AC1 AC2 AC4 AC5 AC6 AC8 AC9 AC11 AC14 AC15
+- base-arm: `.shell-team/specs/T-1021-arith-base10-audit.md` — FAILED: AC1 AC2 AC6 AC17 AC18 AC20 AC23
+- base-arm: `.shell-team/specs/T-1022-close-out-gate-symmetry.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC7 AC10 AC11 AC15 AC16 AC17 AC18
+- base-arm: `.shell-team/specs/T-1023-block-size-deferral-record.md` — FAILED: AC8 AC9 AC10 AC12 AC13
+- base-arm: `.shell-team/specs/T-1024-check-line-mktemp-guard.md` — FAILED: AC7 AC8 AC9 AC10
+- base-arm: `.shell-team/specs/T-1025-assert-parity-dead-comparison.md` — FAILED: AC6 AC7
+- base-arm: `.shell-team/specs/T-1026-skill-md-doc-completeness.md` — FAILED: AC5 AC6 AC7 AC8
+- base-arm: `.shell-team/specs/T-1027-promote-retro-2026-08-04.md` — FAILED: AC5 AC7 AC10 AC12
+- base-arm: `.shell-team/specs/T-1028-class-m-refreeze.md` — FAILED: AC10 AC11 AC14 AC15
+- base-arm: `.shell-team/specs/T-1029-claim-fidelity-qa-step.md` — FAILED: AC5 AC7 AC8
+- base-arm: `.shell-team/specs/T-1030-reviewer-board-write-boundary.md` — FAILED: AC1 AC4 AC5 AC8 AC9
+- base-arm: `.shell-team/specs/T-1031-check-handoff-flag-anchor.md` — FAILED: AC6 AC8 AC15 AC16
+- base-arm: `.shell-team/specs/T-1032-audit-prose-accuracy.md` — FAILED: AC5 AC7 AC8 AC11 AC13 AC14
+- base-arm: `.shell-team/specs/T-1033-promote-retro-2026-08-05.md` — FAILED: AC6 AC7 AC8 AC10 AC11 AC13 AC14
+- base-arm: `.shell-team/specs/T-1034-refreeze-hardening-execbit.md` — FAILED: AC5 AC15 AC16
+- base-arm: `.shell-team/specs/T-1035-spec-template-staleness-locks.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC7 AC10 AC11 AC12 AC13
+- base-arm: `.shell-team/specs/T-1036-wording-batch-141-143-144.md` — FAILED: AC2 AC6 AC9 AC10 AC12 AC13
+- base-arm: `.shell-team/specs/T-1037-checker-retro-precision.md` — FAILED: AC9 AC10 AC12 AC13
+- base-arm: `.shell-team/specs/T-1038-errexit-safe-pin-keying.md` — FAILED: AC6 AC14
+- base-arm: `.shell-team/specs/T-1039-promote-retro-2026-08-06.md` — FAILED: AC4 AC5 AC6 AC9 AC10 AC12 AC13 AC14
+- base-arm: `.shell-team/specs/T-1040-frozen-repair-batch.md` — FAILED: AC13 AC14 AC15 AC17 AC18 AC19
+- base-arm: `.shell-team/specs/T-1041-freeze-ux.md` — FAILED: AC14 AC15 AC16 AC17 AC21
+- base-arm: `.shell-team/specs/T-1042-ignored-base-and-retro-ledger.md` — FAILED: AC16
+- base-arm: `.shell-team/specs/T-1043-pm-spec-check-conventions.md` — FAILED: AC1 AC4 AC5 AC6 AC7 AC8 AC12 AC13
+- base-arm: `.shell-team/specs/T-1044-test-infra-bundle.md` — FAILED: AC7 AC13 AC14 AC15
+- base-arm: `.shell-team/specs/T-1045-codex-version-provenance.md` — FAILED: AC6 AC7 AC8 AC9
+- base-arm: `.shell-team/specs/T-1046-ignored-base-verdict.md` — FAILED: AC1 AC2 AC3
+- base-arm: `.shell-team/specs/T-1047-promote-retro-2026-08-08.md` — FAILED: AC1 AC5 AC6 AC7 AC10 AC11 AC13 AC14 AC15 AC16
+- base-arm: `.shell-team/specs/T-1048-handoff-durability-barrier.md` — FAILED: AC12 AC16
+- base-arm: `.shell-team/specs/T-1050-check-layer-fast-follow.md` — FAILED: AC5 AC6 AC7 AC9 AC11 AC14 AC15
+- base-arm: `.shell-team/specs/T-1051-inspection-ux-polish.md` — FAILED: AC2 AC5 AC7 AC12 AC14 AC16
+- base-arm: `.shell-team/specs/T-1052-records-editorial.md` — FAILED: AC9 AC10 AC11 AC12 AC14 AC15
+- base-arm: `.shell-team/specs/T-1053-retro-mechanization.md` — FAILED: AC1 AC2 AC3 AC4 AC5 AC6 AC8 AC9
+- base-arm: `.shell-team/specs/T-1054-binding-config.md` — FAILED: AC13 AC15
+- base-arm: `.shell-team/specs/T-1055-adapter-envelope.md` — FAILED: AC14 AC16
+- base-arm: `.shell-team/specs/T-1056-loop-liveness.md` — FAILED: AC10 AC14 AC16 AC17 AC18
+- base-arm: `.shell-team/specs/T-1057-loop-integration.md` — FAILED: AC12 AC16 AC17 AC18
+- base-arm: `.shell-team/specs/T-1058-telemetry-binding.md` — FAILED: AC1 AC2 AC6 AC7 AC9 AC11
+- base-arm: `.shell-team/specs/T-1059-docs-release-notes.md` — FAILED: AC6 AC7 AC8 AC10
+- base-arm: `.shell-team/specs/T-1060-adopter-binding-docs.md` — FAILED: AC5 AC8 AC9 AC11
+- base-arm: `.shell-team/specs/T-1061-adopter-docs-gate.md` — FAILED: AC1 AC2 AC3 AC11 AC12 AC13
+- base-arm: `.shell-team/specs/T-1062-release-notes-compare-link.md` — FAILED: AC5
+- base-arm: `.shell-team/specs/T-1063-editorial-batch.md` — FAILED: AC4 AC5 AC10
+- base-arm: `.shell-team/specs/T-1064-shipped-docs-accuracy.md` — FAILED: AC3 AC4 AC6 AC11
+- base-arm: `.shell-team/specs/T-1065-task-class-verification-pricing.md` — FAILED: AC2 AC5 AC6 AC8 AC10 AC11
+- base-arm: `.shell-team/specs/T-1066-effort-time-telemetry.md` — FAILED: AC4 AC5 AC7 AC9 AC10 AC12
+- base-arm: `.shell-team/specs/T-1067-context-lifecycle.md` — FAILED: AC9 AC10
+- base-arm: `.shell-team/specs/T-1068-agent-concurrency.md` — FAILED: AC9 AC10
+- base-arm: `.shell-team/specs/T-1069-phase-multiplexing.md` — FAILED: AC1 AC5 AC6 AC8 AC9 AC10
+- base-arm: `.shell-team/specs/T-1070-check-handoff-scaling.md` — FAILED: AC9 AC10 AC11
+- base-arm: `.shell-team/specs/T-1071-record-set-derivation.md` — FAILED: AC7 AC8 AC13
+- base-arm: `.shell-team/specs/T-1072-telemetry-span-discriminator.md` — FAILED: AC6 AC11 AC16
+- base-arm: `.shell-team/specs/T-1073-harness-agent-concurrency.md` — FAILED: AC12 AC14
+- base-arm: `.shell-team/specs/T-1074-fanout-orchestration.md` — FAILED: AC14 AC18
+- base-arm: `.shell-team/specs/T-1075-fanout-adoption-versioning.md` — FAILED: AC3 AC4 AC5 AC14 AC15 AC17
+- base-arm: `.shell-team/specs/T-1076-log-run-locking.md` — FAILED: AC13 AC15 AC16
+- base-arm: `.shell-team/specs/T-1077-worktree-reconcile.md` — FAILED: AC12 AC13
+- base-arm: `.shell-team/specs/T-1078-tier3-pilot.md` — FAILED: AC14 AC15 AC16
+- base-arm: `.shell-team/specs/T-1079-tier2-judge.md` — FAILED: AC8 AC11 AC13 AC15 AC16
+- base-arm: `.shell-team/specs/T-1080-depth-axis-contract.md` — FAILED: AC5 AC10 AC14 AC15 AC16
+- base-arm: `.shell-team/specs/T-1081-freeze-sweep-hardening.md` — FAILED: AC11 AC12 AC13 AC15 AC17
+- base-arm: `.shell-team/specs/T-1082-telemetry-discriminator.md` — FAILED: AC6 AC10 AC12 AC16
+- base-arm: `.shell-team/specs/T-1083-agent-launch-fanout.md` — FAILED: AC2 AC4 AC18 AC20
+- base-arm: `.shell-team/specs/T-1084-dispatch-routing-record.md` — FAILED: AC3 AC5 AC10 AC11 AC14 AC15 AC16
+- base-arm: `.shell-team/specs/T-1085-default-path-firing.md` — FAILED: AC1 AC16 AC18
+- base-arm: `.shell-team/specs/T-1086-subject-harness.md` — FAILED: AC8 AC18 AC19 AC20
+- base-arm: `.shell-team/specs/T-1087-judge-briefing.md` — FAILED: AC6 AC7 AC8
+- base-arm: `.shell-team/specs/T-1088-tier2-firing.md` — FAILED: AC1 AC4 AC5 AC6
+- base-arm: `.shell-team/specs/T-1089-harness-recut.md` — FAILED: AC2 AC10 AC11 AC12
+- base-arm: `.shell-team/specs/T-1090-sign-safety-close.md` — FAILED: AC5 AC6
+- base-arm: `.shell-team/specs/T-1091-operator-authored-entry.md` — FAILED: AC4 AC5 AC9 AC11 AC12 AC13 AC15 AC16 AC17
+- base-arm: `.shell-team/specs/T-1092-specify-seam-review.md` — FAILED: AC4 AC5 AC6 AC10 AC12 AC15 AC16 AC18 AC19 AC20
+- base-arm: `.shell-team/specs/T-1093-verification-ceiling.md` — FAILED: AC8 AC9 AC10
+- base-arm: `.shell-team/specs/T-1094-trial-adoption.md` — FAILED: AC8 AC9 AC12
+- base-arm: `.shell-team/specs/T-1095-means-ends-reflection.md` — FAILED: AC3 AC7 AC13 AC14
+- base-arm: `.shell-team/specs/T-1096-selection-trust-gates.md` — FAILED: AC14 AC15 AC17 AC18 AC19 AC20 AC21
+- base-arm: `.shell-team/specs/T-1097-trial-branch-flag.md` — FAILED: AC14 AC16
+- base-arm: `.shell-team/specs/T-1098-trial-recipe-execution.md` — FAILED: AC2 AC16
+- base-arm: `.shell-team/specs/T-1099-board-heading-integrity.md` — FAILED: AC12 AC17 AC18
+- base-arm: `.shell-team/specs/T-1100-verify-axis-split.md` — FAILED: AC5 AC6 AC7 AC9 AC11 AC14 AC15
+- base-arm: `.shell-team/specs/T-1101-pii-path-shapes.md` — FAILED: AC14 AC17
+- base-arm: `.shell-team/specs/T-1102-check-acs-fence.md` — FAILED: AC11 AC15
+- base-arm: `.shell-team/specs/T-1103-oversight-profiles.md` — FAILED: AC2 AC7 AC8 AC9 AC14 AC18
+- base-arm: `.shell-team/specs/T-1104-review-input-fidelity.md` — FAILED: AC1 AC10 AC11 AC12 AC13 AC14 AC17 AC18
+- base-arm: `.shell-team/specs/T-1105-review-executor-resolution.md` — FAILED: AC13 AC15 AC16 AC17 AC18
+- base-arm: `.shell-team/specs/T-1106-check-binding-consistency.md` — FAILED: AC13 AC14 AC15
+- base-arm: `.shell-team/specs/T-1107-close-out-gates.md` — FAILED: AC12 AC13 AC14
+- base-arm: `.shell-team/specs/T-1108-sweep-corpus-isolation.md` — FAILED: AC2 AC3 AC4 AC10 AC11 AC12 AC13
+- base-arm: `.shell-team/specs/T-1109-dispatch-reflection.md` — FAILED: AC7 AC11 AC12 AC13 AC14
+- base-arm: `.shell-team/specs/T-1110-freeze-version-derivation.md` — FAILED: AC6 AC9 AC11 AC12
+- base-arm: `.shell-team/specs/T-1111-plugin-role-agent-concurrency.md` — FAILED: AC14
+- base-arm: `.shell-team/specs/T-1112-parallel-default-and-executor-hosting.md` — FAILED: AC7 AC10
+- base-arm: `.shell-team/specs/T-1113-quantity-relay-checker.md` — FAILED: AC13 AC15
+- base-arm: `.shell-team/specs/T-1114-scope-lock-worktree-deltas.md` — FAILED: AC6 AC7 AC10 AC11 AC12 AC14 AC15
+- base-arm: `.shell-team/specs/T-1115-version-tier-tiebreaker.md` — FAILED: AC11
 
 Any merged scope-lock criterion keyed to its own branch point does not enter this task's range and is not expected to flip; a merged criterion already red at the branch point is recorded as red on both arms rather than attributed to this diff.
 
@@ -441,15 +687,15 @@ Every design point below was settled by `tech-lead`'s Routing Map for this redo 
 
 Rows **A-1** through **A-12** are `**relayed**`: the primary confirmation is held by the coordinating session, which read the Agent tool's own schema and description text first-hand in its own context. This role has no path to that surface — it cannot see a tool schema, invoke a sub-agent or read a tool result — so each row names the holder, states the premise as the holder states it, and names what the freeze run must re-read and report beside it. Twelve relayed rows is also the measured `cost-input: t1092-domain-premise-count` for this task, and it is the concrete ground for the `spec-review — cross-provider` election: this spec's soundness rests on a domain premise this repository cannot itself measure.
 
-- **A-1 — relayed — the `model` parameter's enum is closed at `sonnet`, `opus`, `haiku`, `fable`.** Holder: the coordinating session (Agent tool JSON schema, `"enum"`). This is the premise behind the two override tiers and behind row A-5's consequence. The freeze run re-reads the schema and records the enum beside this row.
-- **A-2 — relayed — the precedence sentence and its `fork` exception.** Holder: the coordinating session, quoting the parameter description: the override "takes precedence over the agent definition's model frontmatter and the configured default subagent model", and is "ignored for `subagent_type: \"fork\"`". This is a **declaration**, not an observation of routing, and the whole point of this task is that the declaration's being honored for a plugin role with a pinned model is exactly what has never been measured. The freeze run re-reads and records it.
-- **A-3 — relayed — the parameter list is exactly `description`, `prompt`, `subagent_type`, `model`, `isolation`, with no effort field and no cwd field.** Holder: the coordinating session. Two consequences this spec depends on: the effort verdict's primary evidence is this closed list, and the venue is an instruction plus an after-the-fact measurement rather than an enforcement, because no cwd parameter exists to point a launch anywhere. What this spec does **not** do is rest on the premise being true: the freeze run's own first-hand re-reading of the parameter list is what can falsify it, and where it does, the effort branch **re-routes** — schema read `present`, a real launch-side attempt, an observed-effect reading — rather than stopping the task, because the model question's instrument reads none of this row. That asymmetry against **A-1**/**A-5**, whose falsification defeats a never-dropped item and does stop the task, is frozen in the paragraph recording the dropped falsification calls. The dedicated `falsify-effort-key` call that used to carry this row's falsification left the protocol under the pre-commitment's executed drop (1); the reading replaces it, and the freeze run re-reads the list and records it.
-- **A-4 — relayed — the result's `<usage>` block carries exactly `subagent_tokens`, `tool_uses`, `duration_ms`, and no model field.** Holder: the coordinating session, observed on every sub-agent return in its own session. Two consequences: the harness never echoes what ran, so no verdict can be read off a usage block; and `tool_uses` is the field the validity guard reads, so the guard is only as good as this premise. The freeze run re-confirms the field set and records it.
-- **A-5 — relayed — a value outside the enum is a schema validation error at call time, refused before any instance launches.** Holder: the coordinating session. This is what makes a deliberately invalid token a measurement of schema validation rather than of routing, and what makes a fully-qualified id unreachable in-vocabulary. The `falsify-out-of-enum-model` call that used to test it left the protocol under the pre-commitment's executed drop (1), so this row is now **covered by the reading rather than by a live call**: the freeze run reads the schema first-hand and records the enum on the `- model-schema-read:` line, whose `enum=` field **AC12** requires to carry both `haiku` and `opus`, the only two values any launch passes as `model`. Where that reading contradicts this row, no note is written and the never-dropped set's defeat clause sends the task back to planning. The probe no longer tests it with an invalid call.
-- **A-6 — relayed — plugin roles are available as `subagent_type` values.** Holder: the coordinating session. Without this the plugin arms cannot run at all. The freeze run re-confirms it.
-- **A-7 — relayed — `isolation` accepts `worktree` and `remote` and is omitted for every probe launch.** Holder: the coordinating session. The launch lines record the literal `omitted` rather than a value, which is why **AC5** asserts that literal. The freeze run re-reads the enum and records it.
+- **A-1 — relayed — the `model` parameter's enum is closed at `sonnet`, `opus`, `haiku`, `fable`.** Holder: the coordinating session (Agent tool JSON schema, `"enum"`). This is the premise behind the two override tiers and behind row A-5's consequence. The freeze run re-reads the schema and records the enum beside this row. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: `"enum": ["sonnet", "opus", "haiku", "fable"]` — confirmed.
+- **A-2 — relayed — the precedence sentence and its `fork` exception.** Holder: the coordinating session, quoting the parameter description: the override "takes precedence over the agent definition's model frontmatter and the configured default subagent model", and is "ignored for `subagent_type: \"fork\"`". This is a **declaration**, not an observation of routing, and the whole point of this task is that the declaration's being honored for a plugin role with a pinned model is exactly what has never been measured. The freeze run re-reads and records it. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: description text confirmed verbatim, including the `fork` exception.
+- **A-3 — relayed — the parameter list is exactly `description`, `prompt`, `subagent_type`, `model`, `isolation`, with no effort field and no cwd field.** Holder: the coordinating session. Two consequences this spec depends on: the effort verdict's primary evidence is this closed list, and the venue is an instruction plus an after-the-fact measurement rather than an enforcement, because no cwd parameter exists to point a launch anywhere. What this spec does **not** do is rest on the premise being true: the freeze run's own first-hand re-reading of the parameter list is what can falsify it, and where it does, the effort branch **re-routes** — schema read `present`, a real launch-side attempt, an observed-effect reading — rather than stopping the task, because the model question's instrument reads none of this row. That asymmetry against **A-1**/**A-5**, whose falsification defeats a never-dropped item and does stop the task, is frozen in the paragraph recording the dropped falsification calls. The dedicated `falsify-effort-key` call that used to carry this row's falsification left the protocol under the pre-commitment's executed drop (1); the reading replaces it, and the freeze run re-reads the list and records it. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: the schema's `properties` are exactly `description`, `prompt`, `subagent_type`, `model`, `isolation`; no effort, reasoning or cwd key — confirmed.
+- **A-4 — relayed — the result's `<usage>` block carries exactly `subagent_tokens`, `tool_uses`, `duration_ms`, and no model field.** Holder: the coordinating session, observed on every sub-agent return in its own session. Two consequences: the harness never echoes what ran, so no verdict can be read off a usage block; and `tool_uses` is the field the validity guard reads, so the guard is only as good as this premise. The freeze run re-confirms the field set and records it. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: every sub-agent return in this session carried `<usage><subagent_tokens>…</subagent_tokens><tool_uses>…</tool_uses><duration_ms>…</duration_ms></usage>` and nothing else — confirmed.
+- **A-5 — relayed — a value outside the enum is a schema validation error at call time, refused before any instance launches.** Holder: the coordinating session. This is what makes a deliberately invalid token a measurement of schema validation rather than of routing, and what makes a fully-qualified id unreachable in-vocabulary. The `falsify-out-of-enum-model` call that used to test it left the protocol under the pre-commitment's executed drop (1), so this row is now **covered by the reading rather than by a live call**: the freeze run reads the schema first-hand and records the enum on the `- model-schema-read:` line, whose `enum=` field **AC12** requires to carry both `haiku` and `opus`, the only two values any launch passes as `model`. Where that reading contradicts this row, no note is written and the never-dropped set's defeat clause sends the task back to planning. The probe no longer tests it with an invalid call. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: the parameter is a closed `enum` with `additionalProperties: false` on the tool, so an out-of-enum value is rejected at validation before any launch (InputValidationError) — confirmed from the schema; not exercised by a live call, since drop (1) removed the falsification calls.
+- **A-6 — relayed — plugin roles are available as `subagent_type` values.** Holder: the coordinating session. Without this the plugin arms cannot run at all. The freeze run re-confirms it. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: `shell-team:tech-lead` and `general-purpose` are both listed among the available `subagent_type` values in this session — confirmed.
+- **A-7 — relayed — `isolation` accepts `worktree` and `remote` and is omitted for every probe launch.** Holder: the coordinating session. The launch lines record the literal `omitted` rather than a value, which is why **AC5** asserts that literal. The freeze run re-reads the enum and records it. **Re-read first-hand by the coordinating session at freeze (2026-09-02, Agent tool schema as loaded in this session)**: `isolation` enum is `["worktree", "remote"]`; omitted on every probe launch — confirmed.
 - **A-8 — relayed — issue #418's title and body.** Holder: the coordinating session, which read it through the GitHub API on 2026-09-02; the title is "Measure the harness's per-invocation model and effort parameter surface for a plugin-role sub-agent launch". This role has no network path. **No criterion depends on any figure or wording from the issue.** The freeze run re-measures the issue's live state and records it beside this row.
-- **A-9 — relayed, and measured as far as this checkout allows — the predecessor branch's pull request #423 is open.** Holder: the coordinating session. It is the premise that makes the two-arm `- base-ref-discriminator:` mandatory rather than `not-applicable`. Measured first-hand here: both branch ref files read the same commit and the predecessor resolves in `refs/heads/` and in `refs/remotes/origin/`, so arm 1 is selected; the PR's state itself is a fact of the repository of record this role cannot query. The freeze run reports the measured state beside this row.
+- **A-9 — relayed, and measured as far as this checkout allows — the predecessor branch's pull request #423 is open.** Holder: the coordinating session. It is the premise that makes the two-arm `- base-ref-discriminator:` mandatory rather than `not-applicable`. Measured first-hand here: both branch ref files read the same commit and the predecessor resolves in `refs/heads/` and in `refs/remotes/origin/`, so arm 1 is selected; the PR's state itself is a fact of the repository of record this role cannot query. The freeze run reports the measured state beside this row. **Measured by the freeze run (GitHub API, 2026-09-02)**: PR #423 `open`, head `feature/1115-version-tier-tiebreaker`, base `develop` — the two-arm form is mandatory as declared.
 - **A-10 — relayed — the stacked-train arrangement and the sprint batch GO.** Holder: the coordinating session. Feature PRs are held open, each task branches from the previous task's tip, and merge waits for one batch GO. This is why the scope lock is keyed to the branch point rather than to `develop`, and why the lock is expected to go stale at the batch merge.
 - **A-11 — relayed — the sprint's approved version premise is PATCH.** Holder: the coordinating session. The authoring-time reading of this task against `CONTRIBUTING.md`'s two tests, applied jointly, is **PATCH**: the headline test is not met (no adopter recognizes "the loop measured its own harness's model parameter" as a release headline), and the default-reachability test is not met (the shipped default path is byte-unchanged and the note is reached only by a maintainer opening `docs/loop-engineering/`). The freeze-time version-derivation gate re-derives this independently and its verdict governs over this reading.
 - **A-12 — relayed — the operator's discard ruling and the discarded round's spec review.** Holder: the coordinating session. The first attempt was discarded in full by operator ruling; nothing of it exists in the repository (measured first-hand: no spec file, no board entry, and the only in-repo occurrence of this task id is inside `.shell-team/interventions/no-task.md`'s third entry). The seven Majors and two Minors reached this role as a scratch file and are reconciled row by row in `## Prior review findings`; **no criterion depends on the review's wording**, only on the design decisions taken in response.
@@ -459,7 +705,7 @@ Rows **A-1** through **A-12** are `**relayed**`: the primary confirmation is hel
 - **A-16 — measured first-hand — the model-overridability residual, at exactly the width its source states it.** `docs/loop-engineering/plugin-role-agent-concurrency.md:247` states that "whether a plugin role's model binding can be overridden at launch is unknown here"; `:248` states that "the model actually bound" is `unobserved`. Those are two different claims and this spec keeps them apart, because `.shell-team/interventions/no-task.md`'s 2026-09-02 entry records a prior briefing conflating them and being corrected. No re-measurement owed.
 - **A-17 — measured first-hand — T-1057 DP6's unconfirmed branch selector.** `.shell-team/specs/T-1057-loop-integration.md:59` pre-decides both branches and states the confirmation owner is the executing side; `.shell-team/provenance/T-1057.md:4` records the selector as "unconfirmed from this role's own execution context" with Branch B taken. No re-measurement owed.
 - **A-18 — RELAYED PREMISE MEASURED FALSE — a finding about the hand-off, not a correction made in passing.** The Routing Map's Part 2 item 5 states that "the Opus-era discard-and-redo event is already recorded cross-task in `.shell-team/interventions/no-task.md` (entry dated 2026-09-02, class `work-abandoned`, on the train head)". Measured first-hand by reading that file end to end: it carries **three** entries — `human-stop` (2026-08-13), `human-interrupt` (2026-08-20) and `assumption-contradicted` (2026-09-02) — and **no** `work-abandoned` entry of any date. Its 2026-09-02 entry concerns a **citation** error about which artifact records the launch-overridability question, and mentions this task only as the destination the corrected citation was carried into; it is not a record of the discard. Consequence for the plan, stated rather than acted on unilaterally: if the discard-and-redo is to be recorded at all, the coordinating session owns writing it — into `.shell-team/interventions/T-1116.md`, which is that session's file per the same Part 2 item — and this spec neither asserts that the record exists nor requires it, since **AC15** reads that file for conformance only once it exists. Reported to the coordinating session as a hand-off finding. **Resolution by the coordinating session (freeze run, 2026-09-02)**: the premise was true of the sprint train head and false of this branch's ancestry — the `work-abandoned` entry was committed to `.shell-team/interventions/no-task.md` on `chore/lesson-promotion-2026-09-02` at `8be7350`, a commit made **after** this branch was cut from `d056359`, so the file this branch carries predates it. The record exists in the repository's train (it lands on `develop` with PR #417) but is not reachable from this branch. Recorded on this task's own interventions file as an `assumption-contradicted` entry about the hand-off briefing.
-- **A-19 — borrowed-vocabulary count premises, classified here and measured at the branch point by the execution-capable side before the freeze.** This spec asserts **no** literal `= 0` count premise about any borrowed token over a pre-existing file: every zero it asserts is either a path-set assertion over this task's own diff (**AC16**), a byte-identity comparison rather than a token count (**AC14**), or a token count over a file this task itself creates. Classification per token:
+- **A-19 — borrowed-vocabulary count premises, classified here and measured at the branch point by the execution-capable side before the freeze.** This spec asserts **no** literal `= 0` count premise about any borrowed token over a pre-existing file: every zero it asserts is either a path-set assertion over this task's own diff (**AC16**), a byte-identity comparison rather than a token count (**AC14**), or a token count over a file this task itself creates. Classification per token: **Measured at `d056359` by the freeze run**: `git show d056359:docs/loop-engineering/harness-invocation-parameters.md` exits 128 (path absent; `git ls-tree` lists no such entry), so every `= 0` premise about the note is vacuous at the branch point and binds only the note at HEAD, as this row states.
   - `- clone-ref:` — **borrowed** (coined by the sibling probe notes), and the one borrowed token carrying a `= 0` premise. Scope: the new note only. Measurement: `git show "$B:docs/loop-engineering/harness-invocation-parameters.md" | grep -c '^- clone-ref:'` — expected to fail because the path does not exist at the branch point, which is itself **AC1**'s absence assertion; the premise is therefore discharged by that criterion rather than by a token count over a file that is not there.
   - `git clone`, `git worktree add` — **borrowed** (git's own vocabulary). Scope: `- command:` lines in the new note only; same discharge as above.
   - `shell-team:tech-lead`, `general-purpose`, `subagent_type`, `isolation`, `in-process`, `cli-flag`, `unobserved`, `undetermined`, `probe-protocol`, `- probe-evidence-sha (` — **borrowed**, each reused with a presence or exactly-one premise and **no** `= 0` premise, so none owes a branch-point zero measurement. `- probe-evidence-sha (T-1116)` is the task-scoped instance of a borrowed family, and **AC2**'s premise about it is exactly-one rather than zero.
