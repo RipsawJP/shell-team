@@ -189,38 +189,33 @@ Each of the six inner-loop roles — `tech-lead`, `pm-spec`, `engineer`,
 `qa-verifier`, `codex-reviewer`, `ui-designer` — is host-assignable to a
 specific executor (provider + model + effort + adapter) through a
 `<base>/binding.conf`; with no host config, the plugin-shipped
-`templates/binding-default.conf` is the **shipped default**. The how-to,
-the config grammar, the fail-closed refusals and each adapter's own
-effort values live in [docs/adopting.md](docs/adopting.md) — the single
-canonical detail surface for this mechanism — and in `bash
-resolve-executor.sh --help`, which is that script's own header and
-cannot drift from it. **The honest boundary** has two axes: the binding
-gates **whether** a call proceeds in the loops that consult it — in
-`/shell-team:run`, `/shell-team:goal`, `/shell-team:review` and
-`/shell-team:review-response` alike, resolution runs immediately before
-each bound role's invocation and a refusal stops the phase rather than
-falling back, so a rebind can stop a call outright — and, for every
-bound role other than `tech-lead`, it never
-changes **how** a
-proceeding call is executed, where it moves only what resolution reports
-and what **telemetry** records, provider, model, effort and adapter
-alike. `tech-lead` is the disclosed exception: this project ships exactly
-one alternate-executor invocation path, narrowed to one role, one adapter
-and one sandbox mode — a host that binds `tech-lead` to the `codex-cli`
-adapter runs it in `--sandbox read-only`, with its own recipe and a
-fail-closed refusal that keeps a write-authority role out of it; no other
-role, adapter or sandbox mode has one (see
-[docs/adopting.md](docs/adopting.md) for the recipe and its refusal
-tokens). Illustratively, on the reporting-only axis, for every role other
-than `tech-lead`: the model still comes from the role's own `agents/<role>.md`
-pin (issue **#236** tracks retiring those pins for the five
-`claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
-effort is recorded but applied to no call, and executor-level routing is
-not resolved at all. Every bound value is declared, never an observation
-of what executed — except `tech-lead`'s alternate path, where the
-resolved row's model column is what actually ran. See [Design
-choices](#design-choices) for the reviewer row's own shipped default and
-its rationale.
+`templates/binding-default.conf` is the **shipped default**. The how-to, the
+config grammar, the fail-closed refusals and each adapter's own effort values
+live in [docs/adopting.md](docs/adopting.md) — the single canonical detail
+surface for this mechanism — and in `bash resolve-executor.sh --help`, which is
+that script's own header and cannot drift from it. **The honest boundary** has
+two axes: the binding gates **whether** a call proceeds in the loops that
+consult it — in `/shell-team:run`, `/shell-team:goal`, `/shell-team:review` and
+`/shell-team:review-response` alike, resolution runs immediately before each
+bound role's invocation and a refusal stops the phase rather than falling back,
+so a rebind can stop a call outright — and, for every bound role other than
+`tech-lead`, it never changes **how** a proceeding call is executed, where it
+moves only what resolution reports and what **telemetry** records, provider,
+model, effort and adapter alike. `tech-lead` is the disclosed exception: this
+project ships exactly one alternate-executor invocation path, narrowed to one
+role, one adapter and one sandbox mode — a host that binds `tech-lead` to the
+`codex-cli` adapter runs it in `--sandbox read-only`, with its own recipe and a
+fail-closed refusal that keeps a write-authority role out of it; no other role,
+adapter or sandbox mode has one (see [docs/adopting.md](docs/adopting.md) for
+the recipe and its refusal tokens). Illustratively, on the reporting-only axis,
+for every role other than `tech-lead`: the model still comes from the role's
+own `agents/<role>.md` pin (issue **#236** tracks retiring those pins for the
+five `claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
+effort is recorded but applied to no call, and executor-level routing is not
+resolved at all. Every bound value is declared, never an observation of what
+executed — except `tech-lead`'s alternate path, where the resolved row's model
+column is what actually ran. See [Design choices](#design-choices) for the
+reviewer row's own shipped default and its rationale.
 
 ## Replaying a run
 

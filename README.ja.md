@@ -207,7 +207,7 @@ fail-closed な refusal・各 adapter 自身の effort 値は、
 effort・adapter のいずれも同じ）であり、実行そのものには手を加えない。
 `tech-lead` はその開示された例外である：`tech-lead` を `codex-cli`
 adapter に紐付けると、このプロジェクト最初の——そして出荷済みの宣言を
-測定するかぎり唯一の——別 executor への invocation path が配線される。
+測定するかぎり唯一の——別 executor への呼び出し経路が配線される。
 これはちょうど 1 つの役割・1 つの adapter・1 つの sandbox mode に
 絞られており、`tech-lead` は `codex-cli` のもとで `--sandbox
 read-only` で走る。専用の recipe

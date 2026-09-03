@@ -280,7 +280,7 @@ run に届くのとまったく同じようにこれらにも届く。
 実行そのものは何も変わらない。`tech-lead` はその開示された例外である。
 `tech-lead` を `codex-cli` adapter に紐付けると、このプロジェクト
 最初の——そして出荷済みの宣言を測定するかぎり唯一の——別 executor への
-invocation path が配線される。これはちょうど 1 つの役割・1 つの
+呼び出し経路が配線される。これはちょうど 1 つの役割・1 つの
 adapter・1 つの sandbox mode に絞られている：`tech-lead` は `codex-cli`
 のもとで `--sandbox read-only` で走り、専用の recipe
 （`templates/prompt-blocks/alternate-executor-invocation.md`）と、
