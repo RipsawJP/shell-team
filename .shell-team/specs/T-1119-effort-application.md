@@ -285,39 +285,39 @@ The sentence #420 demands, carried verbatim from `tech-lead`'s Routing Map item 
 
 **Scaffold — filled by the coordinating session after the intent hash is recorded and before `engineer` is invoked, per the frozen `probe-protocol` region. The engineer alters not one byte of this section.** Every `<…>` below is replaced by a measured value; the families and cardinalities are the frozen ones **AC15** asserts, and the verdict is the one **AC16** recomputes rather than reads.
 
-- resolution: role=tech-lead — row=<the whole row --print-resolved printed for that role, verbatim> — effort-field=<that row's effort column> — <text>
-- run: arm=in-set — value=<the effort token passed> — status=<accepted|refused|not-run> — exit=<digits|na> — wall-clock-seconds=<digits|na> — <text>
-- run: arm=out-of-set — value=<the effort token passed> — status=<accepted|refused|not-run> — exit=<digits|na> — wall-clock-seconds=<digits|na> — <text>
-- argv: arm=in-set — clause-present=<yes|no> — token=<the -c token verbatim|absent> — source=<command-line-record|stream-item|absent> — <text>
-- argv: arm=out-of-set — clause-present=<yes|no> — token=<the -c token verbatim|absent> — source=<command-line-record|stream-item|absent> — <text>
-- provider-accept: arm=in-set — <accepted|rejected|not-run> — <text>
-- provider-accept: arm=out-of-set — <accepted|rejected|not-run> — <text>
-- reject-signal: <reasoning-effort-enum|other|absent> — substrings=<both|one|none> — top-level-types=<comma-separated|none> — <text>
-- unset-line: identity=<identical|differs|undetermined> — <the git show comparison command, verbatim>
-- prompt: <the frozen prompt string, verbatim>
-- reasoning-output-tokens: in-set=<digits|na> — comparison-reading=0 — non-licensing — <text>
-- effort-observability: <text>
-- codex-version: version=<codex-cli x.y.z> — <text>
-- channel: resolved-row — licensing — <text>
-- channel: argv-record — licensing — <text>
-- channel: process-exit — licensing — <text>
-- channel: stream-error-substring — licensing — <text>
-- channel: reasoning-output-tokens — non-licensing — <text>
-- channel: codex-version — non-licensing — <text, naming its one licensing use>
-- capture: arm=in-set — out=<basename|refused> — jsonl=<basename|refused> — <text>
-- capture: arm=out-of-set — out=<basename|refused> — jsonl=<basename|refused> — <text>
-- prior-probe: <text>
-- prior-probe: <text>
-- verdict: <clause-applied|clause-refused|undetermined> — <text>
-- command: <cmd>
-- command: <cmd>
-- command: <cmd>
-- command: <cmd>
-- command: <cmd>
-- command: <cmd>
-- command: <cmd>
-- evidence-boundary: <text>
-- reproduce: <cmd>
+- resolution: role=tech-lead — row=resolved tech-lead codex provider-configured low codex-cli — effort-field=low — step 0 ran `bash bin/resolve-executor.sh --print-resolved` from a scratch installed tree (`<scratch>/t1119-liverun/inst`: copies of `bin/`, `templates/` and `agents/`, plus `.shell-team/binding.conf` = the shipped default with the `tech-lead` row rewritten to `bind tech-lead codex provider-configured low codex-cli`); the row is the tool's own output, transcribed verbatim, and its fifth field is the only source of the in-set arm's value — the argv below was composed as `-c model_reasoning_effort=$(cat <scratch>/t1119-liverun/effort-field.txt)`, that file holding the printed field and nothing else.
+- run: arm=in-set — value=low — status=accepted — exit=0 — wall-clock-seconds=na — completed 2026-09-03 16:31:06Z with process exit 0 and the `-o` capture reading `EFFORT_APPLY_OK`; the launch mark was recorded after the arm finished (a procedural slip of the coordinating session), so its wall-clock is recorded `na` rather than reconstructed; bounded above by the two-arm background slice's own span of under a minute.
+- run: arm=out-of-set — value=zzz-not-a-tier-t1119 — status=refused — exit=1 — wall-clock-seconds=4 — completed 2026-09-03 16:31:10Z, four seconds after the in-set arm's end mark, with process exit 1 and an empty `-o` capture; the provider refused the value before any turn produced output.
+- argv: arm=in-set — clause-present=yes — token=-c model_reasoning_effort=low — source=command-line-record — the invocation the coordinating session issued (recorded under `- command:` below) carries the clause immediately after `--ephemeral` and before `--json`, its value expanded from step 0's `effort-field` file; the stream carries no `command_execution` item (the reply needed no tool call), so the record is the command line itself.
+- argv: arm=out-of-set — clause-present=yes — token=-c model_reasoning_effort=zzz-not-a-tier-t1119 — source=command-line-record — the literal the frozen protocol fixes for this arm, at the same insertion point.
+- provider-accept: arm=in-set — accepted — exit 0.
+- provider-accept: arm=out-of-set — rejected — exit 1.
+- reject-signal: reasoning-effort-enum — substrings=both — top-level-types=thread.started,turn.started,error,turn.failed — the published stream carries `[ReasoningEffortParam]` twice and `invalid_enum_value` twice (once in the `error` event, once in `turn.failed`), the provider's message enumerating `'none', 'minimal', 'low', 'medium', 'high', 'xhigh', and 'max'` — the seven values `templates/adapters/codex-cli.txt` declares; no `item.type` key appears on any line, as the protocol records.
+- unset-line: identity=identical — `cmp <(git show 61a99f9:templates/prompt-blocks/alternate-executor-invocation.md | grep 'codex exec --sandbox read-only --cd <REPO>') <(grep 'codex exec --sandbox read-only --cd <REPO>' templates/prompt-blocks/alternate-executor-invocation.md)` — run as two `grep` extractions into files and `cmp`, exit 0: the recipe's frozen `codex exec` line at this commit is byte-identical to the branch-point blob, so the `-` case composes exactly the line T-1118 froze.
+- prompt: Reply with exactly: EFFORT_APPLY_OK
+- reasoning-output-tokens: in-set=0 — comparison-reading=0 — non-licensing — `usage.reasoning_output_tokens` read 0 on the in-set arm (input 28320, output 9), equal to the 2026-09-03 valid-value probe's reading on the same prompt shape; read by no verdict branch.
+- effort-observability: no field in the `--json` stream echoes the effort setting (`grep -i 'effort\|reasoning_effort'` over the in-set stream matches nothing), so the reasoning tier the provider executed at is unobservable from this CLI; what this run establishes is that the clause reached the provider and was accepted, and the telemetry `--effort` value on this path is an observation of what was passed.
+- codex-version: version=codex-cli 0.149.1 — measured by `codex --version` immediately before the arms ran; `templates/adapters/codex-cli.txt`'s header cites `codex-cli 0.145.0` (2026-08-10), the staleness **AC17** binds the engineer's refresh to this reading; the seven `effort-value` rows need no change because the provider's enumeration above is identical to them.
+- channel: resolved-row — licensing — step 0's printed row and its fifth field, read by the verdict's equality conjunct against the in-set argv token.
+- channel: argv-record — licensing — the command lines the coordinating session issued, transcribed under `- command:`; source of `clause-present` for both arms.
+- channel: process-exit — licensing — the process exit status of each arm; sole source of `provider-accept`.
+- channel: stream-error-substring — licensing — the two substrings in the out-of-set arm's stream; sole source of `reject-signal`.
+- channel: reasoning-output-tokens — non-licensing — recorded, read by no verdict branch.
+- channel: codex-version — non-licensing — read by no verdict branch; its one licensing use is **AC17**'s equality between this line's version and the amended adapter header's citation.
+- capture: arm=in-set — out=T-1119-effort-in-set.txt — jsonl=T-1119-effort-in-set.jsonl — published by `bin/codex-capture.sh --publish` (exit 0) into the reviews directory; both gitignored.
+- capture: arm=out-of-set — out=refused — jsonl=refused — `--publish` exited 3 on the empty `-o` capture, exactly as the protocol pre-records for a rejected run; not an invalidation. The raw stream is retained under the session scratchpad (`<scratch>/t1119-liverun/out-of-set-raw.jsonl`) for reproduction of the substring reads.
+- prior-probe: 2026-09-03 14:33Z, coordinating session — out-of-set value `bogus-value-t1119` under the same flags on codex-cli 0.149.1: exit 1, top-level `error`/`turn.failed` events carrying `[ReasoningEffortParam] [reasoning.effort] [invalid_enum_value]` and the same seven-value enumeration (`<scratch>/t1119-inputs/effort-probe-events.jsonl`).
+- prior-probe: 2026-09-03 14:35Z, coordinating session — in-set value `low` under the same flags: exit 0, `EFFORT_PROBE_OK`, no stream field echoing the setting, `reasoning_output_tokens` 0 (`<scratch>/t1119-inputs/effort-valid-events.jsonl`).
+- verdict: clause-applied — by the frozen total function: neither `- run:` reads `status=not-run` (clause 0 does not fire); `unset-line-identity=identical` (clause 1 does not fire); in-set `provider-accept=accepted`, in-set `clause-present=yes`, the in-set argv token value `low` equals the `- resolution:` line's `effort-field=low`, out-of-set `provider-accept=rejected`, and `reject-signal=reasoning-effort-enum` (clause 2). A claim about the clause reaching the provider and being accepted on this host — never about the reasoning tier the run executed at.
+- command: cd <scratch>/t1119-liverun/inst && bash bin/resolve-executor.sh --print-resolved
+- command: bash bin/codex-capture.sh --alloc --stem T-1119-effort-in-set
+- command: codex exec --sandbox read-only --cd <home>/workspace/_my-repos/shell-team --ignore-user-config --ignore-rules --ephemeral -c model_reasoning_effort=$(cat <scratch>/t1119-liverun/effort-field.txt) --json -o "<RAW_OUT>" "Reply with exactly: EFFORT_APPLY_OK" < /dev/null > "<RAW_JSONL>" 2>&1
+- command: bash bin/codex-capture.sh --publish --stem T-1119-effort-in-set --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"
+- command: bash bin/codex-capture.sh --alloc --stem T-1119-effort-out-of-set
+- command: codex exec --sandbox read-only --cd <home>/workspace/_my-repos/shell-team --ignore-user-config --ignore-rules --ephemeral -c model_reasoning_effort=zzz-not-a-tier-t1119 --json -o "<RAW_OUT>" "Reply with exactly: EFFORT_APPLY_OK" < /dev/null > "<RAW_JSONL>" 2>&1
+- command: bash bin/codex-capture.sh --publish --stem T-1119-effort-out-of-set --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"
+- evidence-boundary: a `clause-applied` verdict is a claim about the **clause reaching the provider and being accepted**, and the **reasoning tier** the run executed at is **not observable** from this CLI — no `--json` field echoes the setting and `reasoning_output_tokens` cannot settle it — so the telemetry value on this path is an observation of **what was passed**; the value's provenance is measured end to end only as far as step 0's resolution row and the composed argv (the live-use **composition** step — the recipe reading the resolved row and composing the clause at invocation time — is the engineer's prose and is self-attested here, not exercised); the rejection arm is a **drift guard** whose live reachability today is nil, since the declared set and the provider's own enumeration agree; both arms ran on **this host** at codex-cli 0.149.1 under `--ignore-user-config`, so an adopter's host and a later CLI version are unmeasured either way; the transcription of the argv and the stream into these lines is the same self-attestation boundary every other evidence line here stands on; and whether the run happened at all is a self-attestation no artifact read can settle, exactly as every freeze attestation in this repository is.
+- reproduce: R=$(bash bin/team-paths.sh --get reviews); grep -c 'EFFORT_APPLY_OK' "$R/T-1119-effort-in-set.txt"; grep -o '"reasoning_output_tokens":[0-9]*' "$R/T-1119-effort-in-set.jsonl"; codex --version
 
 ## Blast radius
 
