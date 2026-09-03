@@ -398,6 +398,22 @@ else
   fail "cip-authority-duplicated: expected exit 2 with admits-authority named on stderr"
 fi
 
+# Second arm of the same case: an exact, byte-identical repeated row (the
+# (adapter, value) pair itself duplicated, not merely a second ungrounded
+# value) — the shape review round 1 reproduced live and the sibling
+# families (invocation-recipe, wires-role) already refuse.
+di_base_ok tech-lead || fail "cip-authority-duplicated: pristine tree did not admit tech-lead (byte-identical arm)"
+printf '%s\n' 'admits-authority codex-cli none' >> "$DI_RECIPE"
+n="$(grep -c '^admits-authority codex-cli ' "$DI_RECIPE" || true)"
+[ "$n" = "2" ] || fail "cip-authority-duplicated: byte-identical mutation did not produce two codex-cli rows"
+n2="$(grep -cxF -- 'admits-authority codex-cli none' "$DI_RECIPE" || true)"
+[ "$n2" = "2" ] || fail "cip-authority-duplicated: byte-identical mutation did not repeat the exact row"
+if di_arm2 tech-lead admits-authority; then
+  pass "cip-authority-duplicated — a byte-identical repeated (adapter, value) pair also refuses exit 2, family named"
+else
+  fail "cip-authority-duplicated: expected exit 2 with admits-authority named on stderr (byte-identical arm)"
+fi
+
 # cip-authority-missing: the missing SET is adapter-scoped, so it is
 # exercised with tech-lead REBOUND to codex-cli in a scratch conf, per
 # AC13/AC14's own discipline.

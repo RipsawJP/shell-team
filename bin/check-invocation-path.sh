@@ -312,6 +312,24 @@ while [ "$i" -lt "${#WIRES_ADAPTER[@]}" ]; do
   i=$((i + 1))
 done
 
+# duplicated-key detection: admits-authority keyed on the (adapter, value)
+# pair — the same shape its two sibling families already carry above. This
+# is independent of the cross-check below (which asks whether a value is
+# GROUNDED by a wired role's own authority): two byte-identical, individually
+# well-grounded rows for the same (adapter, value) pair are still a
+# corrupted-looking repetition this gate should not interpret charitably.
+i=0
+while [ "$i" -lt "${#ADM_ADAPTER[@]}" ]; do
+  j=0
+  while [ "$j" -lt "${#ADM_ADAPTER[@]}" ]; do
+    if [ "$i" -ne "$j" ] && [ "${ADM_ADAPTER[$i]}" = "${ADM_ADAPTER[$j]}" ] && [ "${ADM_VALUE[$i]}" = "${ADM_VALUE[$j]}" ]; then
+      refuse2 "declaration-integrity: admits-authority: duplicated (adapter, value) pair: ${ADM_ADAPTER[$i]} ${ADM_VALUE[$i]}"
+    fi
+    j=$((j + 1))
+  done
+  i=$((i + 1))
+done
+
 # admits-authority cross-check: for every adapter appearing in
 # admits-authority rows, its declared VALUE SET must be a subset of the
 # DISTINCT role-board-authority values among the roles wires-role wires
