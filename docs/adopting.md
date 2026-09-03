@@ -281,15 +281,18 @@ row — issue **#236** tracks retiring those pins, for the five
 `claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
 whose pin configures the Claude wrapper that shells out to the Codex CLI
 rather than the model that reviews; a declared **effort** no longer tells
-one story shared by every adapter — each bound adapter's own
-`applies-effort` declaration decides for itself whether a resolved value
-ever reaches an invocation, so the two adapters this project ships
-disagree with one another: on a `codex-cli` row the resolved value is
-**applied** to the invocation itself, as `-c model_reasoning_effort=<value>`
-gated on that adapter's own `cli-config-override` declaration, while on a
-`claude-cli` row it stays **recorded** on the span and applied to nothing,
-its only other effect being the `capability-unsupported` refusal above;
-and which **executor** — provider and adapter — a role is invoked through
+one story shared by every adapter, and which story applies depends on
+**dispatch shape**, not on the adapter token alone: on `tech-lead`'s
+alternate path — dispatched `sandbox-read-only` through the `codex-cli`
+recipe — the resolved value is **applied** to the invocation itself, as
+`-c model_reasoning_effort=<value>` gated on that adapter's own
+`cli-config-override` declaration; every other `codex-cli` row, including
+`codex-reviewer`'s own shipped default, which is dispatched
+`wrapper-hosted` through its own `agents/codex-reviewer.md` and never
+receives that recipe's line at all, and every `claude-cli` row, stays
+**recorded** on the span and applied to nothing, its only other effect
+being the `capability-unsupported` refusal above (#420); and which **executor**
+— provider and adapter — a role is invoked through
 is not routed by resolution at all, for any role other than `tech-lead`, with no
 issue tracking that. The rule to take away is the second axis stated
 universally rather than its list: every bound value is **declared, never
