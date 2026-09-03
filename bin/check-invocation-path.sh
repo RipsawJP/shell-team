@@ -35,6 +35,8 @@
 #     --print-contract`), then judge admissibility against the shipped
 #     recipe. On success (exit 0), stdout is exactly one non-empty line:
 #       admitted <role> <adapter> <invocation-kind>
+#     or, for a role admitted by the wrapper-hosted derivation (DP-m) below:
+#       admitted <role> <adapter> wrapper-hosted <agent-file-path>
 #   check-invocation-path.sh --help
 #
 # Exit codes:
@@ -66,8 +68,14 @@
 #                                 adapter. NEVER printed for a role this
 #                                 gate could not evaluate at all — that is
 #                                 always exit 2, never this token.
-#   0 — admitted; the recipe declares this (role, adapter, sandbox-mode)
-#       triple admissible.
+#   0 — admitted; either the recipe declares this (role, adapter,
+#       sandbox-mode) triple admissible, or (for a sandbox-read-only
+#       adapter only) the role's own agents/<role>.md hosts a bare,
+#       first-token `codex exec ` line and is admitted `wrapper-hosted`
+#       (DP-m) — that role's write authority stays with the Claude-hosted
+#       wrapper and the read-only recipe never receives it. This derivation
+#       is evaluated BEFORE wires-role/admits-authority and never widens
+#       either declaration.
 #
 # An unavailable or unauthenticated executor is BLOCKED with the exact
 # error at the INVOCATION site — this gate makes no availability claim
@@ -352,6 +360,24 @@ while [ "$i" -lt "${#INVREC_ADAPTER[@]}" ]; do
 done
 [ -n "$INVOCATION_KIND" ] \
   || refuse1 no-recipe "no invocation-recipe row for adapter: $ADAPTER"
+
+# --- wrapper-hosted derivation (DP-m) --------------------------------------
+# The codex-cli token conflates two shapes: a role hosting its own bare,
+# first-token `codex exec ` call (a Claude-hosted wrapper, whose write stays
+# with the wrapper and never reaches the read-only sandbox) and the
+# alternate path this recipe actually wires. Admissibility for the former is
+# DERIVED from the role's own agents/<role>.md, never from widening
+# wires-role/admits-authority, and only ever considered for a
+# sandbox-read-only adapter — an in-process adapter has no such conflation
+# to resolve. This runs BEFORE the wires-role question, so a role need not
+# be named in wires-role at all to be admitted this way.
+if [ "$INVOCATION_KIND" = "sandbox-read-only" ]; then
+  AGENT_FILE="$TEMPLATES_ROOT/agents/$ROLE_ARG.md"
+  if [ -r "$AGENT_FILE" ] && grep -qE '^[[:space:]]*codex exec ' "$AGENT_FILE"; then
+    printf 'admitted %s %s wrapper-hosted %s\n' "$ROLE_ARG" "$ADAPTER" "$AGENT_FILE"
+    exit 0
+  fi
+fi
 
 # Is this role wired to that adapter?
 WIRED=0

@@ -30,16 +30,20 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-invocation-path-test.XXXXXX")" || { echo "FAIL: could not create scratch root" >&2; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 
-# build_installed_tree <dest> — a scratch copy of bin/ + templates/, the
-# ONLY sanctioned way to exercise a mutated recipe/conf/sibling: this gate
-# has no override flag of its own, and running the copied gate
-# additionally exercises the real $SCRIPT_DIR-relative resolution rather
-# than a test-only path.
+# build_installed_tree <dest> — a scratch copy of bin/ + templates/ +
+# agents/, the ONLY sanctioned way to exercise a mutated recipe/conf/
+# sibling/agent-definition: this gate has no override flag of its own, and
+# running the copied gate additionally exercises the real
+# $SCRIPT_DIR-relative resolution rather than a test-only path. agents/
+# joins the copy because the wrapper-hosted derivation (DP-m) reads a
+# role's own agents/<role>.md from the gate's own installed directory.
 build_installed_tree() {
   local dest="$1"
   mkdir -p "$dest"
   cp -R "$REPO_ROOT/bin" "$dest/bin"
   cp -R "$REPO_ROOT/templates" "$dest/templates"
+  mkdir -p "$dest/agents"
+  cp "$REPO_ROOT"/agents/*.md "$dest/agents/"
   chmod +x "$dest/bin/check-invocation-path.sh"
 }
 
@@ -153,6 +157,65 @@ if bash "$RB_TREE/bin/check-invocation-path.sh" --role codex-reviewer >/dev/null
 else
   fail "cip-reviewer-rebound-admitted: expected codex-reviewer rebound to claude-cli to be admitted"
 fi
+
+# =============================================================================
+# cip-wrapper-hosted-admitted (AC12/DP-m — the wrapper-hosted derivation)
+# =============================================================================
+WH_TREE="$TMP/wrapperhosted"
+build_installed_tree "$WH_TREE"
+grep -qE '^[[:space:]]*codex exec ' "$WH_TREE/agents/codex-reviewer.md" \
+  || fail "cip-wrapper-hosted-admitted: agents/codex-reviewer.md carries no anchored bare 'codex exec ' line"
+o="$TMP/wh.out"; e="$TMP/wh.err"
+rc=0
+bash "$WH_TREE/bin/check-invocation-path.sh" --role codex-reviewer > "$o" 2> "$e" || rc=$?
+[ "$rc" -eq 0 ] || fail "cip-wrapper-hosted-admitted: expected exit 0, got $rc"
+[ -s "$o" ] || fail "cip-wrapper-hosted-admitted: expected non-empty stdout"
+grep -qF -- 'wrapper-hosted' "$o" || fail "cip-wrapper-hosted-admitted: expected the wrapper-hosted token on stdout"
+grep -qF -- 'agents/codex-reviewer.md' "$o" || fail "cip-wrapper-hosted-admitted: expected the agent file named on stdout"
+pass "cip-wrapper-hosted-admitted — codex-reviewer, unwired and unadmitted by the recipe, is admitted wrapper-hosted by its own agent definition"
+
+# =============================================================================
+# cip-wrapper-line-removed-refused (AC13(vi) — the derivation is derived,
+# not hardcoded: removing the anchored line flips the admission)
+# =============================================================================
+WL_TREE="$TMP/wrapperline"
+build_installed_tree "$WL_TREE"
+bash "$WL_TREE/bin/check-invocation-path.sh" --role codex-reviewer >/dev/null 2>&1 \
+  || fail "cip-wrapper-line-removed-refused: expected the pristine tree to admit codex-reviewer first"
+grep -vE '^[[:space:]]*codex exec ' "$REPO_ROOT/agents/codex-reviewer.md" > "$WL_TREE/agents/codex-reviewer.md"
+n="$(grep -cE '^[[:space:]]*codex exec ' "$WL_TREE/agents/codex-reviewer.md" || true)"
+[ "$n" = "0" ] || fail "cip-wrapper-line-removed-refused: mutation did not remove the anchored line"
+o="$TMP/wl.out"; e="$TMP/wl.err"
+rc=0
+bash "$WL_TREE/bin/check-invocation-path.sh" --role codex-reviewer > "$o" 2> "$e" || rc=$?
+[ "$rc" -eq 1 ] || fail "cip-wrapper-line-removed-refused: expected exit 1, got $rc"
+[ ! -s "$o" ] || fail "cip-wrapper-line-removed-refused: expected zero bytes on stdout"
+grep -qF -- 'role-not-wired' "$e" || fail "cip-wrapper-line-removed-refused: expected the role-not-wired token on stderr"
+pass "cip-wrapper-line-removed-refused — removing codex-reviewer's own anchored codex exec line flips its admission to role-not-wired"
+
+# =============================================================================
+# cip-nonwrapper-authority-incompatible (AC13(v) — the derivation's
+# negative side: a non-wrapper role wired onto the path still refuses)
+# =============================================================================
+NW_TREE="$TMP/nonwrapper"
+build_installed_tree "$NW_TREE"
+NW_CONF="$NW_TREE/templates/binding-default.conf"
+NW_RECIPE="$NW_TREE/templates/prompt-blocks/alternate-executor-invocation.md"
+sed -E 's/^bind([[:space:]]+)pm-spec([[:space:]]+)claude([[:space:]]+)[^[:space:]]+([[:space:]]+)-([[:space:]]+)claude-cli/bind\1pm-spec\2codex\3provider-configured\4-\5codex-cli/' \
+  "$DEFAULT_CONF" > "$NW_CONF"
+bash "$NW_TREE/bin/check-binding.sh" --config "$NW_CONF" >/dev/null 2>&1 \
+  || fail "cip-nonwrapper-authority-incompatible: rebound conf failed to validate"
+printf '%s\n' 'wires-role codex-cli pm-spec' >> "$NW_RECIPE"
+grep -qxF -- 'wires-role codex-cli pm-spec' "$NW_RECIPE" || fail "cip-nonwrapper-authority-incompatible: appended wires-role row missing"
+n="$(grep -cE '^[[:space:]]*codex exec ' "$NW_TREE/agents/pm-spec.md" || true)"
+[ "$n" = "0" ] || fail "cip-nonwrapper-authority-incompatible: agents/pm-spec.md unexpectedly carries an anchored codex exec line"
+o="$TMP/nw.out"; e="$TMP/nw.err"
+rc=0
+bash "$NW_TREE/bin/check-invocation-path.sh" --role pm-spec > "$o" 2> "$e" || rc=$?
+[ "$rc" -eq 1 ] || fail "cip-nonwrapper-authority-incompatible: expected exit 1, got $rc"
+[ ! -s "$o" ] || fail "cip-nonwrapper-authority-incompatible: expected zero bytes on stdout"
+grep -qF -- 'authority-incompatible' "$e" || fail "cip-nonwrapper-authority-incompatible: expected the authority-incompatible token on stderr"
+pass "cip-nonwrapper-authority-incompatible — pm-spec (not a wrapper) wired onto the read-only path still refuses authority-incompatible"
 
 # =============================================================================
 # cip-no-recipe (AC13(iii))
@@ -431,7 +494,7 @@ for f in "$TMP"/*.out; do
     def-*|di.base.out) continue ;;
   esac
   [ -s "$f" ] && case "$base" in
-    br1.out|br2.out|us1.out|us2.out|us3.out|rm.out|nr.out|rw.out|ai.out|ua.out|am.out|di.arm.out|di.noai.out)
+    br1.out|br2.out|us1.out|us2.out|us3.out|rm.out|nr.out|rw.out|ai.out|ua.out|am.out|di.arm.out|di.noai.out|wl.out|nw.out)
       fail "cip-stdout-empty-on-refusal: $base unexpectedly carries bytes on stdout" ;;
   esac
 done
