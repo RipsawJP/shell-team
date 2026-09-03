@@ -199,19 +199,28 @@ gates **whether** a call proceeds in the loops that consult it — in
 `/shell-team:run`, `/shell-team:goal`, `/shell-team:review` and
 `/shell-team:review-response` alike, resolution runs immediately before
 each bound role's invocation and a refusal stops the phase rather than
-falling back, so a rebind can stop a call outright — and it never
+falling back, so a rebind can stop a call outright — and, for every
+bound role other than `tech-lead`, it never
 changes **how** a
 proceeding call is executed, where it moves only what resolution reports
 and what **telemetry** records, provider, model, effort and adapter
-alike, so no
-alternate-executor **invocation path** is wired. Illustratively, on that
-second axis: the model still comes from the role's own `agents/<role>.md`
+alike. `tech-lead` is the disclosed exception: this project ships exactly
+one alternate-executor invocation path, narrowed to one role, one adapter
+and one sandbox mode — a host that binds `tech-lead` to the `codex-cli`
+adapter runs it in `--sandbox read-only`, with its own recipe and a
+fail-closed refusal that keeps a write-authority role out of it; no other
+role, adapter or sandbox mode has one (see
+[docs/adopting.md](docs/adopting.md) for the recipe and its refusal
+tokens). Illustratively, on the reporting-only axis, for every role other
+than `tech-lead`: the model still comes from the role's own `agents/<role>.md`
 pin (issue **#236** tracks retiring those pins for the five
 `claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
 effort is recorded but applied to no call, and executor-level routing is
 not resolved at all. Every bound value is declared, never an observation
-of what executed. See [Design choices](#design-choices) for the reviewer
-row's own shipped default and its rationale.
+of what executed — except `tech-lead`'s alternate path, where the
+resolved row's model column is what actually ran. See [Design
+choices](#design-choices) for the reviewer row's own shipped default and
+its rationale.
 
 ## Replaying a run
 
