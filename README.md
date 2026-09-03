@@ -210,11 +210,18 @@ adapter or sandbox mode has one (see [docs/adopting.md](docs/adopting.md) for
 the recipe and its refusal tokens). Illustratively, on the reporting-only axis,
 for every role other than `tech-lead`: the model still comes from the role's
 own `agents/<role>.md` pin (issue **#236** tracks retiring those pins for the
-five `claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
-effort is recorded but applied to no call, and executor-level routing is not
-resolved at all. Every bound value is declared, never an observation of what
-executed — except `tech-lead`'s alternate path, where the resolved row's model
-column is what actually ran. See [Design choices](#design-choices) for the
+five `claude-cli`-bound roles only, `codex-reviewer` excluded), and
+executor-level routing is not resolved at all. A declared effort is no
+longer a single story shared by every adapter this project ships — each
+bound adapter's own `applies-effort` declaration decides for itself whether
+a resolved value ever reaches an invocation, so the two adapters this
+project ships disagree with one another: on a `codex-cli` row the value is
+now **applied** to the invocation — `-c model_reasoning_effort=<value>`,
+gated on that adapter's own `cli-config-override` declaration — while on
+every `claude-cli` row it stays **recorded** and applied to nothing. Every
+bound value is declared, never an observation of what executed — except
+`tech-lead`'s alternate path, where the resolved row's model column is what
+actually ran and, on a `codex-cli` row, its effort column is applied too. See [Design choices](#design-choices) for the
 reviewer row's own shipped default and its rationale.
 
 ## Replaying a run

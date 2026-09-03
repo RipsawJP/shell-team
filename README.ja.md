@@ -218,9 +218,15 @@ write 権限または propose 権限を持つ役割が同じ形で紐付けら�
 （報告のみの軸）の例示として、`tech-lead` を除くすべての役割について:
 model は今なお役割自身の `agents/<role>.md` の pin から来る（issue
 **#236** はその pin の退役を追跡するが、対象は `claude-cli` に紐付く
-5 役割のみで `codex-reviewer` は除外）。宣言された effort は記録される
-がどの呼び出しにも適用されず、executor レベルの経路は resolution が
-制御していない（`tech-lead` を除くいずれの役割についても）。紐付けられた
+5 役割のみで `codex-reviewer` は除外）。宣言された effort はもはや adapter
+を問わず一様ではない——紐付けられた adapter 自身の `applies-effort` 宣言
+が、resolved な値がその呼び出しに実際に届くかどうかを決めており、この
+プロジェクトが出荷する 2 つの adapter は互いに異なる挙動をとる：
+`codex-cli` の行では値が実際の呼び出しに
+**適用**される（`-c model_reasoning_effort=<value>` として、その adapter
+自身の `cli-config-override` 宣言に紐付く）(T-1119)。一方 `claude-cli` の行では
+**記録**されるだけで何にも適用されない。executor レベルの経路は
+resolution が制御していない（`tech-lead` を除くいずれの役割についても）。紐付けられた
 値はすべて宣言された値であって、実行されたものの観測ではない——ただし
 `tech-lead` の別経路だけは例外で、そこでは resolved row の model 列が
 そのまま実際に走ったものになる。reviewer 行自身の出荷時の既定とその

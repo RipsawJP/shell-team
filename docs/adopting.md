@@ -280,16 +280,22 @@ comes from that role's own `agents/<role>.md` pin, not from the resolved
 row — issue **#236** tracks retiring those pins, for the five
 `claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
 whose pin configures the Claude wrapper that shells out to the Codex CLI
-rather than the model that reviews; a declared **effort** is recorded on
-the span but applied to no call, its only other effect being the
-`capability-unsupported` refusal above — an adapter definition declares
-an effort *mechanism*, and declaring one is not applying it; and which
-**executor** — provider and adapter — a role is invoked through is not
-routed by resolution at all, for any role other than `tech-lead`, with no
+rather than the model that reviews; a declared **effort** no longer tells
+one story shared by every adapter — each bound adapter's own
+`applies-effort` declaration decides for itself whether a resolved value
+ever reaches an invocation, so the two adapters this project ships
+disagree with one another: on a `codex-cli` row the resolved value is
+**applied** to the invocation itself, as `-c model_reasoning_effort=<value>`
+gated on that adapter's own `cli-config-override` declaration, while on a
+`claude-cli` row it stays **recorded** on the span and applied to nothing,
+its only other effect being the `capability-unsupported` refusal above;
+and which **executor** — provider and adapter — a role is invoked through
+is not routed by resolution at all, for any role other than `tech-lead`, with no
 issue tracking that. The rule to take away is the second axis stated
 universally rather than its list: every bound value is **declared, never
 an observation of what executed** — except `tech-lead`'s alternate path,
-where the resolved row's model column is what actually ran.
+where the resolved row's model column is what actually ran and, on a
+`codex-cli` row, its effort column is applied too.
 
 **The read boundary `tech-lead`'s alternate path stands on, disclosed at
 exactly the width it was measured.** The Codex CLI offers no read-scope
