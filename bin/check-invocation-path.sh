@@ -76,8 +76,8 @@
 #
 # This gate joins tests/check-binding/run.sh's live
 # cb-adapters-not-forwarded-population set by naming check-binding.sh
-# nowhere and spelling --adapters nowhere: it never forwards a registry
-# override of any kind.
+# nowhere and carrying no adapters-override flag of any kind: it never
+# forwards a registry override.
 #
 # #419 / T-1118.
 
