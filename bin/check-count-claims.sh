@@ -295,7 +295,7 @@ while [ "$ridx" -lt "$ROW_COUNT" ]; do
   set -e
 
   if [ "$rc" -ne 0 ]; then
-    fail "$TASK's \`- count: $label\` command exited $rc — a non-zero exit (e.g. \`grep -c\` finding zero matches, exit 1) is refused rather than read as zero; pipe through \`| wc -l\` instead (drop \`-c\`: \`grep zzz file | wc -l\`, never \`grep -c zzz file | wc -l\`, which double-counts a zero match as one line): $cmd — and because the command now runs under \`set -o pipefail\`, guard a LEGITIMATE non-zero upstream exit with \`|| true\` before the pipe so only \`wc -l\`'s own status is reported, e.g. \`(grep zzz file || true) | wc -l\`"
+    fail "$TASK's \`- count: $label\` command exited $rc — a non-zero exit (e.g. \`grep -c\` finding zero matches, exit 1) is refused rather than read as zero, because the command now runs under \`set -o pipefail\`: guard a LEGITIMATE non-zero upstream exit with \`|| true\` before piping to \`wc -l\`, e.g. \`(grep zzz file || true) | wc -l\` (drop \`-c\` from \`grep\` first — \`grep -c\`'s own \"0\" text output would itself be counted as one line by \`wc -l\`, double-counting a zero match as one): $cmd"
   fi
 
   measured="$(trim "$out")"
