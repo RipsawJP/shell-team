@@ -4,6 +4,13 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.5.1**
+  - **`binding.conf` で既定以外の executor に紐づけた役割を、実際にその executor で呼び出せるようになりました。** 最初の代替 executor 呼び出し経路を、役割・adapter・sandbox モードそれぞれ 1 つ — `codex-cli` の `--sandbox read-only` 下の `tech-lead` — に限って出荷レシピ（prompt block）として配線し、レシピが配線していない役割・adapter・権限の組み合わせを拒否する fail-closed の admission gate（`bin/check-invocation-path.sh`）と、凍結済みの実走記録をその証拠として添えました。rebind だけでは解決される名前と telemetry の記録しか変わりません — この経路が rebind を実行に結びつけます。
+  - **解決された effort 値が、その経路の呼び出しに実際に届きます。** `codex-cli` 代替経路では binding の effort 値が `-c model_reasoning_effort=<値>` として適用され、adapter が宣言していない値は fail-closed で拒否されます。各 adapter の文書は、effort が呼び出しに適用されるのか記録されるだけなのかを明記するようになりました — 何も呼び出していないのに「適用される」と読めた記載を置き換えています。
+  - **plugin 役割の起動時に harness が呼び出し単位の model / effort パラメータを尊重するかを、推測でなく測定しました。** 起動前に凍結した probe protocol と、較正済みの能力差分のみを routing の証拠として結果を記録し、その結果として役割の frontmatter model pin は廃止せずロック下で維持します。
+  - **claude provider の全役割の frontmatter model pin が、出荷既定の model token と一致することを CI 配線済みのチェッカー（`bin/check-model-pins.sh`）が保証します。** pin と既定が黙って食い違うことはなくなりました。
+  - **バージョン規則に tiebreaker を明記しました。** 既定や主張の反転が性能改善とも読める場合にどの条項が優先するかを `CONTRIBUTING.md` が述べ、その種の変更の tier は議論でなく 1 回の導出で決まります。
+  - **`check-count-claims` のゼロ件拒否メッセージは、`set -o pipefail` 下でも生き残るレシピ — ガード付きの `(grep … || true) | wc -l` 形 — だけを教えるようになりました。** あわせて fan-out 文書の古い記載をその場で修正しています: 両 README はフェーズ内 fan-out の選択を「Plan 時の dispatch 決定を Specify の継ぎ目で転記し Validate フェーズが読む」と述べ、phase-multiplexing ノートは出荷済みの fan-out instance チェッカーを「未構築の前提」として扱わなくなりました。
 - **v2.5.0**
   - **mechanism-class の検証 sweep が既定で並列 fan-out するようになりました。** 検証対象が機械的に列挙可能なフェーズは、既定の出荷パスで N インスタンスに分割されます — 従来の「Opt-in only（既定ではどのフェーズも fan-out しない）」という記載は事実でなくなったため両 README から削除しました。あわせて、fan-out の起動記録は実行ホストを必ず明記します: コーディネーティングセッションが分離 staged worktree 上に harness-tracked な background shell slice を起動する形が唯一の準拠形で、detached 子プロセスを抱えるサブエージェント hosting は専用パイロットで実測されるまで禁止です。本リポジトリ自身の対象群では、並列形は operator が最も長く待つフェーズで実測約 44% の壁時計時間短縮でした。
   - **freeze がリリースティア自体を導出し、作業が承認済みプランを超えた時点で停止するようになりました。** 初回・再 freeze を問わず毎回、spec 自身の宣言から headline テストと default-reachability テストを結合適用してティアを再導出し、board エントリに記録して承認済みプランニング前提と照合します。不一致なら停止し、見積もり超過の明示・continue-or-stop の問い・根拠つき推奨の 3 要素を備えた逸脱通知を出します — 裸の「続行しますか？」は出しません。このゲートは初の実発火で、まさに本リリースの名前を変えた前提崩れを検出しました。
