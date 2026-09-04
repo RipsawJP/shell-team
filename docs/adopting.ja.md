@@ -293,10 +293,17 @@ write 権限または propose 権限を持つ役割が同じ形で紐付けら�
 **#236** がその pin の退役を追跡するが、対象は `claude-cli` に紐付く
 5 役割のみで、`codex-reviewer` は意図的に除外される（その pin は Codex
 CLI を呼び出す Claude 側の wrapper を設定するもので、レビューを行う
-モデルではない）。次に、宣言された **effort** は span に記録されるが
-どの呼び出しにも適用されず、他に及ぶ影響は上記の `capability-unsupported`
-refusal だけである。adapter 定義が宣言しているのは effort の*機構*で
-あって、宣言は適用ではない。最後に、どの **executor**（provider と
+モデルではない）。次に、宣言された **effort** はもはや adapter を問わず
+一様な話ではない——どちらの話になるかは **dispatch の形**にも左右
+される：`tech-lead` の別経路——`codex-cli` の recipe を通じて
+`sandbox-read-only` で dispatch される——では値がその呼び出し自体に
+**適用**される（`-c model_reasoning_effort=<value>` として、その adapter
+自身の `cli-config-override` 宣言に紐付く）#420。それ以外の `codex-cli` の
+行——出荷時既定の `codex-reviewer` 自身の行を含め、これは自身の
+`agents/codex-reviewer.md` を通じて `wrapper-hosted` で dispatch され、
+その recipe の行を一切受け取らない——と、すべての `claude-cli` の行は、
+span に**記録**されるだけで何にも適用されず、他に及ぶ影響は上記の
+`capability-unsupported` refusal だけである。最後に、どの **executor**（provider と
 adapter）経由で役割が呼び出されるかは、`tech-lead` を除くどの役割に
 ついても resolution が経路制御しておらず、これを追跡する issue も
 存在しない。持ち帰るべき規則は、第 2 軸を列挙ではなく普遍形で述べた

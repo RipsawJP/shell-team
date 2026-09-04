@@ -401,6 +401,29 @@ supported`, `effort-mechanism cli-flag`, and five `effort-value` rows (`low`,
 branch applies: the specimen is left exactly as T-1054 shipped it. No edit
 was made to `templates/binding-template.conf` by this task.
 
+### Runtime application (T-1119, issue #420)
+
+- applied-at: `templates/prompt-blocks/alternate-executor-invocation.md` —
+  the one invocation path this repository ships with a *measured*
+  per-invocation effort mechanism, `tech-lead` under `codex-cli`. A
+  resolved row whose effort field is not `-` reaches that recipe's `codex
+  exec` line as `-c model_reasoning_effort=<EFFORT>`, gated on the bound
+  adapter's own `applies-effort codex-cli cli-config-override`
+  declaration; every other bound path stays `applies-effort <adapter>
+  not-applied` — declared, recorded, and applied to nothing.
+
+The accepted-value set was re-measured before this runtime application
+shipped: `codex --version` on 2026-09-03 reports `codex-cli 0.149.1`, and
+the provider's own accepted-value enumeration on that version is
+identical, value for value, to the seven `effort-value` rows recorded
+above from the 2026-08-10 measurement — so those rows are unchanged, and
+only `templates/adapters/codex-cli.txt`'s version citation moved. Had the
+set moved instead, those rows would have been updated inside T-1119
+itself, since they are this fail-closed gate's own input, with the
+Adapter envelope contract's (T-1055) own `stale-at` line — "the Codex CLI
+or the Claude harness changes its effort/reasoning mechanism or the set of
+values it accepts" — as the trigger.
+
 ## Fail-closed effort, statically and at runtime
 
 - normative: An adapter presented an effort value it does not declare fails closed: it returns a non-success status with error-class capability-unsupported and invokes nothing, never silently ignoring the value and never substituting a default. An unset effort means the provider or model default.

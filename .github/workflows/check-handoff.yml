@@ -304,6 +304,33 @@ jobs:
       - name: Dogfood check-invocation-path — the alternate-executor admissibility gate against this repository
         run: bash bin/check-invocation-path.sh --role tech-lead
 
+      - name: Dogfood applies-effort — the recipe's declaration agrees with each adapter's own effort-mechanism (T-1119)
+        run: |
+          set -e
+          K=templates/prompt-blocks/alternate-executor-invocation.md
+          test -r "$K"
+          while read -r t m; do
+            test -n "$t" || continue
+            test "$(grep -c "^applies-effort $t " "$K" || true)" = "1"
+            v=$(awk -v t="$t" '$1=="applies-effort" && $2==t{print $3}' "$K" | head -n 1)
+            test -n "$v"
+            case "$m" in
+              in-process)
+                test "$v" = "not-applied"
+                ;;
+              sandbox-read-only)
+                A="templates/adapters/$t.txt"
+                test -r "$A"
+                em=$(awk '$1=="effort-mechanism"{print $2}' "$A" | head -n 1)
+                test -n "$em"
+                test "$v" = "$em"
+                ;;
+              *)
+                exit 1
+                ;;
+            esac
+          done < <(awk '$1=="invocation-recipe"{print $2, $3}' "$K")
+
       - name: Run derive-populations fixture suite
         run: bash tests/derive-populations/run.sh
 

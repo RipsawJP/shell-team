@@ -34,6 +34,20 @@
 # Those seven values are transcribed verbatim below. See the contract
 # document's "Effort mechanism measurements" section for the full
 # transcript and command.
+#
+# re-measured (T-1119, issue #420), 2026-09-03: `codex --version` now
+# reports `codex-cli 0.149.1`. The provider's own accepted-value
+# enumeration was elicited again on this version and reads identically to
+# the seven `effort-value` rows below, so the directive rows are unchanged
+# — only this version citation was stale. `templates/prompt-blocks/
+# alternate-executor-invocation.md` applies a resolved, non-`-` effort
+# value to the shipped `codex-cli` recipe as `-c model_reasoning_effort=
+# <EFFORT>`, keyed on this file's own `effort-mechanism cli-config-override`
+# declaration below; see that block's `applies-effort codex-cli
+# cli-config-override` row and the recipe's own escalation prose for the
+# runtime-rejection arm, which maps a value this file no longer declares to
+# `capability-unsupported` — the same error class the static resolver rule
+# already enforces at resolution.
 
 adapter codex-cli
 provider codex

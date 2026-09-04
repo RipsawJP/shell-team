@@ -29,6 +29,23 @@
 # effort-mechanism is `cli-flag`; the five accepted values are transcribed
 # verbatim from that help text. See the contract document's "Effort
 # mechanism measurements" section for the full transcript and command.
+#
+# provenance disclosure (T-1119, issue #420), 2026-09-03: `--effort <level>`
+# above was measured against the `claude` binary itself (`claude --help`),
+# not against the Agent tool this loop's own harness invokes to dispatch a
+# bound role. `bin/resolve-executor.sh` classifies provider `claude` as
+# `in-process` — no external binary is ever invoked for a role bound to
+# this adapter — so the declared `cli-flag` mechanism is unreachable from
+# every invocation this loop actually performs on that path. This is
+# measured, not inferred: `docs/loop-engineering/harness-invocation-
+# parameters.md` reads the Agent tool's own parameter schema and records
+# `- effort-parameter: absent`, naming this exact mismatch (T-1116). The
+# directive rows below are therefore left exactly as measured — this
+# adapter's declaration is a true statement about the `claude` CLI, and
+# flipping it to `unsupported` would trade one inaccuracy for another —
+# and `templates/prompt-blocks/alternate-executor-invocation.md` declares
+# `applies-effort claude-cli not-applied`: an effort value on a
+# `claude-cli`-bound row is still recorded and applied to nothing.
 
 adapter claude-cli
 provider claude
