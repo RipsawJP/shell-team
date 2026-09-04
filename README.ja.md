@@ -201,16 +201,30 @@ fail-closed な refusal・各 adapter 自身の effort 値は、
 各役割の invocation の直前に走り、refusal はフォールバックせず
 フェーズを停止させる。したがって rebind によって呼び出しを完全に
 止められる。第 2 の軸は、行われる
-呼び出しが**どう実行されるか**で、binding はこれを決して変えない。
-そちらで動くのは resolution が報告する値と**テレメトリ**が記録する値
-だけ（provider・model・effort・adapter のいずれも同じ）であり、別
-executor への**呼び出し経路**は配線されない。第 2 軸の例示として、
+呼び出しが**どう実行されるか**で、`tech-lead` 以外のすべての紐付け役割
+について binding はこれを決して変えない。そちらで動くのは resolution
+が報告する値と**テレメトリ**が記録する値だけ（provider・model・
+effort・adapter のいずれも同じ）であり、実行そのものには手を加えない。
+`tech-lead` はその開示された例外である：`tech-lead` を `codex-cli`
+adapter に紐付けると、このプロジェクト最初の——そして出荷済みの宣言を
+測定するかぎり唯一の——別 executor への呼び出し経路が配線される。
+これはちょうど 1 つの役割・1 つの adapter・1 つの sandbox mode に
+絞られており、`tech-lead` は `codex-cli` のもとで `--sandbox
+read-only` で走る。専用の recipe
+（`templates/prompt-blocks/alternate-executor-invocation.md`）と、
+write 権限または propose 権限を持つ役割が同じ形で紐付けられるのを
+拒否する fail-closed gate（`bin/check-invocation-path.sh`）を伴う。
+他のどの役割・adapter・sandbox mode にもこの経路は無い。第 2 軸
+（報告のみの軸）の例示として、`tech-lead` を除くすべての役割について:
 model は今なお役割自身の `agents/<role>.md` の pin から来る（issue
 **#236** はその pin の退役を追跡するが、対象は `claude-cli` に紐付く
 5 役割のみで `codex-reviewer` は除外）。宣言された effort は記録される
 がどの呼び出しにも適用されず、executor レベルの経路は resolution が
-制御していない。紐付けられた値はすべて宣言された値であって、実行された
-ものの観測ではない。reviewer 行自身の出荷時の既定とその理由は
+制御していない（`tech-lead` を除くいずれの役割についても）。紐付けられた
+値はすべて宣言された値であって、実行されたものの観測ではない——ただし
+`tech-lead` の別経路だけは例外で、そこでは resolved row の model 列が
+そのまま実際に走ったものになる。reviewer 行自身の出荷時の既定とその
+理由は
 [設計上の選択](#設計上の選択) を参照。
 
 ## run のリプレイ

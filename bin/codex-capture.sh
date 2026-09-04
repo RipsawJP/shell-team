@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # bin/codex-capture.sh — shared temp-capture hygiene helper for the `codex
 # exec` invocations used by agents/codex-reviewer.md (primary + adversarial
-# passes) and agents/drift-evaluator.md (semantic pass)
+# passes), agents/drift-evaluator.md (semantic pass), and the alternate-
+# executor invocation path recipe at
+# templates/prompt-blocks/alternate-executor-invocation.md (T-1118; #419)
 # (T-097, #303 / T-092b carve-out; T-098 validate/publish depth hardening;
 # T-107, #353 structural split — docs/specs/T-107-codex-capture-split.md).
 #

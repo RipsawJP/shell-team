@@ -273,12 +273,22 @@ run に届くのとまったく同じようにこれらにも届く。
 （invoke no bound role）ので、そこには resolution が解決すべきものが
 無い。
 
-第 2 の軸は**行われる呼び出しがどう実行されるか**。こちらで binding が
-変えるのは、`resolve-executor.sh` が解決して報告する値と**テレメトリ**が
-記録する値**だけ**であり（provider・model・effort・adapter のいずれも
-同じ）、実行そのものは何も変わらない。つまり別 executor への
-**呼び出し経路**は配線されない。この第 2 軸の具体例を 3 つ挙げる（網羅ではなく
-例示）。まず、役割が走る **model** は今なおその役割自身の
+第 2 の軸は**行われる呼び出しがどう実行されるか**。`tech-lead` 以外の
+すべての紐付け役割については、こちらで binding が変えるのは、
+`resolve-executor.sh` が解決して報告する値と**テレメトリ**が記録する値
+**だけ**であり（provider・model・effort・adapter のいずれも同じ）、
+実行そのものは何も変わらない。`tech-lead` はその開示された例外である。
+`tech-lead` を `codex-cli` adapter に紐付けると、このプロジェクト
+最初の——そして出荷済みの宣言を測定するかぎり唯一の——別 executor への
+呼び出し経路が配線される。これはちょうど 1 つの役割・1 つの
+adapter・1 つの sandbox mode に絞られている：`tech-lead` は `codex-cli`
+のもとで `--sandbox read-only` で走り、専用の recipe
+（`templates/prompt-blocks/alternate-executor-invocation.md`）と、
+write 権限または propose 権限を持つ役割が同じ形で紐付けられるのを
+拒否する fail-closed gate（`bin/check-invocation-path.sh`）を伴う。
+他のどの役割・adapter・sandbox mode にもこの経路は無い。この報告のみの
+軸の具体例を 3 つ挙げる（網羅ではなく例示、いずれも `tech-lead` を除く
+役割について）。まず、役割が走る **model** は今なおその役割自身の
 `agents/<role>.md` の pin から来る（resolved row からではない）。issue
 **#236** がその pin の退役を追跡するが、対象は `claude-cli` に紐付く
 5 役割のみで、`codex-reviewer` は意図的に除外される（その pin は Codex
@@ -287,11 +297,37 @@ CLI を呼び出す Claude 側の wrapper を設定するもので、レビュ�
 どの呼び出しにも適用されず、他に及ぶ影響は上記の `capability-unsupported`
 refusal だけである。adapter 定義が宣言しているのは effort の*機構*で
 あって、宣言は適用ではない。最後に、どの **executor**（provider と
-adapter）経由で役割が呼び出されるかは、どの役割についても resolution が
-経路制御しておらず、これを追跡する issue も存在しない。持ち帰るべき
-規則は、第 2 軸を列挙ではなく普遍形で述べたほうである。すなわち、
-紐付けられた値はすべて**宣言された値であって、実行されたものの観測では
-ない**。
+adapter）経由で役割が呼び出されるかは、`tech-lead` を除くどの役割に
+ついても resolution が経路制御しておらず、これを追跡する issue も
+存在しない。持ち帰るべき規則は、第 2 軸を列挙ではなく普遍形で述べた
+ほうである。すなわち、紐付けられた値はすべて**宣言された値であって、
+実行されたものの観測ではない**——ただし `tech-lead` の別経路だけは
+例外で、そこでは resolved row の model 列がそのまま実際に走ったものに
+なる。
+
+**`tech-lead` の別経路が立っている読み取り境界を、測定された幅のまま
+開示する。** Codex CLI 自体には読み取り範囲を制限する仕組みが無い。
+そのポリシーテキスト自身が sandbox は read access everywhere を
+許可すると明言しており、したがって `--sandbox read-only` は**書き込み**
+の境界であって、読み取りは CLI 自身の設計により制限されない——この
+ループの設定ミスではない。出荷済みの recipe はその上に測定済みの
+3 つの分離フラグ `--ignore-user-config`・`--ignore-rules`・
+`--ephemeral` を重ねる（測定を行ったホスト上で config 由来の plugin と
+hook を取り除く）。さらに、役割自身のファイルだけを唯一の
+instruction-bearing document とする 2 層構成の scope instruction を
+重ねる。どちらの層もこの隙間を完全には閉じない。3 つのフラグを
+すべてくぐり抜けて残る CLI 由来の instruction document が 1 つ測定
+されており、`<INSTRUCTIONS>` で wrap されていて、その正体は
+**undetermined** である。これを取り除く、あるいは特定するには
+クリーンな `CODEX_HOME` が要るが、この cut ではそれを見送っている——
+クリーンな `CODEX_HOME` 下での認証は未測定であり、認証できない
+executor は fallback ではなく `BLOCKED` になるため、未測定の認証経路に
+依存する first cut は自らの happy path として failure mode を出荷して
+しまう。したがって、この経路自身の記録が示すのは**事後の**監査証跡で
+あって、invocation の行のどこにも**強制**されている境界ではない。
+証跡がきれいであることは、証跡に不正な読み取りが現れていないという
+証拠であり、そのような読み取りが一度も起きなかったという証拠では
+決してない。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
