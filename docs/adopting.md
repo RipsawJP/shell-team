@@ -261,25 +261,66 @@ that hands the findings you accept to `/shell-team:run`. The two
 remaining commands, `/shell-team:loop-triage` and
 `/shell-team:team-init`, invoke no bound role at all, so there is
 nothing for resolution to resolve in them. **How a proceeding call is
-executed** — there the binding changes
+executed** — for every bound role other than `tech-lead`, the binding changes
 **only** what `resolve-executor.sh` resolves and reports and what
 **telemetry** records, provider, model, effort and adapter alike, and
-nothing about the execution itself, so no alternate-executor
-**invocation path** is wired. Three instances of that second axis,
+nothing about the execution itself. `tech-lead` is the disclosed
+exception: binding it to the `codex-cli` adapter wires this project's
+first — and, by measurement of the shipped declarations, only —
+alternate-executor invocation path, narrowed to exactly one role, one
+adapter and one sandbox mode — `tech-lead` runs under `codex-cli` in
+`--sandbox read-only`, with its own shipped recipe
+(`templates/prompt-blocks/alternate-executor-invocation.md`) and a
+fail-closed gate (`bin/check-invocation-path.sh`) that refuses a
+write-authority or propose-authority role bound the same way. No other
+role, adapter or sandbox mode has one. Three instances of the
+reporting-only axis, for every role other than `tech-lead` and
 illustrative rather than exhaustive: the **model** a role runs at still
 comes from that role's own `agents/<role>.md` pin, not from the resolved
 row — issue **#236** tracks retiring those pins, for the five
 `claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
 whose pin configures the Claude wrapper that shells out to the Codex CLI
-rather than the model that reviews; a declared **effort** is recorded on
-the span but applied to no call, its only other effect being the
-`capability-unsupported` refusal above — an adapter definition declares
-an effort *mechanism*, and declaring one is not applying it; and which
-**executor** — provider and adapter — a role is invoked through is not
-routed by resolution at all, for any role, with no issue tracking that.
-The rule to take away is the second axis stated universally rather than
-its list: every bound value is **declared, never an observation of what
-executed**.
+rather than the model that reviews; a declared **effort** no longer tells
+one story shared by every adapter, and which story applies depends on
+**dispatch shape**, not on the adapter token alone: on `tech-lead`'s
+alternate path — dispatched `sandbox-read-only` through the `codex-cli`
+recipe — the resolved value is **applied** to the invocation itself, as
+`-c model_reasoning_effort=<value>` gated on that adapter's own
+`cli-config-override` declaration; every other `codex-cli` row, including
+`codex-reviewer`'s own shipped default, which is dispatched
+`wrapper-hosted` through its own `agents/codex-reviewer.md` and never
+receives that recipe's line at all, and every `claude-cli` row, stays
+**recorded** on the span and applied to nothing, its only other effect
+being the `capability-unsupported` refusal above (#420); and which **executor**
+— provider and adapter — a role is invoked through
+is not routed by resolution at all, for any role other than `tech-lead`, with no
+issue tracking that. The rule to take away is the second axis stated
+universally rather than its list: every bound value is **declared, never
+an observation of what executed** — except `tech-lead`'s alternate path,
+where the resolved row's model column is what actually ran and, on a
+`codex-cli` row, its effort column is applied too.
+
+**The read boundary `tech-lead`'s alternate path stands on, disclosed at
+exactly the width it was measured.** The Codex CLI offers no read-scope
+control of its own: its own embedded policy text states plainly that the
+sandbox grants read access everywhere, so `--sandbox read-only` is a
+**write** boundary and reads are unconstrained by the CLI's own design,
+not by this loop's misconfiguration. The shipped recipe layers three
+measured isolation flags on top of that — `--ignore-user-config`,
+`--ignore-rules` and `--ephemeral` — which remove config-declared plugins
+and hooks on the host they were measured against, plus a two-tier scope
+instruction naming the role's own file as the sole instruction-bearing
+document. Neither layer closes the gap fully: a residual CLI-injected
+instruction document, wrapped in `<INSTRUCTIONS>`, is measured to survive
+all three flags, and its identity is **undetermined**. Removing or
+identifying it would need a clean `CODEX_HOME`, which this cut declines
+to run under — authentication under a clean `CODEX_HOME` is unmeasured,
+and an unauthenticated executor is `BLOCKED` rather than a fallback, so a
+first cut resting on an unmeasured auth path would ship a failure mode as
+its happy path. What this path's own record shows is therefore an audit
+trail taken **after the fact**, never a boundary **enforced** by
+anything on the invocation line: a clean trail is evidence that no
+unauthorized read appears in the trail, and never that none occurred.
 
 ## Conversational usage (no slash commands)
 

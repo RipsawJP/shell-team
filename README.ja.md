@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.5.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.5.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -171,7 +171,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 - **Loop 契約** — 各ループは TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT を `tasks/loops/*.contract.yaml` に宣言し、`bin/check-contract.sh` で lint。BUDGET ＋ STOP は必須。
 - **実行時ガードレール** — `bin/loop-guard.sh` が契約の BUDGET/STOP を実行時に強制（fail-closed な暴走 / 課金 kill-switch）。
 - **テレメトリ** — `/shell-team:run` が各フェーズで 1 `--span` 行、各ハンドオフで 1 `--event` 行（イベント語彙: `handoff|rework|gate|human|release`）を `bin/log-run.sh` で emit、`bin/check-run.sh` が JSONL を lint、`bin/gen-loop-replay.sh` がどちらの行種別も run-replay ページとして描画し直す（[run のリプレイ](#run-のリプレイ)参照）。run 横断のロールアップが、1 run ずつでは見えない系統的な問題も浮かび上がらせる。各 span 行は、どの役割インスタンスが生成したかを示す nullable な `--instance` discriminator も持ち、per-instance の fan-out でもハンドオフ記録がそれを生成したインスタンスに帰属できるようにする。すべての追記は、決して奪い取らないディレクトリロック（既定 10 秒の有界待機、`TEAM_LOG_LOCK_TIMEOUT` で上書き可能）の背後で直列化され、並行ライタが 1 行を混在させることはない——時間内にロックを獲得できない場合は何も書かずに exit 3 で終了し、行を破損させることはない。`--seq auto` は同じロックの下でファイル自身から `run_id` ごとの次のカウンタ値を導出し、自前のカウンタを持ちたくない呼び出し元に使える。
-- **フェーズ内 fan-out** — 機械的に列挙可能な検証作業を持つフェーズは、1 つの役割の N インスタンスへ分割し、`bin/aggregate-verdicts.sh` で N 個の per-instance 部分検証結果を 1 つの正統な verdict へ還元できる（直列実行の代わりに）。`bin/check-fanout-instances.sh` はその集約結果をこの fan-out 自身のテレメトリ行に結び付けて検証し、選択された各行が discriminator を持つこと・その discriminator が writer 自身の文法に従うこと・同じ id が 2 つ以上の異なる役割に跨って使われていないこと・テレメトリの instance 集合と集約結果が宣言する part 集合が双方向で一致することのいずれかが崩れれば、分類された exit code と空の stdout で refuse する。`verify-mechanism` refinement のメカニズムクラス sweep は既定で fan-out する: coordinating session が起動する harness-tracked のバックグラウンド shell slice として実行され、sub-agent-hosted になることはなく、launch record の audit-only な `- execution-host:` フィールドに記録される。他の検証作業で fan-out を使うかどうかは、依然として Validate フェーズの中でタスクごとに明示的に選ぶ。degree の決定則・liveness の要件・テレメトリ規約は run skill 自身の fan-out ステップを参照。起動前にオーケストレーターが書く**launch record**は `<runs>/fanout-<label>.launch` に置かれ、population・requested/achieved の N・cap の根拠・per-unit の assign・per-instance の liveness をバージョン付き終端宣言として記録する——ゲートされる各フィールドは上記 2 つのチェッカーの引数そのものなので、第三のチェッカーはこれを読まない。
+- **フェーズ内 fan-out** — 機械的に列挙可能な検証作業を持つフェーズは、1 つの役割の N インスタンスへ分割し、`bin/aggregate-verdicts.sh` で N 個の per-instance 部分検証結果を 1 つの正統な verdict へ還元できる（直列実行の代わりに）。`bin/check-fanout-instances.sh` はその集約結果をこの fan-out 自身のテレメトリ行に結び付けて検証し、選択された各行が discriminator を持つこと・その discriminator が writer 自身の文法に従うこと・同じ id が 2 つ以上の異なる役割に跨って使われていないこと・テレメトリの instance 集合と集約結果が宣言する part 集合が双方向で一致することのいずれかが崩れれば、分類された exit code と空の stdout で refuse する。`verify-mechanism` refinement のメカニズムクラス sweep は既定で fan-out する: coordinating session が起動する harness-tracked のバックグラウンド shell slice として実行され、sub-agent-hosted になることはなく、launch record の audit-only な `- execution-host:` フィールドに記録される。他の検証作業で fan-out を使うかどうかは、`tech-lead` が Plan で決める `verify` 軸の dispatch 決定であり、オーケストレーターがそれを Specify-to-Implement seam でタスクのボードエントリへ転記し、Validate フェーズ自身の fan-out ステップがそれを読む。degree の決定則・liveness の要件・テレメトリ規約は run skill 自身の fan-out ステップを参照。起動前にオーケストレーターが書く**launch record**は `<runs>/fanout-<label>.launch` に置かれ、population・requested/achieved の N・cap の根拠・per-unit の assign・per-instance の liveness をバージョン付き終端宣言として記録する——ゲートされる各フィールドは上記 2 つのチェッカーの引数そのものなので、第三のチェッカーはこれを読まない。
 - **状況依存ディスパッチ記録** — `tech-lead` の Routing Map が、タスクの implement フェーズと verify フェーズをどの機構で走らせるかを軸ごとに決定し、オーケストレーターがその決定をタスクのボードエントリへクローズド語彙の文法 `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>` のサブ箇条書きとして転記する。`bin/close-out.sh` は存在する各サブ箇条書きを検証し、不整合な記録（別の軸の値、重複した軸、クローズドセット外の軸、不正な modality、priced-line の接頭辞を持たない ground）は refuse する——1 つも無いエントリはそのまま close-out できる。あるタスクの検証責務が fixture-suite の半分とメカニズムクラスの full-population diff の半分を束ねている場合、`verify-fixture` と `verify-mechanism` の refinement キーが単一の `verify` 行の代わりに各半分を独立に値付けする——エントリは親の `verify` キーかその refinement の 1 つ以上のどちらかを記録し、両方を記録することはない。`bin/close-out.sh` はさらに、Active の flag がまだ `READY_FOR_MERGE`（cross-provider review が APPROVE 時に書く唯一の状態）でないエントリの昇格を拒否し（exit 1、ボードは byte 単位で無変更）、`--issue` が省略された場合は `develop` へのマージが issue を自動クローズしない旨を 1 行のノートとして出力する（手動クローズ手順を黙ってスキップする代わりに）。
 - **クロスタスク dispatch-reflection** — 上記の dispatch record を転記する前に、オーケストレーターは直前のタスクのボードエントリを一読し、軸ごとにこのタスクがそれを踏襲したか乖離したかを記録する: `- dispatch-reflection: <axis> — <predecessor> — <repeat|differs|no-predecessor-row> — <ground>`。タスクに前段が全く無い場合は軸ごとの行の代わりに `- dispatch-reflection: all — no-predecessor — no-predecessor-row — <ground>` の 1 行のみを記録する。`bin/check-entry-mode.sh` はこのファミリーが存在する時にそれを検証する——エントリ自身の dispatch 行が記録する各軸に対応する reflection 行が無ければならず、同じ軸が 2 回現れてはならず、記された verdict は前段エントリ自身が記録したその軸の値と一致していなければならない（前段は board の active セクション・done セクションのどちらかでちょうど 1 件の top-level エントリへ解決される）——一方、reflection 行を 1 つも持たないエントリはそのまま通る。
 - **spec authorship も dispatch 軸の一つ** — `specify` 軸は `pm-authored`（出荷時デフォルト: `pm-spec` が spec を書く）と `operator-authored`（coordinating session が既に spec を書いている状態。典型的には judgment-density のボトルネックにより authorship を委譲する価値が無い場合——[spec を誰が書くかを選ぶ](docs/adopting.ja.md#spec-を誰が書くかを選ぶt-1091)を参照）の 2 値に閉じている。どちらの場合も loop の machinery——freeze sweep・2 つの review gate・interventions ledger——はそのまま走る。`operator-authored` 側では `pm-spec` が author ではなく conformance formatter として参加する。
@@ -201,16 +201,38 @@ fail-closed な refusal・各 adapter 自身の effort 値は、
 各役割の invocation の直前に走り、refusal はフォールバックせず
 フェーズを停止させる。したがって rebind によって呼び出しを完全に
 止められる。第 2 の軸は、行われる
-呼び出しが**どう実行されるか**で、binding はこれを決して変えない。
-そちらで動くのは resolution が報告する値と**テレメトリ**が記録する値
-だけ（provider・model・effort・adapter のいずれも同じ）であり、別
-executor への**呼び出し経路**は配線されない。第 2 軸の例示として、
+呼び出しが**どう実行されるか**で、`tech-lead` 以外のすべての紐付け役割
+について binding はこれを決して変えない。そちらで動くのは resolution
+が報告する値と**テレメトリ**が記録する値だけ（provider・model・
+effort・adapter のいずれも同じ）であり、実行そのものには手を加えない。
+`tech-lead` はその開示された例外である：`tech-lead` を `codex-cli`
+adapter に紐付けると、このプロジェクト最初の——そして出荷済みの宣言を
+測定するかぎり唯一の——別 executor への呼び出し経路が配線される。
+これはちょうど 1 つの役割・1 つの adapter・1 つの sandbox mode に
+絞られており、`tech-lead` は `codex-cli` のもとで `--sandbox
+read-only` で走る。専用の recipe
+（`templates/prompt-blocks/alternate-executor-invocation.md`）と、
+write 権限または propose 権限を持つ役割が同じ形で紐付けられるのを
+拒否する fail-closed gate（`bin/check-invocation-path.sh`）を伴う。
+他のどの役割・adapter・sandbox mode にもこの経路は無い。第 2 軸
+（報告のみの軸）の例示として、`tech-lead` を除くすべての役割について:
 model は今なお役割自身の `agents/<role>.md` の pin から来る（issue
 **#236** はその pin の退役を追跡するが、対象は `claude-cli` に紐付く
-5 役割のみで `codex-reviewer` は除外）。宣言された effort は記録される
-がどの呼び出しにも適用されず、executor レベルの経路は resolution が
-制御していない。紐付けられた値はすべて宣言された値であって、実行された
-ものの観測ではない。reviewer 行自身の出荷時の既定とその理由は
+5 役割のみで `codex-reviewer` は除外）。宣言された effort（#420） はもはや adapter
+を問わず一様ではない——どちらの話になるかは **dispatch の形**にも左右
+される：`tech-lead` の別経路——`codex-cli` の recipe を通じて
+`sandbox-read-only` で dispatch される——では値が実際の呼び出しに
+**適用**される（`-c model_reasoning_effort=<value>` として、その adapter
+自身の `cli-config-override` 宣言に紐付く）#420。それ以外の
+`codex-cli` の行——出荷時既定の `codex-reviewer` 自身の行を含め、これは
+自身の `agents/codex-reviewer.md` を通じて `wrapper-hosted` で dispatch
+され、その recipe の行を一切受け取らない——と、すべての `claude-cli` の
+行は、**記録**されるだけで何にも適用されない。executor レベルの経路は
+resolution が制御していない（`tech-lead` を除くいずれの役割についても）。紐付けられた
+値はすべて宣言された値であって、実行されたものの観測ではない——ただし
+`tech-lead` の別経路だけは例外で、そこでは resolved row の model 列が
+そのまま実際に走ったものになる。reviewer 行自身の出荷時の既定とその
+理由は
 [設計上の選択](#設計上の選択) を参照。
 
 ## run のリプレイ

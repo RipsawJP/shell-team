@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.5.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.5.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -171,7 +171,7 @@ The agent pipeline above is the **inner loop**. An **outer loop** of operating d
 - **Loop contracts** — every loop declares TRIGGER/SCOPE/ACTION/BUDGET/STOP/REPORT in `tasks/loops/*.contract.yaml`; `bin/check-contract.sh` lints them. BUDGET + STOP are mandatory.
 - **Runtime guardrails** — `bin/loop-guard.sh` enforces the contract's BUDGET/STOP at run time (a fail-closed runaway / billing kill-switch).
 - **Telemetry** — `/shell-team:run` emits one `--span` row per phase and one `--event` row per hand-off (event vocabulary: `handoff|rework|gate|human|release`) via `bin/log-run.sh`; `bin/check-run.sh` lints the JSONL, `bin/gen-loop-replay.sh` renders either kind back as a run-replay page (see [Replaying a run](#replaying-a-run)), and cross-run roll-ups surface systemic issues instead of showing up one run at a time. Each span row also carries a nullable `--instance` discriminator naming which instance of a role produced it, so a per-instance fan-out's hand-off records stay attributable to the instance that emitted them. Every append is serialized behind a never-stealing directory lock (default 10s bounded wait, overridable via `TEAM_LOG_LOCK_TIMEOUT`) so concurrent writers can't interleave a row — a lock that can't be acquired in time writes nothing and exits 3 rather than tearing a row — and `--seq auto` derives the next counter per `run_id` from the file itself under that same lock, for a caller that doesn't want to carry its own counter.
-- **Within-phase fan-out** — a phase whose own verification work is mechanically enumerable can split it across N instances of one role and reduce the N per-instance partial verdicts to one authoritative verdict with `bin/aggregate-verdicts.sh`, rather than run serially. `bin/check-fanout-instances.sh` then ties the fan-out's own telemetry rows to that merged verdict, refusing (a classified exit code, empty stdout) unless every selected row carries a discriminator, every discriminator conforms to the writer's own grammar, no id is claimed by two different roles, and the telemetry's instance set and the merged record's declared part set agree in both directions. The `verify-mechanism` refinement's mechanism-class sweeps now fan-out by default: they run as harness-tracked background shell slices launched by the coordinating session, never sub-agent-hosted, recorded on the launch record's audit-only `- execution-host:` field; using fan-out for other verification work is still an explicit per-task choice made inside the Validate phase, where the run skill's own fan-out step documents the degree rule, the liveness requirement and the telemetry convention. Before launching, the orchestrator writes a **launch record** at `<runs>/fanout-<label>.launch` — a versioned, terminated declaration of the population, the requested/achieved N, the cap's ground, the per-unit assignment and per-instance liveness — whose gated fields are already arguments to the two checkers above, so no third checker reads it.
+- **Within-phase fan-out** — a phase whose own verification work is mechanically enumerable can split it across N instances of one role and reduce the N per-instance partial verdicts to one authoritative verdict with `bin/aggregate-verdicts.sh`, rather than run serially. `bin/check-fanout-instances.sh` then ties the fan-out's own telemetry rows to that merged verdict, refusing (a classified exit code, empty stdout) unless every selected row carries a discriminator, every discriminator conforms to the writer's own grammar, no id is claimed by two different roles, and the telemetry's instance set and the merged record's declared part set agree in both directions. The `verify-mechanism` refinement's mechanism-class sweeps now fan-out by default: they run as harness-tracked background shell slices launched by the coordinating session, never sub-agent-hosted, recorded on the launch record's audit-only `- execution-host:` field; using fan-out for other verification work is a Plan-time `verify`-axis dispatch decision `tech-lead` elects and the orchestrator transcribes onto the task's board entry at the Specify-to-Implement seam, which the Validate phase's own fan-out step then reads — see its degree rule, liveness requirement and telemetry convention. Before launching, the orchestrator writes a **launch record** at `<runs>/fanout-<label>.launch` — a versioned, terminated declaration of the population, the requested/achieved N, the cap's ground, the per-unit assignment and per-instance liveness — whose gated fields are already arguments to the two checkers above, so no third checker reads it.
 - **Situational dispatch record** — `tech-lead`'s Routing Map decides, per axis, which mechanism runs a task's implement phase and which runs its verify phase, and the orchestrator transcribes each decision onto the task's board entry under the closed-vocabulary grammar `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>`. `bin/close-out.sh` validates every such sub-bullet when present and refuses a malformed one (a value from another axis's set, a duplicated axis, an axis outside the closed set, a bad modality, or a ground with no priced-line prefix) — an entry carrying none of them still closes out. When a task's verification duty bundles a fixture-suite half with a mechanism-class full-population diff, the `verify-fixture` and `verify-mechanism` refinement keys price each half independently in place of the single `verify` row — an entry records the parent `verify` key or one or more of its refinements, never both. `bin/close-out.sh` also refuses (exit 1, board byte-untouched) to promote an entry whose Active flag is not already `READY_FOR_MERGE` — the one state the cross-provider review writes on APPROVE — and, when `--issue` is omitted, prints a one-line note that a `develop` merge does not auto-close the issue, instead of silently skipping the manual close procedure.
 - **Cross-task dispatch reflection** — before transcribing the dispatch record above, the orchestrator skims the immediately preceding task's own board entry and records, per axis, whether this task repeats or diverges from what that predecessor elected: `- dispatch-reflection: <axis> — <predecessor> — <repeat|differs|no-predecessor-row> — <ground>`, or the single `- dispatch-reflection: all — no-predecessor — no-predecessor-row — <ground>` line where the task has no predecessor at all. `bin/check-entry-mode.sh` validates this family when it is present — every axis the entry's own dispatch rows record must carry a matching reflection row, no axis may appear twice, and a stated verdict must agree with the predecessor entry's own recorded value for that axis, the predecessor resolved to exactly one top-level board entry in either the active or the done section of the board — while an entry carrying no reflection line at all still passes.
 - **Spec authorship as a dispatch axis** — `specify`, closed over `pm-authored` (the shipped default: `pm-spec` writes the spec) and `operator-authored` (the coordinating session has already written it, typically because a judgment-density bottleneck made delegating authorship worthless — see [Choosing who authors the spec](docs/adopting.md#choosing-who-authors-the-spec-t-1091)). Either way the loop's machinery — the freeze sweep, both review gates, the interventions ledger — runs unchanged; `pm-spec` participates as a conformance formatter rather than an author in the `operator-authored` branch.
@@ -189,29 +189,43 @@ Each of the six inner-loop roles — `tech-lead`, `pm-spec`, `engineer`,
 `qa-verifier`, `codex-reviewer`, `ui-designer` — is host-assignable to a
 specific executor (provider + model + effort + adapter) through a
 `<base>/binding.conf`; with no host config, the plugin-shipped
-`templates/binding-default.conf` is the **shipped default**. The how-to,
-the config grammar, the fail-closed refusals and each adapter's own
-effort values live in [docs/adopting.md](docs/adopting.md) — the single
-canonical detail surface for this mechanism — and in `bash
-resolve-executor.sh --help`, which is that script's own header and
-cannot drift from it. **The honest boundary** has two axes: the binding
-gates **whether** a call proceeds in the loops that consult it — in
-`/shell-team:run`, `/shell-team:goal`, `/shell-team:review` and
-`/shell-team:review-response` alike, resolution runs immediately before
-each bound role's invocation and a refusal stops the phase rather than
-falling back, so a rebind can stop a call outright — and it never
-changes **how** a
-proceeding call is executed, where it moves only what resolution reports
-and what **telemetry** records, provider, model, effort and adapter
-alike, so no
-alternate-executor **invocation path** is wired. Illustratively, on that
-second axis: the model still comes from the role's own `agents/<role>.md`
-pin (issue **#236** tracks retiring those pins for the five
-`claude-cli`-bound roles only, `codex-reviewer` excluded), a declared
-effort is recorded but applied to no call, and executor-level routing is
-not resolved at all. Every bound value is declared, never an observation
-of what executed. See [Design choices](#design-choices) for the reviewer
-row's own shipped default and its rationale.
+`templates/binding-default.conf` is the **shipped default**. The how-to, the
+config grammar, the fail-closed refusals and each adapter's own effort values
+live in [docs/adopting.md](docs/adopting.md) — the single canonical detail
+surface for this mechanism — and in `bash resolve-executor.sh --help`, which is
+that script's own header and cannot drift from it. **The honest boundary** has
+two axes: the binding gates **whether** a call proceeds in the loops that
+consult it — in `/shell-team:run`, `/shell-team:goal`, `/shell-team:review` and
+`/shell-team:review-response` alike, resolution runs immediately before each
+bound role's invocation and a refusal stops the phase rather than falling back,
+so a rebind can stop a call outright — and, for every bound role other than
+`tech-lead`, it never changes **how** a proceeding call is executed, where it
+moves only what resolution reports and what **telemetry** records, provider,
+model, effort and adapter alike. `tech-lead` is the disclosed exception: this
+project ships exactly one alternate-executor invocation path, narrowed to one
+role, one adapter and one sandbox mode — a host that binds `tech-lead` to the
+`codex-cli` adapter runs it in `--sandbox read-only`, with its own recipe and a
+fail-closed refusal that keeps a write-authority role out of it; no other role,
+adapter or sandbox mode has one (see [docs/adopting.md](docs/adopting.md) for
+the recipe and its refusal tokens). Illustratively, on the reporting-only axis,
+for every role other than `tech-lead`: the model still comes from the role's
+own `agents/<role>.md` pin (issue **#236** tracks retiring those pins for the
+five `claude-cli`-bound roles only, `codex-reviewer` excluded), and
+executor-level routing is not resolved at all. A declared effort is no
+longer a single story shared by every adapter this project ships, and
+which story applies depends on **dispatch shape**, not on the adapter
+token alone: on `tech-lead`'s alternate path — dispatched
+`sandbox-read-only` through the `codex-cli` recipe — the value is now
+**applied** to the invocation, as `-c model_reasoning_effort=<value>`
+gated on that adapter's own `cli-config-override` declaration; every
+other `codex-cli` row, including the shipped default's own
+`codex-reviewer`, which is dispatched `wrapper-hosted` through its own
+`agents/codex-reviewer.md` and never receives that recipe's line at all,
+and every `claude-cli` row, stays **recorded** and applied to nothing. Every
+bound value is declared, never an observation of what executed — except
+`tech-lead`'s alternate path, where the resolved row's model column is what
+actually ran and, on a `codex-cli` row, its effort column is applied too. See [Design choices](#design-choices) for the
+reviewer row's own shipped default and its rationale.
 
 ## Replaying a run
 

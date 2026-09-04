@@ -52,3 +52,4 @@ marker  playbook-pm-spec.md                agents/pm-spec.md
 contain fanout-orchestration.md            skills/run/SKILL.md
 contain dispatch-record.md                 agents/tech-lead.md skills/run/SKILL.md
 contain means-ends-reflection.md           skills/run/SKILL.md skills/goal/SKILL.md
+contain alternate-executor-invocation.md   skills/run/SKILL.md
