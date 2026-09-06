@@ -75,11 +75,12 @@ on your board with the four answers as its ground, rather than being
 escalated as one option beside a cheaper-looking patch. Escalation to you
 stays mandatory whenever one of those three conditions fails, whenever the
 disposition itself would be destructive or irreversible, or whenever the
-finding set is empty or not yet classified. What the loop actually
-guarantees is unchanged: it never merges on its own — merging is a human
-action — and it stops before a destructive or irreversible operation. Any
-further stop is whatever the operator's own oversight configuration adds;
-see [Tuning how often the team stops to ask](tuning-oversight.md). This
+finding set is empty or not yet classified. What the loop's fixed layer
+guarantees is unchanged: a task is done only when both gates are green, and
+it never merges on its own — merging is a human action. Any further stop —
+including one before a destructive or irreversible operation — is whatever
+the operator's own oversight configuration adds; see [Tuning how often the
+team stops to ask](tuning-oversight.md). This
 mechanism only changes what the loop will and will not interrupt you for
 at those three firing points. See
 [`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)

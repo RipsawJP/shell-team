@@ -851,11 +851,11 @@ notice を発行する: 英語で述べられ、裸の "proceed?" では決し�
 の必須要素——作業が exceeds the approved estimate（承認済みの見積りを
 超えたこと）、continue-or-stop の問い、そして根拠を伴う recommendation
 ——のすべてを運ぶ。この停止は新しい gate を追加しない: loop が merge の
-前に必ず従っている同じ authority——merge は人間の行為であり、破壊的・
-不可逆な操作の前にも loop は同じように停止する——が、承認済みの
-release-tier premise が失効した時点で再び働いているだけである。それを
-超える停止が入るかどうかは the operator's own oversight configuration
-が追加するものに委ねられる（詳細は
+前に必ず従っている同じ authority——merge は人間の行為である——が、承認済みの
+release-tier premise が失効した時点で再び働いているだけである。破壊的・
+不可逆な操作の前の停止を含め、それを超える停止が入るかどうかは
+the operator's own oversight configuration が追加するものに委ねられる
+（詳細は
 [チームが確認で止まる頻度を調整する](tuning-oversight.ja.md) を参照）。
 derived tier が承認済み premise と一致しないということは、その approval
 が lapse した（失効した）ことを意味するからである。新しい status flag も

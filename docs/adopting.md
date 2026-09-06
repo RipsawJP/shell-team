@@ -887,11 +887,11 @@ task and issues a deviation notice: stated in English, never a bare
 work now exceeds the approved estimate, the continue-or-stop question,
 and a recommendation with its rationale. This stop adds no new gate: it
 is the same authority the loop already defers to before it merges —
-merging is a human action, and the loop stops before a destructive or
-irreversible operation the same way — reasserting itself once the
-approved release-tier premise no longer holds; any further stop beyond
-that authority is whatever the operator's own oversight configuration
-adds (see [Tuning how often the team stops to ask](tuning-oversight.md)).
+merging is a human action — reasserting itself once the
+approved release-tier premise no longer holds; any further stop, including
+one before a destructive or irreversible operation, is whatever
+the operator's own oversight configuration adds (see [Tuning how often
+the team stops to ask](tuning-oversight.md)).
 No new status flag and no new phase are added.
 
 Enforcement today is a **duty, not a checker**: the coordinating
