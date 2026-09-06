@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1127** `docs/history.md`'s `## Status` stops pinning a release-line version that goes stale, in both language versions — `READY_FOR_QA` — spec: .shell-team/specs/T-1127-history-status-stale-version.md
+- [ ] **T-1127** `docs/history.md`'s `## Status` stops pinning a release-line version that goes stale, in both language versions — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1127-history-status-stale-version.md
   - freeze-attestation (v1, 2026-09-06): lines=5/5 sweep=mutual-satisfiability verdict=2P/3F owner=coordinating session (Fable 5.1 orchestrator). All 5 `- check:` lines run live under `bash` (BSD grep, BWK awk) against the frozen pre-implementation tree `6c8d142` (`check-acs: 2 passed, 3 failed`). Green at base: the negative preservation locks (**AC3**, **AC4**). Red at base for the intended cause only: **AC5** (the scope lock asserts the changed set is exactly the two history files, and at base that set is empty — it turns green only once the two files change and nothing else does), **AC1** (stale literal present at `docs/history.md:26` / `docs/history.ja.md:26`), **AC2** (`.claude-plugin/plugin.json` not yet named in either file). Recorded under the sprint's operator-approved lightweight mode (2026-09-06T15:04Z): one freeze, no per-task sweep agent.
   - intent-hash (v1): fb78b832aa2b81dd054688f4fd17f715f3eb2263
   - stacked-on: `feature/444-method-neutral-gates` at `8cfe1ea73b8a123a942aad4d640f18a3dc71463b` (PR #446, open) — read first-hand from `.git/refs/heads/`; no 40-hex literal enters any criterion, because the `- base-ref-discriminator:` expression resolves the branch point live with `git merge-base` behind a `git show-ref --verify` existence test.
@@ -25,6 +25,21 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - engineer: `bash bin/check-provenance.sh .shell-team/provenance/T-1127.md` → `conformant (0 decision entries, 1 sentinel)`, exit 0 — no non-trivial decisions (wording fully constrained by the frozen ACs).
   - engineer: files changed: `docs/history.md`, `docs/history.ja.md`, `.shell-team/provenance/T-1127.md`, `.shell-team/todo.md`. No test suite applies (no-mechanism, prose-only task); the 5 ACs are the full verification surface.
   - engineer: notes for QA — the Japanese sentence is a natural mirror, not a literal translation, and shares the machine token `.claude-plugin/plugin.json` with the English sentence per AC2.
+
+### QA verification — T-1127 (qa-verifier)
+
+- Task: T-1127 → READY_FOR_REVIEW
+- 5/5 `- check:` lines run verbatim: AC1 exit 1 (clean absence, correct per contract) → PASS, AC2 exit 0 → PASS, AC3 exit 0 → PASS, AC4 exit 0 → PASS, AC5 exit 0 (base resolved to `8cfe1ea73b8a123a942aad4d640f18a3dc71463b`, changed set exactly `docs/history.md docs/history.ja.md`) → PASS.
+- `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1127.md` → `conformant (0 decision entries, 1 sentinel)`, exit 0.
+- `bash bin/check-interventions.sh --task T-1127 -- .shell-team/interventions/T-1127.md` → `conformant (0 entries, 1 sentinel)`, exit 0.
+- `bash bin/check-intent.sh .shell-team/specs/T-1127-history-status-stale-version.md .shell-team/todo.md` → `aligned: T-1127 v1 (fb78b832aa2b81dd054688f4fd17f715f3eb2263)`, exit 0.
+- Reader check on `docs/history.md` `## Status` and `docs/history.ja.md` `## ステータス`: first sentence in both now points at `.claude-plugin/plugin.json` without pinning any version; second sentence verbatim in both languages (`board, specs, and reviews under version control` / `board・spec・review をバージョン管理下に置き`); `## Status` / `## ステータス` headings intact; `## The Oversight-model evolution (v0.3.0)` / `## Oversight モデル進化（v0.3.0）` chapter headings intact; Japanese first sentence reads naturally.
+- Diff scope confirmed by AC5's own check: outside `.shell-team/`, only `docs/history.md` and `docs/history.ja.md` changed relative to predecessor tip `8cfe1ea`.
+- Verification ceiling: unit-and-static — every criterion is a fixed-string grep or a byte-scoped diff over this checkout; none needs a real adopter environment, and none is marked above the ceiling — verifies every criterion at or below that level; none above this ceiling.
+- No production edits made; test-only/record edits: none beyond this board append.
+- Adversarial fixture synthesis checklist: not applicable — deliverable is prose-only (two documentation files, no executable artifact, no runnable-command claim).
+- Risk notes for reviewer: none.
 
 ### QA verification — T-1126 round 2 (qa-verifier)
 
