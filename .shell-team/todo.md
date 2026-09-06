@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1127** `docs/history.md`'s `## Status` stops pinning a release-line version that goes stale, in both language versions — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1127-history-status-stale-version.md
+- [ ] **T-1127** `docs/history.md`'s `## Status` stops pinning a release-line version that goes stale, in both language versions — `READY_FOR_QA` — spec: .shell-team/specs/T-1127-history-status-stale-version.md
   - freeze-attestation (v1, 2026-09-06): lines=5/5 sweep=mutual-satisfiability verdict=2P/3F owner=coordinating session (Fable 5.1 orchestrator). All 5 `- check:` lines run live under `bash` (BSD grep, BWK awk) against the frozen pre-implementation tree `6c8d142` (`check-acs: 2 passed, 3 failed`). Green at base: the negative preservation locks (**AC3**, **AC4**). Red at base for the intended cause only: **AC5** (the scope lock asserts the changed set is exactly the two history files, and at base that set is empty — it turns green only once the two files change and nothing else does), **AC1** (stale literal present at `docs/history.md:26` / `docs/history.ja.md:26`), **AC2** (`.claude-plugin/plugin.json` not yet named in either file). Recorded under the sprint's operator-approved lightweight mode (2026-09-06T15:04Z): one freeze, no per-task sweep agent.
   - intent-hash (v1): fb78b832aa2b81dd054688f4fd17f715f3eb2263
   - stacked-on: `feature/444-method-neutral-gates` at `8cfe1ea73b8a123a942aad4d640f18a3dc71463b` (PR #446, open) — read first-hand from `.git/refs/heads/`; no 40-hex literal enters any criterion, because the `- base-ref-discriminator:` expression resolves the branch point live with `git merge-base` behind a `git show-ref --verify` existence test.
@@ -20,6 +20,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - source: GitHub issue #445; sprint "method-neutral", operator-approved lightweight mode (2026-09-06T15:04Z) — pm-authored spec, one freeze, no cross-provider spec-review round, no per-task freeze or blast-radius sweep (one sprint-level sweep before release).
   - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default (`docs/loop-engineering/specify-seam-review.md:64`) — the sprint's operator-approved lightweight mode (method-neutral, approved 2026-09-06T15:04Z) removes the cross-provider spec-review round for its wording-only tasks; every premise of this spec is measurable in-repo.
   - pm-spec: spec frozen with intent markers in place; 5 acceptance criteria, all fixed-string presence/absence greps plus one byte-scoped diff (`verification-class: no-mechanism` — the diff touches only `docs/`). Declaration region carries `user-visible: yes`, `verification-class`, `base-ref-discriminator` (two-arm, stacked behind PR #446) and `verification-ceiling: unit-and-static`.
+  - engineer: replaced the version-pinned first sentence in `docs/history.md:26` and `docs/history.ja.md:26` with wording anchored on `.claude-plugin/plugin.json`; second sentence and both headings left verbatim.
+  - engineer: all 5 `- check:` lines run live: AC1 exit 0, AC2 exit 0, AC3 exit 0, AC4 exit 0, AC5 exit 0 (base resolved via the two-arm discriminator to `8cfe1ea73b8a123a942aad4d640f18a3dc71463b`; changed set exactly `docs/history.md docs/history.ja.md`).
+  - engineer: `bash bin/check-provenance.sh .shell-team/provenance/T-1127.md` → `conformant (0 decision entries, 1 sentinel)`, exit 0 — no non-trivial decisions (wording fully constrained by the frozen ACs).
+  - engineer: files changed: `docs/history.md`, `docs/history.ja.md`, `.shell-team/provenance/T-1127.md`, `.shell-team/todo.md`. No test suite applies (no-mechanism, prose-only task); the 5 ACs are the full verification surface.
+  - engineer: notes for QA — the Japanese sentence is a natural mirror, not a literal translation, and shares the machine token `.claude-plugin/plugin.json` with the English sentence per AC2.
 
 ### QA verification — T-1126 round 2 (qa-verifier)
 
