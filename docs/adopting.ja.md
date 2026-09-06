@@ -838,24 +838,27 @@ verdict では決してなく、derived tier は `MAJOR` / `MINOR` / `PATCH` の
 れ、後続の checker がこの family を present なときだけ検証できるように
 しつつ、この行を一切持たない entry も引き続き pass する。両者の間にある
 `premise=` field は self-contained であることが要求される: それは
-expected tier と、その planning approval が承認された根拠の両方を運び、
+expected tier と、その approval が承認された根拠の両方を運び、
 後の読者が開けない approval への裸の pointer には決してならない。
-repository に承認済みの planning premise が記録されていない場合——
+repository に承認済みの release-tier premise が記録されていない場合——
 adopter が一度も設定していない場合の既定の姿——比較対象がそもそも無く、
 これは freeze を拒否する理由には決してならず、record は
 `verdict=no-premise-on-record` として書かれ続ける。
 
-derived tier が repository の承認済み planning premise と一致しない場
-合、freeze はそのタスクへのそれ以上の作業の前に停止し、deviation
+derived tier が repository の承認済み release-tier premise と一致しな
+い場合、freeze はそのタスクへのそれ以上の作業の前に停止し、deviation
 notice を発行する: 英語で述べられ、裸の "proceed?" では決してなく、3 つ
 の必須要素——作業が exceeds the approved estimate（承認済みの見積りを
 超えたこと）、continue-or-stop の問い、そして根拠を伴う recommendation
-——のすべてを運ぶ。この停止は not a fourth human gate（第 4 の human
-gate ではない）: これは re-enters the existing planning-approval gate
-（既存の planning-approval gate に再突入する）——このループがすでに宣言
-している 3 つの standing human gate のうちの 1 つ——である。derived
-tier が承認済み premise と一致しないということは、その approval が
-lapse した（失効した）ことを意味するからである。新しい status flag も
+——のすべてを運ぶ。この停止は新しい gate を追加しない: loop が merge の
+前に必ず従っている同じ authority——merge は人間の行為であり、破壊的・
+不可逆な操作の前にも loop は同じように停止する——が、承認済みの
+release-tier premise が失効した時点で再び働いているだけである。それを
+超える停止が入るかどうかは the operator's own oversight configuration
+が追加するものに委ねられる（詳細は
+[チームが確認で止まる頻度を調整する](tuning-oversight.ja.md) を参照）。
+derived tier が承認済み premise と一致しないということは、その approval
+が lapse した（失効した）ことを意味するからである。新しい status flag も
 新しい phase も追加されない。
 
 現時点の強制は**チェッカーではなく duty** である: coordinating session

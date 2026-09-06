@@ -76,10 +76,14 @@ auxiliary component（複数ある場合は pre-commitment に記録された dr
 order 順）のみ、(3) その中で最も早い component に対して pre-priced
 disposition が存在する、である。3 条件のいずれかが成り立たない場合、
 disposition 自体が破壊的・不可逆な場合、または finding set が空か未分類
-の場合は、あなたへの escalation が引き続き必須となる。3 つの standing
-human gate——マージ前の batch GO、スプリントプランニングの承認、破壊的・
-不可逆な操作——は変わらない。この機構が変えるのは、この 3 地点で loop が
-あなたに割り込むか否かだけである。この reflection がこれまでのところ
+の場合は、あなたへの escalation が引き続き必須となる。loop が実際に保証
+するものは変わらない: loop は自分の判断だけで merge することはなく——
+merge は人間の行為である——破壊的・不可逆な操作の前には必ず停止する。
+それ以上の停止が入るかどうかは the operator's own oversight configuration
+が追加するものに委ねられる（詳細は
+[チームが確認で止まる頻度を調整する](tuning-oversight.ja.md) を参照）。
+この機構が変えるのは、この 3 地点で loop があなたに割り込むか否かだけで
+ある。この reflection がこれまでのところ
 拠って立つ唯一の worked example は
 [`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)
 を参照。

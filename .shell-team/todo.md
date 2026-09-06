@@ -11,10 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1126** Shipped docs, skills and prompt blocks stop asserting this repository's own sprint gate set as the adopter's default, and state what the loop actually guarantees — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1126-method-neutral-human-gates.md
+- [ ] **T-1126** Shipped docs, skills and prompt blocks stop asserting this repository's own sprint gate set as the adopter's default, and state what the loop actually guarantees — `READY_FOR_QA` — spec: .shell-team/specs/T-1126-method-neutral-human-gates.md
   - entry-mode: pm-authored
   - source: GitHub issue #444; sprint "method-neutral", operator-approved lightweight mode (2026-09-06T15:04Z) — pm-authored spec, one freeze, no cross-provider spec-review round, no per-task freeze or blast-radius sweep (one sprint-level sweep before release).
   - dispatch: spec-review — none — operator-approved lightweight mode (sprint method-neutral)
+  - engineer: reworded all 12 measured occurrence sites (`docs/workflow.md`/`.ja.md`, `docs/adopting.md`/`.ja.md`, `skills/run/SKILL.md`, `skills/goal/SKILL.md`, `templates/prompt-blocks/means-ends-reflection.md`, `templates/prompt-blocks/fanout-orchestration.md`); AC1–AC8 all exit 0, `bash bin/check-prompt-sync.sh` exit 0 (see hand-off for the full 8-exit-code table and commit SHA). Provenance: `.shell-team/provenance/T-1126.md` (2 decision entries, `check-provenance.sh` conformant).
 
 
 ### QA verification — T-1120 (qa-verifier)
