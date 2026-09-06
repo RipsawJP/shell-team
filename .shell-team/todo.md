@@ -11,6 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1126** Shipped docs, skills and prompt blocks stop asserting this repository's own sprint gate set as the adopter's default, and state what the loop actually guarantees — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1126-method-neutral-human-gates.md
+  - entry-mode: pm-authored
+  - source: GitHub issue #444; sprint "method-neutral", operator-approved lightweight mode (2026-09-06T15:04Z) — pm-authored spec, one freeze, no cross-provider spec-review round, no per-task freeze or blast-radius sweep (one sprint-level sweep before release).
+  - dispatch: spec-review — none — operator-approved lightweight mode (sprint method-neutral)
+
 
 ### QA verification — T-1120 (qa-verifier)
 
