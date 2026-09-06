@@ -11,6 +11,13 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1127** `docs/history.md`'s `## Status` stops pinning a release-line version that goes stale, in both language versions — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1127-history-status-stale-version.md
+  - stacked-on: `feature/444-method-neutral-gates` at `8cfe1ea73b8a123a942aad4d640f18a3dc71463b` (PR #446, open) — read first-hand from `.git/refs/heads/`; no 40-hex literal enters any criterion, because the `- base-ref-discriminator:` expression resolves the branch point live with `git merge-base` behind a `git show-ref --verify` existence test.
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: GitHub issue #445; sprint "method-neutral", operator-approved lightweight mode (2026-09-06T15:04Z) — pm-authored spec, one freeze, no cross-provider spec-review round, no per-task freeze or blast-radius sweep (one sprint-level sweep before release).
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default (`docs/loop-engineering/specify-seam-review.md:64`) — the sprint's operator-approved lightweight mode (method-neutral, approved 2026-09-06T15:04Z) removes the cross-provider spec-review round for its wording-only tasks; every premise of this spec is measurable in-repo.
+  - pm-spec: spec frozen with intent markers in place; 5 acceptance criteria, all fixed-string presence/absence greps plus one byte-scoped diff (`verification-class: no-mechanism` — the diff touches only `docs/`). Declaration region carries `user-visible: yes`, `verification-class`, `base-ref-discriminator` (two-arm, stacked behind PR #446) and `verification-ceiling: unit-and-static`.
 
 ### QA verification — T-1126 round 2 (qa-verifier)
 
