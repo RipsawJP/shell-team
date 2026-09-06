@@ -11,11 +11,37 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1126** Shipped docs, skills and prompt blocks stop asserting this repository's own sprint gate set as the adopter's default, and state what the loop actually guarantees — `READY_FOR_QA` — spec: .shell-team/specs/T-1126-method-neutral-human-gates.md
+- [ ] **T-1126** Shipped docs, skills and prompt blocks stop asserting this repository's own sprint gate set as the adopter's default, and state what the loop actually guarantees — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1126-method-neutral-human-gates.md
   - entry-mode: pm-authored
   - source: GitHub issue #444; sprint "method-neutral", operator-approved lightweight mode (2026-09-06T15:04Z) — pm-authored spec, one freeze, no cross-provider spec-review round, no per-task freeze or blast-radius sweep (one sprint-level sweep before release).
   - dispatch: spec-review — none — operator-approved lightweight mode (sprint method-neutral)
   - engineer: reworded all 12 measured occurrence sites (`docs/workflow.md`/`.ja.md`, `docs/adopting.md`/`.ja.md`, `skills/run/SKILL.md`, `skills/goal/SKILL.md`, `templates/prompt-blocks/means-ends-reflection.md`, `templates/prompt-blocks/fanout-orchestration.md`); AC1–AC8 all exit 0, `bash bin/check-prompt-sync.sh` exit 0 (commit `343009c`). Provenance: `.shell-team/provenance/T-1126.md` (2 decision entries, `check-provenance.sh` conformant).
+
+### QA verification — T-1126 (qa-verifier)
+
+**Verdict: PASS.** `bash bin/check-acs.sh .shell-team/specs/T-1126-method-neutral-human-gates.md` → `check-acs: 8 passed, 0 failed, 0 skipped, 0 unrecognized` — AC1–AC8 each independently re-run by hand under `bash`, all exit 0 (`grep -c '^AC[0-9]*: PASS (exit 0)' <log>` = 8). `bash bin/check-prompt-sync.sh` → exit 0 (`all registered prompt blocks in sync`). `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0; `bash bin/check-handoff.sh templates/todo-template.md` → exit 0. No `bin/`/`tests/` diff exists (AC7), so the CI shellcheck list is unaffected by this change.
+
+**12-site reader judgment** (each: authority claim present — never merges on its own / merging is a human action / stops before destructive-or-irreversible — further stops pointed at the operator's own oversight configuration + `docs/tuning-oversight.md`, no interruption-at-merge promise reintroduced):
+1. `docs/workflow.md:78-82` — meets it.
+2. `docs/workflow.ja.md:79-84` — meets it; reads naturally in Japanese with the AC1-mandated English clause embedded verbatim, as the frozen check requires.
+3. `templates/prompt-blocks/means-ends-reflection.md:4` (canonical) — meets it.
+4–6. `skills/run/SKILL.md:85,105`, `skills/goal/SKILL.md:245` (contain-mode consumers of #3) — byte-identical to canonical, meets it.
+7. `templates/prompt-blocks/fanout-orchestration.md:19` (canonical, `invariant-lock: human-gate-set`) — meets it.
+8. `skills/run/SKILL.md:239` (consumer of #7) — meets it.
+9. `skills/run/SKILL.md:259` (hand-edited reconcile-step variant) — meets it, same authority phrasing.
+10. `skills/run/SKILL.md:57` (version-derivation gate paragraph) — no more "one of exactly three standing human gates"; now "the same authority the loop already defers to before it merges (`invariant-lock: human-gate-set`) reasserting itself" — meets it; renamed to "the repository's approved release-tier premise" throughout.
+11. `docs/adopting.md:868-895` — meets it; premise renamed consistently to "approved release-tier premise".
+12. `docs/adopting.ja.md:834-862` — meets it; natural Japanese, same rename, `version-derivation` field grammar identical to English.
+
+**Rename consistency**: `skills/run/SKILL.md`, `docs/adopting.md`, `docs/adopting.ja.md` all use "approved release-tier premise" (not "planning premise") at every site; confirmed the `- version-derivation (v<N>, YYYY-MM-DD): verdict=… derived=… headline=… default-reach=… premise=… grounds:` field grammar is byte-identical between `git merge-base develop HEAD` (`c585f17`) and HEAD in `skills/run/SKILL.md` (only the surrounding prose changed).
+
+**Summarized sources spot-checked against source bytes** (not the spec's paraphrase): `CONTRIBUTING.md:141` ("No personal oversight preferences… kept in the gitignored `CLAUDE.local.md`… this file does not restate it") — matches. `docs/tuning-oversight.md:12` ("the loop never merges on its own — merging is a human action… whether a given merge earns a conversational stop is the tunable layer") — matches. `templates/prompt-blocks/registry.txt:52,54` (`contain fanout-orchestration.md … skills/run/SKILL.md`; `contain means-ends-reflection.md … skills/run/SKILL.md skills/goal/SKILL.md`) — matches. `bin/check-prompt-sync.sh:125-134` (`check_contain`, fixed-string substring match, no rewrite) — matches. `agents/scrum-master.md:119` (already conditional, "While a repository operates under a stacked batch-GO cycle…") — matches.
+
+**Risk notes for reviewer**:
+- `bash bin/check-intent.sh .shell-team/specs/T-1126-method-neutral-human-gates.md .shell-team/todo.md` → exit 2 (`attestation`: no `- freeze-attestation (v1)` or `- intent-hash (v1)` sub-bullet recorded on the board for T-1126 at all). Not treated as blocking here: the board's own dispatch line for this task ("no per-task freeze or blast-radius sweep") reads as the operator-approved lightweight-mode ruling covering exactly this record; flagged for the orchestrator to confirm that reading (or backfill the record) before further re-freezes of this spec.
+- `bash bin/check-interventions.sh --task T-1126 -- .shell-team/interventions/T-1126.md` → exit 2 (`usage`: file does not exist — not even a zero-entry sentinel). Every other task in this board's history (T-1002–T-1120) carries one; this gap is not named anywhere in the sprint's lightweight-mode ruling. Cannot create it myself (write scope this round is limited to `.shell-team/todo.md`) — flagged for the orchestrator to backfill (`no interventions occurred` sentinel, if none occurred) before this task's next freeze/rework cycle.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1126.md` → `conformant: (2 decision entries, 0 sentinel)`.
+- `git status --short` clean before and after this verification, aside from this board append.
 
 
 ### QA verification — T-1120 (qa-verifier)
