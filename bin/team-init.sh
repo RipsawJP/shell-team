@@ -387,6 +387,8 @@ printf 'Test recipe: %s/test-recipe.md (engineer/QA read it first, append establ
   "$TEAM_RUN_BASE"
 printf 'Executor binding specimen: %s/binding.conf.example (inert — rename to binding.conf to opt in; see bin/resolve-executor.sh --help).\n' \
   "$TEAM_RUN_BASE"
+printf 'If %s/ does not appear in git status afterwards, a repo-level or global ignore rule may be hiding it — see "Where the operating files live" in docs/adopting.md for the one-line re-include.\n' \
+  "$TEAM_RUN_BASE"
 # shellcheck disable=SC2016  # backticks here are literal text for the user, not a subshell.
 printf 'Next: run `/shell-team:run <your request>` from the target repo. See docs/adopting.md.\n'
 exit 0

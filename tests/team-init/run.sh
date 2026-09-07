@@ -710,4 +710,14 @@ GIT_INDEX_FILE="$IL/decoy-index" \
 [ -f "$IL/repo/.shell-team/todo.md" ] || fail "T-1097 env-leak: the legitimate run did not scaffold"
 pass "T-1097 env-leak: GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE never reach the flag's own git calls — a leaked GIT_DIR/GIT_WORK_TREE refuses cleanly without moving an unrelated decoy repository's HEAD, and a leaked GIT_INDEX_FILE alone does not break an otherwise-legitimate run"
 
+# --- T-1129 pointer-line: closing summary names the re-include doc ---------
+PL="$TMP/pointer-line"
+mkdir -p "$PL"
+init "$PL" > "$PL/out" 2>&1 || fail "T-1129 pointer-line: team-init exited non-zero"
+[ "$(grep -cF -- 'does not appear in git status' "$PL/out" || true)" = "1" ] \
+  || fail "T-1129 pointer-line: expected exactly one anchor-phrase line on stdout"
+grep -qF -- 'docs/adopting.md' "$PL/out" \
+  || fail "T-1129 pointer-line: the anchor line does not name docs/adopting.md"
+pass "T-1129 pointer-line: the closing summary prints exactly one static pointer line naming docs/adopting.md, with no git call added"
+
 printf '\nAll team-init assertions passed.\n'

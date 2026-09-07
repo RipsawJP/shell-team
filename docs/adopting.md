@@ -47,7 +47,10 @@ symptom is indirect: the board simply never appears in `git status`. To
 re-include it in a single repo, add `!.shell-team/` to that repo's root
 `.gitignore`; repo-level patterns outrank the global file. This repository
 carries that line for exactly that reason, so its own base dir stays tracked
-even for an operator who ignores `.shell-team/` globally.
+even for an operator who ignores `.shell-team/` globally. `team-init` prints a
+reminder of this on every run: its closing summary tells you that if the base
+dir does not appear in git status afterwards, this section is where the
+one-line re-include lives.
 
 For what the loop's **gates** actually do if you leave the operating files untracked instead of committing them, see [Trying the team on one ticket](#trying-the-team-on-one-ticket) below — this paragraph is about scope, not about what happens if you skip tracking altogether.
 
