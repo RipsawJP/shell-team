@@ -872,22 +872,27 @@ The result is recorded on the task's own board entry as a
 free-form `grounds:` field, so a later checker can validate the family
 when it is present while an entry carrying none of this still passes.
 The `premise=` field between them is required to be self-contained: it
-carries the expected tier together with the ground the planning
-approval was given on, never a bare pointer to an approval a later
-reader has no way to open. Where the repository has no approved
-planning premise on record — the shipped default for an adopter who
-never configured one — there is nothing to derive against; this is
-never a reason to refuse the freeze, and the record is still written
-with `verdict=no-premise-on-record`.
+carries the expected tier together with the ground the approval was
+given on, never a bare pointer to an approval a later reader has no way
+to open. Where the repository has no approved release-tier premise on
+record — the shipped default for an adopter who never configured one —
+there is nothing to derive against; this is never a reason to refuse
+the freeze, and the record is still written with
+`verdict=no-premise-on-record`.
 
-When the derived tier disagrees with the repository's approved planning
-premise, the freeze stops before any further work on the task and
-issues a deviation notice: stated in English, never a bare "proceed?",
-and carrying all three of its required elements — that the work now exceeds the approved estimate, the continue-or-stop question, and a
-recommendation with its rationale. This stop is not a fourth human gate: it re-enters the existing planning-approval gate, one of the
-three standing human gates this loop already declares, because a
-derived tier that disagrees with the approved premise means that
-approval has lapsed. No new status flag and no new phase are added.
+When the derived tier disagrees with the repository's approved
+release-tier premise, the freeze stops before any further work on the
+task and issues a deviation notice: stated in English, never a bare
+"proceed?", and carrying all three of its required elements — that the
+work now exceeds the approved estimate, the continue-or-stop question,
+and a recommendation with its rationale. This stop adds no new gate: it
+is the same authority the loop already defers to before it merges —
+merging is a human action — reasserting itself once the
+approved release-tier premise no longer holds; any further stop, including
+one before a destructive or irreversible operation, is whatever
+the operator's own oversight configuration adds (see [Tuning how often
+the team stops to ask](tuning-oversight.md)).
+No new status flag and no new phase are added.
 
 Enforcement today is a **duty, not a checker**: the coordinating
 session performs this derivation as a read, and no mechanical checker ships for it yet.

@@ -23,4 +23,4 @@ The v0.3.0 line asked a harder question: as the team's own output grows, does co
 
 ## Status
 
-v0.3.0 is the current release line. The project keeps its board, specs, and reviews under version control so both the operating history and the reasoning behind it stay inspectable, not just the code.
+The current release's version lives in `.claude-plugin/plugin.json`, not restated here. The project keeps its board, specs, and reviews under version control so both the operating history and the reasoning behind it stay inspectable, not just the code.
