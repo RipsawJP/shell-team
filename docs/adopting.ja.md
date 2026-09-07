@@ -49,7 +49,10 @@ base dir を git に載せない方法は 2 つあり、効く範囲が違いま
 ときは、その repo の root `.gitignore` に `!.shell-team/` を追記してください。
 repo 側のパターンが global ファイルより優先されます。このリポジトリ自身も
 まさにその理由でこの行を持っており、`.shell-team/` を global に無視している
-操作者の環境でも、自分の base dir は追跡されたままになります。
+操作者の環境でも、自分の base dir は追跡されたままになります。`team-init` は
+毎回の実行終了時にこれを一言リマインドします — base dir が実行後に
+`does not appear in git status`（git status に現れない）状態であれば、
+この節が一行での再取り込み手順の場所です。
 
 なお、このパラグラフが述べているのは無視設定の効く範囲だけです。稼働ファイルを
 追跡せずに残したときにループの **gates** が実際にどうなるかは、下記の
@@ -139,6 +142,22 @@ FAIL を報告する。
 ループは Plan → Specify → Implement → Validate → Review を回し、各フェーズゲートで
 ボード（`<base>/todo.md`）の status flag を進め、マージ/プッシュの前に人間のために
 一時停止します。
+
+**ループはセッションの root にある repository に対して動きます。** `run` は
+ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、
+起動される sub-agent もその同じツリーを読み・編集し・テストします。別の checkout を
+指し示すフラグはありません。ある repository で作業するには、その repository を
+作業ディレクトリとする Claude Code セッションを開いてください — `team-init` 済みで、
+自身の `CLAUDE.md` を持つものです。他所にある知識（進捗メモを集約した hub repository、
+repository 横断の計測、インシデント履歴）は、オーケストレータ側セッションの文脈を
+通ってループに届くことはありません。sub-agent は毎回 fresh に起動し、briefing と
+tracked ファイルしか見ないからです。hub からループを回しても executor が得るものは
+無く、ループはサポート経路から外れます。知識は spec に載せて持ち込んでください:
+判断がある場所で spec を書き、`specify — operator-authored` で route し
+（[spec を誰が書くかを選ぶ](#spec-を誰が書くかを選ぶt-1091) を参照）、対象 repository
+で run します。ロール間を渡る状態は base dir 配下の tracked ファイルだけなので、
+global excludes で base dir が隠れていると gate は何も読めません — 1 行の再包含は
+[稼働ファイルの置き場所](#稼働ファイルの置き場所) にあります。
 
 ## 役割と executor の紐付け
 

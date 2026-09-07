@@ -4,6 +4,10 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.5.3**
+  - **`team-init` の終了サマリが、base dir が `git status` に現れない場合の参照先を案内するようになりました。** 固定の 1 行が `docs/adopting.md` の *Where the operating files live* にある 1 行の再包含手順を指します。git には何も問わず、ignore 規則について何も主張しません — repo または global の excludes が `.shell-team/` を隠す罠は既に文書化されており、その案内が症状の後ではなく前に届くようになりました。
+  - **`docs/adopting.md` が「ループはセッションの root にある repository に対して動く」と明記しました。** 別の checkout を指すフラグは無く、オーケストレータ側セッションの文脈は sub-agent に届かないため、他所にある知識は `operator-authored` の spec に載せて渡します。
+  - **出荷される役割 playbook に lessons corpus から 2 つの規則と 1 つの拡張が加わりました。** 見積り失効後の中止・繰り延べ提案は規則名の引用でなく測定された失敗・代替案・後回しの理由で述べる。checker が検証する行を書く briefing・board 編集は形を記憶から書かず現行の precedent を写す。プランニングの項目別の表は record grammar がその項目の状態を表現できるかも確認する。
 - **v2.5.2**
   - **出荷 docs と skills が、この repository 固有のスプリント運用を loop の human gate として説明しなくなりました。** `docs/workflow.md`・`docs/adopting.md`・`run` / `goal` の両 skill と、それらが読み込む 2 つの prompt block は「3 つの standing human gate — マージ前の batch GO、スプリントプランニングの承認、破壊的・不可逆な操作」を loop の事実として断定していました。いまは loop が実際に保証すること — タスクが done になるのは両方の gate が green の時だけで、loop は自分の判断だけで merge しない — だけを述べ、破壊的・不可逆操作前の停止を含むそれ以上の停止は operator 自身の oversight 設定（`docs/tuning-oversight.md`）が加えるものだと明記します。スプリントを回さないプロジェクトが、設定していない gate の説明を読むことはなくなります。
   - **version-derivation record の `premise=` field は「planning premise」ではなく「承認済みの release-tier premise」として説明されます。** field の文法は同じで、文章がスプリントを前提としなくなりました。
