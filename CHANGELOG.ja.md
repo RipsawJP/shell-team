@@ -4,6 +4,10 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.5.2**
+  - **出荷 docs と skills が、この repository 固有のスプリント運用を loop の human gate として説明しなくなりました。** `docs/workflow.md`・`docs/adopting.md`・`run` / `goal` の両 skill と、それらが読み込む 2 つの prompt block は「3 つの standing human gate — マージ前の batch GO、スプリントプランニングの承認、破壊的・不可逆な操作」を loop の事実として断定していました。いまは loop が実際に保証すること — タスクが done になるのは両方の gate が green の時だけで、loop は自分の判断だけで merge しない — だけを述べ、破壊的・不可逆操作前の停止を含むそれ以上の停止は operator 自身の oversight 設定（`docs/tuning-oversight.md`）が加えるものだと明記します。スプリントを回さないプロジェクトが、設定していない gate の説明を読むことはなくなります。
+  - **version-derivation record の `premise=` field は「planning premise」ではなく「承認済みの release-tier premise」として説明されます。** field の文法は同じで、文章がスプリントを前提としなくなりました。
+  - **`docs/history.md` が、古くなるリリースラインの版を固定しなくなりました。** `## Status` は版を名指しせず `.claude-plugin/plugin.json` を参照します。
 - **v2.5.1**
   - **`binding.conf` で既定以外の executor に紐づけた役割を、実際にその executor で呼び出せるようになりました。** 最初の代替 executor 呼び出し経路を、役割・adapter・sandbox モードそれぞれ 1 つ — `codex-cli` の `--sandbox read-only` 下の `tech-lead` — に限って出荷レシピ（prompt block）として配線し、レシピが配線していない役割・adapter・権限の組み合わせを拒否する fail-closed の admission gate（`bin/check-invocation-path.sh`）と、凍結済みの実走記録をその証拠として添えました。rebind だけでは解決される名前と telemetry の記録しか変わりません — この経路が rebind を実行に結びつけます。
   - **解決された effort 値が、その経路の呼び出しに実際に届きます。** `codex-cli` 代替経路では binding の effort 値が `-c model_reasoning_effort=<値>` として適用され、adapter が宣言していない値は fail-closed で拒否されます。各 adapter の文書は、effort が呼び出しに適用されるのか記録されるだけなのかを明記するようになりました — 何も呼び出していないのに「適用される」と読めた記載を置き換えています。
