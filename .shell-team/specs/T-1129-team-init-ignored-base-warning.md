@@ -1,273 +1,194 @@
-# `team-init` warns when the resolved base dir is git-ignored — BLOCKED before freeze
+# `team-init`'s closing summary points the adopter at the documented re-include, with no git query and no ignore-state claim
 
-**Status**: BLOCKED
+**Status**: READY_FOR_ARCH
 **Owner**: pm-spec
 **Task ID**: T-1129
-**Entry mode**: pm-authored
-**Spec review**: none
-
-> **No intent block is present in this file, deliberately.** Freezing an intent
-> block records what the loop intends to build. This task's proposed deliverable
-> is forbidden by the Non-goals of a **merged, frozen** spec in this repository
-> (`.shell-team/specs/T-1046-ignored-base-verdict.md`) and turns one of that
-> spec's own live-tree acceptance criteria red **by construction**. Recording
-> that intent as frozen would commit the loop to something it is not authorized
-> to hold. The markers go in when — and only when — a disposition below is
-> chosen. `bin/check-intent.sh` and `bin/check-acs.sh` are therefore not
-> runnable against this file yet; that is the intended pre-freeze state, not a
-> defect.
 
 ## Problem
 
-GitHub issue #452 reports a real, reproduced adopter trap: on a machine whose
+GitHub issue #452 reports a real adopter trap: on a machine whose
 `core.excludesFile` carries a `.shell-team/` line, `team-init` succeeds while the
-base dir is invisible to git — the board, specs, interventions and loop contract
-never reach `git status`, and every tracked-state gate in the loop reads nothing.
-`docs/adopting.md` (*Where the operating files live*, lines 41–52) already
-documents the trap and its one-line re-include; the issue's complaint is
-**ordering** — the documentation is read after the symptom, and the symptom is
-indirect. Its proposal: at the end of `team-init`, ask git whether the base dir
-is ignored and print one warning line — a warning, not a gate.
+base dir is invisible to git — board, specs, interventions and loop contract
+never reach `git status`, and the loop's tracked-state gates read nothing.
+`docs/adopting.md` *Where the operating files live* already documents the trap
+and its one-line re-include, in both languages. The complaint is **ordering**:
+the documentation is read after the symptom, and the symptom is indirect.
 
-That problem statement is sound. The **proposed answer** is the one this
-repository has already tried twice, across two tasks, and terminally closed.
+The issue's original proposal — ask git whether the base dir is ignored and warn
+— was refused before freeze, because it is forbidden by the frozen Non-goals of
+merged spec `.shell-team/specs/T-1046-ignored-base-verdict.md` and defeated by
+that spec's recorded defeat vector 6. The operator ruled **C** on 2026-09-07:
+close the ordering gap with a **static pointer line** that queries nothing and
+claims nothing. That ruling, and the re-scope comment on issue #452, are this
+spec's canon; the issue's original body is superseded by them.
 
 ## Summarized sources
 
-- **`.shell-team/specs/T-1046-ignored-base-verdict.md` — read first-hand, in full (267 lines).** The distinctions carried over below are the ones that file itself draws: that its frozen Goal asserts a zero-occurrence invariant for the token `check-ignore` across `bin/` and `.github/`; that its Non-goals forbid reviving *any* mechanism for asking git this question inside the plugin; that its Input space names **a `team-init` prompt** verbatim as an out-of-scope third design; that **AC4** is deliberately a live-tree zero-invariant carrying no staleness trigger, because "a later file introducing one of these tokens is exactly the event it exists to make red"; that six defeat vectors are recorded, each live-reproduced by at least two parties; and that its `## Same-class-2 pre-commitment` routes any further attempt to "#167's own record … and a future planning cycle's decision about whether to spend more on it."
-- **`.shell-team/specs/T-1042-ignored-base-and-retro-ledger.md`:181 — read first-hand at the cited row.** Carried over: the predecessor task's own directive was "No warning, notice, probe or ignore-status classification ships in this task, on any script". Its force is task-scoped rather than forward-binding, which is why T-1046 and not T-1042 is the blocking document.
-- **`.shell-team/specs/T-1097-trial-branch-flag.md`:88–111 — read first-hand at **AC9**–**AC16**.** Carried over: **AC13**'s exact shape, which is a *conditional* rather than an absence — the trial section of `docs/adopting.md` must carry **at least one** line containing both `no git command` and `--trial-branch`, and **no** line containing `no git command` without it. So the claim-site repair this task would need is a re-scoping, never a deletion; deleting the phrase reddens **AC13** as surely as leaving it unqualified does.
-- **`bin/team-init.sh` — read first-hand, end to end (393 lines).** Carried over: the no-flag path invokes zero git commands; the `--trial-branch` path's git calls at `:235`–`:268` are each `git -C "$TARGET"` under `env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE`; `log_warn` writes to stderr; the ignore check the issue proposes would have to run after the scaffold, because a trailing-slash pattern only matches a path that exists as a directory.
-- **`tests/team-init/run.sh`:581–601 — read first-hand.** Carried over: the "T-1097 git-free" arm asserts `[ ! -e "$GF/marker" ]` with a failing `git` shim first on `PATH`, i.e. it mechanically asserts the no-flag path reaches git **zero** times, and its `PASS` string states that property in words.
-- **`docs/adopting.md`:35–61 and `:391`–`:404`, and `docs/adopting.ja.md`:36–65 and `:402`–`:417` — read first-hand.** Carried over: the trap and its remedy are already documented in both languages; `docs/adopting.md`:54–59 (mirror at `.ja.md`:58–63) is the standing instruction that any assertion about ignore behaviour must pin `core.excludesFile` explicitly rather than inherit the operator's; and `docs/adopting.ja.md`:415 **does** carry the mirror of `docs/adopting.md`:402's now-would-be-false claim — see `## Measurements`.
-- **`templates/shell-team.gitignore` — read first-hand (8 lines).** Carried over: the scaffolded `<base>/.gitignore` ignores `runs/` and `reviews/.codex-capture.*`, and nothing else. So a descendant of the base dir is ignored **by design** in every default scaffold, which is the fact issue #452's arm (c) is built on.
-- **GitHub issue #452 — body relayed verbatim into this role in the task dispatch, not opened by this role.** Carried over: the failure narrative, the "warning, not a gate" scoping, the four-arm acceptance sketch, the fail-closed requirement, and the PATCH tier. Its body names no prior work on this question.
-- **GitHub issue #167 — RELAYED as still open and unanswered, from T-1046's own frozen text and board record; not opened by this role** (no readable tracker path from here). Carried over: it is the tracker item this question belongs to, left open deliberately with two review records named as its evidence.
+- **GitHub issue #452's 2026-09-07 re-scope comment — RELAYED verbatim into this role, not opened by it.** Distinctions carried over exactly as the relay draws them: the deliverable is **one fixed line** in the closing summary block, with **no git call and no detection**; it points at *Where the operating files live* for the one-line re-include (`!<base>/` in the repo root `.gitignore`); **it claims nothing about the repository's ignore state**; and the comment supersedes the issue body above it. The body's four-arm acceptance sketch (`core.excludesFile`-pinned arms, a "could not run" line) is therefore **retired**, not carried.
+- **`.shell-team/specs/T-1046-ignored-base-verdict.md` — read first-hand, in full (267 lines).** Distinctions carried over: its frozen Non-goals (`:131`) forbid reviving "any mechanism for asking git this question inside the plugin"; its frozen `## Input space` (`:185`) names "a `team-init` prompt" among out-of-scope third designs **for answering #167**; its **AC4** (`:151`–`:152`) is a deliberately staleness-trigger-free live-tree zero-invariant over two token sets — `check-ignore` across `bin/` and `.github/`, and `report_ignored_base_verdict` / `git_probe` / `resolved base dir as ignored` / `check-ignored-base` across `bin/ tests/ docs/ templates/ agents/ skills/ .github/` — plus a by-name lock on `bin/check-ignored-base.sh` including the dangling-symlink case; and that `docs/adopting.md` carries `check-ignore` as **base content**, which is why that one token's sweep is narrower than the other four. **AC3** carried over precisely because it does **not** apply here: it is a merge-point-scoped diff allow-list pinned to `d825293`, already stale by its own text, and nothing in this task repairs or re-points it.
+- **`bin/team-init.sh` — read first-hand, end to end (393 lines).** Distinctions carried over: the no-flag path invokes **zero** git commands; the closing summary block is `:371`–`:392`, a run of `printf` statements to **stdout** ending with the `Next: run …` line and `exit 0`; `log_warn` writes to stderr and is used only for skip warnings; `$TEAM_RUN_BASE` is the resolved, target-relative base dir and is already interpolated by three lines in that block; and `:390` carries `# shellcheck disable=SC2016` with the stated reason that its backticks are literal user-facing text.
+- **`tests/team-init/run.sh` — read first-hand at `:1`–`:70` and `:372`–`:601`.** Distinctions carried over: two temp roots with one shared `trap` — the plain `$TMP` (`:27`–`:31`) and the `$TMPDIR`-backed `$GIT_TMP` (`:38`–`:42`) reserved for **git-needing** fixtures per the T-1042 sandbox quirk; helpers `fail`/`pass`/`init` at `:53`–`:58`, where `init` runs `env -u TEAM_RUN_BASE`; `GIT_CEILING_DIRECTORIES` exported at `:50`–`:51`; and the "T-1097 git-free" arm at `:581`–`:601`, whose three assertions are `[ ! -e "$GF/marker" ]` (`:592`), `[ -s "$GF/marker" ]` (`:599`) and `[ ! -e "$GF/plain2/.shell-team" ]` (`:600`).
+- **`.shell-team/specs/T-1097-trial-branch-flag.md` — read first-hand at **AC11**–**AC16** (`:92`–`:111`).** Distinctions carried over: **AC11**'s exact seven `PASS` tokens and its `All team-init assertions passed.` positive control, which a new arm must not disturb; **AC12**'s shellcheck shape (presence plus non-empty `--version` as the control against a missing tool reading as a clean lint, plus the bash-3.2 floor token sweep); and **AC13**'s shape, which is a *conditional* rather than an absence — so the pre-existing `no git command` prose stays as it is under this scope rather than being edited.
+- **`docs/adopting.md`:11–65 and `docs/adopting.ja.md`:12–65 — read first-hand.** Distinctions carried over: the English heading is exactly `## Where the operating files live` (`:11`), the Japanese exactly `## 稼働ファイルの置き場所` (`:12`); the section already states the trap, the global-versus-repo-level scope difference, and the `!.shell-team/` re-include (`:47`–`:48`, mirror `:48`–`:49`); and `:54`–`:59` (mirror `:58`–`:63`) is the standing instruction to pin `core.excludesFile` in any ignore-behaviour assertion — retained as context, and moot for this task, which asserts none.
+- **`.shell-team/test-recipe.md`:43–48 — read first-hand.** Distinction carried over: `shellcheck` is pinned to the version CI installs (currently 0.11.0, from `.github/workflows/check-handoff.yml`'s `SHELLCHECK_VERSION`), and a shellcheck-clean claim is trusted only after `shellcheck --version` is checked locally, because CI installs its own copy regardless of the runner's.
+- **`templates/shell-team.gitignore` — read first-hand (8 lines).** Distinction carried over: the scaffolded `<base>/.gitignore` ignores `runs/` and `reviews/.codex-capture.*` only. Relevant here solely as the reason the new line must not assert anything about ignore state: a descendant of the base dir is ignored by design in every scaffold, so any state claim would be wrong in the default case.
 
-## The blocking conflict, as measured
+## Goal
 
-**1. A merged frozen Non-goal forbids the deliverable.**
-`.shell-team/specs/T-1046-ignored-base-verdict.md`:131, inside that spec's frozen
-intent block:
+<!-- BEGIN intent-block: T-1129 -->
 
-> **No revival of any mechanism for asking git this question inside the plugin.**
-> Dispositions (a) and (c) are ruled and spent; an opt-in
-> `bin/check-ignored-base.sh` is explicitly not built; both pre-commitments
-> forbid presenting the menu again.
+- user-visible: yes — the deliverable is a new line in a shipped script's adopter-facing stdout, plus the two adopting-doc sentences that describe it; an adopter running `team-init` sees the change directly.
+- verification-class: mechanism — declared by the checklist's own enumeration rather than by feel: this task's diff reaches `bin/team-init.sh` and `tests/team-init/run.sh`, both executing surfaces, so every item of the freeze-time protocol applies as written even though the change's content is prose the script prints.
+- verification-ceiling: unit-and-static — all five criteria run the shipped script or a fixed-string read against this checkout; none needs a real adopter environment, and none is marked `- above-ceiling:`. Non-vacuity holds: five criteria sit at the declared ceiling.
+- base-ref-discriminator: not-applicable — this branch sits directly on `develop` at the relayed branch point `e00f560` with no open predecessor PR, and **no criterion in this spec reads a base-side blob**: there is no scope-lock allow-list, and every criterion measures the live tree or the shipped script's live output. There is accordingly no branch-point-versus-merge-base ambiguity for any criterion to resolve.
 
-and its frozen `## Input space`, out-of-scope, at `:185`, which names this
-task's shape in so many words:
+`bin/team-init.sh`'s closing summary block prints **one additional fixed line**
+on every run, naming the resolved base dir, telling the adopter what to do if
+that directory does not appear in `git status`, and pointing at *Where the
+operating files live* in `docs/adopting.md` for the one-line re-include. The line
+is **static text**: `team-init` adds no git command, performs no detection, and
+makes no claim — true or false — about whether this repository's ignore rules
+actually hide the base dir. The no-flag path therefore still invokes zero git
+commands, and `tests/team-init/run.sh`'s "T-1097 git-free" arm keeps passing with
+its three assertions unedited. Both adopting documents' *Where the operating
+files live* sections gain one sentence stating that `team-init` prints this
+pointer at the end of its run. `T-1046`'s **AC4** zero-token invariant stays
+green: no string this task adds anywhere contains any of the five tokens that
+criterion sweeps for, and no `bin/check-ignored-base.sh` comes into existence.
+The host root stays untouched, `bin/` stays pure bash and shellcheck-clean, and
+exit status is unchanged.
 
-> **Any third design for answering #167** — an opt-in checker, a per-loop-step
-> notice, a README line, **a `team-init` prompt**.
+### Why this scope is freezable where the issue's original proposal was not
 
-**2. A merged frozen criterion goes red by construction, and it is not the
-merge-point-scoped kind that is *supposed* to.** T-1046 **AC4** (`:151`–`:152`)
-requires `grep -rlF -- 'check-ignore' bin .github` to name **zero** files, and
-its own body forecloses the reading that this is acceptable drift:
+Recorded so review attacks a stated rationale rather than an unstated choice.
+T-1046's frozen Non-goal forbids "any mechanism for asking git this question",
+and its out-of-scope list names "a `team-init` prompt" as a third **design for
+answering #167**. This scope asks git nothing and answers nothing: an adopter
+whose base dir is genuinely hidden receives no signal specific to their state,
+exactly as before. What changes is only *when* the already-shipped documentation
+is put in front of them. The distinction is narrow and is not claimed as
+self-evident — the operator's ruling of 2026-09-07 is the authority for it, and
+**AC3** is the mechanical boundary that keeps T-1046's own invariant green rather
+than asking anyone to take the reading on trust.
 
-> This is a zero-invariant re-derived over the live tree rather than a declared
-> population size, so it needs no re-measurement trigger — a later file
-> introducing one of these tokens is exactly the event it exists to make red.
+## Non-goals
 
-T-1046's frozen **Goal** sentence (`:115`) states the same invariant directly.
-Measured now, at this branch: `check-ignore` occurs in **zero** files under
-`bin/`, so **AC4** is green today and this task is the event that reddens it.
+- **No git command is added, on any path.** No `check-ignore`, no `status`, no `ls-files`, no `add --dry-run`, no probe of any kind, and no substitute that asks the same question through a different subcommand. Avoiding the token while shipping the mechanism would satisfy **AC3**'s letter against its plain intent and is refused explicitly.
+- **No detection and no ignore-state claim.** The line is unconditional and identical on every run. It must not say the base dir *is* ignored, *is not* ignored, or that anything was checked.
+- **No revival of the four-arm design from issue #452's original body.** No `core.excludesFile`-pinned fixture arms, no "the check could not run" line, no non-git-target arm, no failing-`git`-shim arm beyond the one T-1097 already ships. That body is superseded by the 2026-09-07 comment.
+- **No edit to the pre-existing "no git command" prose** at `bin/team-init.sh`:28–29, `:31`–`32`, `:115`, `docs/adopting.md`:402, `docs/adopting.ja.md`:415 or `tests/team-init/run.sh`:601. Those claims stay **true** under this scope, so touching them would be a change with no defect behind it — see `## Assumptions`.
+- **No change to the T-1097 git-free arm's assertions**, and no new git-needing fixture. The new arm needs no repository and belongs under the plain `$TMP` root, not `$GIT_TMP`.
+- **No host-root write.** `team-init` still never edits the target's `CLAUDE.md` and never appends to its root `.gitignore`; the line *tells* the adopter about the re-include and does not perform it.
+- **No exit-status change, no new flag, no CI change, no version bump, no CHANGELOG entry, no new `bin/` script and no new test suite.**
+- **No repair or re-pointing of T-1046 `AC3`**, its merge-point-scoped diff allow-list pinned to `d825293`. It is already stale by its own text and is not this task's business.
+- **No scope-lock criterion.** One is deliberately not written, because a base-relative diff would contradict this spec's own `base-ref-discriminator: not-applicable` declaration; scope is held by the criteria's own narrowness and by review.
 
-**3. The proposed design's own acceptance sketch is defeated by a recorded,
-thrice-reproduced defect — and this is the substantive objection, independent of
-governance.** T-1046 `:105`, defeat vector 6:
+## Acceptance criteria
 
-> **A directory-form query blind to name- and extension-scoped ignore rules.**
-> … With `.shell-team/*.md`, or an ordinary repo-wide `*.md`, that query stays
-> silent while every record the loop writes is genuinely ignored and
-> `git add .shell-team/todo.md` stages zero files — **#167's own failure
-> occurring while the prescribed self-check reports an all-clear**, and every
-> record the loop writes is markdown.
+Every check runs from the repository root, asserts its inputs are readable before
+judging, writes only inside a `mktemp -d` scratch directory built on the guarded
+`${TMPDIR:-/tmp}` template, and carries a positive control wherever it counts or
+greps for an absent condition.
 
-Reproduced independently three times on `git 2.53.0` (the primary Codex pass, the
-adversarial pass with its own positive control, and the coordinating session).
-Issue #452's acceptance sketch has **no arm** for this class, and the routing
-map's arm (c) elevates the very rule that produces it — "the query asks about the
-base dir itself, never a descendant" — to frozen intended behaviour. So as
-sketched, the new warning would print nothing in a real, reproduced instance of
-exactly the trap it exists to catch: a false all-clear, shipped.
+- [ ] **AC1** The default no-flag run prints the pointer, exactly once, on stdout, and still exits 0. `bin/team-init.sh <fresh dir>` run with `env -u TEAM_RUN_BASE` exits **0**; its **stdout** contains exactly **one** line carrying the fixed anchor phrase `does not appear in git status`; that same line also names `docs/adopting.md` and the section title `Where the operating files live`, and names the resolved base dir `.shell-team`; and the pre-existing closing line `Next: run` is still present, so the new line is an addition to the summary block rather than a replacement of it. The scaffold still lands (`<target>/.shell-team/todo.md` exists) and the host root is untouched (neither `<target>/CLAUDE.md` nor `<target>/.gitignore` exists). Positive controls: the target directory is asserted to exist and the captured stdout asserted non-empty before any count is trusted, so a run that produced nothing cannot satisfy the anchor count vacuously. The anchor phrase occurs **zero** times anywhere in the repository at authoring time (measured — see `## Assumptions`), so this is not satisfiable by inherited text.
+  - check: rc=0; export LC_ALL=C; T=$(mktemp -d "${TMPDIR:-/tmp}/t1129a1.XXXXXX") || exit 1; test -s bin/team-init.sh || exit 1; mkdir -p "$T/tgt" || exit 1; test -d "$T/tgt" || exit 1; env -u TEAM_RUN_BASE bash bin/team-init.sh "$T/tgt" > "$T/out" 2> "$T/err"; s=$?; test "$s" -eq 0 || rc=1; test -s "$T/out" || rc=1; test "$(grep -cF -- 'does not appear in git status' "$T/out" || true)" = "1" || rc=1; grep -F -- 'does not appear in git status' "$T/out" > "$T/ln" || true; grep -qF -- 'docs/adopting.md' "$T/ln" || rc=1; grep -qF -- 'Where the operating files live' "$T/ln" || rc=1; grep -qF -- '.shell-team' "$T/ln" || rc=1; grep -qF -- 'Next: run' "$T/out" || rc=1; test -f "$T/tgt/.shell-team/todo.md" || rc=1; test ! -e "$T/tgt/CLAUDE.md" || rc=1; test ! -e "$T/tgt/.gitignore" || rc=1; rm -rf "$T"; test "$rc" -eq 0
 
-**4. Vectors 1–4 are partially, but only partially, neutralized by the "warning,
-not a gate" framing — and that difference is real and is why this is a planning
-question rather than a flat refusal.** T-1046 `:97`–`:100` records four
-verdict-flipping channels (`GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n`,
-`GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_GLOBAL`/`SYSTEM`, `GIT_DIR`+`GIT_WORK_TREE`
-redirection, `XDG_CONFIG_HOME`, an exported shell function named `env` or `git`,
-and system-scope `$(prefix)/etc/gitconfig`). Those killed a design whose output
-was a **verdict** other logic relied on. An advisory line that never changes exit
-status has materially lower stakes, and #452's framing is a genuine improvement
-over both earlier attempts. Vector 6 is untouched by that improvement: a false
-all-clear is a false all-clear whether it is advisory or gating.
+- [ ] **AC2** The fixture suite covers the new line and stays green with the T-1097 git-free arm's assertions unedited. `bash tests/team-init/run.sh` exits **0**, prints **zero** `FAIL:` lines, and carries a `PASS` line for a new case named `T-1129 pointer-line` **and** for each of T-1097's seven pre-existing cases (`T-1097 creation`, `T-1097 args`, `T-1097 no-work-tree`, `T-1097 not-repo-root`, `T-1097 branch-exists`, `T-1097 dirty-preserved`, `T-1097 git-free`), so the new arm is additive rather than a replacement. The suite's closing line `All team-init assertions passed.` is asserted present, so a truncated run cannot pass on the strength of the tokens alone. The git-free arm is locked as source text rather than by a base-ref read: the three assertion fragments `[ ! -e "$GF/marker" ]`, `[ -s "$GF/marker" ]` and `[ ! -e "$GF/plain2/.shell-team" ]` are each still present verbatim in `tests/team-init/run.sh`, so the arm cannot have been weakened or deleted to accommodate this task. The new arm needs no repository, so it belongs under the plain `$TMP` root rather than `$GIT_TMP`; this criterion asserts that by requiring the literal `T-1129 pointer-line` to occur in the suite on no line that also names `GIT_TMP`.
+  - check: rc=0; export LC_ALL=C; S=tests/team-init/run.sh; test -s "$S" || exit 1; T=$(mktemp -d "${TMPDIR:-/tmp}/t1129a2.XXXXXX") || exit 1; bash "$S" > "$T/o" 2>&1; s=$?; test "$s" -eq 0 || rc=1; test -s "$T/o" || rc=1; test "$(grep -c '^FAIL:' "$T/o" || true)" = "0" || rc=1; i=0; for t in 'T-1129 pointer-line' 'T-1097 creation' 'T-1097 args' 'T-1097 no-work-tree' 'T-1097 not-repo-root' 'T-1097 branch-exists' 'T-1097 dirty-preserved' 'T-1097 git-free'; do i=$((i+1)); grep -q "^PASS.*$t" "$T/o" || rc=1; done; test "$i" = "8" || rc=1; grep -qF -- 'All team-init assertions passed.' "$T/o" || rc=1; for a in '[ ! -e "$GF/marker" ]' '[ -s "$GF/marker" ]' '[ ! -e "$GF/plain2/.shell-team" ]'; do grep -qF -- "$a" "$S" || rc=1; done; grep -F -- 'T-1129 pointer-line' "$S" > "$T/na" || rc=1; test -s "$T/na" || rc=1; test "$(grep -cF -- 'GIT_TMP' "$T/na" || true)" = "0" || rc=1; rm -rf "$T"; test "$rc" -eq 0
 
-## Why this cannot be routed around from inside this task
+- [ ] **AC3** T-1046's zero-token invariant stays green, measured with **that spec's own instrument rather than a paraphrase of it**: the check line below is copied **verbatim** from `.shell-team/specs/T-1046-ignored-base-verdict.md:152`, `mktemp` template string included, so the two criteria cannot diverge. It requires zero files containing `check-ignore` across `bin/` and `.github/`; zero containing `report_ignored_base_verdict`, `git_probe`, `resolved base dir as ignored` or `check-ignored-base` across `bin/ tests/ docs/ templates/ agents/ skills/ .github/`; and no `bin/check-ignored-base.sh` as a regular path or a dangling symlink. Its own positive controls are carried unchanged: every searched directory must exist, every search's stderr must be empty so an unreadable path fails rather than reading as a silent zero, and a control search for `team-paths.sh` under `bin/` must find at least one file. This is the criterion that mechanically holds the boundary between this scope and the design T-1046 closed; it is a live-tree zero-invariant and needs no staleness trigger, because a later file introducing one of these tokens is exactly the event it exists to make red.
+  - check: rc=0; for d in bin tests docs templates agents skills .github; do test -d "$d" || exit 1; done; T=$(mktemp -d "${TMPDIR:-/tmp}/t1046v5a4.XXXXXX") || exit 1; grep -rlF -- 'check-ignore' bin .github > "$T/h0" 2> "$T/e0"; test ! -s "$T/e0" || rc=1; test ! -s "$T/h0" || rc=1; k=0; for t in 'report_ignored_base_verdict' 'git_probe' 'resolved base dir as ignored' 'check-ignored-base'; do k=$((k+1)); grep -rlF -- "$t" bin tests docs templates agents skills .github > "$T/h.$k" 2> "$T/e.$k"; test ! -s "$T/e.$k" || rc=1; test ! -s "$T/h.$k" || rc=1; done; test "$k" = "4" || rc=1; { test ! -e bin/check-ignored-base.sh && test ! -L bin/check-ignored-base.sh; } || rc=1; grep -rlF -- 'team-paths.sh' bin > "$T/pc" 2> "$T/e9"; test ! -s "$T/e9" || rc=1; test -s "$T/pc" || rc=1; rm -rf "$T"; test "$rc" -eq 0
 
-- **Satisfying **AC4**'s letter by avoiding the literal token is off the table.**
-  `git status --porcelain --ignored`, `git add --dry-run` or `git ls-files
-  --ignored` would keep the string `check-ignore` out of `bin/` while shipping
-  exactly the mechanism the Non-goal names. That is gaming a criterion against
-  its plainly stated intent, and T-1046's Input space closes the loophole by
-  naming the *shape* ("a `team-init` prompt") rather than a token. Recorded here
-  so nobody spends a round discovering it.
-- **Amending T-1046 is a class-B re-freeze of merged frozen intent.** Rewriting
-  a merged spec's Goal, Non-goals or a criterion needs human GO plus an
-  `- intent-ratified` record under the freeze procedure — and this checkout's own
-  standing ruling (`CLAUDE.local.md`, 2026-08-04) delegates *freezing* to the
-  coordinating session, never *amending another task's already-ratified frozen
-  intent*. It is not mine to do and not the engineer's.
-- **T-1046 already named the legitimate route, and it is not this task.**
-  `:235`: "The correct home for any further attempt is **#167's own record** …
-  and a future planning cycle's decision about whether to spend more on it." A
-  planning decision **can** authorize a third attempt. This sprint's planning
-  approval, though, derived T-1129's PATCH row from issue #452's body — which
-  names no prior work — so the operator approved this item without #167,
-  T-1042, T-1046 or the six defeat vectors in view. The approval's premise is
-  incomplete rather than the approval being wrong, which under this checkout's
-  own rule (premise break ⇒ approval lapse) is a stop-and-report, not a
-  proceed-and-disclose.
-- **The base rate is on the record, quoted rather than aggregated by this role.**
-  T-1046 `:91` states, of that task alone and before its own v5 re-freeze: "four
-  freezes (v1–v4)", "three cross-provider rounds", "four QA rounds" and "two full
-  implementations of a mechanism plus one of a documentation deliverable"; and of
-  its predecessor T-1042: "two further cross-provider rounds and seven Majors on
-  the same question". Both shipped no behaviour. A third attempt priced as a
-  PATCH wording-tier item, under a sprint mode that runs one freeze and no
-  per-task sweep, is mispriced by a wide margin.
+- [ ] **AC4** Both adopting documents describe the new line, each inside its own *Where the operating files live* section rather than anywhere in the file. The section extracted from `docs/adopting.md` (from the line `## Where the operating files live` to the next `^## ` heading) contains both the fixed anchor phrase `does not appear in git status` and the literal `team-init`; the section extracted from `docs/adopting.ja.md` (from `## 稼働ファイルの置き場所` to its next `^## `) contains the same anchor phrase and the same literal `team-init`, so the two languages share one machine token and cannot drift apart on it. Positive controls: each heading is asserted present as a whole line before extraction, and each extracted section is asserted to carry at least ten non-empty lines before any literal is judged, so a renamed or missing heading fails here rather than satisfying the criterion against an empty extraction. The anchor phrase occurs zero times in either file at authoring time, so neither presence check is satisfiable by inherited text.
+  - check: rc=0; export LC_ALL=C; A=docs/adopting.md; J=docs/adopting.ja.md; test -s "$A" || exit 1; test -s "$J" || exit 1; T=$(mktemp -d "${TMPDIR:-/tmp}/t1129a4.XXXXXX") || exit 1; grep -qxF -- '## Where the operating files live' "$A" || rc=1; grep -qxF -- '## 稼働ファイルの置き場所' "$J" || rc=1; awk '/^## /{if(f)exit} /^## /&&!f{if($0=="## Where the operating files live"){f=1;next}} f{print}' "$A" > "$T/sec"; test "$(grep -c . "$T/sec" || true)" -ge 10 || rc=1; grep -qF -- 'does not appear in git status' "$T/sec" || rc=1; grep -qF -- 'team-init' "$T/sec" || rc=1; awk '/^## /{if(f)exit} /^## /&&!f{if($0=="## 稼働ファイルの置き場所"){f=1;next}} f{print}' "$J" > "$T/jsec"; test "$(grep -c . "$T/jsec" || true)" -ge 10 || rc=1; grep -qF -- 'does not appear in git status' "$T/jsec" || rc=1; grep -qF -- 'team-init' "$T/jsec" || rc=1; rm -rf "$T"; test "$rc" -eq 0
+  - adopter-surface: `docs/adopting.md`'s `## Where the operating files live` section and its `docs/adopting.ja.md` mirror `## 稼働ファイルの置き場所` — one sentence each, landing in this same task rather than as a fast-follow, so the section an adopter is pointed *to* also tells them the pointer exists.
 
-## Measurements this role took (relayed premises re-measured)
+- [ ] **AC5** The two edited executing surfaces keep this repository's `bin/` purity floor. `shellcheck` exits 0 on `bin/team-init.sh` and on `tests/team-init/run.sh`, and neither file contains a bash-4-only construct (`mapfile`, `readarray`, `declare -A`, `coproc`), so the bash 3.2 floor holds. Positive control, chosen so a missing tool cannot read as a clean lint: `shellcheck` is asserted present on `PATH` and its `--version` output asserted non-empty before either file is linted. The version the claim is trusted at is the pinned 0.11.0 recorded in `.shell-team/test-recipe.md`:43–46 and `.github/workflows/check-handoff.yml`'s `SHELLCHECK_VERSION`; the criterion does not hard-gate on the version string, because CI installs its own pinned copy regardless of the runner's, and a local run at a different version is to be disclosed in the hand-off rather than silently trusted.
+  - check: rc=0; export LC_ALL=C; command -v shellcheck >/dev/null 2>&1 || rc=1; test -n "$(shellcheck --version 2>/dev/null)" || rc=1; shellcheck bin/team-init.sh >/dev/null 2>&1 || rc=1; shellcheck tests/team-init/run.sh >/dev/null 2>&1 || rc=1; for f in bin/team-init.sh tests/team-init/run.sh; do test -s "$f" || rc=1; test "$(grep -cE '(mapfile|readarray|declare -A|coproc)' "$f" || true)" = "0" || rc=1; done; test "$rc" -eq 0
 
-| Premise as relayed | Measured | Verdict |
-|---|---|---|
-| `bin/team-init.sh` invokes zero git commands on the no-flag path | Read end to end; the only git calls are `:235`–`:268`, inside `if [ "$TRIAL_BRANCH_GIVEN" -eq 1 ]` | confirmed |
-| `tests/team-init/run.sh`:581–601 asserts it with a failing `git` shim | Read; `[ ! -e "$GF/marker" ]` at `:592`, `PASS` text at `:601` | confirmed |
-| 5 prose sites become false | **6 sites.** The relayed grep used English-only patterns over 3 files, so it could not see the Japanese mirror — as the routing map itself anticipated | corrected |
-| `docs/adopting.ja.md` carries no such claim (English patterns returned nothing) | **False.** `:415` carries 「`--trial-branch` を指定しない場合、`team-init.sh` は自身で git コマンドを一切実行せず、どのブランチにいるかも気にしません。」 — the exact mirror of `docs/adopting.md`:402 | corrected |
-| `docs/adopting.md`:404 is a second trap-teaching site; decide in or out | **Out**, with reason: its claim is about what `git add` does, and stays true after any disposition below. Its mirror is `docs/adopting.ja.md`:417 | decided |
-| A tracked base dir is "by definition not hidden", and `git check-ignore` returning non-zero there is the correct no-warning outcome | **Not confirmed, and not freezable as stated.** `git check-ignore` skips paths *in the index*; a base **directory** is never itself an index entry, so whether it reports ignored while its contents are tracked is a live measurement nobody in this chain has taken. It must be measured, not assumed, by whichever disposition proceeds | unverified — flagged |
-| `check-ignore` occurs zero times under `bin/` today (T-1046 **AC4** green) | Content search over `bin/`: no matches | confirmed |
+## Input space
 
-The six claim sites, for whichever disposition proceeds:
-`bin/team-init.sh`:28–29, `:31`–`32`, `:115` (`--help`); `docs/adopting.md`:402;
-`docs/adopting.ja.md`:415; `tests/team-init/run.sh`:592 (the assertion) and
-`:601` (its `PASS` text).
+**Reachable input classes** — what real adopter usage and this repository's own fixtures produce, all of which the implementation must handle correctly:
 
-- count: no-git-claim-lines — 5 — command: cd "$(git rev-parse --show-toplevel)" || exit 3; for f in bin/team-init.sh docs/adopting.md docs/adopting.ja.md tests/team-init/run.sh; do test -r "$f" || exit 3; done; git grep -n -F -e 'no git command' -e 'git コマンドを一切実行せず' -- bin/team-init.sh docs/adopting.md docs/adopting.ja.md tests/team-init/run.sh | wc -l | tr -d ' '
+1. A fresh, empty target directory at a repository's top level — the ordinary `team-init.sh .` case, and **AC1**'s own fixture.
+2. A target that is **not** a git repository at all, and a target on a `PATH` with no working `git`. Both must behave identically to case 1, because nothing queries git: the line prints, the scaffold lands, exit status is 0. This is the class T-1097's git-free arm already exercises.
+3. A **re-run** over an existing scaffold, where `copy_template` skips and emits `log_warn` lines to stderr. The pointer line still prints on stdout, once.
+4. Both supported layouts and the `$TEAM_RUN_BASE` override, including the legacy `tasks/` + `docs/specs/` split-root layout where the closing block already prints an extra `Specs live under:` line. The pointer names the **resolved** base dir, so it must interpolate `$TEAM_RUN_BASE` rather than hardcode `.shell-team`.
+5. A target path containing a space (the suite already covers this class), and a target reached through a symlinked path that canonicalizes to the repository root.
+6. `--force` and `--trial-branch` runs: the pointer line prints on those paths too, since it sits in the unconditional closing block.
+7. The readers of the two adopting-doc sentences: a GitHub markdown renderer and a plain-text reader.
 
-That command returns 5 **lines**; the sixth site (`bin/team-init.sh`:31–32,
-"plus, only when `--trial-branch` is given, git.") states the same claim in
-different words and is matched by neither pattern. Re-run the command rather
-than quoting either number.
+**Out-of-scope synthetic extremes** — declined explicitly, so a finding escalating one of these is answerable rather than open-ended:
 
-## Candidate dispositions
+- **Every ignore-state input class**, named because this is where the earlier design died: a repo-level `.gitignore` pattern, a global `core.excludesFile`, `$GIT_DIR/info/exclude`, a name- or extension-scoped rule (`.shell-team/*.md`, a repo-wide `*.md`), a negated re-include, a tracked base dir, and a base dir occupied by a symlink or a submodule gitlink. **Out of scope by construction, not by concession**: the line is static, so no ignore configuration can make it more or less correct.
+- **Every environment-injection and configuration-scope channel** T-1046 recorded — `GIT_CONFIG_COUNT`/`KEY_<n>`/`VALUE_<n>`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_GLOBAL`/`SYSTEM`, `GIT_DIR`/`GIT_WORK_TREE` redirection, `XDG_CONFIG_HOME`, `GIT_CONFIG_NOSYSTEM`, an exported shell function named `env` or `git`, a hostile `PATH` or `HOME`, and system-scope `$(prefix)/etc/gitconfig`. This task adds no git call, so none of them has a target in its diff.
+- **Terminal rendering of the printed line**: width, wrapping, column count, ANSI handling, a narrow or non-UTF-8 terminal, and ever-longer resolved base-dir names. The line is plain ASCII plus the resolved base path and is not laid out.
+- **Localization of the script's output.** `bin/` output stays English; only the adopting docs carry a Japanese mirror.
+- **Adversarially constructed markdown** in either adopting document (nested fences hiding a heading, zero-width or homoglyph substitutes for the anchor phrase, CRLF-only variants), and non-UTF-8 re-encodings of either file.
+- **A repository where a base ref is unreachable** (a shallow or `--single-branch` clone). No criterion here reads a base ref, so this class cannot arise.
 
-Each option's content is stated, not just its label. Choosing among them is a
-planning decision, not this role's.
-
-**A — Return T-1129 to planning; leave #452 open, cross-referenced to #167.**
-*Content*: no shipped change. T-1129 closes as BLOCKED; #452 is annotated with
-`.shell-team/reviews/T-1042.md`, `.shell-team/reviews/T-1046.md` and this record
-as its prior art, and marked a re-opening of #167 under a lower-stakes framing.
-The sprint's goal row for this item is recorded **not met** rather than softened.
-*Cost*: one planning turn. *Risk*: the adopter trap stays as it is — already
-documented in both languages, and no worse than yesterday.
-**Recommended.**
-
-**B — Re-scope to a design that answers vector 6, and take it through planning
-with the full history in view.** *Content*: the query stops asking about the base
-**dir** and asks about **the record files the loop actually writes** — the
-scaffolded `<base>/todo.md` and the specs dir's `.gitkeep`, which are precisely
-what a later `git add` would refuse. That inverts arm (c) into its correct form:
-the rule is not "never query a descendant" (which is what *produces* the false
-all-clear) but "an ignored `runs/` must not trigger a warning" — two different
-rules that #452's sketch conflates into one. This is a materially different
-deliverable from the issue's acceptance sketch, so it needs #452's body amended,
-its planning row re-derived with the defeat history cited, and a human-GO'd
-class-B amendment (or an explicit planning-level supersession) of T-1046's
-Non-goals and **AC4** before any freeze. Vectors 1–4 would additionally have to
-be dispositioned in writing as accepted-for-an-advisory-line rather than
-re-litigated. *Cost*: a planning turn plus a task priced as a mechanism change
-against an adversarial gate, not a PATCH wording item. *Risk*: the class's own
-base rate above.
-
-**C — Proceed exactly as issue #452 and the routing map specify.** *Content*: the
-four arms as sketched. *Consequences, all three certain rather than possible*: a
-merged frozen Non-goal is contradicted; T-1046 **AC4** goes red by construction,
-in the one way its own text says must never be treated as acceptable staleness;
-and the shipped warning stays silent in the reproduced `.shell-team/*.md` /
-repo-wide `*.md` case, i.e. the loop ships a false all-clear for the exact trap.
-**Not recommended, and not something this role will freeze.**
+<!-- END intent-block: T-1129 -->
 
 ## Assumptions
 
-- **Relayed, not measurable from this role**: the branch point `e00f560`; that
-  this branch has no open predecessor PR; the sprint "b-first-run" planning
-  approval of 2026-09-07T05:52Z and its per-item PATCH derivation; the
-  operator-approved lightweight mode; and issue #452's and #167's current tracker
-  state. No 40-hex literal from any of these appears anywhere in this file as a
-  load-bearing anchor. The coordinating session holds the primary confirmation
-  for each and should report #167's live state beside disposition A or B, since
-  whether #167 is still open decides whether #452 is a duplicate or a re-scope.
-- **Unverified and flagged above**: `git check-ignore`'s answer for a base
-  **directory** whose contents are tracked.
-- **Declarations are deliberately absent.** No `- user-visible:`,
-  `- verification-class:`, `- verification-ceiling:` or
-  `- base-ref-discriminator:` line is written, because each is a first-freeze
-  declaration about a deliverable and this file declares none. Had the design
-  been freezable they would have read: `user-visible: yes` (a new line in a
-  shipped script's adopter-facing output, adopter surface *Where the operating
-  files live* in both languages plus `--help`); `verification-class: mechanism`
-  (the diff reaches `bin/` and `tests/`); `verification-ceiling:
-  unit-and-static`; and `base-ref-discriminator: not-applicable` — no open
-  predecessor PR, so the branch point is `git merge-base develop HEAD` and no
-  predecessor-versus-merge-base ambiguity exists. They are recorded here as
-  worked-out inputs to a later freeze, not as declarations in force.
+- **Relayed premises, not measurable from this role.** (1) The operator ruling of 2026-09-07 selecting **C**, and issue #452's 2026-09-07 re-scope comment as canon superseding the issue body. (2) **GitHub issue #167 is closed** (2026-08-09, completed) — this corrects this role's earlier hand-off, which described it as open on the strength of T-1046's frozen text; #167 is not described as open anywhere in this file. (3) The branch point `e00f560` and the absence of an open predecessor PR. (4) `.shell-team/interventions/T-1129.md`'s `assumption-contradicted` and `work-abandoned` entries at commits `1aceca6` and `613ffe7`. (5) The sprint "b-first-run" planning approval of 2026-09-07T05:52Z, its lightweight mode, and the re-derived PATCH row (`headline=not-met / default-reach=met`). No 40-hex or short-hex literal from any of these is load-bearing in any criterion. The coordinating session holds the primary confirmation for each.
+- **Borrowed-vocabulary count-premise sweep (T-1081).** Two classes of literal count premise are asserted, classified and enumerated for measurement at the branch point by the execution-capable side:
+  - **own-coinage** — the anchor phrase `does not appear in git status` occurs **zero** times in the whole repository. Measured by this role on 2026-09-07 with a repository-wide content search returning no matches. This is the non-vacuity ground for **AC1** and **AC4**. Command to confirm at the branch point: `git grep -c -F -e 'does not appear in git status' "$(git merge-base develop HEAD)" -- . ; echo rc=$?` (rc=1 with no output is the expected zero).
+  - **borrowed** — the five tokens **AC3** sweeps are pre-existing vocabulary coined by T-1046, not this task's: `check-ignore` occurs **zero** times across `bin/` and `.github/`, and `report_ignored_base_verdict`, `git_probe`, `resolved base dir as ignored` and `check-ignored-base` occur **zero** times across `bin/ tests/ docs/ templates/ agents/ skills/ .github/`. Measured by this role on 2026-09-07 for the first token (a content search over `bin/` returned no matches; `check-ignore` **is** present in `docs/adopting.md`, `docs/adopting.ja.md` and three files under `tests/`, which is precisely why T-1046 scoped that one token's sweep to `bin/` and `.github/`). The freeze run re-measures all five at the branch point and records the values here; **AC3**'s own check line is the same measurement over the live tree.
+    - measured at the branch point `e00f560` by the coordinating session on 2026-09-07 (freeze run): `check-ignore` 0 files across `bin/` + `.github/`; `report_ignored_base_verdict` 0, `git_probe` 0, `resolved base dir as ignored` 0, `check-ignored-base` 0 files across the seven trees; own-coinage `does not appear in git status` 0 occurrences repository-wide; `- count: no-git-claim-lines` re-run = 5.
+- **The pre-existing "no git command" prose stays true and is deliberately untouched.** Five lines carry it — `bin/team-init.sh`:28–29 and `:115`, `docs/adopting.md`:402, `docs/adopting.ja.md`:415 and `tests/team-init/run.sh`:601 — plus a sixth site at `bin/team-init.sh`:31–32 stating the same claim in different words (`plus, only when --trial-branch is given, git.`) that neither pattern below matches. Under this scope no git command is added, so every one of them remains accurate; no criterion is written for them and no edit is made. This is the disposition of the six-site inventory this role measured before the re-scope, and it also leaves T-1097 **AC13** green untouched, whose shape is a conditional (the trial section must keep at least one line carrying both `no git command` and `--trial-branch`) that an edit here could only endanger.
+  - count: no-git-claim-lines — 5 — command: cd "$(git rev-parse --show-toplevel)" || exit 3; for f in bin/team-init.sh docs/adopting.md docs/adopting.ja.md tests/team-init/run.sh; do test -r "$f" || exit 3; done; git grep -n -F -e 'no git command' -e 'git コマンドを一切実行せず' -- bin/team-init.sh docs/adopting.md docs/adopting.ja.md tests/team-init/run.sh | wc -l | tr -d ' '
+- **Downstream-impact analysis, and what stays unmeasured.** A literal-path derivation over the merged spec corpus identifies T-1097 **AC11** (the suite's seven `PASS` tokens plus its closing line) and **AC12** (shellcheck on the same two files) as the criteria reading the paths this task edits; **AC2** and **AC5** here re-assert both, so an additive arm and a clean lint keep them green. T-1046 **AC4** is re-run verbatim as **AC3**. T-1046 **AC3** is a merge-point-scoped allow-list pinned to `d825293` and already stale by its own text; this task neither repairs nor worsens it. **Indirection class disclosed, not engineered around**: a merged criterion reaching these files through a directory-level pathspec, a glob, or a path built at run time from `bin/team-paths.sh --get …` is invisible to a literal-path derivation in principle. Under the operator-approved lightweight mode this task runs **no per-task two-arm full-population sweep** — the sprint runs one before release — so that class stays **disclosed as unmeasured** rather than claimed as covered.
+- **`git check-ignore`'s behaviour for a base directory whose contents are tracked** was flagged unverified in this role's pre-re-scope finding. It is **moot under this scope** and is recorded here only so the open question is not silently dropped: nothing in this task queries git.
+- **pm-spec cannot run a `check:` line.** All five were written by reading the target files at this HEAD. The execution-capable side runs them live and in full before the freeze, repairs anything broken or vacuous with a meaning-preserving fix, and only then records the hash. **AC1** and **AC2** are expected **red** at a pre-implementation sweep (the line and the arm do not exist yet); **AC3** and **AC5** are expected **green** at base; **AC4** is expected red. That distribution is the criteria working, not broken lines.
+- **Line numbers move.** Every `:NNN` in this file was measured on 2026-09-07. Locate each site by its quoted text, not by its line number.
 
-## Open questions — blocking
+## Open questions
 
-1. **Which disposition (A, B or C)?** This is the block. It is a planning
-   decision because T-1046's own terminal pre-commitment routes it there, and
-   because the approval that authorized T-1129 was derived without the defeat
-   history in view.
-2. **Is #167 still open?** Not readable from this role. If open, #452 is a
-   duplicate re-filing and the two should be merged before either is worked.
+None blocking.
+
+## Pre-commitment
+
+Dispositions are named here, before review round 1, so a firing trigger executes
+a decision instead of opening one.
+
+- **Droppable (first and only) — the two adopting-doc sentences (**AC4**).** Trigger: two consecutive review rounds producing independent new defects against the doc sentences' wording, placement or extraction. Disposition: **AC4** is dropped and its findings travel with it to a fast-follow issue as its requirement list; the shipped pointer line still ships, because the line is what closes the ordering gap and the doc sentences only describe it. The `- adopter-surface:` obligation is discharged in that case by the pointer line itself, which is adopter-facing output.
+- **Never-dropped — the pointer line printing on the default path (**AC1**) and T-1046's zero-token invariant staying green (**AC3**).** These are the task's whole value and its one hard boundary respectively. Defeat of either **stops the task and returns it to planning**; it is not answered by another patch round, because the same mechanism defeated across consecutive design generations is evidence about the design premise rather than about the implementation's craft — and this question has already spent two tasks and two closed pre-commitments.
+- **Threshold** is the repository's default "two consecutive rounds of the same-class defect", not loosened.
+
+## Body-to-AC correspondence
+
+| # | Body directive | Source | Where it lands |
+|---|---|---|---|
+| 1 | One fixed line prints in the closing summary block, on stdout, on the default path | Goal, #452 comment | **AC1** (exactly-one anchor count, exit 0, `Next: run` still present) |
+| 2 | The line names the resolved base dir, `docs/adopting.md` and the section title | Goal, #452 comment | **AC1** (same-line chained assertions) |
+| 3 | No git command is added, on any path | Goal, Non-goals | **AC2** (the git-free arm's three assertions still present verbatim and the suite green — the arm fails the moment a git call appears on the no-flag path), **AC3** (`check-ignore` zero across `bin/`) |
+| 4 | No detection, and no claim about the repository's ignore state | Goal, Non-goals | **AC1** (the line is asserted identical and unconditional in a run against a fresh non-repository target, where no ignore state exists to be right about) |
+| 5 | T-1046's five-token zero-invariant and the by-name lock stay green | Goal, "Why this scope is freezable" | **AC3** (that spec's own check line, copied verbatim) |
+| 6 | Both adopting docs' *Where the operating files live* sections gain a sentence | Goal, #452 comment | **AC4** (section-scoped, both languages, shared machine token) |
+| 7 | The T-1097 git-free arm keeps passing with its assertions unedited | Goal, Non-goals | **AC2** |
+| 8 | Fixture coverage lands in `tests/team-init/run.sh`, additive, under the plain `$TMP` root | #452 comment, relayed routing | **AC2** (new `PASS` token, seven pre-existing tokens, closing line, no `GIT_TMP` on the new arm's line) |
+| 9 | Host root untouched | Shipped invariant, Non-goals | **AC1** (neither `CLAUDE.md` nor root `.gitignore` exists after the run) |
+| 10 | Pure bash, zero new dependency, shellcheck-clean, bash 3.2 floor | Shipped invariant | **AC5** |
+| 11 | Exit status unchanged | Non-goals | **AC1** (exit 0 asserted) |
+| 12 | The scaffold still lands | Goal | **AC1** (`<target>/.shell-team/todo.md` exists) |
+| 13 | The pre-existing "no git command" prose is not edited | Non-goals | info-only (not promoted to AC) — a directive to leave six sites **unchanged** under a scope that adds no git call has no observable artifact of its own; the sites stay true by construction, and T-1097 **AC13**, already merged and green, is the standing lock on the two that matter. Recorded with its measurement in `## Assumptions` |
+| 14 | No new flag, no CI change, no version bump, no CHANGELOG, no new `bin/` script, no new test suite | Non-goals | info-only (not promoted to AC) — no scope lock is written here by design (it would contradict the `base-ref-discriminator: not-applicable` declaration), so this is held by the criteria's narrowness and by review rather than by a diff assertion; stated so a finding about it is answerable |
+| 15 | T-1046 `AC3`'s stale allow-list is not repaired or re-pointed | Non-goals | info-only (not promoted to AC) — it is another task's merge-point-scoped criterion, already stale by its own text; asserting anything about it here would be the merge-ranging its own body forbids |
+| 16 | No four-arm ignore-detection design, no `core.excludesFile`-pinned arms, no "could not run" line | Non-goals | info-only (not promoted to AC) — a declared absence of a mechanism has no artifact to read; **AC3** is what makes its revival mechanically red |
+| 17 | Tier PATCH, planning row re-derived | Relayed planning premise | info-only (not promoted to AC) — the release tier is a property of the sprint's version derivation, not of any file this task edits, so no check over this checkout can observe it |
+| 18 | This scope is distinguishable from the design T-1046 closed | "Why this scope is freezable" | **AC3** (the mechanical boundary). The reading itself is the operator's ruling and is recorded, not asserted by a check — no command can observe a rationale |
 
 ## Notes for engineer
 
-**Do not implement anything from this file.** It is a pre-freeze record of a
-blocking conflict, not a work order: there are no acceptance criteria, no intent
-block and no frozen intent to implement against.
-
-If disposition **B** is later authorized, these are the measured inputs worth
-carrying into its spec rather than re-deriving:
-
-- The six claim sites listed under `## Measurements`, and the constraint that
-  T-1097 **AC13** makes their repair a **re-scoping** — the trial section of
-  `docs/adopting.md` must keep at least one line carrying both `no git command`
-  and `--trial-branch`, and no line carrying the former without the latter.
-  Deleting the phrase reddens **AC13**; leaving it unqualified makes it false.
-- The surviving half of the T-1097 git-free invariant, if that arm is ever
-  re-scoped: "git's absence or failure never fails `team-init` — exit status
-  stays 0 and the scaffold still lands". `tests/team-init/run.sh`:592 is the
-  assertion that would have to change, and `:601` its `PASS` text.
-- Any ignore assertion must pin `core.excludesFile` explicitly rather than
-  inherit the operator's, per `docs/adopting.md`:54–59. Pinning it *for the
-  script's own internal call* is not possible from outside with `git -c`; the
-  portable, git-version-agnostic pin for a fixture is repo-local
-  (`git -C "$repo" config core.excludesFile <fixture>`), which overrides the
-  global file by config precedence. `GIT_CONFIG_GLOBAL` needs git ≥ 2.32 and is
-  itself one of T-1046's recorded injection vectors.
-- The ignore query has to run **after** the scaffold: a trailing-slash pattern
-  such as `.shell-team/` only matches a path that exists as a directory on disk.
-- The T-1097 environment-hygiene pattern at `bin/team-init.sh`:235–268 —
-  `git -C "$TARGET"` under `env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE` —
-  and the shipped invariants it protects: pure bash, zero new dependency,
-  shellcheck-clean, no host-root file written.
-- **Measured-at-ref command check**: `not applicable — no deliverable of this
-  task prints a command beside a label naming the git ref its result was measured
-  at.` The one `- count:` line above reads the working tree deliberately and
-  carries no ref label.
+- **The whole deliverable is one `printf` in the closing block** (`bin/team-init.sh`:371–392, the run of stdout `printf` statements ending with the `Next: run …` line and `exit 0`), plus one fixture arm and two doc sentences. Put the new line **before** the `Next: run …` line, so the "what to do next" call to action stays last.
+- **Interpolate the resolved base dir; do not hardcode `.shell-team`.** Three lines in that block already do it with `"$TEAM_RUN_BASE"`. The legacy `tasks/` layout and the `$TEAM_RUN_BASE` override both reach this line, and **AC1** only checks the default layout, so the hardcoded form would pass **AC1** while being wrong for two reachable input classes.
+- **The anchor phrase is `does not appear in git status`** — fixed, and the single machine token shared by the shipped line, the fixture arm and both doc sentences. It occurs zero times in the repository today, so nothing satisfies **AC1** or **AC4** by accident. The line must also carry `docs/adopting.md` and `Where the operating files live`.
+- **Say nothing about ignore state.** A conditional ("if it does not appear …", "a repo-level or global ignore rule can hide it") is fine; an assertion ("your base dir is ignored", "checked and clear") is not, and is what the frozen Non-goals refuse.
+- **Avoid every one of T-1046 **AC4**'s five tokens in every string you add**, in `bin/`, `tests/` and `docs/` alike: `check-ignore`, `report_ignored_base_verdict`, `git_probe`, `resolved base dir as ignored`, `check-ignored-base`. The trap to watch is the third one — a natural phrasing such as "…the resolved base dir as ignored…" would redden **AC3** from a docs sentence. Note `docs/adopting.md` and `docs/adopting.ja.md` already contain `check-ignore` as base content; that is fine, because that token's sweep is scoped to `bin/` and `.github/` only. Read **AC3**'s check line before writing any string.
+- **Prefer no backticks in the new `printf`.** If you add any, `bin/team-init.sh`:390 is the precedent — `# shellcheck disable=SC2016` on its own line immediately above the statement, with the reason that the backticks are literal user-facing text.
+- **The new fixture arm needs no repository**, so build it under the plain `$TMP` root (`tests/team-init/run.sh`:27–31), **not** `$GIT_TMP` — that second root exists only for git-needing fixtures, per the T-1042 sandbox quirk documented at `:33`–`:37`. Use the existing `init`, `pass` and `fail` helpers (`:53`–`:58`); `init` already runs `env -u TEAM_RUN_BASE`. Name the case exactly `T-1129 pointer-line` in its `pass` string, and keep `GIT_TMP` off that line (**AC2** asserts both).
+- **Do not touch `tests/team-init/run.sh`:581–601.** **AC2** locks its three assertion fragments verbatim. Adding an arm elsewhere in the file is what is wanted.
+- **Both doc sentences go inside their own section** — `## Where the operating files live` (`docs/adopting.md`:11) and `## 稼働ファイルの置き場所` (`docs/adopting.ja.md`:12) — not in the trial-adoption section further down. `docs/adopting.md`:404 and its mirror `:417` already teach the trap for the trial route and are deliberately out of scope. Write natural Japanese around the shared English anchor phrase, exactly as that file already embeds bracketed English tokens.
+- **Measured-at-ref command check**: `not applicable — no deliverable of this task prints a command beside a label naming the git ref its result was measured at.` The one `- count:` line in `## Assumptions` reads the working tree deliberately and carries no ref label.
+- **Prior art worth reading first**: `.shell-team/specs/T-1097-trial-branch-flag.md` **AC11**/**AC12** (the suite-green and shellcheck shapes reused here), `.shell-team/specs/T-1046-ignored-base-verdict.md` `## What this achieved and what it cost` (the six defeat vectors — the reason this scope queries nothing), and `.shell-team/interventions/T-1129.md` (why the original scope was abandoned).
