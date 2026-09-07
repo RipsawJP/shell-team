@@ -134,6 +134,25 @@ The loop runs Plan → Specify → Implement → Validate → Review, advancing 
 flag in the board (`<base>/todo.md`) at each phase gate, and pauses for a human
 before merge/push.
 
+**The loop operates on the repository your session is rooted in.** `run`
+resolves the board, specs and loop contract from the current working directory
+(the skill's Step 0), and the sub-agents it dispatches read, edit and test that
+same tree; there is no flag that points a run at another checkout. To work on a
+repository, open a Claude Code session whose working directory *is* that
+repository — one that has been through `team-init` and carries its own
+`CLAUDE.md`. Knowledge that lives elsewhere — a hub repository holding progress
+notes, cross-repository measurements, incident history — does not reach the loop
+through the orchestrating session's context, because every sub-agent starts
+fresh and sees only its briefing and the tracked files; running the loop from
+that hub buys the executors nothing and takes the loop off its supported path.
+Bring the knowledge in through the spec instead: write the spec where the
+judgment lives and route `specify — operator-authored` (see [Choosing who authors
+the spec](#choosing-who-authors-the-spec-t-1091)), then run in the target
+repository. The tracked files under the base dir are the only state that
+crosses between roles, so a base dir hidden by a global excludes file leaves the
+gates reading nothing — [Where the operating files
+live](#where-the-operating-files-live) has the one-line re-include.
+
 ## Binding roles to executors
 
 `team-init` scaffolds an inert `<base>/binding.conf.example`
