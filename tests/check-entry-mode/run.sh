@@ -543,6 +543,57 @@ refl_board none "- entry-mode: pm-authored" "$D_SPECIFY" \
   "-  dispatch: verify — serial — unconditional — recommendation: r"
 chk901 "zero dispatch-reflection rows with a malformed dispatch line still passes (round-2 regression fix, AC6 validate-if-present)" 0
 
+# --- source 4: `- refreeze-ratifier:` (T-1131, issue #459) ----------------
+# Strict validate-if-present. Accepted arm: both vocabulary words on an
+# operator-authored entry, and the absent line in both modes. Rejected arm:
+# every out-of-set spelling, a duplicated line, both whitespace variants
+# this file's own history names as reachable, and a well-formed line
+# sitting on a pm-authored entry (the record disagreeing with itself).
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: operator"
+chk "T-1131 ratifier-accepted: 'operator' on an operator-authored entry passes" 0
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: authoring-session"
+chk "T-1131 ratifier-accepted: 'authoring-session' on an operator-authored entry passes" 0
+
+bd "- entry-mode: operator-authored" "$D2"
+chk "T-1131 ratifier-accepted: an absent refreeze-ratifier line still passes on an operator-authored entry" 0
+
+bd "- entry-mode: pm-authored" "$D1"
+chk "T-1131 ratifier-accepted: an absent refreeze-ratifier line still passes on a pm-authored entry" 0
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: Operator"
+chk "T-1131 ratifier-rejected: a case variant ('Operator') refuses" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: authoring-session:hub"
+chk "T-1131 ratifier-rejected: the superseded label form ('authoring-session:hub') refuses" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: operators"
+chk "T-1131 ratifier-rejected: the near-miss ('operators') refuses" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier:"
+chk "T-1131 ratifier-rejected: an empty value refuses" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: operator" "- refreeze-ratifier: operator"
+chk "T-1131 ratifier-rejected: a duplicated refreeze-ratifier line refuses" 1
+
+bd "- entry-mode: operator-authored" "$D2" "-  refreeze-ratifier: operator"
+chk "T-1131 ratifier-rejected: doubled-space-after-bullet-dash refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier : operator"
+chk "T-1131 ratifier-rejected: space-before-colon refuses rather than reading as absent" 1
+
+bd "- entry-mode: pm-authored" "$D1" "- refreeze-ratifier: operator"
+chk "T-1131 ratifier-rejected: a well-formed refreeze-ratifier line on a pm-authored entry refuses (the record disagreeing with itself)" 1
+
+run >/dev/null || true
+grep -qF -- 'appears more than once' "$T/err" && fail "duplicate-line stderr check ran against the wrong fixture"
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: operator" "- refreeze-ratifier: operator"
+[ "$(run)" = "1" ] || fail "T-1131 duplicate-line exit-code recheck"
+run >/dev/null || true
+grep -qF -- 'appears more than once' "$T/err" || fail "T-1131 duplicate-line stderr must name the duplication"
+pass "T-1131 ratifier-rejected: duplicated refreeze-ratifier line's stderr names the duplication"
+
 # --- comment-stripped flattened form carries the two shipped limits --------
 fc() { sed 's/^[[:space:]]*#[[:space:]]*//' "$1" | tr '\n' ' ' | tr -s ' '; }
 fc "$SCRIPT" > "$T/flat"

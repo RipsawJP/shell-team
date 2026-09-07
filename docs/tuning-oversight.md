@@ -137,6 +137,10 @@ Record the class, the trigger (`broken-as-command` / `vacuous` / `contradictory`
 
 One limitation is disclosed rather than fixed: a pure **swap** of two `- check:` lines between two different criteria classifies as `mechanics` (test case `crc-blindspot-swapped-checks`), even though it changes which criterion each line belongs to — a meaning change the checker cannot see, because it never parses which criterion a check line is nested under. Closing it would need a second, criterion-structure-aware parser this project does not build; it is pinned as known behavior instead. Three things stay human regardless of the grant: **the grant itself** (transferring authority is yours to give), **the residual-risk acceptance** the swap case above is the concrete instance of, and **the decision to revoke the grant**.
 
+### Which human the class-B GO is addressed to (T-1131, issue #459)
+
+The default sentence above never moves without a per-instance human GO — but for an `entry-mode: operator-authored` spec, nothing before this said which human that GO is addressed to: you in person, or an authoring session acting for you in a hub-and-spoke run. An optional `- refreeze-ratifier: operator|authoring-session` sub-bullet on that spec's board entry answers it. The default, `operator` — what every entry carrying no such line already reaches — means the class-B escalation above addresses you, the operator, exactly as it always has. `authoring-session` addresses the ratification request to the declared authoring session instead, and takes effect only for that one `operator-authored` entry; a `pm-authored` entry carries no such line, because there is no separate author to address there — the ratifier is you by construction. Nothing here opens a channel, verifies an identity, or delivers a request anywhere: the sub-bullet only changes who the escalation message names and what it says when the declaration does not apply.
+
 ## Who may grant a loop extension
 
 A loop contract's `budget:` block carries an optional field, `extension_ratifier`,

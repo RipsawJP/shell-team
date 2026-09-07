@@ -32,6 +32,20 @@
 # passes — presence is `templates/prompt-blocks/dispatch-record.md`'s own
 # requirement, never this script's.
 #
+# T-1131 (issue #459) adds a FOURTH, independent family at this same seam:
+# `- refreeze-ratifier: operator|authoring-session`, a board sub-bullet
+# declaring WHO ratifies a class-B intent-block re-freeze for an
+# `operator-authored` entry. Strict validate-if-present, the same shape the
+# `- dispatch-reflection:` family already uses: an entry carrying no such
+# line still passes, in both modes — presence is a prose producer duty on
+# `pm-spec` (agents/pm-spec.md), never this script's refusal. Present ⇒ the
+# closed two-word vocabulary and the exact grammar are enforced, and the
+# line is refused outright on a `pm-authored` entry (the ratifier is the
+# operator there by construction, so the record disagreeing with itself is
+# the same class the two-source mismatch above already refuses). No
+# `<label>` suffix is accepted — that form is superseded (see the frozen
+# spec's Goal).
+#
 # The verdict is "both present, and agreeing" — a MISSING source is a
 # refusal, never a silently-false condition, which is what makes the
 # verdict order-independent (the shipped condition does not read as false
@@ -72,15 +86,18 @@
 #   check-entry-mode.sh --board PATH --task T-NNN
 #
 # Exit codes: 0 = both sources present and agreeing, every flagged gap is
-# resolved (or none were flagged), and the dispatch-reflection family (if
+# resolved (or none were flagged), the dispatch-reflection family (if
 # present) is well-formed, covers every axis and agrees with the
-# predecessor's own recorded values; 1 = a refusal about the board entry's
+# predecessor's own recorded values, and the refreeze-ratifier family (if
+# present) is well-formed; 1 = a refusal about the board entry's
 # content (a source missing, duplicated, or outside its closed vocabulary;
 # the two sources disagree; a malformed or unresolved flagged-gap marker;
 # a malformed, incomplete, mixed, mismatched or unresolved
-# `- dispatch-reflection:` row — T-1109); 2 = a usage error or an
-# unresolvable environment (bad invocation, an unreadable board, or the
-# task not found as exactly one top-level ## Active entry).
+# `- dispatch-reflection:` row — T-1109; a `- refreeze-ratifier:` value
+# outside its closed pair, a duplicated line, a malformed spacing variant,
+# or the line present on a `pm-authored` entry — T-1131); 2 = a usage error
+# or an unresolvable environment (bad invocation, an unreadable board, or
+# the task not found as exactly one top-level ## Active entry).
 
 set -euo pipefail
 
@@ -214,6 +231,36 @@ esac
 # --- both directions of a mismatch refuse --------------------------------
 if [ "$EM_VALUE" != "$D_VALUE" ]; then
   fail "$TASK's \`- entry-mode:\` ('$EM_VALUE') and \`- dispatch: specify\` ('$D_VALUE') disagree"
+fi
+
+# --- source 4: `- refreeze-ratifier:` (T-1131, issue #459) ---------------
+# Strict validate-if-present: COLLECT WIDE, PARSE STRICT — this script's
+# recurring defect class, repaired twice already for the gap/resolution
+# stem (T-1096 rework Blocker 2) and the dispatch-reflection stem (Codex
+# round 1 Major 4). The stem net below tolerates extra whitespace after the
+# bullet dash and on either side of the colon, so any spacing variant that
+# MEANS this family is collected rather than silently read as the
+# conformant absent case; the full grammar stays strict (the canonical
+# two-space board indent every other family's fixtures use, exactly one
+# space around the colon), so a variant the stem collects but the full
+# grammar rejects is refused as malformed.
+rr_stem_re='^[[:space:]]*-[[:space:]]+refreeze-ratifier[[:space:]]*:[[:space:]]*'
+rr_full_re='^  - refreeze-ratifier: (operator|authoring-session)$'
+
+RR_LINES="$(printf '%s\n' "$ENTRY" | grep -E "$rr_stem_re" || true)"
+RR_COUNT="$(printf '%s\n' "$RR_LINES" | grep -c . || true)"
+
+if [ "$RR_COUNT" -gt 1 ]; then
+  fail "$TASK's \`- refreeze-ratifier:\` sub-bullet appears more than once ($RR_COUNT times)"
+fi
+if [ "$RR_COUNT" -eq 1 ]; then
+  if [[ ! "$RR_LINES" =~ $rr_full_re ]]; then
+    fail "$TASK has a malformed \`- refreeze-ratifier:\` sub-bullet — found, but it does not match the canonical grammar '  - refreeze-ratifier: operator|authoring-session': $RR_LINES"
+  fi
+  RR_VALUE="${BASH_REMATCH[1]}"
+  if [ "$EM_VALUE" = "pm-authored" ]; then
+    fail "$TASK carries a \`- refreeze-ratifier: $RR_VALUE\` sub-bullet on a \`pm-authored\` entry — the ratifier is the operator by construction there, so the record disagrees with itself"
+  fi
 fi
 
 # --- flagged-gap / flagged-gap-resolution id pairing ---------------------
