@@ -31,6 +31,7 @@ budget:
   max_wallclock_min: 0     # untracked (host-dependent)
   max_subagents: 5         # tech-lead, pm-spec, engineer, qa-verifier, codex-reviewer
   max_usd: 0               # untracked (host-dependent)
+  extension_ratifier: operator   # default; or: authoring-session
 
 stop:
   all_acs_green: true              # QA + Codex Reviewer both reach READY_FOR_MERGE

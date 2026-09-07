@@ -163,5 +163,48 @@ assert "T-1021-loop-guard-iteration-flag (zero-fixture=010) -> STOP" "STOP:max_i
 assert "T-1021-loop-guard-iteration-flag (zero-fixture=08) -> STOP" "STOP:max_iterations_reached" 3 -- \
   "$GUARD" --iteration 08
 
+# --- T-1130: budget.extension_ratifier vocabulary validation ---------------
+# Scratch contracts are built under $TMP, never as checked-in fixture files
+# under tests/loop-guard/fixtures/ (AC4 locks that listing unchanged), the
+# same pattern the T-1021 arms above already use.
+
+# Accepted arm: operator | authoring-session | inline-comment spelling |
+# empty value must all leave decisions unchanged vs. the field being absent
+# entirely — checked below against the same $GUARD fixture (cap 3) at an
+# iteration under, at, and over the cap.
+RAT_OPERATOR="$TMP/ratifier-operator-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier: operator\nstop:\n  no_progress: false\n' > "$RAT_OPERATOR"
+RAT_AUTHORING="$TMP/ratifier-authoring-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier: authoring-session\nstop:\n  no_progress: false\n' > "$RAT_AUTHORING"
+RAT_COMMENT="$TMP/ratifier-comment-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier:   operator   # default; or: authoring-session\nstop:\n  no_progress: false\n' > "$RAT_COMMENT"
+RAT_EMPTY="$TMP/ratifier-empty-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier:\nstop:\n  no_progress: false\n' > "$RAT_EMPTY"
+
+for c in "$RAT_OPERATOR" "$RAT_AUTHORING" "$RAT_COMMENT" "$RAT_EMPTY"; do
+  assert "T-1130 ratifier-accepted ($c) under cap -> CONTINUE" "CONTINUE" 0 -- \
+    "$c" --iteration 1
+  assert "T-1130 ratifier-accepted ($c) at cap -> STOP:max_iterations_reached" "STOP:max_iterations_reached" 3 -- \
+    "$c" --iteration 3
+done
+
+# Rejected arm: a case variant, an underscore variant and a quoted value must
+# all fail closed to STOP:guard_error, exit 2 — both below AND above the
+# iteration cap, proving the vocabulary check runs ahead of the enforcement
+# blocks rather than being shadowed by max_iterations_reached.
+RAT_CASE="$TMP/ratifier-case-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier: Operator\nstop:\n  no_progress: false\n' > "$RAT_CASE"
+RAT_UNDERSCORE="$TMP/ratifier-underscore-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier: authoring_session\nstop:\n  no_progress: false\n' > "$RAT_UNDERSCORE"
+RAT_QUOTED="$TMP/ratifier-quoted-contract.yaml"
+printf 'budget:\n  max_iterations: 3\n  max_wallclock_min: 30\n  max_usd: 0\n  extension_ratifier: "operator"\nstop:\n  no_progress: false\n' > "$RAT_QUOTED"
+
+for c in "$RAT_CASE" "$RAT_UNDERSCORE" "$RAT_QUOTED"; do
+  assert "T-1130 ratifier-rejected ($c) below cap -> STOP:guard_error" "STOP:guard_error" 2 -- \
+    "$c" --iteration 1
+  assert "T-1130 ratifier-rejected ($c) above cap -> STOP:guard_error" "STOP:guard_error" 2 -- \
+    "$c" --iteration 99
+done
+
 printf 'OK\n'
 exit 0
