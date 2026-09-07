@@ -65,7 +65,7 @@ BLOCKED エスカレーション対応の 1 回のみ（telemetry `20260907T0552
   `fast-follow disposition` 行。
 - （relayed・v3-ma 側）same-class-2 の全件棚卸し方式への切替で spec-review r2 以降の絞り込み漏れと
   実装の型ガード漏れを1ラウンドで閉じ、QA の adversarial probe 拡大（23→109本）が Codex 指摘クラスの
-  closure を独立確認した — source: `/Users/sawamatsu/workspace/v2/v3-ma/.shell-team/retros/retro-input-T-001-2026-09-07.md`
+  closure を独立確認した — source: the external project's own `.shell-team/retros/retro-input-T-001-2026-09-07.md` (private repository, relayed)
   "Keep" 節（relayed、本role未検証）。
 
 <!-- retro-section: problem -->
@@ -159,7 +159,7 @@ BLOCKED エスカレーション対応の 1 回のみ（telemetry `20260907T0552
 - **relayed データの限界**: v3-ma 側の実測値（壁時計6h47m・入力≈35・ハード割り込み8・
   ラウンド数等）は、この role が直接読めない別 repo・複数セッション transcript から
   コーディネーティングセッションが relay したもの。本 role が直接読んだのは
-  `/Users/sawamatsu/workspace/v2/v3-ma/.shell-team/retros/retro-input-T-001-2026-09-07.md`
+  the external project's own `.shell-team/retros/retro-input-T-001-2026-09-07.md` (private repository, relayed)
   自体のみで、その中の数値が元の transcript を正しく転記しているかまでは検証していない
   （`## Loop-trap check` の unverified 項目参照）。
 - **pr-metadata unavailable**（`gh` 未認証）のため、PR #450（lesson promotion）・PR #451
