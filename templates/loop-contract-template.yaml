@@ -38,6 +38,7 @@ budget:
   max_wallclock_min: 30
   max_subagents: 5
   max_usd: 0
+  extension_ratifier: operator   # default; or: authoring-session
 
 # STOP — terminal conditions (REQUIRED). All four flags must be present.
 stop:

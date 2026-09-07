@@ -34,6 +34,7 @@ budget:
   max_wallclock_min: 60     # PRIMARY lever — driver passes --elapsed-min each tick
   max_subagents: 3          # engineer, qa-verifier, codex-reviewer per tick
   max_usd: 0                # untracked — token/usd is never a hard STOP lever here
+  extension_ratifier: operator   # default; or: authoring-session
 
 stop:
   all_acs_green: true               # check-acs PASS + check-intent aligned (when applicable) + check-provenance conformant + QA PASS + Codex APPROVE
