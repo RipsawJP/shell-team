@@ -140,6 +140,22 @@ FAIL を報告する。
 ボード（`<base>/todo.md`）の status flag を進め、マージ/プッシュの前に人間のために
 一時停止します。
 
+**ループはセッションの root にある repository に対して動きます。** `run` は
+ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、
+起動される sub-agent もその同じツリーを読み・編集し・テストします。別の checkout を
+指し示すフラグはありません。ある repository で作業するには、その repository を
+作業ディレクトリとする Claude Code セッションを開いてください — `team-init` 済みで、
+自身の `CLAUDE.md` を持つものです。他所にある知識（進捗メモを集約した hub repository、
+repository 横断の計測、インシデント履歴）は、オーケストレータ側セッションの文脈を
+通ってループに届くことはありません。sub-agent は毎回 fresh に起動し、briefing と
+tracked ファイルしか見ないからです。hub からループを回しても executor が得るものは
+無く、ループはサポート経路から外れます。知識は spec に載せて持ち込んでください:
+判断がある場所で spec を書き、`specify — operator-authored` で route し
+（[spec を誰が書くかを選ぶ](#spec-を誰が書くかを選ぶt-1091) を参照）、対象 repository
+で run します。ロール間を渡る状態は base dir 配下の tracked ファイルだけなので、
+global excludes で base dir が隠れていると gate は何も読めません — 1 行の再包含は
+[稼働ファイルの置き場所](#稼働ファイルの置き場所) にあります。
+
 ## 役割と executor の紐付け
 
 `team-init` は不活性な `<base>/binding.conf.example`
