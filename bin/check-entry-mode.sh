@@ -44,7 +44,17 @@
 # operator there by construction, so the record disagreeing with itself is
 # the same class the two-source mismatch above already refuses). No
 # `<label>` suffix is accepted — that form is superseded (see the frozen
-# spec's Goal).
+# spec's Goal). The stem net that COLLECTS a candidate line (Codex round 1
+# Major 2) is widened past the earlier colon-anchored form to the bullet
+# dash immediately followed by the bare field name alone — no colon, exact
+# case, or separator required to collect — because a line that MEANS this
+# family can spell it with a missing or doubled colon, `=` in the colon's
+# place, no space after the dash, a tab there, any letter case, `_` or a
+# bare space joining the two words, or no space after the colon, and every
+# one of those slipped past a colon-anchored stem and read as the
+# conformant absent case (RR_COUNT staying zero) rather than being refused.
+# The full grammar enforcing the exact canonical shape stays strict and
+# case-sensitive; only the collection stem widened.
 #
 # The verdict is "both present, and agreeing" — a MISSING source is a
 # refusal, never a silently-false condition, which is what makes the
@@ -94,10 +104,13 @@
 # the two sources disagree; a malformed or unresolved flagged-gap marker;
 # a malformed, incomplete, mixed, mismatched or unresolved
 # `- dispatch-reflection:` row — T-1109; a `- refreeze-ratifier:` value
-# outside its closed pair, a duplicated line, a malformed spacing variant,
-# or the line present on a `pm-authored` entry — T-1131); 2 = a usage error
-# or an unresolvable environment (bad invocation, an unreadable board, or
-# the task not found as exactly one top-level ## Active entry).
+# outside its closed pair, a duplicated line, any spelling that MEANS this
+# family but fails the strict grammar — a malformed spacing variant, a
+# missing or doubled colon, `=` for the colon, a wrong letter case, or `_`
+# or a bare space joining the two words — or the line present on a
+# `pm-authored` entry — T-1131); 2 = a usage error or an unresolvable
+# environment (bad invocation, an unreadable board, or the task not found
+# as exactly one top-level ## Active entry).
 
 set -euo pipefail
 
@@ -235,19 +248,39 @@ fi
 
 # --- source 4: `- refreeze-ratifier:` (T-1131, issue #459) ---------------
 # Strict validate-if-present: COLLECT WIDE, PARSE STRICT — this script's
-# recurring defect class, repaired twice already for the gap/resolution
-# stem (T-1096 rework Blocker 2) and the dispatch-reflection stem (Codex
-# round 1 Major 4). The stem net below tolerates extra whitespace after the
-# bullet dash and on either side of the colon, so any spacing variant that
-# MEANS this family is collected rather than silently read as the
-# conformant absent case; the full grammar stays strict (the canonical
-# two-space board indent every other family's fixtures use, exactly one
-# space around the colon), so a variant the stem collects but the full
-# grammar rejects is refused as malformed.
-rr_stem_re='^[[:space:]]*-[[:space:]]+refreeze-ratifier[[:space:]]*:[[:space:]]*'
+# recurring defect class, repaired three times now: the gap/resolution stem
+# (T-1096 rework Blocker 2), the dispatch-reflection stem (Codex round 1
+# Major 4), and this family's own stem (Codex round 1 Major 2). That third
+# repair widened the net past whitespace tolerance alone: a colon was never
+# a reliable boundary to require, because a line that MEANS this family can
+# spell it with no colon at all (`- refreeze-ratifier authoring-session`),
+# with `=` or `::` in the colon's place, with no space after the bullet
+# dash, with a tab there instead of a space, in any letter case
+# (`Refreeze-Ratifier:`, `REFREEZE-RATIFIER:`), with `_` or a bare space
+# joining the two words (`refreeze_ratifier:`, `refreeze ratifier:`), with
+# no space after the colon, or with a trailing comment — every one of these
+# reads as the conformant absent case under a stem anchored on the colon,
+# because RR_COUNT never leaves zero. The stem net below instead anchors on
+# the bullet dash immediately followed by the field name alone (whitespace
+# or `_` optionally joining `refreeze` and `ratifier`, matched
+# case-insensitively with `grep -Ei`), with no colon, exact case, or
+# trailing-boundary requirement at the collection stage at all — anything
+# after "refreeze[-_ ]?ratifier" is irrelevant to whether a line is
+# collected. Collecting on the bullet-start anchor (not a bare substring
+# search) is what keeps a line whose field key is something else — a
+# `- source: … refreeze-ratifier …` or `- flagged-gap (g1): refreeze-ratifier
+# …` sub-bullet merely mentioning the token in its value text — out of the
+# net: the family name must sit immediately after the dash to collect, not
+# merely appear somewhere on the line. The full grammar stays strict and
+# case-sensitive (the canonical two-space board indent every other family's
+# fixtures use, a literal colon, exactly one space around it, exact
+# lower-case spelling, nothing trailing), so any of the above variants is
+# COLLECTED here and REFUSED as malformed below, never silently read as
+# absent.
+rr_stem_re='^[[:space:]]*-[[:space:]]*refreeze[-_ ]?ratifier'
 rr_full_re='^  - refreeze-ratifier: (operator|authoring-session)$'
 
-RR_LINES="$(printf '%s\n' "$ENTRY" | grep -E "$rr_stem_re" || true)"
+RR_LINES="$(printf '%s\n' "$ENTRY" | grep -Ei "$rr_stem_re" || true)"
 RR_COUNT="$(printf '%s\n' "$RR_LINES" | grep -c . || true)"
 
 if [ "$RR_COUNT" -gt 1 ]; then

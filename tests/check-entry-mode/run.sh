@@ -586,6 +586,56 @@ chk "T-1131 ratifier-rejected: space-before-colon refuses rather than reading as
 bd "- entry-mode: pm-authored" "$D1" "- refreeze-ratifier: operator"
 chk "T-1131 ratifier-rejected: a well-formed refreeze-ratifier line on a pm-authored entry refuses (the record disagreeing with itself)" 1
 
+# --- Codex round 1 Major 2: the stem net widened past the colon anchor -----
+# A completely missing colon (the reported case), and every other spelling
+# that MEANS this family but was never reliably bounded by a literal colon,
+# must each be COLLECTED and REFUSED, never silently read as absent (RR_COUNT
+# staying zero and the family passing as though the line were not there).
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier authoring-session"
+chk "T-1131 ratifier-rejected: a missing colon refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier= operator"
+chk "T-1131 ratifier-rejected: '=' in the colon's place refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier:: operator"
+chk "T-1131 ratifier-rejected: a doubled colon refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "-refreeze-ratifier: operator"
+chk "T-1131 ratifier-rejected: no space at all after the bullet dash refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" $'-\trefreeze-ratifier: operator'
+chk "T-1131 ratifier-rejected: a tab after the bullet dash refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- Refreeze-Ratifier: operator"
+chk "T-1131 ratifier-rejected: a title-case field name refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- REFREEZE-RATIFIER: operator"
+chk "T-1131 ratifier-rejected: an upper-case field name refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze_ratifier: operator"
+chk "T-1131 ratifier-rejected: an underscore joining 'refreeze' and 'ratifier' refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze ratifier: operator"
+chk "T-1131 ratifier-rejected: a bare space joining 'refreeze' and 'ratifier' refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier:operator"
+chk "T-1131 ratifier-rejected: no space after the colon refuses rather than reading as absent" 1
+
+bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: operator # comment"
+chk "T-1131 ratifier-rejected: a trailing comment refuses rather than reading as absent" 1
+
+# The widened net collects on the bullet-start anchor (field name
+# immediately after the dash), never a bare substring search — a line
+# merely MENTIONING the token in its value text, under a different field
+# key, must leave the verdict unchanged (accepted-arm: exit 0, no real
+# `- refreeze-ratifier:` line is present).
+bd "- entry-mode: operator-authored" "$D2" "- source: see refreeze-ratifier discussion"
+chk "T-1131 ratifier-accepted: a 'refreeze-ratifier' token mentioned inside a different sub-bullet's value text does not get collected (verdict unchanged)" 0
+
+bd "- entry-mode: operator-authored" "$D2" "- flagged-gap (g1): refreeze-ratifier not declared — author-only" "- flagged-gap-resolution (g1): decided operator"
+chk "T-1131 ratifier-accepted: a 'refreeze-ratifier' token mentioned inside a flagged-gap's text does not get collected (verdict unchanged)" 0
+
 run >/dev/null || true
 grep -qF -- 'appears more than once' "$T/err" && fail "duplicate-line stderr check ran against the wrong fixture"
 bd "- entry-mode: operator-authored" "$D2" "- refreeze-ratifier: operator" "- refreeze-ratifier: operator"
