@@ -4,6 +4,9 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.5.4**
+  - **ループ契約で「`max_iterations` の延長を誰が裁定するか」を宣言できるようになりました。** `budget.extension_ratifier` の任意キー 1 つ（`operator` = 出荷既定で既存の判定は 1 バイトも変わらない／`authoring-session`）を `bin/loop-guard.sh` が検証し、それ以外の値は fail-closed で停止します。`operator-authored` なタスクで `STOP:max_iterations_reached` が発火すると、`run`／`goal` スキルは延長の問い合わせを宣言された authoring セッションへ向け、それ以外は理由を明示してオペレーターへ戻し、許可された延長を board に記録します。`docs/tuning-oversight.md` にフィールドの説明を追加しました。
+  - **operator-authored な spec が、class-B 再凍結の批准者を宣言できるようになりました。** spec の作者が宣言し `pm-spec` が転記する board サブバレット `refreeze-ratifier`（`operator` または `authoring-session`）を、`bin/check-entry-mode.sh` が存在時に検証します（広く収集して厳密に解析・`pm-authored` エントリ上では拒否）。`run` スキルの `drift-detected` エスカレーションは発火時に手続きを発明せずこの行を読み、行の無いエントリは従来どおりオペレーターへ届きます。`docs/tuning-oversight.md` の再凍結節に「その GO を誰に向けるか」を追記しました。
 - **v2.5.3**
   - **`team-init` の終了サマリが、base dir が `git status` に現れない場合の参照先を案内するようになりました。** 固定の 1 行が `docs/adopting.md` の *Where the operating files live* にある 1 行の再包含手順を指します。git には何も問わず、ignore 規則について何も主張しません — repo または global の excludes が `.shell-team/` を隠す罠は既に文書化されており、その案内が症状の後ではなく前に届くようになりました。
   - **`docs/adopting.md` が「ループはセッションの root にある repository に対して動く」と明記しました。** 別の checkout を指すフラグは無く、オーケストレータ側セッションの文脈は sub-agent に届かないため、他所にある知識は `operator-authored` の spec に載せて渡します。

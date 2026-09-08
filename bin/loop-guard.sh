@@ -36,6 +36,19 @@
 #     `stop.no_progress: true` AND the current and previous verdict hashes are
 #     both present and identical (a stuck loop).
 #
+# budget.extension_ratifier (T-1130, optional): declares who may rule on a
+# max_iterations extension once a STOP fires. This guard validates its
+# VOCABULARY ONLY — absent, empty, `operator` and `authoring-session` are
+# accepted; any other value fails closed to STOP:guard_error, in the same
+# shape as the max_usd guard below, and that validation runs BEFORE the
+# enforcement blocks so a corrupt value is never shadowed by
+# max_iterations_reached. This field adds no new decision this guard reaches:
+# with the field absent or set to either accepted word, every decision this
+# guard prints is exactly what it printed before this field existed. The
+# board condition that decides which of the two accepted words actually
+# takes effect for a given task belongs to the run/goal skills, not to this
+# guard.
+#
 # Exit: 0 = CONTINUE, 3 = STOP (terminal condition), 2 = STOP:guard_error
 #       (could not evaluate — fail-closed). stdout always carries the decision.
 #
@@ -140,10 +153,11 @@ read_value() {
   printf -v "$1" '%s' "$__v"
 }
 
-read_value MAX_ITER    budget max_iterations
-read_value MAX_WALL    budget max_wallclock_min
-read_value MAX_USD     budget max_usd
-read_value STOP_NOPROG stop   no_progress
+read_value MAX_ITER     budget max_iterations
+read_value MAX_WALL     budget max_wallclock_min
+read_value MAX_USD      budget max_usd
+read_value STOP_NOPROG  stop   no_progress
+read_value EXT_RATIFIER budget extension_ratifier
 
 # The two integer budget levers are required and must parse (fail-closed).
 [[ "$MAX_ITER" =~ ^[0-9]{1,9}$ ]] || guard_error "budget.max_iterations missing/out-of-range: '${MAX_ITER}'"
@@ -160,6 +174,15 @@ MAX_WALL=$((10#$MAX_WALL))
 # silently disabling billing enforcement.
 if [[ -n "$MAX_USD" && ! "$MAX_USD" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
   guard_error "budget.max_usd not numeric: '${MAX_USD}'"
+fi
+# budget.extension_ratifier is optional and vocabulary-closed. Absent or
+# empty means the field is not set (the shipped extractor cannot distinguish
+# the two, and this guard does not try to). An out-of-vocabulary value is a
+# corrupt contract — fail closed rather than silently ignoring it. Exact
+# byte comparison: no case folding, no whitespace stripping beyond what
+# contract_value already does, no quote stripping.
+if [[ -n "$EXT_RATIFIER" && "$EXT_RATIFIER" != "operator" && "$EXT_RATIFIER" != "authoring-session" ]]; then
+  guard_error "budget.extension_ratifier not one of operator|authoring-session: '${EXT_RATIFIER}'"
 fi
 
 # 1. iteration cap (primary runaway guard)

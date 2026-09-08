@@ -123,6 +123,49 @@ board 自身の `- refreeze-class` sub-bullet には、次を記録してくだ�
 
 1 つの限界は修正されずに開示されています: 2 つの異なる criterion の間で `- check:` 行を 2 本純粋に**入れ替える**と `mechanics`（テストケース `crc-blindspot-swapped-checks`）に分類されます——どの criterion にその行が属するかが変わっているにも関わらずです。これはこのチェッカーが見えない意味の変化です。check 行がどの criterion にネストしているかを一切パースしないためです。これを閉じるには、このプロジェクトが作らない 2 つ目の criterion-structure-aware なパーサが要ります。既知の挙動として固定してあります。grant があっても人間に残る 3 つのことがあります: **grant 自体**（権限の委譲はあなたが与えるものです）、上の swap のケースが具体例である**残余リスクの受容**、そして**grant を取り消す決定**です。
 
+### その GO は誰に向けたものか（T-1131, issue #459）
+
+上の既定文は、都度の人間 GO なしには何が変わっても動きません——ただし
+`entry-mode: operator-authored` な spec については、その GO が**誰**に
+向けたものかをここまで何も言っていませんでした: あなた本人なのか、
+hub-and-spoke 運用であなたの代わりに動く authoring session なのか、です。
+その spec の board entry にある任意の `- refreeze-ratifier:
+operator|authoring-session` サブブレットがこれに答えます。既定値
+`operator`——このサブブレットを一切持たないすべての entry がすでに届いて
+いる値——は、上の class-B エスカレーションがこれまでどおりあなた
+（operator）に向くことを意味します。`authoring-session` にすると宣言された
+authoring session にラティフィケーション要求が向きますが、それが効くのは
+その `operator-authored` entry 1 件だけです。`pm-authored` entry はこの
+サブブレットを一切持ちません——そこでは別に宛てるべき author がおらず、
+ratifier は構造上あなただからです。ここにはチャネルを開く仕組みも身元検証も
+どこかへリクエストを配送する仕組みもありません: このサブブレットが変えるの
+は、エスカレーションメッセージが誰の名前を挙げるか、そして宣言が当ては
+まらない時に何を言うかだけです。
+
+## ループの延長を誰が裁定してよいか
+
+loop contract の `budget:` block には任意項目 `extension_ratifier` があり、
+`bin/loop-guard.sh` が `STOP:max_iterations_reached` を出した時に誰が延長を
+裁定してよいかを宣言します。語彙は 2 語だけに閉じています。
+
+既定値 `operator` は、出荷される 3 つのテンプレート全部が持つ値であり、手で
+編集していない既存の contract もこの値にしか届きません。この値だと、STOP
+はこれまでどおりあなた（operator）にエスカレーションされます。値を
+`authoring-session` にすると別のフォールバック経路にオプトインできますが、
+それは条件付きです: そのタスクの board entry が `- entry-mode:
+operator-authored` を持っている場合にだけ有効になります。それ以外の
+タスク——`pm-authored` の場合、あるいは `- entry-mode:` サブブレットを
+一切持たない場合（この規約より前のすべてのタスクが該当します）——では、
+contract の `extension_ratifier` の値に関わらず、ループは理由を明示した
+うえで operator にフォールバックします。黙って動くことはありません。
+
+contract に宣言された ratifier は AI の自己規律ではなく **operator-ratified**
+な裁定です。contract を書いて値を選んだのはあなただからです。ここには
+チャネルを開く仕組みも身元検証も、どこかへリクエストを配送する仕組みも
+ありません。この項目が変えるのは、エスカレーションメッセージが誰の名前を
+挙げるか、そして宣言が当てはまらない時に何を言うかだけです。延長が
+承認された場合は、決定の記録が残るようタスクの board entry に記録されます。
+
 ## 限界
 
 `CLAUDE.md` は context であって Claude が従わなければならない設定ではありません。これを通じた緩和も強化も、**確率を変えるだけで機構を変えません**。確実に成立させたいものは CI（このリポジトリ自身の check がそうしています）か hook に属します。
