@@ -48,6 +48,14 @@
 #   a malformed `- dispatch:` sub-bullet refuses the close-out before any board write.
 #   an Active flag other than `READY_FOR_MERGE` refuses the close-out before any board write (T-1107, #53).
 #
+# T-1132: the T-068 gate above refuses only the literal `pending:` on an
+# anchored disposition line, exactly as before. `filed as issue #N`,
+# `waived: <reason>` and the newer `deferred: <reason>` are all terminal
+# forms this gate lets pass unchanged. A `deferred:` reason that itself
+# contains the literal `pending:` is still refused, by the same whole-line
+# grep, by design (see the T-068 gate comment below) — this is not a new
+# gate class, only documentation of an already-terminal third value.
+#
 # T-1096's backstop is deliberately NOT a general-purpose reader: it invokes
 # the sibling bin/check-spec-review.sh, which resolves its own reviews
 # directory ($TEAM_REVIEWS_DIR at the same override precedence
@@ -233,6 +241,15 @@ grep -q '^## Done' "$BOARD" || fail "board has no ## Done section: $BOARD"
 # mistaken for a real disposition line; the second grep then rejects only when
 # that anchored line still carries the literal `pending:` token (the resolved
 # forms `filed as issue #N` / `waived:` carry no `pending:`).
+#
+# T-1132: `deferred: <reason>` is a third terminal form alongside `filed as
+# issue #N` and `waived: <reason>` — used when the author has not ruled on
+# filing or waiving. It carries no `pending:` in its own grammar, so this
+# gate passes it exactly as it already passes `waived:`, with no change to
+# the two greps below. The one input class where the two vocabularies meet —
+# a `deferred:` reason whose text happens to contain the literal `pending:` —
+# is refused by this same whole-line grep, by design; that is not a new
+# gate class, and the fixture suite carries a control proving it.
 if sed -n "${A_START},${A_END}p" "$BOARD" \
      | grep -E -- '^[[:space:]]*- fast-follow disposition \(' \
      | grep -Fq 'pending:'; then

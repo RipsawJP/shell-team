@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1132** a third terminal fast-follow disposition value, deferred, lets close-out pass without the author ruling on issue filing — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1132-deferred-disposition.md
+- [ ] **T-1132** a third terminal fast-follow disposition value, deferred, lets close-out pass without the author ruling on issue filing — `READY_FOR_QA` — spec: .shell-team/specs/T-1132-deferred-disposition.md
    - dispatch-reflection: implement — T-1131 — repeat — T-1131's recorded value is `serial`; same shape here: two coupled single-line prose edits, one comment-only script edit and one additive fixture block that must land together, not partitionable, and the tier2 trigger's judge role does not exist.
    - dispatch-reflection: verify — T-1131 — repeat — T-1131's recorded value is `serial` on the parent key; this task's duty is likewise one fixture suite in one bash process plus fixed-string reads of two skill files, below the fan-out authoring threshold; no mechanism-class full-population diff is in scope under mode A2.
    - dispatch-reflection: specify — T-1131 — repeat — T-1131's recorded value is `pm-authored`; same mode A2 and the same first-hand-artifact shape (every decision input is a repository file plus issue #468 relayed verbatim), no judgment-density concentration.
@@ -26,6 +26,14 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #468, relayed verbatim into pm-spec in the task brief (not opened by pm-spec; every repository fact was re-measured first-hand against the files named in the spec's `## Summarized sources`). Sprint successor to T-1131, operator-approved lightweight mode A2 — pm-authored spec, one freeze, wording mutable, no spec review, no per-task freeze or blast-radius sweep. Release-tier premise on record: PATCH (one question removed from an existing flow, not a new adopter capability; an entry recording none of the three values reaches the operator byte-unchanged, so default-reachability is not met).
+
+### Engineer hand-off — T-1132 (engineer, mode A2 — 5-line form)
+
+- Files changed: `skills/run/SKILL.md` (append-only extension of the T-068 bullet's one physical line), `skills/goal/SKILL.md` (same, parallel bullet), `bin/close-out.sh` (comments only — two new paragraphs, no executable line touched), `tests/close-out/run.sh` (two new fixtures), `.shell-team/provenance/T-1132.md` (new, 4 decision entries), `.shell-team/todo.md` (this entry).
+- Tests added: two fixtures in `tests/close-out/run.sh` immediately after the existing T-068 positive fixture — a positive `deferred: <reason>` case (`pass "T-068: deferred fast-follow disposition lets close-out succeed (Active -> Done)"`) and a control where the `deferred:` reason contains the literal `pending:` (`pass "T-068: a deferred reason containing the literal pending: still refuses close-out (board untouched)"`); both reuse `make_legacy_root` + `inject_pending_task` per the spec's own Notes for engineer.
+- Verification: `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh .shell-team/specs/T-1132-deferred-disposition.md` → `check-acs: 9 passed, 0 failed, 0 skipped, 0 unrecognized`. `bash tests/close-out/run.sh` → exit 0, closing `All close-out assertions passed.`, `grep -c '^PASS:' <log>` = 133; base-vs-HEAD `pass "` site count (AC6): `git show $(git merge-base develop HEAD):tests/close-out/run.sh | grep -cE '^[[:space:]]*pass "'` = 75, `grep -cE '^[[:space:]]*pass "' tests/close-out/run.sh` = 77 (strictly greater, delta of 2 = the two new fixtures). `shellcheck bin/close-out.sh tests/close-out/run.sh` → exit 0. `bash bin/check-prompt-sync.sh` → in sync. `bash bin/check-intent.sh .shell-team/specs/T-1132-deferred-disposition.md .shell-team/todo.md` → `aligned: T-1132 v1 (bc8ff5697d4002f7e9072a18eb32b6c82491002c)`. `bash bin/check-pii-shapes.sh --base develop` → clean.
+- Provenance: `.shell-team/provenance/T-1132.md` — `bash bin/check-provenance.sh .shell-team/provenance/T-1132.md` → `check-provenance: conformant: .shell-team/provenance/T-1132.md (4 decision entries, 0 sentinel)`.
+- Notes for QA: no `pending:` semantics changed — the gate's refusal condition is untouched (AC4 proves every non-comment line byte-identical to base); the new `deferred:` value is documented as terminal on both skill surfaces but is never mechanically enforced for reason-mandatoriness (no new gate class, per Non-goals). No design note (non-UI task, no design-note file in the specs dir).
 
 ### Engineer hand-off — T-1131 (engineer)
 
