@@ -4,6 +4,9 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.5.5**
+  - **レビュアーの fast-follow 繰り延べが、close-out の前に作者の起票判断を待たなくてよくなりました。** `run`／`goal` スキルの fast-follow disposition 規則に第 3 の終端値 `deferred: <reason>` が加わります。作者が起票するか見送るかをまだ決めていない時に記録し、close-out はそのまま通り、該当する finding は hand-off 要約とマージ GO 提示の `undispositioned fast-follows` 見出しの下に全件列挙されます（見送りと誤記録されず、先送りとして運ばれます）。`pending:` の時限の意味は変わらず、`bin/close-out.sh` は従来どおり拒否します — スクリプトの拒否条件は 1 バイトも変わらず、コメントだけが変わりました。issue 作成にオペレーターの承認が要る採用 repo で、直近 2 回連続で close-out を止めていた問いが 1 つ消えます。
+  - **`codex-reviewer` は Codex の各 pass を前景で実行して待ちます。** sub-agent 内で background job として起動した pass はハーネスに追跡されず、レビューが走ったままロールが手番を返し得ました。ロール定義はそれを禁止し、明示的な長い timeout つきの前景待ちを規定します。
 - **v2.5.4**
   - **ループ契約で「`max_iterations` の延長を誰が裁定するか」を宣言できるようになりました。** `budget.extension_ratifier` の任意キー 1 つ（`operator` = 出荷既定で既存の判定は 1 バイトも変わらない／`authoring-session`）を `bin/loop-guard.sh` が検証し、それ以外の値は fail-closed で停止します。`operator-authored` なタスクで `STOP:max_iterations_reached` が発火すると、`run`／`goal` スキルは延長の問い合わせを宣言された authoring セッションへ向け、それ以外は理由を明示してオペレーターへ戻し、許可された延長を board に記録します。`docs/tuning-oversight.md` にフィールドの説明を追加しました。
   - **operator-authored な spec が、class-B 再凍結の批准者を宣言できるようになりました。** spec の作者が宣言し `pm-spec` が転記する board サブバレット `refreeze-ratifier`（`operator` または `authoring-session`）を、`bin/check-entry-mode.sh` が存在時に検証します（広く収集して厳密に解析・`pm-authored` エントリ上では拒否）。`run` スキルの `drift-detected` エスカレーションは発火時に手続きを発明せずこの行を読み、行の無いエントリは従来どおりオペレーターへ届きます。`docs/tuning-oversight.md` の再凍結節に「その GO を誰に向けるか」を追記しました。
