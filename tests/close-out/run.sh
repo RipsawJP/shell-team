@@ -278,6 +278,45 @@ grep -q 'filed as issue #999' "$PP/tasks/todo.md" \
   || fail "T-068: the resolved disposition sub-bullet must move to ## Done along with the entry"
 pass "T-068: resolved (filed as issue #N) fast-follow disposition lets close-out succeed (Active -> Done)"
 
+# Positive (T-1132): disposition resolved to the new `deferred: <reason>`
+# terminal value => close-out succeeds exactly as for `filed as issue #N` /
+# `waived: <reason>`, and the sub-bullet moves to ## Done with the entry.
+PD="$TMP/pending-deferred"
+make_legacy_root "$PD"
+inject_pending_task "$PD" 'deferred: author has not ruled on filing — carried forward'
+
+( cd "$PD" && bash "$CLOSEOUT" --task T-150 --date 2026-07-16 ) >/dev/null \
+  || fail "T-068: deferred fast-follow disposition should let close-out succeed"
+grep -q '^- \[ \] \*\*T-150\*\*' "$PD/tasks/todo.md" \
+  && fail "T-068: T-150 must leave ## Active once deferred and closed out"
+# shellcheck disable=SC2016  # backticks are literal board grammar, not expansion
+grep -q '^- \[x\] \*\*T-150\*\* .* — `READY_FOR_MERGE` — spec: docs/specs/t-150.md$' "$PD/tasks/todo.md" \
+  || fail "T-068: T-150 Done line must keep the hand-off grammar with READY_FOR_MERGE"
+grep -q 'deferred: author has not ruled on filing — carried forward' "$PD/tasks/todo.md" \
+  || fail "T-068: the deferred disposition sub-bullet must move to ## Done along with the entry"
+pass "T-068: deferred fast-follow disposition lets close-out succeed (Active -> Done)"
+
+# Control (T-1132): a `deferred:` reason whose text itself contains the
+# literal `pending:` is still refused by the same whole-line grep — the one
+# input class where the two vocabularies meet. This proves AC7 above is not
+# satisfied by a gate that had been loosened to refuse nothing at all.
+PDR="$TMP/pending-deferred-refused"
+make_legacy_root "$PDR"
+inject_pending_task "$PDR" 'deferred: filing pending: author approval'
+before_pdr="$TMP/pending-deferred-refused-board-before"
+cp "$PDR/tasks/todo.md" "$before_pdr"
+
+set +e
+( cd "$PDR" && bash "$CLOSEOUT" --task T-150 --date 2026-07-16 ) >/dev/null 2>"$TMP/pending-deferred-refused-err"
+rc_deferred_refused=$?
+set -e
+[ "$rc_deferred_refused" -eq 1 ] || fail "T-068: a deferred reason containing the literal pending: should refuse close-out with exit 1, got $rc_deferred_refused"
+cmp -s "$before_pdr" "$PDR/tasks/todo.md" \
+  || fail "T-068: a refused deferred-with-pending: close-out must leave the board byte-identical"
+grep -q 'resolve it to a filed issue number or a waived reason before close-out' "$TMP/pending-deferred-refused-err" \
+  || fail "T-068: the deferred-with-pending: rejection message must point to the filed/waived resolution"
+pass "T-068: a deferred reason containing the literal pending: still refuses close-out (board untouched)"
+
 # Positive (round3 regression lock): hand-off PROSE quotes the anchor string
 # and `pending:` on the same line (backticked, e.g. a rework note describing
 # the guard itself — the exact shape T-068's own board entry took) but there
