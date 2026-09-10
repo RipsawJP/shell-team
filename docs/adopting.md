@@ -408,8 +408,8 @@ back from GitHub — QA runs commands locally and reports what they returned,
 it does not query a check run or a pull request's status.
 
 The recipe's `## CI parity` section is a **record, not a precondition**: it
-is where the workflow file(s), the lint/format commands lifted from them,
-and the pinned versions get written down, filled in by the engineer or QA
+is where the workflow file(s), the lint/format/static commands lifted from
+them, and the pinned versions get written down, filled in by the engineer or QA
 on first use so a later round is not re-deriving the same list from
 scratch.
 

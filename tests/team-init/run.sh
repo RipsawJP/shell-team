@@ -730,8 +730,8 @@ printf 'name: ci\non: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest
   > "$CIP_POS/.github/workflows/ci.yml"
 init "$CIP_POS" > "$TMP/ci-parity-yes.out" 2>&1 \
   || fail "T-1133: team-init exited non-zero on a target with .github/workflows"
-grep -qF -- 'This repository has .github/workflows' "$TMP/ci-parity-yes.out" \
-  || fail "T-1133: team-init did not print the CI parity pointer line for a target with .github/workflows"
+[ "$(grep -cF -- 'This repository has .github/workflows' "$TMP/ci-parity-yes.out")" -eq 1 ] \
+  || fail "T-1133: team-init did not print the CI parity pointer line exactly once for a target with .github/workflows"
 pass "T-1133: team-init points at the CI parity recipe section when the target has .github/workflows"
 
 CIP_NEG="$TMP/ci-parity-no"
