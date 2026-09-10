@@ -4,6 +4,9 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.5.6**
+  - **QA が採用先リポジトリ自身の CI の lint/format/static ステップも検証するようになり、「両ゲート green」なのにプルリクエストの初回 push でフォーマッタに落ちる、という穴が塞がります。** 対象リポジトリに `.github/workflows` がある場合、`qa-verifier` は毎 round ワークフローファイルを読み、プルリクエストで走る lint/format/static のステップを導出し、ワークフローが固定するバージョンの下でローカルに実行して（固定が無ければその旨を記録）、導出したリストを verdict に報告します。非ゼロ終了は round の FAIL、ローカルで実行できないステップは黙って skip せず名指しし、ワークフローを持たないリポジトリの挙動は従来どおりです。`team-init` がスキャフォールドする recipe には `## CI parity` セクションが加わり（コマンドと pin を engineer が記録し、QA は出発点として読んで毎 round 現行ワークフローと突き合わせる）、workflows ディレクトリを検出した `team-init` はそこを指し示します。
+  - **`docs/adopting.md` に「両ゲート green」が何をカバーし何をカバーしないかを明記しました。** GitHub の review approval ではないこと（プルリクエストの作者はあなた自身のトークンなので、branch protection の approval は別アカウントが要る）、hub セッションから run を駆動する場合も merge の GO と close-out はループを回すセッションのものであること、を含みます。
 - **v2.5.5**
   - **レビュアーの fast-follow 繰り延べが、close-out の前に作者の起票判断を待たなくてよくなりました。** `run`／`goal` スキルの fast-follow disposition 規則に第 3 の終端値 `deferred: <reason>` が加わります。作者が起票するか見送るかをまだ決めていない時に記録し、close-out はそのまま通り、該当する finding は hand-off 要約とマージ GO 提示の `undispositioned fast-follows` 見出しの下に全件列挙されます（見送りと誤記録されず、先送りとして運ばれます）。`pending:` の時限の意味は変わらず、`bin/close-out.sh` は従来どおり拒否します — スクリプトの拒否条件は 1 バイトも変わらず、コメントだけが変わりました。issue 作成にオペレーターの承認が要る採用 repo で、直近 2 回連続で close-out を止めていた問いが 1 つ消えます。
   - **`codex-reviewer` は Codex の各 pass を前景で実行して待ちます。** sub-agent 内で background job として起動した pass はハーネスに追跡されず、レビューが走ったままロールが手番を返し得ました。ロール定義はそれを禁止し、明示的な長い timeout つきの前景待ちを規定します。
