@@ -392,19 +392,26 @@ re-freeze of an already-recorded hash.
 "Both gates green" — QA reaching `READY_FOR_REVIEW` and the cross-provider
 review reaching `READY_FOR_MERGE` — covers the task's own spec (its
 acceptance criteria) and this repository's own test suite, as recorded in
-`<base>/test-recipe.md`. It does **not** by itself cover your repository's
-own CI (a `.github/workflows` pipeline running lint, format or static checks
-on pull requests), unless the recipe's `## CI parity` section names those
-commands: that section is where the workflow file(s), the lint/format
-commands lifted from them, and the pinned versions live, and QA reads and
-runs them from there.
+`<base>/test-recipe.md`. When your repository has `.github/workflows`, it
+also covers the lint/format/static steps those workflows run on pull
+requests: QA runs them locally, under the version the workflow pins (or
+records that none is pinned), and a non-zero exit is a FAIL of the round —
+not a surprise on your pull request's first push. This is unconditional on
+the recipe: QA reads the workflow files themselves rather than waiting on a
+filled-in section, so a freshly scaffolded repository is covered from its
+first task onward.
 
-Fill that section in yourself on first use, the same append-back duty that
-already covers the rest of the recipe. Once it names real commands, QA runs
-them locally as part of its own verification, and a non-zero exit is a FAIL
-of the round rather than a surprise on your pull request's first push. Until
-it is filled in, QA's gate does not reach your CI at all — a scaffolded but
-empty section is the honest starting state, not a silent guarantee.
+What it does not cover: a step that cannot be run locally — a deploy, a
+cloud-credentialled test, a container build — is named explicitly by QA,
+never silently skipped, but is not executed; and nothing here reads a result
+back from GitHub — QA runs commands locally and reports what they returned,
+it does not query a check run or a pull request's status.
+
+The recipe's `## CI parity` section is a **record, not a precondition**: it
+is where the workflow file(s), the lint/format commands lifted from them,
+and the pinned versions get written down, filled in by the engineer or QA
+on first use so a later round is not re-deriving the same list from
+scratch.
 
 ## Trying the team on one ticket
 
