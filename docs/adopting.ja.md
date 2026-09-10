@@ -400,6 +400,34 @@ path の allowlist を作れば、adopter のリポジトリをこの repository
 freeze でのみ適用され、すでに記録済みのハッシュの re-freeze では適用され
 ない。
 
+## 両ゲート green と自分のリポジトリの CI
+
+「両ゲート green」——QA が `READY_FOR_REVIEW` に達し、cross-provider review が
+`READY_FOR_MERGE` に達すること——がカバーするのは、そのタスク自身の spec
+（acceptance criteria）と、この repository 自身のテストスイート
+（`<base>/test-recipe.md` に記録されているもの）である。あなたの repository
+自身が `.github/workflows` を持つ場合、それらのワークフローがプルリクエスト
+で走らせる lint/format/static のステップも**併せてカバーされる**——ワーク
+フローファイルこそが正典であり、QA は毎 round それらからステップを導出し、
+ワークフローが固定するバージョンの下でローカルに実行し（何も固定していな
+ければその旨を記録する）、非ゼロ終了は round の FAIL になる（プルリクエス
+トを初めて push した時の驚きではなく）。
+
+カバーされないもの: ローカルで実行できないステップ（デプロイ・cloud
+credential が要るテスト・container build）は、QA が黙って skip せず明示的に
+名指しするが、実行はされない。また、ここでの検証は GitHub から結果を
+読み返すものではない——QA はコマンドをローカルで実行してその結果を報告する
+だけで、check run やプルリクエストの status を問い合わせることはしない。
+
+recipe の `## CI parity` セクションは**engineer の記録**であり、既存の
+append-back duty のもとで書かれ更新される——ワークフローファイル・そこから
+抜き出した lint/format/static コマンド・固定されたバージョンを書き留める
+場所で、round がゼロから導出せず記録済みのリストから始められるようにする。
+QA はこの記録を出発点としてのみ読み、毎 round 現在のワークフローファイルと
+突き合わせて reconcile する。記録が欠けている・空である・古くなっている
+場合、QA はその旨——導出したリストとともに——を verdict に記録し、engineer
+が refresh する。QA 自身がこのセクションを書くことはない。
+
 ## 1 チケットでチームを試す
 
 チーム全体でどう導入するかを決める前に、実際のチケット 1 件でループを一度だけ試したいなら、**trial branch（お試し用ブランチ）** を使います。ブランチを作り、そこへ shell-team 本来の仕組みでスキャフォールドし、稼働ファイルをそのブランチ上でコミットし、ループを実行し、終わったらブランチを削除する——という流れです。ループの gate は稼働ファイルが **tracked（追跡済み）** であることを前提にしており、このルートはその前提を回避せず尊重します。`git switch -c` に続けて `team-init` を実行するか、`team-init.sh` 自身の `--trial-branch <name>` フラグでその 2 つを 1 回にまとめます。
