@@ -720,4 +720,27 @@ grep -qF -- 'docs/adopting.md' "$PL/out" \
   || fail "T-1129 pointer-line: the anchor line does not name docs/adopting.md"
 pass "T-1129 pointer-line: the closing summary prints exactly one static pointer line naming docs/adopting.md, with no git call added"
 
+# --- T-1133 CI parity: team-init points at the recipe section when the -----
+# --- target has .github/workflows, and prints nothing extra when it -------
+# --- does not. The negative arm is the load-bearing one — without it, an --
+# --- unconditional line would satisfy the positive arm too. ---------------
+CIP_POS="$TMP/ci-parity-yes"
+mkdir -p "$CIP_POS/.github/workflows"
+printf 'name: ci\non: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest\n' \
+  > "$CIP_POS/.github/workflows/ci.yml"
+init "$CIP_POS" > "$TMP/ci-parity-yes.out" 2>&1 \
+  || fail "T-1133: team-init exited non-zero on a target with .github/workflows"
+grep -qF -- 'This repository has .github/workflows' "$TMP/ci-parity-yes.out" \
+  || fail "T-1133: team-init did not print the CI parity pointer line for a target with .github/workflows"
+pass "T-1133: team-init points at the CI parity recipe section when the target has .github/workflows"
+
+CIP_NEG="$TMP/ci-parity-no"
+mkdir -p "$CIP_NEG"
+init "$CIP_NEG" > "$TMP/ci-parity-no.out" 2>&1 \
+  || fail "T-1133: team-init exited non-zero on a target with no .github/workflows"
+if grep -qF -- 'This repository has .github/workflows' "$TMP/ci-parity-no.out"; then
+  fail "T-1133: team-init printed the CI parity pointer line for a target with no .github/workflows"
+fi
+pass "T-1133: team-init prints no CI parity line when the target has no .github/workflows"
+
 printf '\nAll team-init assertions passed.\n'

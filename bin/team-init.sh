@@ -387,6 +387,13 @@ printf 'Test recipe: %s/test-recipe.md (engineer/QA read it first, append establ
   "$TEAM_RUN_BASE"
 printf 'Executor binding specimen: %s/binding.conf.example (inert — rename to binding.conf to opt in; see bin/resolve-executor.sh --help).\n' \
   "$TEAM_RUN_BASE"
+# T-1133: the target's own CI is a coverage source QA reads from, not one this
+# script parses — a directory-existence test only, guarded against the
+# TARGET (never the host root), no file written.
+if [ -d "$TARGET/.github/workflows" ]; then
+  printf 'This repository has .github/workflows — fill in the "## CI parity" section of %s/test-recipe.md so QA can run those lint/format/static steps locally.\n' \
+    "$TEAM_RUN_BASE"
+fi
 printf 'If %s/ does not appear in git status afterwards, a repo-level or global ignore rule may be hiding it — see "Where the operating files live" in docs/adopting.md for the one-line re-include.\n' \
   "$TEAM_RUN_BASE"
 # shellcheck disable=SC2016  # backticks here are literal text for the user, not a subshell.

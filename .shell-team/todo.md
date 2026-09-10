@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1133** QA verifies the adopter's own CI lint/format steps and the test recipe carries the list — `READY_FOR_ENG` — spec: .shell-team/specs/T-1133-ci-parity-verification.md
+- [ ] **T-1133** QA verifies the adopter's own CI lint/format steps and the test recipe carries the list — `READY_FOR_QA` — spec: .shell-team/specs/T-1133-ci-parity-verification.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #474, relayed verbatim into pm-spec in the task brief by the coordinating session, which holds the primary copy. Sprint successor to T-1132, operator-approved lightweight mode A2 — pm-authored spec, one freeze, wording mutable, no spec review, no per-task freeze or blast-radius sweep (one two-arm sweep at release). Release-tier premise on record: PATCH (v2.5.6) — a QA-green-while-CI-red coverage gap is bug-fix class; the spec declares `- user-visible: yes` on default-reachability plus its adopter-facing docs surface, which is the adopter-docs trigger and not a MINOR verdict.
@@ -28,6 +28,14 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - intent-hash (v1): 98a09006bb9bc158f151d63d6abaf5fb3ae53044
   - count: specs-naming-qa-verifier — 44 — command: git grep -lF 'agents/qa-verifier.md' bbba242 -- '.shell-team/specs/*.md' | wc -l
   - count: files-referencing-recipe-template — 2 — command: git grep -lF 'templates/test-recipe.md' bbba242 | wc -l
+
+### Engineer hand-off — T-1133 (engineer, mode A2 — 5-line form)
+
+- Files changed: `agents/qa-verifier.md` (one new Rule line at the end of `## Rules`), `agents/engineer.md` (Inputs item 5's existing line extended in place), `templates/test-recipe.md` (new `## CI parity` section), `bin/team-init.sh` (one conditional `printf` guarded on `$TARGET/.github/workflows`), `tests/team-init/run.sh` (two new fixture arms), `docs/adopting.md` and `docs/adopting.ja.md` (one new mirrored section each), `.shell-team/provenance/T-1133.md` (new, 4 decision entries), `.shell-team/todo.md` (this entry).
+- Tests added: `tests/team-init/run.sh` — a positive arm (`.github/workflows/ci.yml` present) asserting `pass "T-1133: team-init points at the CI parity recipe section when the target has .github/workflows"`, and a negative arm (no `.github/`) asserting the absence of the line's fixed prefix and `pass "T-1133: team-init prints no CI parity line when the target has no .github/workflows"`.
+- Verification: `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh .shell-team/specs/T-1133-ci-parity-verification.md` → `check-acs: 6 passed, 0 failed, 1 skipped, 0 unrecognized` (AC7 is above-ceiling by design). `bash tests/team-init/run.sh` → exit 0, `grep -c '^PASS:' <log>` = 36, both new PASS lines present verbatim. `shellcheck bin/team-init.sh tests/team-init/run.sh` → exit 0. `bash bin/check-prompt-sync.sh` → "all registered prompt blocks in sync". `bash bin/check-intent.sh .shell-team/specs/T-1133-ci-parity-verification.md .shell-team/todo.md` → `aligned: T-1133 v1 (98a09006bb9bc158f151d63d6abaf5fb3ae53044)`. `bash bin/check-pii-shapes.sh --base develop` → "clean (no PII-shaped bytes found)". Mutation self-check on `bin/team-init.sh`: made the new `printf` unconditional, re-ran the suite — the negative arm FAILed (`FAIL: T-1133: team-init printed the CI parity pointer line for a target with no .github/workflows`), then restored byte-identically (`git diff` against the pre-mutation copy showed only the intended 7-line addition) and re-ran green (36 PASS, exit 0).
+- Provenance: `.shell-team/provenance/T-1133.md` — `bash bin/check-provenance.sh .shell-team/provenance/T-1133.md` → `check-provenance: conformant: .shell-team/provenance/T-1133.md (4 decision entries, 0 sentinel)`.
+- Notes for QA: AC7 carries no `- check:` line by design (above-ceiling — this repo ships zero runtime dependencies and cannot install a formatter to self-test the QA agent's behavior); it is a real-adopter-run confirmation for the operator, not a fixture gap. The qa-verifier Rule and the recipe's `## CI parity` section are the never-dropped pair per the spec's Pre-commitment — both shipped, no drop needed. No design note (non-UI task, no `design-note-T-1133.md` in the specs dir).
 
 ### Engineer hand-off — T-1132 (engineer, mode A2 — 5-line form)
 

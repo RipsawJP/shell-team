@@ -400,6 +400,26 @@ path の allowlist を作れば、adopter のリポジトリをこの repository
 freeze でのみ適用され、すでに記録済みのハッシュの re-freeze では適用され
 ない。
 
+## 両ゲート green と自分のリポジトリの CI
+
+「両ゲート green」——QA が `READY_FOR_REVIEW` に達し、cross-provider review が
+`READY_FOR_MERGE` に達すること——がカバーするのは、そのタスク自身の spec
+（acceptance criteria）と、この repository 自身のテストスイート
+（`<base>/test-recipe.md` に記録されているもの）だけである。あなたの
+repository 自身の CI（プルリクエストで lint・format・static check を走らせる
+`.github/workflows` パイプライン）は、recipe の `## CI parity` セクションが
+それらのコマンドを名指ししていない限り、両ゲート green には**含まれない**。
+このセクションこそが、ワークフローファイル・そこから抜き出した
+lint/format コマンド・固定されたバージョンを記録する場所であり、QA はここを
+読んでそれらを実行する。
+
+このセクションは初回利用時に自分で埋める——recipe の他の部分をカバーする
+既存の append-back duty と同じものである。実コマンドが記入されれば、QA は
+それらをローカルで自分の検証の一部として実行し、非ゼロ終了は round の FAIL
+になる（プルリクエストを初めて push した時の驚きではなく）。埋めるまでの
+間、QA のゲートはあなたの CI にまったく届かない——スキャフォールドされた
+空のセクションは正直な初期状態であり、無言の保証ではない。
+
 ## 1 チケットでチームを試す
 
 チーム全体でどう導入するかを決める前に、実際のチケット 1 件でループを一度だけ試したいなら、**trial branch（お試し用ブランチ）** を使います。ブランチを作り、そこへ shell-team 本来の仕組みでスキャフォールドし、稼働ファイルをそのブランチ上でコミットし、ループを実行し、終わったらブランチを削除する——という流れです。ループの gate は稼働ファイルが **tracked（追跡済み）** であることを前提にしており、このルートはその前提を回避せず尊重します。`git switch -c` に続けて `team-init` を実行するか、`team-init.sh` 自身の `--trial-branch <name>` フラグでその 2 つを 1 回にまとめます。

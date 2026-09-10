@@ -387,6 +387,25 @@ path allowlist would coerce every adopter's repository into this one's
 layout. The duty applies at a task's bootstrap freeze only, never at a
 re-freeze of an already-recorded hash.
 
+## Both gates green and your own CI
+
+"Both gates green" — QA reaching `READY_FOR_REVIEW` and the cross-provider
+review reaching `READY_FOR_MERGE` — covers the task's own spec (its
+acceptance criteria) and this repository's own test suite, as recorded in
+`<base>/test-recipe.md`. It does **not** by itself cover your repository's
+own CI (a `.github/workflows` pipeline running lint, format or static checks
+on pull requests), unless the recipe's `## CI parity` section names those
+commands: that section is where the workflow file(s), the lint/format
+commands lifted from them, and the pinned versions live, and QA reads and
+runs them from there.
+
+Fill that section in yourself on first use, the same append-back duty that
+already covers the rest of the recipe. Once it names real commands, QA runs
+them locally as part of its own verification, and a non-zero exit is a FAIL
+of the round rather than a surprise on your pull request's first push. Until
+it is filled in, QA's gate does not reach your CI at all — a scaffolded but
+empty section is the honest starting state, not a silent guarantee.
+
 ## Trying the team on one ticket
 
 If you just want to run the loop once, on one real ticket, without deciding anything about how your whole team adopts it: create a **trial branch**, scaffold onto it with shipped mechanics, commit the operating files there, run the loop, and delete the branch afterward. The loop's gates assume the operating files are **tracked**, and this route honors that assumption instead of working around it — `git switch -c` followed by `team-init`, or the two combined with `team-init.sh`'s own `--trial-branch <name>` flag.
