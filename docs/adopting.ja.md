@@ -159,6 +159,20 @@ tracked ファイルしか見ないからです。hub からループを回し�
 global excludes で base dir が隠れていると gate は何も読めません — 1 行の再包含は
 [稼働ファイルの置き場所](#稼働ファイルの置き場所) にあります。
 
+**別のセッションから run を駆動するのも、同じくサポート経路の外です。** hub
+repository を root とするセッションが、対象 repository を root とするセッション
+にタスクを渡し（セッション間メッセージで brief を送る、など）、その run の
+hand-off を受け取ること自体はループにとって問題ありません。run は tracked
+ファイルのある場所で実行されているからです。移せないのは human gate です。
+ループは `READY_FOR_MERGE` で止まり、**ループを回しているセッションで**オペレータ
+の GO を待ち、その同じセッションが merge と close-out——ボードの移動・release の
+telemetry 行・印字される issue close 手順——を実行します。hub 側セッションが自分で
+プルリクエストを merge してしまうと、run 側の close-out は自分が観測していない
+merge に向けて付け直す必要が生じ、本来自分が生み出すはずの状態を再構成する作業に
+変わります。GO は hub で消費せず run 側セッションへ中継し、hub の役割は spec の
+著作・レビュー投稿・報告に留め、run 側が求めるホスト操作（run 側からはできない
+push、fetch）は要約ではなくコマンドそのものとして中継してください。
+
 ## 役割と executor の紐付け
 
 `team-init` は不活性な `<base>/binding.conf.example`
@@ -427,6 +441,13 @@ QA はこの記録を出発点としてのみ読み、毎 round 現在のワー�
 突き合わせて reconcile する。記録が欠けている・空である・古くなっている
 場合、QA はその旨——導出したリストとともに——を verdict に記録し、engineer
 が refresh する。QA 自身がこのセクションを書くことはない。
+
+両ゲート green は **GitHub の review approval でもない**。ループが開くプルリクエスト
+の作者はそのセッションが使うトークンであり、GitHub はプルリクエスト作者本人の
+approving review を拒否する——branch protection が merge 前に approval を要求する
+設定なら、その approval は別のアカウントから得る必要がある。cross-provider review は
+`<reviews>/T-NNNN.md` とボードのエントリに残るループの第 2 ゲートであって、GitHub の
+review オブジェクトではなく、branch protection のルールを満たすものでもない。
 
 ## 1 チケットでチームを試す
 

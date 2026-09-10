@@ -156,6 +156,22 @@ crosses between roles, so a base dir hidden by a global excludes file leaves the
 gates reading nothing — [Where the operating files
 live](#where-the-operating-files-live) has the one-line re-include.
 
+**Driving a run from another session is the same off-path shape.** A session
+rooted in a hub repository can hand a task to a session rooted in the target
+repository (a brief sent over a session-to-session message, say) and receive
+that run's hand-offs back; the loop does not mind, because the run still
+executes where the tracked files are. What does not transfer is the human
+gate. The loop stops at `READY_FOR_MERGE` and waits for the operator's GO
+**in the session that runs the loop**, and that same session performs the
+merge and the close-out — the board move, the release telemetry row, the
+printed issue-close step. If the hub session merges the pull request itself,
+the running session's close-out has to be re-pointed at a merge it never
+observed, and every step it owns is now reconstructing state instead of
+producing it. Relay the GO to the running session rather than acting on it in
+the hub, keep the hub to spec authorship, review posting and reporting, and
+relay any host action the running session asks for (a push it cannot make, a
+fetch) as the command itself rather than as a summary of it.
+
 ## Binding roles to executors
 
 `team-init` scaffolds an inert `<base>/binding.conf.example`
@@ -414,6 +430,14 @@ it against the current workflow files every round; when the record is
 missing, empty, or stale relative to what the workflows now run, QA reports
 that in its verdict — naming the derived list — for the engineer to refresh.
 QA never writes this section itself.
+
+Both gates green is also **not a GitHub review approval**. The pull request
+the loop opens is authored by the token the session runs under, and GitHub
+refuses an approving review from a pull request's own author — so when your
+branch protection requires an approval before merge, that approval has to
+come from another account. The cross-provider review lives in
+`<reviews>/T-NNNN.md` and on the board entry; it is the loop's second gate,
+not a GitHub review object, and it satisfies no branch-protection rule.
 
 ## Trying the team on one ticket
 
