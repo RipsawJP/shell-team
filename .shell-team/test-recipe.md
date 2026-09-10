@@ -54,6 +54,34 @@ that file's order.
 - No other prerequisite builds or services — every suite is bash + git +
   standard POSIX tools, run directly from the repo root.
 
+## CI parity
+
+<!-- The workflow file(s) this repository's own CI runs on pull requests, the
+     lint/format commands and the static-analysis commands lifted from them,
+     and the pinned versions those workflows use. This is the engineer's
+     record, written and refreshed under the append-back duty; QA reads it
+     as a starting point and reconciles it against the current workflow
+     files each round — the workflow files stay the source of truth, and QA
+     never writes this section. Fill this in on first use; there may be more
+     than one workflow file(s), so list each one rather than assuming a
+     single one. -->
+
+- Workflow file(s): `.github/workflows/check-handoff.yml` (single job, `lint`)
+- Lint/format commands: (none — this workflow runs no separate formatter; its one lint/static command is shellcheck, recorded below)
+- Static-analysis commands:
+  ```
+  shellcheck bin/check-handoff.sh tests/check-handoff/run.sh bin/check-contract.sh tests/check-contract/run.sh bin/loop-guard.sh tests/loop-guard/run.sh bin/log-run.sh tests/log-run/run.sh bin/check-run.sh tests/check-run/run.sh bin/team-init.sh tests/team-init/run.sh bin/discover-work.sh tests/discover-work/run.sh tests/discover-work/fixtures/gh bin/check-acs.sh tests/check-acs/run.sh bin/check-retro.sh tests/check-retro/run.sh bin/check-readme-version.sh tests/check-readme-version/run.sh bin/rollup-runs.sh tests/rollup-runs/run.sh bin/rollup-track.sh tests/rollup-track/run.sh bin/team-paths.sh tests/team-paths/run.sh bin/check-design-note.sh tests/check-design-note/run.sh bin/goal-state.sh tests/goal-state/run.sh bin/consolidate-proposals.sh tests/consolidate-proposals/run.sh bin/review-gate.sh tests/review-gate/run.sh bin/close-out.sh bin/gen-project-status.sh tests/close-out/run.sh bin/check-count-claims.sh tests/check-count-claims/run.sh bin/check-spec-review.sh tests/check-spec-review/run.sh bin/check-entry-mode.sh tests/check-entry-mode/run.sh bin/check-oversight.sh tests/check-oversight/run.sh bin/check-review-input.sh tests/check-review-input/run.sh bin/check-prompt-sync.sh tests/check-prompt-sync/run.sh bin/cluster-failures.sh tests/cluster-failures/run.sh bin/check-playbook.sh tests/check-playbook/run.sh bin/gen-playbook-blocks.sh tests/gen-playbook-blocks/run.sh bin/playbook-promote.sh tests/playbook-promote/run.sh bin/install tests/install/run.sh bin/rework-digest.sh tests/rework-digest/run.sh bin/check-intent.sh tests/check-intent/run.sh bin/check-provenance.sh tests/check-provenance/run.sh bin/check-interventions.sh tests/check-interventions/run.sh bin/check-board-headings.sh tests/check-board-headings/run.sh tests/errexit-safe/run.sh bin/codex-capture.sh tests/codex-skeleton-hygiene/run.sh bin/check-pii-shapes.sh tests/check-pii-shapes/run.sh bin/check-commit-identity.sh tests/check-commit-identity/run.sh tests/gitignore-raw-dumps/run.sh bin/retro-inputs.sh tests/retro-inputs/run.sh tests/retro-inputs/invariants.sh tests/retro-inputs/fixtures/gh tests/retro-inputs/fixtures/git docs/interventions-reminder-hook.sample.sh tests/interventions-reminder/run.sh tests/machine-tokens/run.sh bin/gen-loop-replay.sh tests/gen-loop-replay/run.sh tests/is-span-row-parity/run.sh bin/check-refreeze-class.sh tests/check-refreeze-class/run.sh tests/bin-exec-bit/run.sh bin/check-durability.sh tests/check-durability/run.sh bin/check-binding.sh tests/check-binding/run.sh bin/check-adapter.sh tests/check-adapter/run.sh bin/check-liveness.sh tests/check-liveness/run.sh bin/resolve-executor.sh tests/resolve-executor/run.sh bin/derive-populations.sh tests/derive-populations/run.sh bin/aggregate-verdicts.sh tests/aggregate-verdicts/run.sh bin/land-worktree.sh tests/land-worktree/run.sh bin/check-fanout-instances.sh tests/check-fanout-instances/run.sh docs/loop-engineering/subjects/subject-01/acceptance.sh docs/loop-engineering/subjects/subject-01/regenerate.sh tests/trial-recipe/run.sh tests/trial-recipe/extract-recipe.sh bin/check-model-pins.sh tests/check-model-pins/run.sh bin/check-invocation-path.sh tests/check-invocation-path/run.sh
+  ```
+- Pinned versions: `SHELLCHECK_VERSION="0.11.0"` (set in the "Install shellcheck" step's `env:` block; matches the pin already recorded in `## Environment quirks / prerequisite builds` above)
+
+The rest of this workflow's job is ~70 `bash tests/<suite>/run.sh` steps plus a
+number of `Dogfood <checker>` steps that re-run a checker against this
+repository's own real files — none of those are lint/format/static steps in
+the sense the qa-verifier CI-parity Rule reads, and the full ordered list is
+already this file's own `## How to run tests` section's pointer: "CI
+(`.github/workflows/check-handoff.yml`) is the authoritative list of every
+suite + dogfood step that must pass, run in that file's order."
+
 ## Appended by tasks
 
 <!-- Append-only log: when a task (T-NNN) establishes a new environment

@@ -394,12 +394,10 @@ review reaching `READY_FOR_MERGE` — covers the task's own spec (its
 acceptance criteria) and this repository's own test suite, as recorded in
 `<base>/test-recipe.md`. When your repository has `.github/workflows`, it
 also covers the lint/format/static steps those workflows run on pull
-requests: QA runs them locally, under the version the workflow pins (or
-records that none is pinned), and a non-zero exit is a FAIL of the round —
-not a surprise on your pull request's first push. This is unconditional on
-the recipe: QA reads the workflow files themselves rather than waiting on a
-filled-in section, so a freshly scaffolded repository is covered from its
-first task onward.
+requests: the workflow files are the source of truth, so QA derives those
+steps from them on every round, runs them locally under the version the
+workflow pins (or records that none is pinned), and a non-zero exit is a
+FAIL of the round — not a surprise on your pull request's first push.
 
 What it does not cover: a step that cannot be run locally — a deploy, a
 cloud-credentialled test, a container build — is named explicitly by QA,
@@ -407,11 +405,15 @@ never silently skipped, but is not executed; and nothing here reads a result
 back from GitHub — QA runs commands locally and reports what they returned,
 it does not query a check run or a pull request's status.
 
-The recipe's `## CI parity` section is a **record, not a precondition**: it
-is where the workflow file(s), the lint/format/static commands lifted from
-them, and the pinned versions get written down, filled in by the engineer or QA
-on first use so a later round is not re-deriving the same list from
-scratch.
+The recipe's `## CI parity` section is the **engineer's record**, written
+and refreshed under the existing append-back duty: it is where the workflow
+file(s), the lint/format/static commands lifted from them, and the pinned
+versions get written down, so a round starts from a recorded list instead of
+a blank page. QA reads that record only as a starting point and reconciles
+it against the current workflow files every round; when the record is
+missing, empty, or stale relative to what the workflows now run, QA reports
+that in its verdict — naming the derived list — for the engineer to refresh.
+QA never writes this section itself.
 
 ## Trying the team on one ticket
 
