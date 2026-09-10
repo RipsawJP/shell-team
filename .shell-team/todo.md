@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1133** QA verifies the adopter's own CI lint/format steps and the test recipe carries the list — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1133-ci-parity-verification.md
+- [ ] **T-1133** QA verifies the adopter's own CI lint/format steps and the test recipe carries the list — `READY_FOR_ENG` — spec: .shell-team/specs/T-1133-ci-parity-verification.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #474, relayed verbatim into pm-spec in the task brief by the coordinating session, which holds the primary copy. Sprint successor to T-1132, operator-approved lightweight mode A2 — pm-authored spec, one freeze, wording mutable, no spec review, no per-task freeze or blast-radius sweep (one two-arm sweep at release). Release-tier premise on record: PATCH (v2.5.6) — a QA-green-while-CI-red coverage gap is bug-fix class; the spec declares `- user-visible: yes` on default-reachability plus its adopter-facing docs surface, which is the adopter-docs trigger and not a MINOR verdict.
