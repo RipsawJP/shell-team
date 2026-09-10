@@ -127,7 +127,7 @@ When an adopter repository has `.github/workflows`, the lint/format/static steps
 
 Predictions, not measurements: `pm-spec` holds no shell. Under mode A2 this sprint runs **one** two-arm full-population sweep at release rather than one per task, so these predictions are settled there and not by a criterion in this spec. The two population figures below are stated as derivation commands with their values left for the freeze run; they are transcribed onto the board as conformant `- count:` rows only once they carry integers, because `bin/check-count-claims.sh` closes `<value>` to `^[+-]?[0-9]+$` and would refuse a placeholder.
 
-- count: specs-naming-qa-verifier — 44 — command: git grep -lF 'agents/qa-verifier.md' -- '.shell-team/specs/*.md' | wc -l
+- count: specs-naming-qa-verifier — 45 — command: git grep -lF 'agents/qa-verifier.md' -- '.shell-team/specs/*.md' | wc -l
 - count: files-referencing-recipe-template — 3 — command: git grep -lF 'templates/test-recipe.md' | wc -l
 
 - **Predicted red, by class**: any merged criterion requiring every non-empty base line of `agents/qa-verifier.md` or `agents/engineer.md` to survive as a **whole line**, or requiring either file byte-identical to a base blob — this task appends to the first and extends one line of the second. Same for `templates/test-recipe.md`, `bin/team-init.sh`, `tests/team-init/run.sh`, `docs/adopting.md` and `docs/adopting.ja.md` under byte-identity or line-count locks. Every one of those is a base-relative lock reddening because the file legitimately changed, which is the disclosed class this repository has already priced (T-1131's and T-1132's release-sweep records classify the same shape as head-only failures with functional regressions 0).
