@@ -156,6 +156,22 @@ crosses between roles, so a base dir hidden by a global excludes file leaves the
 gates reading nothing — [Where the operating files
 live](#where-the-operating-files-live) has the one-line re-include.
 
+**Driving a run from another session is the same off-path shape.** A session
+rooted in a hub repository can hand a task to a session rooted in the target
+repository (a brief sent over a session-to-session message, say) and receive
+that run's hand-offs back; the loop does not mind, because the run still
+executes where the tracked files are. What does not transfer is the human
+gate. The loop stops at `READY_FOR_MERGE` and waits for the operator's GO
+**in the session that runs the loop**, and that same session performs the
+merge and the close-out — the board move, the release telemetry row, the
+printed issue-close step. If the hub session merges the pull request itself,
+the running session's close-out has to be re-pointed at a merge it never
+observed, and every step it owns is now reconstructing state instead of
+producing it. Relay the GO to the running session rather than acting on it in
+the hub, keep the hub to spec authorship, review posting and reporting, and
+relay any host action the running session asks for (a push it cannot make, a
+fetch) as the command itself rather than as a summary of it.
+
 ## Binding roles to executors
 
 `team-init` scaffolds an inert `<base>/binding.conf.example`
@@ -386,6 +402,42 @@ the reviewing gates and the human, never for a mechanical check, and a
 path allowlist would coerce every adopter's repository into this one's
 layout. The duty applies at a task's bootstrap freeze only, never at a
 re-freeze of an already-recorded hash.
+
+## Both gates green and your own CI
+
+"Both gates green" — QA reaching `READY_FOR_REVIEW` and the cross-provider
+review reaching `READY_FOR_MERGE` — covers the task's own spec (its
+acceptance criteria) and this repository's own test suite, as recorded in
+`<base>/test-recipe.md`. When your repository has `.github/workflows`, it
+also covers the lint/format/static steps those workflows run on pull
+requests: the workflow files are the source of truth, so QA derives those
+steps from them on every round, runs them locally under the version the
+workflow pins (or records that none is pinned), and a non-zero exit is a
+FAIL of the round — not a surprise on your pull request's first push.
+
+What it does not cover: a step that cannot be run locally — a deploy, a
+cloud-credentialled test, a container build — is named explicitly by QA,
+never silently skipped, but is not executed; and nothing here reads a result
+back from GitHub — QA runs commands locally and reports what they returned,
+it does not query a check run or a pull request's status.
+
+The recipe's `## CI parity` section is the **engineer's record**, written
+and refreshed under the existing append-back duty: it is where the workflow
+file(s), the lint/format/static commands lifted from them, and the pinned
+versions get written down, so a round starts from a recorded list instead of
+a blank page. QA reads that record only as a starting point and reconciles
+it against the current workflow files every round; when the record is
+missing, empty, or stale relative to what the workflows now run, QA reports
+that in its verdict — naming the derived list — for the engineer to refresh.
+QA never writes this section itself.
+
+Both gates green is also **not a GitHub review approval**. The pull request
+the loop opens is authored by the token the session runs under, and GitHub
+refuses an approving review from a pull request's own author — so when your
+branch protection requires an approval before merge, that approval has to
+come from another account. The cross-provider review lives in
+`<reviews>/T-NNNN.md` and on the board entry; it is the loop's second gate,
+not a GitHub review object, and it satisfies no branch-protection rule.
 
 ## Trying the team on one ticket
 

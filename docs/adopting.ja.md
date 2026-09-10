@@ -159,6 +159,20 @@ tracked ファイルしか見ないからです。hub からループを回し�
 global excludes で base dir が隠れていると gate は何も読めません — 1 行の再包含は
 [稼働ファイルの置き場所](#稼働ファイルの置き場所) にあります。
 
+**別のセッションから run を駆動するのも、同じくサポート経路の外です。** hub
+repository を root とするセッションが、対象 repository を root とするセッション
+にタスクを渡し（セッション間メッセージで brief を送る、など）、その run の
+hand-off を受け取ること自体はループにとって問題ありません。run は tracked
+ファイルのある場所で実行されているからです。移せないのは human gate です。
+ループは `READY_FOR_MERGE` で止まり、**ループを回しているセッションで**オペレータ
+の GO を待ち、その同じセッションが merge と close-out——ボードの移動・release の
+telemetry 行・印字される issue close 手順——を実行します。hub 側セッションが自分で
+プルリクエストを merge してしまうと、run 側の close-out は自分が観測していない
+merge に向けて付け直す必要が生じ、本来自分が生み出すはずの状態を再構成する作業に
+変わります。GO は hub で消費せず run 側セッションへ中継し、hub の役割は spec の
+著作・レビュー投稿・報告に留め、run 側が求めるホスト操作（run 側からはできない
+push、fetch）は要約ではなくコマンドそのものとして中継してください。
+
 ## 役割と executor の紐付け
 
 `team-init` は不活性な `<base>/binding.conf.example`
@@ -399,6 +413,41 @@ path の allowlist を作れば、adopter のリポジトリをこの repository
 レイアウトに強制することになってしまう。この duty はタスクの bootstrap
 freeze でのみ適用され、すでに記録済みのハッシュの re-freeze では適用され
 ない。
+
+## 両ゲート green と自分のリポジトリの CI
+
+「両ゲート green」——QA が `READY_FOR_REVIEW` に達し、cross-provider review が
+`READY_FOR_MERGE` に達すること——がカバーするのは、そのタスク自身の spec
+（acceptance criteria）と、この repository 自身のテストスイート
+（`<base>/test-recipe.md` に記録されているもの）である。あなたの repository
+自身が `.github/workflows` を持つ場合、それらのワークフローがプルリクエスト
+で走らせる lint/format/static のステップも**併せてカバーされる**——ワーク
+フローファイルこそが正典であり、QA は毎 round それらからステップを導出し、
+ワークフローが固定するバージョンの下でローカルに実行し（何も固定していな
+ければその旨を記録する）、非ゼロ終了は round の FAIL になる（プルリクエス
+トを初めて push した時の驚きではなく）。
+
+カバーされないもの: ローカルで実行できないステップ（デプロイ・cloud
+credential が要るテスト・container build）は、QA が黙って skip せず明示的に
+名指しするが、実行はされない。また、ここでの検証は GitHub から結果を
+読み返すものではない——QA はコマンドをローカルで実行してその結果を報告する
+だけで、check run やプルリクエストの status を問い合わせることはしない。
+
+recipe の `## CI parity` セクションは**engineer の記録**であり、既存の
+append-back duty のもとで書かれ更新される——ワークフローファイル・そこから
+抜き出した lint/format/static コマンド・固定されたバージョンを書き留める
+場所で、round がゼロから導出せず記録済みのリストから始められるようにする。
+QA はこの記録を出発点としてのみ読み、毎 round 現在のワークフローファイルと
+突き合わせて reconcile する。記録が欠けている・空である・古くなっている
+場合、QA はその旨——導出したリストとともに——を verdict に記録し、engineer
+が refresh する。QA 自身がこのセクションを書くことはない。
+
+両ゲート green は **GitHub の review approval でもない**。ループが開くプルリクエスト
+の作者はそのセッションが使うトークンであり、GitHub はプルリクエスト作者本人の
+approving review を拒否する——branch protection が merge 前に approval を要求する
+設定なら、その approval は別のアカウントから得る必要がある。cross-provider review は
+`<reviews>/T-NNNN.md` とボードのエントリに残るループの第 2 ゲートであって、GitHub の
+review オブジェクトではなく、branch protection のルールを満たすものでもない。
 
 ## 1 チケットでチームを試す
 

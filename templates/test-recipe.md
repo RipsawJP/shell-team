@@ -20,6 +20,23 @@
 
 (none recorded yet)
 
+## CI parity
+
+<!-- The workflow file(s) this repository's own CI runs on pull requests, the
+     lint/format commands and the static-analysis commands lifted from them,
+     and the pinned versions those workflows use. This is the engineer's
+     record, written and refreshed under the append-back duty; QA reads it
+     as a starting point and reconciles it against the current workflow
+     files each round — the workflow files stay the source of truth, and QA
+     never writes this section. Fill this in on first use; there may be more
+     than one workflow file(s), so list each one rather than assuming a
+     single one. -->
+
+- Workflow file(s): (not filled in yet)
+- Lint/format commands: (not filled in yet)
+- Static-analysis commands: (not filled in yet)
+- Pinned versions: (not filled in yet)
+
 ## Appended by tasks
 
 <!-- Append-only log: when a task (T-NNN) establishes a new environment
