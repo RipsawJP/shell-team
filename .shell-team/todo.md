@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1133** QA verifies the adopter's own CI lint/format steps and the test recipe carries the list — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1133-ci-parity-verification.md
+- [ ] **T-1133** QA verifies the adopter's own CI lint/format steps and the test recipe carries the list — `REWORK` — spec: .shell-team/specs/T-1133-ci-parity-verification.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #474, relayed verbatim into pm-spec in the task brief by the coordinating session, which holds the primary copy. Sprint successor to T-1132, operator-approved lightweight mode A2 — pm-authored spec, one freeze, wording mutable, no spec review, no per-task freeze or blast-radius sweep (one two-arm sweep at release). Release-tier premise on record: PATCH (v2.5.6) — a QA-green-while-CI-red coverage gap is bug-fix class; the spec declares `- user-visible: yes` on default-reachability plus its adopter-facing docs surface, which is the adopter-docs trigger and not a MINOR verdict.
@@ -28,6 +28,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - intent-hash (v1): 98a09006bb9bc158f151d63d6abaf5fb3ae53044
   - count: specs-naming-qa-verifier — 44 — command: git grep -lF 'agents/qa-verifier.md' bbba242 -- '.shell-team/specs/*.md' | wc -l
   - count: files-referencing-recipe-template — 2 — command: git grep -lF 'templates/test-recipe.md' bbba242 | wc -l
+  - review-round (1, 2026-09-10): REQUEST_CHANGES — Major 3 (qa-verifier Rule under-covers a recipe with no `## CI parity` section at all = Input space class 9; engineer.md Inputs item 5 gained an unconditional run-before-READY_FOR_QA duty beyond the frozen Goal's "names the section" and without the Rule's cannot-run-locally carve-out; template section has no field for static-analysis steps although the Rule's scope is lint/format/static) / Minor 4 (section placed after the append-only log; positive fixture arm asserts presence not count; stale spec Notes sentence outside the intent block; stale provenance count in the hand-off) — record `.shell-team/reviews/T-1133.md` @ `8dd9959`. Root-cause classes: norm-text-coverage-gap ×2 (Rule condition, template fields), briefing-scope-overreach ×1 (the orchestrator's own engineer briefing asked for the run duty — authored by the coordinating session, not the engineer). same-class-2 fired on norm-text-coverage-gap; `rework-digest.sh --trigger same-class-2` judgment same-class-repetition, recommended-action reconsider-design-premise surfaced to the operator; means-ends reflection: never-dropped items AC1/AC3 are green on their own checks and the findings refine wording within the frozen literals rather than defeating the components, no finding targets the droppable-first component, and the design premise (Rule + recipe record) is unchallenged — so the loop proceeds to rework round 1 with a full-inventory instruction for the repeated class (every place in the seven shipped files where the norm's scope names a case the text does not cover), the operator can redirect at any time.
 
 ### Engineer hand-off — T-1133 (engineer, mode A2 — 5-line form)
 
