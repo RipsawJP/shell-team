@@ -369,6 +369,51 @@ executor は fallback ではなく `BLOCKED` になるため、未測定の認�
 証拠であり、そのような読み取りが一度も起きなかったという証拠では
 決してない。
 
+## Codex CLI から shell-team を使う
+
+slice 1（T-1134）により、Codex CLI セッションからこのループの
+`pm-spec` → `engineer` → `qa-verifier` チェーンを `READY_FOR_REVIEW` まで
+駆動できる——dispatch のどこにも Claude Code プロセスは登場しない。
+`codex-reviewer` 自身の `APPROVE` はこの slice ではまだ Claude Code host 側で
+走るため、Codex CLI 単独の実行では両ゲートまでは届かない。`agents/**` は
+このために複製・分岐されることは一切ない: generator が未改変の
+`agents/<role>.md` から役割ごとに 1 つの Codex custom-agent TOML を導出する
+ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
+
+1. adopt した repository で `bash bin/gen-codex-agents.sh` を実行する
+   （プラグインをロードしていれば `bin/` は `PATH` に載るので
+   `gen-codex-agents.sh` 単体で解決する）。`agents/tech-lead.md`・
+   `agents/pm-spec.md`・`agents/engineer.md`・`agents/qa-verifier.md` を
+   読み、既定では役割ごとの `shell-team-<role>.toml` を
+   `<repo>/.codex/agents/` に 1 つずつ書き出す（別の場所に出したい場合は
+   `--out-dir` を渡す。`--root` は `agents/` を持つディレクトリを指す
+   ——shell-team の稼働ベースディレクトリではない）。
+2. **セッションを開始する前に、その repository へ Codex trust を付与する。**
+   Codex がプロジェクトレベルの custom agent を `<repo>/.codex/agents/` から
+   発見するのは、repository が trusted な場合に限る——untrusted な状態や
+   `--skip-git-repo-check` での実行では、`gen-codex-agents.sh` が既に何を
+   書き出していても、これらの agent は一切見えない。
+3. その repository で Codex CLI セッションを開始し、Codex 自身の
+   `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
+   `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`）を
+   spawn して役割を dispatch する——host ごとの dispatch 文言（
+   `skills/run/SKILL.md` に splice 済み）は
+   `templates/prompt-blocks/host-dispatch.md` を参照。
+4. **役割ファイルを編集した後、またはプラグインをアップグレードした後は
+   `bash bin/gen-codex-agents.sh` を再実行する。** 生成された TOML は
+   コミットされず（`.gitignore` が `.codex/agents` をカバーする）、
+   `agents/*.md` が変わった瞬間に stale になる。`bash
+   bin/check-codex-agents.sh` は何も書き込まずに現在のソースとの drift を
+   報告するので、再実行が必要かを機械的に確認できる。
+
+**誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
+`sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
+導出した「意図された write scope」の宣言的な記述に過ぎない——**enforcement
+boundary ではない**: 実行時は親の Codex セッション自身の sandbox が支配し、
+生成された agent の `sandbox_mode` の値が何であれそれは変わらない。また
+この slice は `READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
+reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
+
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
 やりたいことを普通の言葉で伝えて、メインの Claude セッションにチームへ委譲させる

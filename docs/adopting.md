@@ -360,6 +360,52 @@ trail taken **after the fact**, never a boundary **enforced** by
 anything on the invocation line: a clean trail is evidence that no
 unauthorized read appears in the trail, and never that none occurred.
 
+## Using shell-team from Codex CLI
+
+Slice 1 (T-1134) lets a Codex CLI session drive this loop's `pm-spec` →
+`engineer` → `qa-verifier` chain to `READY_FOR_REVIEW`, with no Claude Code
+process anywhere in the dispatch — `codex-reviewer`'s own `APPROVE` still
+runs on the Claude Code host in this slice, so a Codex CLI run alone stops
+short of both gates. `agents/**` is never duplicated or forked for this: a
+generator derives one Codex custom-agent TOML per role from the unmodified
+`agents/<role>.md`, so both hosts read the same role prose rather than a
+second, Codex-shaped copy of it.
+
+1. In the adopted repository, run `bash bin/gen-codex-agents.sh` — with the
+   plugin loaded, `bin/` is on `PATH`, so `gen-codex-agents.sh` alone
+   resolves. It reads `agents/tech-lead.md`, `agents/pm-spec.md`,
+   `agents/engineer.md` and `agents/qa-verifier.md` and writes one
+   `shell-team-<role>.toml` per role into `<repo>/.codex/agents/` by
+   default (pass `--out-dir` to name a different location; `--root` names
+   the directory holding `agents/`, not the shell-team operating base
+   dir).
+2. **Grant the repository Codex trust before starting a session in it.**
+   Codex discovers a project-level custom agent from `<repo>/.codex/agents/`
+   only when the repository is trusted — an untrusted, or
+   `--skip-git-repo-check`, run never sees these agents at all, whatever
+   `gen-codex-agents.sh` already wrote there.
+3. Start a Codex CLI session in the repository and dispatch a role by
+   spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
+   `shell-team-engineer`, `shell-team-qa-verifier`) with Codex's own
+   `spawn_agent` tool — see `templates/prompt-blocks/host-dispatch.md`
+   (spliced into `skills/run/SKILL.md`) for the per-host dispatch text this
+   loop's own phase list reads.
+4. **Re-run `bash bin/gen-codex-agents.sh` after editing a role file, or
+   after a plugin upgrade.** The generated TOMLs are not committed
+   (`.gitignore` covers `.codex/agents`) and go stale the moment
+   `agents/*.md` changes under them. `bash bin/check-codex-agents.sh`
+   reports the drift against the current source, writing nothing, so it is
+   the mechanical way to find out a re-run is due.
+
+**Honest limits, stated plainly rather than left for you to discover.** Each
+generated agent's `sandbox_mode` is declarative documentation of that role's
+own intended write scope, derived from its `agents/<role>.md` frontmatter
+`tools:` list — it is **not an enforcement boundary**: the parent Codex
+session's own sandbox governs at runtime, whatever a generated agent's
+`sandbox_mode` value says. And this slice stops at `READY_FOR_REVIEW`: no
+Claude-backed reviewer runs on the Codex host yet, so a Codex CLI run alone
+never reaches both gates green.
+
 ## Conversational usage (no slash commands)
 
 You can also just describe what you want in plain language and let the main Claude
