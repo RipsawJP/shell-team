@@ -407,8 +407,8 @@ second, Codex-shaped copy of it.
    `--skip-git-repo-check`, run never sees these agents at all, whatever
    `gen-codex-agents.sh` already wrote there.
 3. **Grant the sandbox write access to `.git` — and, only if Codex itself
-   runs step 1's generator or step 5's checker inside the session, to
-   `.codex` too.** Measured (codex-cli 0.154.0): `codex exec --sandbox
+   runs step 1's generator inside the session, to `.codex` too.**
+   Measured (codex-cli 0.154.0): `codex exec --sandbox
    workspace-write` refuses every write under `.git/` (`Operation not
    permitted`, exit 128) regardless of actual filesystem permissions —
    which blocks `engineer`'s own commit before `READY_FOR_QA` — and
@@ -416,16 +416,18 @@ second, Codex-shaped copy of it.
    (`mkdir: .codex: Operation not permitted`), the same policy applied to
    a second, Codex-owned directory name — which blocks
    `gen-codex-agents.sh`'s own `mkdir -p` of `--out-dir` when Codex runs
-   step 1 (or `check-codex-agents.sh` in step 5) inside the session
-   rather than from your own shell. Running steps 1 and 5 from your own
-   shell — the default path both steps already describe — avoids the
+   step 1 inside the session rather than from your own shell.
+   `check-codex-agents.sh` (step 5) never creates `--out-dir` — it only
+   reads it, comparing it against a scratch regeneration — so it needs no
+   such grant even when Codex runs it in-session. Running step 1 from
+   your own shell — the default path it already describes — avoids the
    `.codex` refusal entirely, since only a role's own commit needs `.git`
    write access. Add whichever directories apply to the sandbox's
    writable roots on the invocation —
    `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` for
    commits alone, or
    `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
-   if Codex also runs step 1 or step 5 inside the session — or the same
+   if Codex also runs step 1 inside the session — or the same
    key under `[sandbox_workspace_write]` in your Codex `config.toml`;
    `--sandbox danger-full-access` also works, at the cost of the whole
    sandbox. (Codex's own configuration directory, `.agents`, is refused
@@ -442,9 +444,10 @@ second, Codex-shaped copy of it.
    `agents/*.md` changes under them.
    `bash "<plugin root>/bin/check-codex-agents.sh"` reports the drift
    against the current source, writing nothing, so it is the mechanical
-   way to find out a re-run is due. Run this from your own shell too, by
-   default — see step 3 if you instead want Codex itself to run it inside
-   a session.
+   way to find out a re-run is due. Run this from your own shell or have
+   Codex run it inside the session — either way needs no `.codex`
+   writable-root grant, since it only reads `--out-dir` to compare
+   against a scratch regeneration and never creates or writes it.
 
 **Honest limits, stated plainly rather than left for you to discover.** Each
 generated agent's `sandbox_mode` is declarative documentation of that role's
@@ -455,9 +458,11 @@ session's own sandbox governs at runtime, whatever a generated agent's
 of `.git/` writes something this plugin can suppress — it is Codex CLI's
 own policy, worked around only by the writable-roots step above. The same
 sandbox policy refuses creating or writing `.codex/` itself, which blocks
-Codex from running step 1's generator or step 5's checker inside a
-session rather than from your own shell — see step 3 for the same
-writable-roots remedy, extended to `.codex`. And this slice stops at
+Codex from running step 1's generator inside a session rather than from
+your own shell — see step 3 for the same writable-roots remedy, extended
+to `.codex`. Step 5's checker never creates or writes `--out-dir` — it
+only reads it to compare against a scratch regeneration — so it needs no
+such grant, in-session or not. And this slice stops at
 `READY_FOR_REVIEW`: no Claude-backed reviewer runs on the Codex host yet,
 so a Codex CLI run alone never reaches both gates green.
 

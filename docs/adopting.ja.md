@@ -417,24 +417,25 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    `--skip-git-repo-check` での実行では、`gen-codex-agents.sh` が既に何を
    書き出していても、これらの agent は一切見えない。
 3. **`.git` への sandbox 書き込みを許可する——さらに、Codex 自身が
-   手順 1 の generator か手順 5 の checker をセッション内で実行する
-   場合に限り `.codex` も。** 実測（codex-cli 0.154.0）:
+   手順 1 の generator をセッション内で実行する場合に限り `.codex` も。**
+   実測（codex-cli 0.154.0）:
    `codex exec --sandbox workspace-write` は実際のファイルシステム権限に
    関係なく `.git/` 配下へのあらゆる書き込みを拒否し
    （`Operation not permitted`、exit 128）——これは `engineer` が
    `READY_FOR_QA` 前に行う commit 自体を止める——さらに、もう一つの
    Codex 自身の設定ディレクトリ名に対して同じポリシーを適用し、
    `.codex/` 自体の作成・書き込みも別途拒否する
-   （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 1
-   （または手順 5 の `check-codex-agents.sh`）を自分自身のシェルからでは
-   なくセッション内で実行しようとしたときに `gen-codex-agents.sh` 自身の
-   `--out-dir` への `mkdir -p` を止める。手順 1・手順 5 を（両手順が既定
-   として書いているとおり）自分自身のシェルから実行すれば、`.codex` の
-   拒否は一切発生しない——役割自身の commit だけが `.git` への書き込みを
-   必要とするため。該当する方を invocation の sandbox writable roots に
-   追加する——commit だけなら
+   （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 1 を
+   自分自身のシェルからではなくセッション内で実行しようとしたときに
+   `gen-codex-agents.sh` 自身の `--out-dir` への `mkdir -p` を止める。
+   `check-codex-agents.sh`（手順 5）は `--out-dir` を一切作成しない——
+   スクラッチ再生成と比較読み取りするだけなので、セッション内で実行しても
+   この付与は不要。手順 1 を（既定として書いているとおり）自分自身の
+   シェルから実行すれば、`.codex` の拒否は一切発生しない——役割自身の
+   commit だけが `.git` への書き込みを必要とするため。該当する方を
+   invocation の sandbox writable roots に追加する——commit だけなら
    `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'`、
-   Codex 自身が手順 1 または手順 5 をセッション内で実行するなら
+   Codex 自身が手順 1 をセッション内で実行するなら
    `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
    ——または Codex の `config.toml` の `[sandbox_workspace_write]` に
    同じキーを設定する。`--sandbox danger-full-access` でも通るが、
@@ -453,8 +454,9 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    カバーする）、`agents/*.md` が変わった瞬間に stale になる。
    `bash "<plugin root>/bin/check-codex-agents.sh"` は何も書き込まずに
    現在のソースとの drift を報告するので、再実行が必要かを機械的に
-   確認できる。これも既定では自分自身のシェルから実行する——Codex 自身に
-   セッション内で実行させたい場合は手順 3 を見ること。
+   確認できる。これは自分自身のシェルから実行しても、Codex にセッション内
+   で実行させても構わない——`--out-dir` を比較のために読み取るだけで、
+   作成も書き込みもしないため、`.codex` の writable-root 付与は不要。
 
 **誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
 `sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
@@ -465,9 +467,10 @@ boundary ではない**: 実行時は親の Codex セッション自身の sandb
 この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
 上記の writable-roots の手順でのみ回避できる。同じ sandbox のポリシーは
 `.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 1 の
-generator や手順 5 の checker を自分自身のシェルからではなくセッション内で
-実行することを妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は
-手順 3 を見ること。またこの slice は
+generator を自分自身のシェルからではなくセッション内で実行することを
+妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は手順 3 を見ること。
+手順 5 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
+セッション内で実行してもこの付与は不要。またこの slice は
 `READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
 reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
 
