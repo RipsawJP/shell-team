@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1134** the Specify to Validate chain runs from a Codex CLI host on generated, single-source role agents — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1134-codex-host-slice1.md
+- [ ] **T-1134** the Specify to Validate chain runs from a Codex CLI host on generated, single-source role agents — `READY_FOR_ENG` — spec: .shell-team/specs/T-1134-codex-host-slice1.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #484, relayed verbatim into pm-spec in the task brief by the coordinating session, which holds the primary copy. Slice 1 of two; slice 2 (Claude-backed reviewer on the Codex host, telemetry conversion, both-gates operation from Codex) is a separate issue and out of scope here. Sprint successor to T-1133, operator-approved lightweight mode A2 — pm-authored spec, one freeze, wording mutable, no spec review, no per-task freeze or blast-radius sweep (one two-arm sweep at release). Release-tier premise on record: this slice merges **unversioned**; `MINOR` is cut with slice 2. Maintainer constraint of 2026-09-06 carried verbatim into the spec: one codebase for both hosts — a Codex-specific copy of role prose, board handling or checkers is not acceptable. The spec declares `- user-visible: yes` on the new adopter-facing capability plus its adopter-facing docs surface, which is the adopter-docs trigger and not a tier verdict.
