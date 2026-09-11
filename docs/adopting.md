@@ -364,7 +364,13 @@ unauthorized read appears in the trail, and never that none occurred.
 
 A Codex CLI session can now drive this loop's whole Specify → Implement →
 Validate → Review chain to `READY_FOR_MERGE`, both gates green, with no
-Claude Code *process* anywhere in the dispatch. Slice 1 (T-1134) wired the
+Claude Code **host session** and no Claude Code Agent-tool orchestration
+anywhere in the dispatch — every role, `codex-reviewer` included, is
+spawned by Codex's own `spawn_agent` tool, never by the Claude Code Agent
+tool, which this host does not have. A `claude -p` **child process** does
+run, for the review pass alone (steps 8 and 10 below); its own
+prerequisite — a Claude Code CLI already installed and authenticated on
+this host — is step 7. Slice 1 (T-1134) wired the
 `pm-spec` → `engineer` → `qa-verifier` chain (plus `tech-lead`) to
 `READY_FOR_REVIEW`; slice 2 (T-1135) adds `codex-reviewer` as a fifth
 generated role and closes the remaining gap by running its review on
@@ -375,7 +381,7 @@ derives one Codex custom-agent TOML per role from the unmodified
 `agents/<role>.md`, so both hosts read the same role prose rather than a
 second, Codex-shaped copy of it. The role name `codex-reviewer` stays as
 it is on both hosts — it is historical rather than descriptive here: on
-this host it is Claude, not Codex, that actually reviews (see step 9).
+this host it is Claude, not Codex, that actually reviews (see step 10).
 
 1. **Install the plugin into Codex CLI**, if `codex plugin list` does not
    already report `shell-team` as `installed, enabled` — that exact STATUS
@@ -478,7 +484,7 @@ this host it is Claude, not Codex, that actually reviews (see step 9).
    (`mkdir: .codex: Operation not permitted`), the same policy applied to
    a second, Codex-owned directory name — which blocks
    `gen-codex-agents.sh`'s own `mkdir -p` of `--out-dir` when Codex runs
-   step 3 inside the session rather than from your own shell. Step 10's
+   step 3 inside the session rather than from your own shell. Step 11's
    checker never creates `--out-dir` — it only reads it, comparing it
    against a scratch regeneration — so it needs no such grant even when
    Codex runs it in-session. Running step 3 from your own shell — the
@@ -494,20 +500,39 @@ this host it is Claude, not Codex, that actually reviews (see step 9).
    `--sandbox danger-full-access` also works, at the cost of the whole
    sandbox. (Codex's own configuration directory, `.agents`, is refused
    the same way; nothing in this loop writes to it.)
-7. **Grant the sandbox network access the Claude-side review pass needs
-   (T-1135), and read the symptom correctly if you don't.** Measured
+7. **Confirm Claude Code CLI is installed and authenticated on this host
+   — outside any Codex session, before you rely on it inside one
+   (T-1135).** The review pass (steps 8 and 10) runs a real `claude -p`
+   **child process**; if Claude Code CLI is not installed on this host,
+   or is installed but not authenticated, that process fails with `Not
+   logged in · Please run /login` regardless of the Codex sandbox's own
+   network setting — and this time `/login` genuinely is the fix. Verify
+   this once, in an ordinary shell with no Codex sandbox involved at all:
+   `claude -p "reply with the single word ok"` should print `ok` and exit
+   `0`. If it instead reports a login prompt or an authentication error,
+   resolve that first (`claude /login`, or your organization's own Claude
+   Code provisioning) — step 8's network grant cannot substitute for this
+   prerequisite, and granting it will not fix an authentication failure.
+8. **Grant the sandbox network access the Claude-side review pass needs
+   (T-1135), and tell its `Not logged in` apart from step 7's.** Measured
    (codex-cli 0.154.0, Claude Code CLI 2.1.268): at the sandbox's default
    `sandbox_workspace_write.network_access = false`, the `claude -p`
-   invocation step 9's review pass runs fails with `Not logged in · Please
-   run /login` — this is the sandbox refusing outbound network access,
-   **not** an authentication problem, and running `/login` fixes nothing.
-   Grant the network with `-c
+   invocation step 10's review pass runs fails with the identical `Not
+   logged in · Please run /login` message step 7's own authentication
+   failure produces — but for a different reason, and the two need
+   different fixes. Tell them apart by where step 7's own outside-Codex
+   sanity call stood: if that call already failed **outside** any Codex
+   session, the cause is authentication — `/login` is the fix, and this
+   network grant will not help. If that same call **passed** outside a
+   Codex session but the review pass still fails with the identical
+   message **inside** one, the cause is this sandbox's own network
+   refusal, and `/login` fixes nothing here. Grant the network with `-c
    'sandbox_workspace_write.network_access=true'` on the `codex`
    invocation, or the equivalent `network_access = true` entry under
    `[sandbox_workspace_write]` in your Codex `config.toml`. `--sandbox
    danger-full-access` also works, at the cost of the whole sandbox, and
    is not needed otherwise.
-8. **Export `<plugin root>/bin` onto `PATH` before starting `codex`
+9. **Export `<plugin root>/bin` onto `PATH` before starting `codex`
    (T-1135, closing the PATH-resolution gap slice 1 disclosed).** A spawned Codex custom agent inherits
    the parent process's own `PATH`, so running
    `export PATH="<plugin root>/bin:$PATH"` in the shell you start `codex`
@@ -518,17 +543,17 @@ this host it is Claude, not Codex, that actually reviews (see step 9).
    running inside the session. Skipping this step does not change what
    the role prose says; it changes whether those calls can find the
    scripts they name.
-9. Start a Codex CLI session in the repository and dispatch a role by
-   spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
-   `shell-team-engineer`, `shell-team-qa-verifier`, `shell-team-codex-reviewer`)
-   with Codex's own `spawn_agent` tool — see
-   `templates/prompt-blocks/host-dispatch.md` (spliced into
-   `skills/run/SKILL.md`) for the per-host dispatch text this loop's own
-   phase list reads, including the `claude -p` recipe `codex-reviewer`
-   runs instead of a second Codex pass. Its `APPROVE` reaches
-   `READY_FOR_MERGE` — both gates green — without either host ever
-   leaving the Codex CLI session.
-10. **Re-run step 3's command** after editing a role file, after a plugin
+10. Start a Codex CLI session in the repository and dispatch a role by
+    spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
+    `shell-team-engineer`, `shell-team-qa-verifier`, `shell-team-codex-reviewer`)
+    with Codex's own `spawn_agent` tool — see
+    `templates/prompt-blocks/host-dispatch.md` (spliced into
+    `skills/run/SKILL.md`) for the per-host dispatch text this loop's own
+    phase list reads, including the `claude -p` recipe `codex-reviewer`
+    runs instead of a second Codex pass. Its `APPROVE` reaches
+    `READY_FOR_MERGE` — both gates green — without either host ever
+    leaving the Codex CLI session.
+11. **Re-run step 3's command** after editing a role file, after a plugin
     upgrade, or after changing your own `binding.conf` or `TEAM_RUN_BASE`:
     the generated TOML also depends on the resolved binding row (which
     provider, model, effort and adapter each role binds to), so a rebind
@@ -551,7 +576,7 @@ session's own sandbox governs at runtime, whatever a generated agent's
 `sandbox_mode` value says — `codex-reviewer`'s own generated
 `workspace-write` value included; its actual read-only confinement on this
 host comes from the `claude -p` invocation's own `--permission-mode
-dontAsk` plus its `--allowedTools` git-only allowlist in step 9, never
+dontAsk` plus its `--allowedTools` git-only allowlist in step 10, never
 from `sandbox_mode` and never from `--tools`/`--disallowedTools` alone —
 measured (Claude Code CLI 2.1.268): `--allowedTools` by itself let an
 unlisted `Bash` command run anyway, because the adopter's own permission
@@ -573,7 +598,7 @@ CLI's own policy, worked around only by the writable-roots step above. The
 same sandbox policy refuses creating or writing `.codex/` itself, which
 blocks Codex from running step 3's generator inside a session rather than
 from your own shell — see step 6 for the same writable-roots remedy,
-extended to `.codex`. Step 10's checker never creates or writes
+extended to `.codex`. Step 11's checker never creates or writes
 `--out-dir` — it only reads it to compare against a scratch regeneration —
 so it needs no such grant, in-session or not. What model and reasoning
 effort a spawned role actually runs with: under the shipped default
@@ -583,9 +608,9 @@ own configuration; a `binding.conf` row that rebinds a role to a Codex
 adapter with a real model and a non-`-` effort overrides both, per role,
 exactly as `bin/gen-codex-agents.sh` already does for any role bound that
 way. A spawned role's own command execution assumes `bin/` is reachable
-from its own execution context — step 8's `PATH` export, or a
+from its own execution context — step 9's `PATH` export, or a
 checkout-rooted `cwd` — which step 3's one-time generator bootstrap does
-not itself provide; skipping step 8 leaves a spawned role's own
+not itself provide; skipping step 9 leaves a spawned role's own
 `bin/*.sh` calls unresolved inside the session even though nothing about
 the role prose changed. On a host where a released version of this
 plugin is already installed, a spawned role may resolve `bin/*.sh` through

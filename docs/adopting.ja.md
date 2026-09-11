@@ -373,18 +373,23 @@ executor は fallback ではなく `BLOCKED` になるため、未測定の認�
 
 Codex CLI セッションから、このループの Specify → Implement → Validate →
 Review のチェーン全体を `READY_FOR_MERGE`、両ゲート green まで駆動できる
-ようになった——dispatch のどこにも Claude Code の *プロセス* は登場しない。
-slice 1（T-1134）は `pm-spec` → `engineer` → `qa-verifier` チェーン
-（`tech-lead` も含む）を `READY_FOR_REVIEW` まで配線し、slice 2（T-1135）が
-`codex-reviewer` を 5 つ目の生成役割として追加し、そのレビューを Codex では
-なく Claude 上で走らせることで残りのギャップを閉じる——Codex CLI host が
-「そうではない」provider が Claude だから。このループが前提とする
-cross-provider の性質は host を切り替えても保たれる。`agents/**` は
+ようになった——dispatch のどこにも Claude Code の **host セッション**も
+Claude Code Agent tool によるオーケストレーションも登場しない: `codex-reviewer`
+を含む全ての役割は Codex 自身の `spawn_agent` ツールで spawn され、この
+host には存在しない Claude Code Agent tool では一切ない。`claude -p` の
+**子プロセス**は実際に走る——レビュー pass（下の手順 8 と 10）のみ——
+その前提条件（この host に Claude Code CLI が既にインストール・認証済み
+であること）が手順 7 である。slice 1（T-1134）は `pm-spec` → `engineer` →
+`qa-verifier` チェーン（`tech-lead` も含む）を `READY_FOR_REVIEW` まで配線し、
+slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追加し、その
+レビューを Codex ではなく Claude 上で走らせることで残りのギャップを閉じる
+——Codex CLI host が「そうではない」provider が Claude だから。このループが
+前提とする cross-provider の性質は host を切り替えても保たれる。`agents/**` は
 このために複製・分岐されることは一切ない: generator が未改変の
 `agents/<role>.md` から役割ごとに 1 つの Codex custom-agent TOML を導出する
 ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
 役割名 `codex-reviewer` は両 host で変わらない——ここでは歴史的な名前に
-過ぎず、実際にレビューするのは Codex ではなく Claude である（手順 9 参照）。
+過ぎず、実際にレビューするのは Codex ではなく Claude である（手順 10 参照）。
 
 1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
    `codex plugin list` が `shell-team` を厳密に `installed, enabled` と
@@ -489,7 +494,7 @@ cross-provider の性質は host を切り替えても保たれる。`agents/**`
    （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 3 を
    自分自身のシェルからではなくセッション内で実行しようとしたときに
    `gen-codex-agents.sh` 自身の `--out-dir` への `mkdir -p` を止める。
-   `check-codex-agents.sh`（手順 10）は `--out-dir` を一切作成しない——
+   `check-codex-agents.sh`（手順 11）は `--out-dir` を一切作成しない——
    スクラッチ再生成と比較読み取りするだけなので、セッション内で実行しても
    この付与は不要。手順 3 を（既定として書いているとおり）自分自身の
    シェルから実行すれば、`.codex` の拒否は一切発生しない——役割自身の
@@ -503,21 +508,40 @@ cross-provider の性質は host を切り替えても保たれる。`agents/**`
    sandbox 全体を失う代償を伴う。（Codex 自身のもう一つの設定
    ディレクトリ `.agents` も同様に拒否されるが、このループはそこには
    何も書き込まない。）
-7. **Claude 側のレビュー pass が必要とする sandbox network access を
-   許可する（T-1135）——許可しない場合の症状も正しく読む。** 実測
-   （codex-cli 0.154.0、Claude Code CLI 2.1.268）: sandbox の既定値
-   `sandbox_workspace_write.network_access = false` のもとでは、手順 9 の
-   レビュー pass が実行する `claude -p` の invocation は `Not logged in ·
-   Please run /login` で失敗する——これは sandbox が outbound network
-   access を拒否している症状であって、認証の問題では**ない**。`/login`
-   を実行しても何も直らない。network を許可するには `codex` の
-   invocation に `-c
+7. **この host に Claude Code CLI が既にインストール・認証済みであることを
+   ——Codex セッションの外で、それを内側で当てにする前に——確認する
+   （T-1135）。** レビュー pass（手順 8 と 10）は実際に `claude -p` の
+   **子プロセス**を走らせる。この host に Claude Code CLI がインストール
+   されていない、あるいはインストール済みでも認証されていない場合、
+   Codex sandbox 自身の network 設定に関係なくそのプロセスは `Not logged
+   in · Please run /login` で失敗する——そしてこの場合は本当に `/login`
+   が対処法である。これを一度、Codex sandbox を一切介さない普通のシェルで
+   確認する: `claude -p "reply with the single word ok"` は `ok` を出力し
+   exit `0` になるはず。もしログインプロンプトや認証エラーが出るなら、
+   まずそれを解決する（`claude /login`、あるいは自組織の Claude Code
+   provisioning 手順）——手順 8 の network 許可はこの前提条件の代わりには
+   ならず、それを許可しても認証の失敗は直らない。
+8. **Claude 側のレビュー pass が必要とする sandbox network access を
+   許可する（T-1135）——そしてその `Not logged in` を手順 7 のものと
+   区別する。** 実測（codex-cli 0.154.0、Claude Code CLI 2.1.268）:
+   sandbox の既定値 `sandbox_workspace_write.network_access = false` の
+   もとでは、手順 10 のレビュー pass が実行する `claude -p` の invocation
+   は、手順 7 自身の認証失敗が出すのと同一の `Not logged in · Please run
+   /login` というメッセージで失敗する——しかし原因は別であり、対処法も
+   異なる。両者を区別するには、手順 7 自身の Codex 外での sanity call が
+   どうだったかを見る: その呼び出しが Codex セッションの**外**で既に
+   失敗していたなら、原因は認証であり——`/login` が対処法で、この
+   network 許可は役に立たない。同じ呼び出しが Codex セッションの外では
+   **通っていた**のに、セッションの**内側**でレビュー pass が同一の
+   メッセージで失敗するなら、原因はこの sandbox 自身の network 拒否で
+   あり、ここでは `/login` は何も直さない。network を許可するには
+   `codex` の invocation に `-c
    'sandbox_workspace_write.network_access=true'` を付けるか、Codex の
    `config.toml` の `[sandbox_workspace_write]` に同等の
    `network_access = true` エントリを設定する。`--sandbox
    danger-full-access` でも通るが、sandbox 全体を失う代償を伴い、他に
    必要な場面はない。
-8. **`codex` を起動する前に `<plugin root>/bin` を `PATH` に export する
+9. **`codex` を起動する前に `<plugin root>/bin` を `PATH` に export する
    （T-1135）。** spawn された Codex custom agent は親プロセス自身の
    `PATH` を継承するので、`codex` を起動するシェルで（セッション内から
    ではなく、起動する**前に**）`export PATH="<plugin root>/bin:$PATH"`
@@ -527,16 +551,16 @@ cross-provider の性質は host を切り替えても保たれる。`agents/**`
    解決可能にする。この手順を省略しても役割プロースの内容自体は変わらない
    ——変わるのは、それらの呼び出しがスクリプトを見つけられるかどうかで
    ある。
-9. その repository で Codex CLI セッションを開始し、Codex 自身の
-   `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
-   `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`・
-   `shell-team-codex-reviewer`）を spawn して役割を dispatch する——host
-   ごとの dispatch 文言（`skills/run/SKILL.md` に splice 済み）は
-   `templates/prompt-blocks/host-dispatch.md` を参照——`codex-reviewer` が
-   2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
-   `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
-   host も Codex CLI セッションを一度も離れない。
-10. **役割ファイルを編集した後、プラグインをアップグレードした後、または
+10. その repository で Codex CLI セッションを開始し、Codex 自身の
+    `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
+    `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`・
+    `shell-team-codex-reviewer`）を spawn して役割を dispatch する——host
+    ごとの dispatch 文言（`skills/run/SKILL.md` に splice 済み）は
+    `templates/prompt-blocks/host-dispatch.md` を参照——`codex-reviewer` が
+    2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
+    `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
+    host も Codex CLI セッションを一度も離れない。
+11. **役割ファイルを編集した後、プラグインをアップグレードした後、または
     自分自身の `binding.conf` や `TEAM_RUN_BASE` を変更した後は、手順 3 と
     同じコマンドを再実行する。** 生成された TOML は解決済みの binding row
     （各役割がどの provider・model・effort・adapter に bind されるか）にも
@@ -557,7 +581,7 @@ cross-provider の性質は host を切り替えても保たれる。`agents/**`
 boundary ではない**: 実行時は親の Codex セッション自身の sandbox が支配し、
 生成された agent の `sandbox_mode` の値が何であれそれは変わらない——
 `codex-reviewer` 自身の生成された `workspace-write` の値も例外ではない。
-この host 上でのその実際の read-only 性は、手順 9 の `claude -p` invocation
+この host 上でのその実際の read-only 性は、手順 10 の `claude -p` invocation
 自身の `--permission-mode dontAsk` と、その `--allowedTools` の git 限定
 allowlist から来るのであって、`sandbox_mode` からでも `--tools` /
 `--disallowedTools` 単体からでもない——実測（Claude Code CLI 2.1.268）:
@@ -580,7 +604,7 @@ is disabled for the rest of this session`）——これが起きても、この
 `.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 3 の
 generator を自分自身のシェルからではなくセッション内で実行することを
 妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は手順 6 を見ること。
-手順 10 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
+手順 11 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
 セッション内で実行してもこの付与は不要。spawn された役割が実際にどの
 model・reasoning effort で走るか: 出荷時の既定 binding では、5 つの役割
 いずれについても `model` も `model_reasoning_effort` も emit されないため、
@@ -589,9 +613,9 @@ row が役割を実 model と非 `-` の effort を持つ Codex adapter へ rebi
 すれば、両方とも上書きされる（役割ごと）——`bin/gen-codex-agents.sh` が
 そのように bind された役割に対して既に行っているのと同じ扱いである。
 spawn された役割自身のコマンド実行は、`bin/` が自分自身の実行コンテキスト
-から到達可能であること——手順 8 の `PATH` export か、checkout を root と
+から到達可能であること——手順 9 の `PATH` export か、checkout を root と
 した `cwd` であること——を前提としており、手順 3 の一度きりの generator
-bootstrap はそれ自体を提供しない。手順 8 を省略すると、役割プロース自体は
+bootstrap はそれ自体を提供しない。手順 9 を省略すると、役割プロース自体は
 何も変わっていなくても、spawn された役割自身の `bin/*.sh` 呼び出しは
 セッション内で解決されないままになる。この plugin のリリース版が既に
 インストール済みのホストでは、spawn された役割が偶然その既存インストール

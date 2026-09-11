@@ -199,8 +199,20 @@ trim() {  # prints $1 with leading/trailing whitespace stripped
 #     refusal). CONTENT_FILES/CONTENT_ROLE stay parallel arrays (this
 #     repo's bin/ scripts avoid associative arrays for bash 3.2 portability
 #     — see bin/resolve-executor.sh's own indexed-array lookups).
-# shellcheck disable=SC2206  # ROLES is a fixed, simple space-separated word list
+# T-1135 review round-2 minor (m2, issue #487 hardening ii closure): word-
+# split ROLES WITHOUT pathname expansion. An unquoted `($ROLES)` array
+# assignment performs BOTH word-splitting and glob expansion; a `--roles`
+# value containing a shell glob character (e.g. `*`) would expand against
+# --out-dir's own directory listing before the role-shape validation below
+# ever runs, so refusal so far depended on the expanded filenames
+# themselves happening to fail that validation — not on this line refusing
+# the glob shape itself. `set -f` (noglob) brackets the split so only
+# word-splitting occurs; `set +f` restores normal globbing immediately
+# after, before anything else in this script relies on it.
+set -f
+# shellcheck disable=SC2206  # ROLES is a fixed, simple space-separated word list; set -f above suppresses glob expansion
 ROLES_ARR=($ROLES)
+set +f
 [ "${#ROLES_ARR[@]}" -ge 1 ] || die "--roles produced an empty role list"
 
 # T-1135 issue #487 hardening (ii): validate every --roles token BEFORE
@@ -361,6 +373,23 @@ done
 # whole-directory stage-and-swap (which would delete an adopter's own,
 # non-shell-team-* Codex agent TOMLs already in --out-dir).
 mkdir -p "$OUT_DIR" || die "cannot create out-dir: $OUT_DIR"
+
+# T-1135 review round-2 minor (m1): refuse BEFORE any rename if a requested
+# role's own final path already exists as something other than a regular
+# file (most concretely: a directory of that name). `mv` onto an existing
+# directory silently moves the staged file INSIDE it and still exits 0, so
+# the expected TOML at that path would simply never be written while this
+# generator still reports success. Checked for every requested role in its
+# own pass, before pass 2 writes (or stages) any of them, so this refusal
+# is whole-run and nothing is written — the same no-partial-output
+# discipline pass 1's own validation already holds to.
+for role in "${CONTENT_ROLE[@]}"; do
+  TARGET="$OUT_DIR/shell-team-$role.toml"
+  if [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; then
+    die "refusing to write: $TARGET already exists and is not a regular file (cannot rename a generated TOML onto it)"
+  fi
+done
+
 idx=0
 for role in "${CONTENT_ROLE[@]}"; do
   STAGE_FILE="$(mktemp "$OUT_DIR/.gen-codex-agents.$role.XXXXXX")" || die "cannot create a staging file in out-dir: $OUT_DIR"

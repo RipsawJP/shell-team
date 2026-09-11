@@ -362,15 +362,23 @@ fi
 
 # =============================================================================
 # fixture 8 (T-1135 AC7 fixed string 4 / AC12 live half): a reviewer span row
-# built from a Claude JSON result's own usage/duration_ms/total_cost_usd
-# fields is accepted by bin/log-run.sh, recorded with provider claude.
+# built from a Claude JSON result's own REAL usage schema — input_tokens,
+# output_tokens, cache_creation_input_tokens, cache_read_input_tokens (no
+# single total_tokens field exists) — is accepted by bin/log-run.sh, with
+# --tokens the SUM of those four fields (round-2 review minor m3: fixture 8
+# previously checked only a field-name's presence, on a flattened
+# total_tokens shape the real CLI never emits).
 # =============================================================================
 printf '\n--- fixture 8 (T-1135): a reviewer span row from a Claude JSON result ---\n'
 LOGRUN="$REPO_ROOT/bin/log-run.sh"
 RUNSDIR8="$T/runs8"
 mkdir -p "$RUNSDIR8"
-CLAUDE_RESULT='{"type":"result","subtype":"success","is_error":false,"duration_ms":4567,"total_cost_usd":0.1234,"usage":{"total_tokens":890},"result":"APPROVE"}'
-TOK8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"total_tokens":\([0-9]*\).*/\1/p')"
+CLAUDE_RESULT='{"type":"result","subtype":"success","is_error":false,"duration_ms":4567,"total_cost_usd":0.1234,"usage":{"input_tokens":120,"output_tokens":340,"cache_creation_input_tokens":89000,"cache_read_input_tokens":1547},"result":"APPROVE"}'
+IN8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"input_tokens":\([0-9]*\).*/\1/p')"
+OUT8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"output_tokens":\([0-9]*\).*/\1/p')"
+CC8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"cache_creation_input_tokens":\([0-9]*\).*/\1/p')"
+CR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"cache_read_input_tokens":\([0-9]*\).*/\1/p')"
+TOK8=$((IN8 + OUT8 + CC8 + CR8))
 DUR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"duration_ms":\([0-9]*\).*/\1/p')"
 USD8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"total_cost_usd":\([0-9.]*\).*/\1/p')"
 if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span codex-reviewer --phase review \
@@ -378,7 +386,7 @@ if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span
     --provider claude --adapter claude-cli >/dev/null 2>"$T/lr8.err"; then
   ROWFILE8="$RUNSDIR8/t1135loop.jsonl"
   if [ -s "$ROWFILE8" ] && [ "$(wc -l < "$ROWFILE8" | tr -d ' ')" -eq 1 ] \
-    && grep -Fq '"tokens":890' "$ROWFILE8" \
+    && grep -Fq "\"tokens\":$TOK8" "$ROWFILE8" \
     && grep -Fq '"duration_ms":4567' "$ROWFILE8" \
     && grep -Fq '"usd":0.1234' "$ROWFILE8" \
     && grep -Fq '"provider":"claude"' "$ROWFILE8" \
@@ -484,6 +492,86 @@ else
   else
     pass "T-1135 extra: a first-listed-role failure emits no unbound-variable noise and writes nothing"
   fi
+fi
+
+# =============================================================================
+# extra (T-1135 round-2 review minor m1): a requested role's own final path
+# already existing as a directory is refused BEFORE any rename, with the
+# TOML never written — `mv` onto an existing directory silently moves the
+# staged file inside it and still exits 0 otherwise.
+# =============================================================================
+printf '\n--- extra (T-1135): a directory at the target path is refused, not silently moved into ---\n'
+OUT13="$T/out13"
+mkdir -p "$OUT13/shell-team-pm-spec.toml"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT13" >/dev/null 2>"$T/gen13.err"; then
+  fail "T-1135 extra: a directory at the target path is refused (generator did not refuse)"
+else
+  if [ -f "$OUT13/shell-team-pm-spec.toml" ]; then
+    fail "T-1135 extra: a directory at the target path is refused (a regular file was written there anyway)"
+  elif [ -f "$OUT13/shell-team-pm-spec.toml/shell-team-pm-spec.toml" ]; then
+    fail "T-1135 extra: a directory at the target path is refused (mv silently moved the staged file INSIDE the directory)"
+  else
+    pass "T-1135 extra: a directory at the target path is refused, not silently moved into"
+  fi
+fi
+
+# =============================================================================
+# extra (T-1135 round-2 review minor m2): a --roles value containing a shell
+# glob character is refused by TOKEN SHAPE, never by accidentally matching
+# an expanded filename — run from the repository root (where an unquoted
+# `($ROLES)` array assignment would otherwise glob-expand `*` against real
+# tracked files) and assert the refusal message names the literal token.
+# =============================================================================
+printf '\n--- extra (T-1135): --roles glob character is refused by token shape, not glob-expanded ---\n'
+OUT14="$T/out14"
+if ( cd "$REPO_ROOT" && bash "$GEN" --out-dir "$OUT14" --roles '*' >/dev/null 2>"$T/gen14.err" ); then
+  fail "T-1135 extra: --roles '*' is refused (generator did not refuse)"
+else
+  n="$(count_toml "$OUT14" '*.toml')"
+  if [ "$n" -ne 0 ]; then
+    fail "T-1135 extra: --roles '*' is refused with no file written (found $n stray file(s))"
+  elif ! grep -Fq -- "token is not a valid role identifier (must match ^[a-z][a-z0-9-]*\$): *" "$T/gen14.err"; then
+    fail "T-1135 extra: --roles '*' refusal names the literal token, not an expanded filename (got: $(cat "$T/gen14.err"))"
+  else
+    pass "T-1135 extra: --roles '*' is refused by token shape, not glob-expanded against a real filename"
+  fi
+fi
+
+# =============================================================================
+# extra (T-1135 round-2 review Blocker B1 class closure, deterministic half):
+# the SAME "$(cat "<PROMPT_FILE>")" command-substitution shape the Claude
+# recipe uses carries a prompt containing all four hazard characters the
+# review named — a backtick, a $(...) command substitution, a $VAR
+# reference and an embedded double quote — through byte-for-byte, unexpanded,
+# when substituted into a double-quoted invocation argument. This is the
+# repo-local, no-API-call half of B1's class closure; the live half (an
+# actual `claude -p` run receiving this same file) is recorded in
+# .shell-team/provenance/T-1135.md and the hand-off, not here (CI carries no
+# authenticated Claude Code CLI).
+# =============================================================================
+printf '\n--- extra (T-1135): the recipe command-substitution quoting carries hazard characters unexpanded ---\n'
+PROMPT_FILE15="$T/hazard-prompt.txt"
+# shellcheck disable=SC2016  # deliberate fixture text (backtick/$(...)/$HOME) that must land in the FILE literally, never expand
+printf 'a `backtick`, a $(echo INJECTED) substitution, a $HOME reference, and an embedded " double quote.\n' > "$PROMPT_FILE15"
+RESULT15="$(bash -c 'printf %s "$1"' -- "$(cat "$PROMPT_FILE15")")"
+EXPECTED15="$(cat "$PROMPT_FILE15")"
+# Byte-for-byte equality against the source file's own content is the whole
+# assertion: if any of the four hazard sequences had been expanded (the
+# backtick or $(...) executed, $HOME substituted with an actual path, or the
+# embedded quote terminating the argument early), RESULT15 would differ from
+# EXPECTED15. The four grep checks below are a POSITIVE CONTROL confirming
+# the fixture's own source text actually contains all four literal hazard
+# sequences (so a vacuous pass — e.g. an empty or truncated PROMPT_FILE15 —
+# cannot slip through the equality check unnoticed).
+# shellcheck disable=SC2016  # each single-quoted grep pattern below is the literal hazard text being searched for, never meant to expand
+if [ "$RESULT15" = "$EXPECTED15" ] \
+  && printf '%s' "$EXPECTED15" | grep -Fq -- '`backtick`' \
+  && printf '%s' "$EXPECTED15" | grep -Fq -- '$(echo INJECTED)' \
+  && printf '%s' "$EXPECTED15" | grep -Fq -- '$HOME' \
+  && printf '%s' "$EXPECTED15" | grep -Fq -- '"'; then
+  pass 'T-1135 extra: the "$(cat <PROMPT_FILE>)" quoting shape carries a backtick, a $(...), a $VAR and an embedded quote unexpanded'
+else
+  fail "T-1135 extra: the quoting shape carries hazard characters unexpanded (got: $RESULT15)"
 fi
 
 # =============================================================================
