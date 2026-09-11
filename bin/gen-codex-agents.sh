@@ -61,14 +61,22 @@
 # Usage:
 #   gen-codex-agents.sh [--root DIR] [--out-dir DIR] [--roles "r1 r2 ..."]
 #
-#   --root      directory holding agents/<role>.md (default: cwd). This is
-#               NOT the shell-team operating base dir (`.shell-team` /
-#               `tasks`) — it is simply the parent of the agents/ directory
-#               being read. The executor-binding read below never goes
-#               through this value.
-#   --out-dir   where the generated shell-team-<role>.toml files land
-#               (default: <root>/.codex/agents, the adopter-facing default
-#               documented in docs/adopting.md)
+#   --root      directory holding agents/<role>.md. Default: this script's
+#               OWN plugin root (the parent of its own bin/ directory,
+#               resolved symlink-safe), never the caller's current working
+#               directory — an adopted repository has no agents/ of its
+#               own, so a cwd default would silently read (or fail to find)
+#               the wrong tree. This is NOT the shell-team operating base
+#               dir (`.shell-team` / `tasks`) — it is simply the parent of
+#               the agents/ directory being read. The executor-binding read
+#               below never goes through this value.
+#   --out-dir   where the generated shell-team-<role>.toml files land.
+#               Default: $PWD/.codex/agents — the adopter's own current
+#               directory (where they run this command), NOT --root's
+#               directory: --root defaults to this plugin's own tree, and an
+#               adopter running the default form expects the output in the
+#               repository they are standing in, not inside the plugin
+#               install. Documented in docs/adopting.md.
 #   --roles     space-separated role-list override (default: the four
 #               roles this task's Goal names: "tech-lead pm-spec engineer
 #               qa-verifier")
@@ -101,7 +109,7 @@ while [ -L "$script_path" ]; do
 done
 SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
-ROOT="."
+ROOT=""
 OUT_DIR=""
 ROLES="tech-lead pm-spec engineer qa-verifier"
 
@@ -110,15 +118,23 @@ while [ "$#" -gt 0 ]; do
     --root)     [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --out-dir)  [ "$#" -ge 2 ] || die "--out-dir requires a value"; shift; OUT_DIR="$1"; shift ;;
     --roles)    [ "$#" -ge 2 ] || die "--roles requires a value"; shift; ROLES="$1"; shift ;;
-    --help|-h)  sed -n '2,81p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)  sed -n '2,89p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
 done
 
+# --root default: this script's OWN plugin root (parent of its own bin/
+# directory), never the caller's cwd — an adopted repository has no
+# agents/ of its own to fall back to. SCRIPT_DIR is already symlink-safe
+# and physical, so a plain `cd .. && pwd -P` is enough here.
+[ -n "$ROOT" ] || ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
 [ -d "$ROOT" ] || die "root path is not a directory: $ROOT"
 ROOT="${ROOT%/}"
 [ -n "$ROOT" ] || ROOT="."
-[ -n "$OUT_DIR" ] || OUT_DIR="$ROOT/.codex/agents"
+# --out-dir default: the caller's OWN current directory, deliberately
+# independent of --root (see header comment above).
+[ -n "$OUT_DIR" ] || OUT_DIR="$PWD/.codex/agents"
 
 # --- executor binding: this script's own sibling, never --root (see header
 #     comment above and the spec's D3-model / freeze-attestation note) -----

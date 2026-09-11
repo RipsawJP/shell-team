@@ -274,6 +274,46 @@ else
 fi
 
 # =============================================================================
+# extra: default --root/--out-dir (no flags at all). --root must resolve to
+# this script's OWN plugin root (never the caller's cwd — an adopted
+# repository has no agents/ of its own), and --out-dir must resolve to
+# $PWD/.codex/agents (the caller's own directory, independent of --root).
+# Regression lock for the class QA's round-1 AC9 finding named: docs told an
+# adopter to run "bash bin/gen-codex-agents.sh" from their own repository,
+# where no bin/ or agents/ exists at all.
+# =============================================================================
+printf '\n--- extra: default --root/--out-dir (no flags) ---\n'
+DEFCWD="$T/defaultcwd"
+mkdir -p "$DEFCWD"
+if ( cd "$DEFCWD" && bash "$GEN" >/dev/null 2>"$T/gendef.err" ); then
+  ok=1
+  for r in $ROLES; do
+    F="$DEFCWD/.codex/agents/shell-team-$r.toml"
+    if [ -s "$F" ]; then
+      SRC="$T/defsrc-$r"
+      awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n==2{print}' "$REPO_ROOT/agents/$r.md" > "$SRC"
+      awk -v k="developer_instructions = '''" 'f{print} $0==k{f=1}' "$F" > "$T/defraw-$r"
+      sed '$d' "$T/defraw-$r" > "$T/defbody-$r"
+      cmp -s "$T/defbody-$r" "$SRC" || ok=0
+    else
+      ok=0
+    fi
+  done
+  if [ "$ok" -eq 1 ]; then
+    pass "T-1134 extra: no-flag invocation defaults --root to the generator's own plugin root and --out-dir to \$PWD/.codex/agents"
+  else
+    fail "T-1134 extra: no-flag invocation defaults --root to the generator's own plugin root and --out-dir to \$PWD/.codex/agents (missing file or byte mismatch)"
+  fi
+else
+  fail "T-1134 extra: no-flag invocation defaults --root to the generator's own plugin root and --out-dir to \$PWD/.codex/agents (generator refused: $(cat "$T/gendef.err"))"
+fi
+if ( cd "$DEFCWD" && bash "$CHK" >/dev/null 2>"$T/chkdef.err" ); then
+  pass "T-1134 extra: check-codex-agents.sh's own no-flag defaults agree with gen-codex-agents.sh's no-flag output"
+else
+  fail "T-1134 extra: check-codex-agents.sh's own no-flag defaults agree with gen-codex-agents.sh's no-flag output ($(cat "$T/chkdef.err"))"
+fi
+
+# =============================================================================
 # extra: test-harness short-circuit class (playbook adversarial checklist
 # class 4) — the real invocation forms, not only `bash script`.
 # =============================================================================

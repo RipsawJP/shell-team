@@ -371,40 +371,72 @@ generator derives one Codex custom-agent TOML per role from the unmodified
 `agents/<role>.md`, so both hosts read the same role prose rather than a
 second, Codex-shaped copy of it.
 
-1. In the adopted repository, run `bash bin/gen-codex-agents.sh` — with the
-   plugin loaded, `bin/` is on `PATH`, so `gen-codex-agents.sh` alone
-   resolves. It reads `agents/tech-lead.md`, `agents/pm-spec.md`,
+1. **Locate the installed plugin root, then run the generator from the
+   adopted repository's own root.** Do not rely on `bin/` being on `PATH` —
+   measured false for an installed plugin, on either host: a fresh session
+   with `shell-team` installed and enabled carries no plugin `bin/`
+   directory on `PATH` at all. Find the plugin root instead — Codex CLI:
+   the `SOURCE` column of `codex plugin list`
+   (`<home>/.codex/plugins/cache/<marketplace>/shell-team/<version>/`);
+   Claude Code: `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`;
+   a checkout of this repository works too. Then, from the adopted
+   repository's own root, run:
+
+   ```
+   bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+   ```
+
+   (or with no flags at all, once your shell's current directory is the
+   adopted repository: `gen-codex-agents.sh`'s own `--root` default is its
+   own plugin root, and its own `--out-dir` default is `$PWD/.codex/agents`
+   — so naming `--out-dir` explicitly above is only clarity, not a
+   requirement). It reads `agents/tech-lead.md`, `agents/pm-spec.md`,
    `agents/engineer.md` and `agents/qa-verifier.md` and writes one
-   `shell-team-<role>.toml` per role into `<repo>/.codex/agents/` by
-   default (pass `--out-dir` to name a different location; `--root` names
-   the directory holding `agents/`, not the shell-team operating base
-   dir).
+   `shell-team-<role>.toml` per role into `.codex/agents/` (`--out-dir`
+   names a different location if you want one; `--root` names the
+   directory holding `agents/`, not the shell-team operating base dir, and
+   only needs setting explicitly if the plugin root cannot be located as
+   above).
 2. **Grant the repository Codex trust before starting a session in it.**
    Codex discovers a project-level custom agent from `<repo>/.codex/agents/`
    only when the repository is trusted — an untrusted, or
    `--skip-git-repo-check`, run never sees these agents at all, whatever
    `gen-codex-agents.sh` already wrote there.
-3. Start a Codex CLI session in the repository and dispatch a role by
+3. **Grant the sandbox write access to `.git` before starting a session in
+   which any dispatched role is expected to commit.** Measured (codex-cli
+   0.154.0): `codex exec --sandbox workspace-write` refuses every write
+   under `.git/` (`Operation not permitted`, exit 128) regardless of actual
+   filesystem permissions — which blocks `engineer`'s own commit before
+   `READY_FOR_QA`. Add the repository's `.git` directory to the sandbox's
+   writable roots on the invocation —
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` — or the
+   same key under `[sandbox_workspace_write]` in your Codex `config.toml`;
+   `--sandbox danger-full-access` also works, at the cost of the whole
+   sandbox.
+4. Start a Codex CLI session in the repository and dispatch a role by
    spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
    `shell-team-engineer`, `shell-team-qa-verifier`) with Codex's own
    `spawn_agent` tool — see `templates/prompt-blocks/host-dispatch.md`
    (spliced into `skills/run/SKILL.md`) for the per-host dispatch text this
    loop's own phase list reads.
-4. **Re-run `bash bin/gen-codex-agents.sh` after editing a role file, or
-   after a plugin upgrade.** The generated TOMLs are not committed
+5. **Re-run the same located-plugin-root command after editing a role
+   file, or after a plugin upgrade.** The generated TOMLs are not committed
    (`.gitignore` covers `.codex/agents`) and go stale the moment
-   `agents/*.md` changes under them. `bash bin/check-codex-agents.sh`
-   reports the drift against the current source, writing nothing, so it is
-   the mechanical way to find out a re-run is due.
+   `agents/*.md` changes under them.
+   `bash "<plugin root>/bin/check-codex-agents.sh"` reports the drift
+   against the current source, writing nothing, so it is the mechanical
+   way to find out a re-run is due.
 
 **Honest limits, stated plainly rather than left for you to discover.** Each
 generated agent's `sandbox_mode` is declarative documentation of that role's
 own intended write scope, derived from its `agents/<role>.md` frontmatter
 `tools:` list — it is **not an enforcement boundary**: the parent Codex
 session's own sandbox governs at runtime, whatever a generated agent's
-`sandbox_mode` value says. And this slice stops at `READY_FOR_REVIEW`: no
-Claude-backed reviewer runs on the Codex host yet, so a Codex CLI run alone
-never reaches both gates green.
+`sandbox_mode` value says. Nor is `--sandbox workspace-write`'s own refusal
+of `.git/` writes something this plugin can suppress — it is Codex CLI's
+own policy, worked around only by the writable-roots step above. And this
+slice stops at `READY_FOR_REVIEW`: no Claude-backed reviewer runs on the
+Codex host yet, so a Codex CLI run alone never reaches both gates green.
 
 ## Conversational usage (no slash commands)
 

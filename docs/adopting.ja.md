@@ -380,38 +380,71 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
 `agents/<role>.md` から役割ごとに 1 つの Codex custom-agent TOML を導出する
 ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
 
-1. adopt した repository で `bash bin/gen-codex-agents.sh` を実行する
-   （プラグインをロードしていれば `bin/` は `PATH` に載るので
-   `gen-codex-agents.sh` 単体で解決する）。`agents/tech-lead.md`・
+1. **インストール済み plugin の root を特定してから、adopt した
+   repository 自身の root で generator を実行する。** `bin/` が `PATH` に
+   載っているという前提は使わない——インストール済み plugin では
+   どちらの host でも実測で偽と分かっている: `shell-team` を
+   インストール・有効化した状態で新規にセッションを開いても、plugin の
+   `bin/` ディレクトリは `PATH` に一切載らない。代わりに plugin root を
+   特定する——Codex CLI: `codex plugin list` の `SOURCE` 列
+   （`<home>/.codex/plugins/cache/<marketplace>/shell-team/<version>/`）。
+   Claude Code: `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`。
+   checkout でも構わない。そのうえで、adopt した repository 自身の root で
+   次を実行する:
+
+   ```
+   bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+   ```
+
+   （シェルのカレントディレクトリが adopt した repository である限り、
+   フラグを一切付けない同一コマンドでも動く——`gen-codex-agents.sh`
+   自身の `--root` の既定値はその plugin root、`--out-dir` の既定値は
+   `$PWD/.codex/agents` なので、上で `--out-dir` を明示しているのは
+   分かりやすさのためであって必須ではない）。`agents/tech-lead.md`・
    `agents/pm-spec.md`・`agents/engineer.md`・`agents/qa-verifier.md` を
-   読み、既定では役割ごとの `shell-team-<role>.toml` を
-   `<repo>/.codex/agents/` に 1 つずつ書き出す（別の場所に出したい場合は
-   `--out-dir` を渡す。`--root` は `agents/` を持つディレクトリを指す
-   ——shell-team の稼働ベースディレクトリではない）。
+   読み、役割ごとの `shell-team-<role>.toml` を `.codex/agents/` に
+   1 つずつ書き出す（別の場所に出したい場合は `--out-dir` を渡す。
+   `--root` は `agents/` を持つディレクトリを指す——shell-team の稼働
+   ベースディレクトリではない。上記のとおり plugin root が特定できる
+   限り明示する必要はない）。
 2. **セッションを開始する前に、その repository へ Codex trust を付与する。**
    Codex がプロジェクトレベルの custom agent を `<repo>/.codex/agents/` から
    発見するのは、repository が trusted な場合に限る——untrusted な状態や
    `--skip-git-repo-check` での実行では、`gen-codex-agents.sh` が既に何を
    書き出していても、これらの agent は一切見えない。
-3. その repository で Codex CLI セッションを開始し、Codex 自身の
+3. **dispatch する役割が commit する見込みなら、セッション開始前に
+   `.git` への sandbox 書き込みを許可する。** 実測（codex-cli 0.154.0）:
+   `codex exec --sandbox workspace-write` は実際のファイルシステム権限に
+   関係なく `.git/` 配下へのあらゆる書き込みを拒否する
+   （`Operation not permitted`、exit 128）——これは `engineer` が
+   `READY_FOR_QA` 前に行う commit 自体を止める。invocation に
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` を
+   付けるか、Codex の `config.toml` の `[sandbox_workspace_write]` に
+   同じキーを設定する。`--sandbox danger-full-access` でも通るが、
+   sandbox 全体を失う代償を伴う。
+4. その repository で Codex CLI セッションを開始し、Codex 自身の
    `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
    `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`）を
    spawn して役割を dispatch する——host ごとの dispatch 文言（
    `skills/run/SKILL.md` に splice 済み）は
    `templates/prompt-blocks/host-dispatch.md` を参照。
-4. **役割ファイルを編集した後、またはプラグインをアップグレードした後は
-   `bash bin/gen-codex-agents.sh` を再実行する。** 生成された TOML は
-   コミットされず（`.gitignore` が `.codex/agents` をカバーする）、
-   `agents/*.md` が変わった瞬間に stale になる。`bash
-   bin/check-codex-agents.sh` は何も書き込まずに現在のソースとの drift を
-   報告するので、再実行が必要かを機械的に確認できる。
+5. **役割ファイルを編集した後、またはプラグインをアップグレードした後は、
+   同じ「plugin root を特定してから実行する」コマンドを再実行する。**
+   生成された TOML はコミットされず（`.gitignore` が `.codex/agents` を
+   カバーする）、`agents/*.md` が変わった瞬間に stale になる。
+   `bash "<plugin root>/bin/check-codex-agents.sh"` は何も書き込まずに
+   現在のソースとの drift を報告するので、再実行が必要かを機械的に
+   確認できる。
 
 **誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
 `sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
 導出した「意図された write scope」の宣言的な記述に過ぎない——**enforcement
 boundary ではない**: 実行時は親の Codex セッション自身の sandbox が支配し、
-生成された agent の `sandbox_mode` の値が何であれそれは変わらない。また
-この slice は `READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
+生成された agent の `sandbox_mode` の値が何であれそれは変わらない。
+`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
+この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
+上記の writable-roots の手順でのみ回避できる。またこの slice は
+`READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
 reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）

@@ -26,8 +26,15 @@
 # Usage:
 #   check-codex-agents.sh [--root DIR] [--out-dir DIR] [--roles "r1 r2 ..."]
 #
-#   --root      forwarded to gen-codex-agents.sh unchanged (default: cwd)
-#   --out-dir   the out-dir under test (default: <root>/.codex/agents)
+#   --root      forwarded to gen-codex-agents.sh unchanged. Default: this
+#               script's OWN plugin root (parent of its own bin/ directory),
+#               matching gen-codex-agents.sh's own default — never the
+#               caller's cwd, for the same reason: an adopted repository
+#               has no agents/ of its own.
+#   --out-dir   the out-dir under test. Default: $PWD/.codex/agents — the
+#               caller's own current directory, matching
+#               gen-codex-agents.sh's own default, deliberately independent
+#               of --root.
 #   --roles     forwarded to gen-codex-agents.sh unchanged (default: the
 #               four roles gen-codex-agents.sh itself defaults to)
 #
@@ -54,7 +61,7 @@ while [ -L "$script_path" ]; do
 done
 SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
-ROOT="."
+ROOT=""
 OUT_DIR=""
 ROLES="tech-lead pm-spec engineer qa-verifier"
 
@@ -63,15 +70,21 @@ while [ "$#" -gt 0 ]; do
     --root)     [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --out-dir)  [ "$#" -ge 2 ] || die "--out-dir requires a value"; shift; OUT_DIR="$1"; shift ;;
     --roles)    [ "$#" -ge 2 ] || die "--roles requires a value"; shift; ROLES="$1"; shift ;;
-    --help|-h)  sed -n '2,32p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)  sed -n '2,45p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
 done
 
+# --root default: this script's OWN plugin root, mirroring
+# gen-codex-agents.sh's own default (see header comment above).
+[ -n "$ROOT" ] || ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
 [ -d "$ROOT" ] || die "root path is not a directory: $ROOT"
 ROOT="${ROOT%/}"
 [ -n "$ROOT" ] || ROOT="."
-[ -n "$OUT_DIR" ] || OUT_DIR="$ROOT/.codex/agents"
+# --out-dir default: the caller's OWN current directory, deliberately
+# independent of --root (see header comment above).
+[ -n "$OUT_DIR" ] || OUT_DIR="$PWD/.codex/agents"
 
 GENERATOR="$SCRIPT_DIR/gen-codex-agents.sh"
 [ -x "$GENERATOR" ] || die "cannot find sibling gen-codex-agents.sh next to check-codex-agents.sh: $GENERATOR"
