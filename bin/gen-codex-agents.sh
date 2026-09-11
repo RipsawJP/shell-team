@@ -76,7 +76,16 @@
 #               directory: --root defaults to this plugin's own tree, and an
 #               adopter running the default form expects the output in the
 #               repository they are standing in, not inside the plugin
-#               install. Documented in docs/adopting.md.
+#               install. Documented in docs/adopting.md. NOTE: under Codex
+#               CLI's own `codex exec --sandbox workspace-write`, this
+#               script's own `mkdir -p "$OUT_DIR"` below is refused
+#               (`Operation not permitted`) if OUT_DIR is under a `.codex/`
+#               that does not already exist — that sandbox refuses creating
+#               or writing `.codex/` itself, the same policy it applies to
+#               `.git/`. Running this script from your own shell, outside a
+#               Codex session, is the default and avoids this entirely; see
+#               docs/adopting.md's "Using shell-team from Codex CLI" step 3
+#               for the writable-roots form when Codex must run it in-session.
 #   --roles     space-separated role-list override (default: the four
 #               roles this task's Goal names: "tech-lead pm-spec engineer
 #               qa-verifier")
@@ -118,7 +127,7 @@ while [ "$#" -gt 0 ]; do
     --root)     [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --out-dir)  [ "$#" -ge 2 ] || die "--out-dir requires a value"; shift; OUT_DIR="$1"; shift ;;
     --roles)    [ "$#" -ge 2 ] || die "--roles requires a value"; shift; ROLES="$1"; shift ;;
-    --help|-h)  sed -n '2,89p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)  sed -n '2,98p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
 done

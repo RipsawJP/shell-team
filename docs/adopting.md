@@ -396,23 +396,40 @@ second, Codex-shaped copy of it.
    names a different location if you want one; `--root` names the
    directory holding `agents/`, not the shell-team operating base dir, and
    only needs setting explicitly if the plugin root cannot be located as
-   above).
+   above). Run this command from your own shell, outside any Codex CLI
+   session — the default and simplest path. If you instead have Codex
+   itself run this command inside a session, see step 3: the same
+   sandbox that refuses `.git/` writes also refuses creating `.codex/`
+   itself.
 2. **Grant the repository Codex trust before starting a session in it.**
    Codex discovers a project-level custom agent from `<repo>/.codex/agents/`
    only when the repository is trusted — an untrusted, or
    `--skip-git-repo-check`, run never sees these agents at all, whatever
    `gen-codex-agents.sh` already wrote there.
-3. **Grant the sandbox write access to `.git` before starting a session in
-   which any dispatched role is expected to commit.** Measured (codex-cli
-   0.154.0): `codex exec --sandbox workspace-write` refuses every write
-   under `.git/` (`Operation not permitted`, exit 128) regardless of actual
-   filesystem permissions — which blocks `engineer`'s own commit before
-   `READY_FOR_QA`. Add the repository's `.git` directory to the sandbox's
+3. **Grant the sandbox write access to `.git` — and, only if Codex itself
+   runs step 1's generator or step 5's checker inside the session, to
+   `.codex` too.** Measured (codex-cli 0.154.0): `codex exec --sandbox
+   workspace-write` refuses every write under `.git/` (`Operation not
+   permitted`, exit 128) regardless of actual filesystem permissions —
+   which blocks `engineer`'s own commit before `READY_FOR_QA` — and
+   separately refuses creating or writing under `.codex/` itself
+   (`mkdir: .codex: Operation not permitted`), the same policy applied to
+   a second, Codex-owned directory name — which blocks
+   `gen-codex-agents.sh`'s own `mkdir -p` of `--out-dir` when Codex runs
+   step 1 (or `check-codex-agents.sh` in step 5) inside the session
+   rather than from your own shell. Running steps 1 and 5 from your own
+   shell — the default path both steps already describe — avoids the
+   `.codex` refusal entirely, since only a role's own commit needs `.git`
+   write access. Add whichever directories apply to the sandbox's
    writable roots on the invocation —
-   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` — or the
-   same key under `[sandbox_workspace_write]` in your Codex `config.toml`;
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` for
+   commits alone, or
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
+   if Codex also runs step 1 or step 5 inside the session — or the same
+   key under `[sandbox_workspace_write]` in your Codex `config.toml`;
    `--sandbox danger-full-access` also works, at the cost of the whole
-   sandbox.
+   sandbox. (Codex's own configuration directory, `.agents`, is refused
+   the same way; nothing in this loop writes to it.)
 4. Start a Codex CLI session in the repository and dispatch a role by
    spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
    `shell-team-engineer`, `shell-team-qa-verifier`) with Codex's own
@@ -425,7 +442,9 @@ second, Codex-shaped copy of it.
    `agents/*.md` changes under them.
    `bash "<plugin root>/bin/check-codex-agents.sh"` reports the drift
    against the current source, writing nothing, so it is the mechanical
-   way to find out a re-run is due.
+   way to find out a re-run is due. Run this from your own shell too, by
+   default — see step 3 if you instead want Codex itself to run it inside
+   a session.
 
 **Honest limits, stated plainly rather than left for you to discover.** Each
 generated agent's `sandbox_mode` is declarative documentation of that role's
@@ -434,9 +453,13 @@ own intended write scope, derived from its `agents/<role>.md` frontmatter
 session's own sandbox governs at runtime, whatever a generated agent's
 `sandbox_mode` value says. Nor is `--sandbox workspace-write`'s own refusal
 of `.git/` writes something this plugin can suppress — it is Codex CLI's
-own policy, worked around only by the writable-roots step above. And this
-slice stops at `READY_FOR_REVIEW`: no Claude-backed reviewer runs on the
-Codex host yet, so a Codex CLI run alone never reaches both gates green.
+own policy, worked around only by the writable-roots step above. The same
+sandbox policy refuses creating or writing `.codex/` itself, which blocks
+Codex from running step 1's generator or step 5's checker inside a
+session rather than from your own shell — see step 3 for the same
+writable-roots remedy, extended to `.codex`. And this slice stops at
+`READY_FOR_REVIEW`: no Claude-backed reviewer runs on the Codex host yet,
+so a Codex CLI run alone never reaches both gates green.
 
 ## Conversational usage (no slash commands)
 

@@ -406,22 +406,41 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    1 つずつ書き出す（別の場所に出したい場合は `--out-dir` を渡す。
    `--root` は `agents/` を持つディレクトリを指す——shell-team の稼働
    ベースディレクトリではない。上記のとおり plugin root が特定できる
-   限り明示する必要はない）。
+   限り明示する必要はない）。このコマンドは Codex CLI セッションの外、
+   自分自身のシェルから実行する——これが既定かつ最も単純な経路。
+   Codex 自身にこのコマンドをセッション内で実行させたい場合は手順 3 を
+   見ること——`.git/` への書き込みを拒否するのと同じ sandbox が、
+   `.codex/` 自体の作成も拒否する。
 2. **セッションを開始する前に、その repository へ Codex trust を付与する。**
    Codex がプロジェクトレベルの custom agent を `<repo>/.codex/agents/` から
    発見するのは、repository が trusted な場合に限る——untrusted な状態や
    `--skip-git-repo-check` での実行では、`gen-codex-agents.sh` が既に何を
    書き出していても、これらの agent は一切見えない。
-3. **dispatch する役割が commit する見込みなら、セッション開始前に
-   `.git` への sandbox 書き込みを許可する。** 実測（codex-cli 0.154.0）:
+3. **`.git` への sandbox 書き込みを許可する——さらに、Codex 自身が
+   手順 1 の generator か手順 5 の checker をセッション内で実行する
+   場合に限り `.codex` も。** 実測（codex-cli 0.154.0）:
    `codex exec --sandbox workspace-write` は実際のファイルシステム権限に
-   関係なく `.git/` 配下へのあらゆる書き込みを拒否する
+   関係なく `.git/` 配下へのあらゆる書き込みを拒否し
    （`Operation not permitted`、exit 128）——これは `engineer` が
-   `READY_FOR_QA` 前に行う commit 自体を止める。invocation に
-   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` を
-   付けるか、Codex の `config.toml` の `[sandbox_workspace_write]` に
+   `READY_FOR_QA` 前に行う commit 自体を止める——さらに、もう一つの
+   Codex 自身の設定ディレクトリ名に対して同じポリシーを適用し、
+   `.codex/` 自体の作成・書き込みも別途拒否する
+   （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 1
+   （または手順 5 の `check-codex-agents.sh`）を自分自身のシェルからでは
+   なくセッション内で実行しようとしたときに `gen-codex-agents.sh` 自身の
+   `--out-dir` への `mkdir -p` を止める。手順 1・手順 5 を（両手順が既定
+   として書いているとおり）自分自身のシェルから実行すれば、`.codex` の
+   拒否は一切発生しない——役割自身の commit だけが `.git` への書き込みを
+   必要とするため。該当する方を invocation の sandbox writable roots に
+   追加する——commit だけなら
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'`、
+   Codex 自身が手順 1 または手順 5 をセッション内で実行するなら
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
+   ——または Codex の `config.toml` の `[sandbox_workspace_write]` に
    同じキーを設定する。`--sandbox danger-full-access` でも通るが、
-   sandbox 全体を失う代償を伴う。
+   sandbox 全体を失う代償を伴う。（Codex 自身のもう一つの設定
+   ディレクトリ `.agents` も同様に拒否されるが、このループはそこには
+   何も書き込まない。）
 4. その repository で Codex CLI セッションを開始し、Codex 自身の
    `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
    `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`）を
@@ -434,7 +453,8 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    カバーする）、`agents/*.md` が変わった瞬間に stale になる。
    `bash "<plugin root>/bin/check-codex-agents.sh"` は何も書き込まずに
    現在のソースとの drift を報告するので、再実行が必要かを機械的に
-   確認できる。
+   確認できる。これも既定では自分自身のシェルから実行する——Codex 自身に
+   セッション内で実行させたい場合は手順 3 を見ること。
 
 **誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
 `sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
@@ -443,7 +463,11 @@ boundary ではない**: 実行時は親の Codex セッション自身の sandb
 生成された agent の `sandbox_mode` の値が何であれそれは変わらない。
 `--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
 この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
-上記の writable-roots の手順でのみ回避できる。またこの slice は
+上記の writable-roots の手順でのみ回避できる。同じ sandbox のポリシーは
+`.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 1 の
+generator や手順 5 の checker を自分自身のシェルからではなくセッション内で
+実行することを妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は
+手順 3 を見ること。またこの slice は
 `READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
 reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
 
