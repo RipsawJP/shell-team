@@ -132,9 +132,14 @@ mkdir -p "$ROK/agents"
 cp "$REPO_ROOT"/agents/*.md "$ROK/agents/"
 printf "%s\n" "two quotes '' and a trailing quote '" >> "$ROK/agents/pm-spec.md"
 OOK="$T/ook"
+# Derived from the generator's OWN default ROLES (not this suite's fixed
+# 4-role $ROLES above), since this fixture runs the generator with no
+# --roles override — read live so a future default-role-count change (as
+# T-1135's own fifth role already was) cannot silently desync this count.
+EXPECT_ROLE_COUNT="$(sed -n 's/^ROLES="\(.*\)"$/\1/p' "$GEN" | head -1 | tr ' ' '\n' | grep -c .)"
 if bash "$GEN" --root "$ROK" --out-dir "$OOK" >/dev/null 2>"$T/genok.err" \
   && [ -s "$OOK/shell-team-pm-spec.toml" ] \
-  && [ "$(find "$OOK" -name 'shell-team-*.toml' | wc -l | tr -d ' ')" -eq 4 ]; then
+  && [ "$(find "$OOK" -name 'shell-team-*.toml' | wc -l | tr -d ' ')" -eq "$EXPECT_ROLE_COUNT" ]; then
   pass "T-1134 extra: two consecutive apostrophes and a trailing-line apostrophe are legal and still generate"
 else
   fail "T-1134 extra: the positive apostrophe control did not generate ($(cat "$T/genok.err"))"
@@ -273,6 +278,212 @@ if [ "$BEFORE" = "$AFTER" ] && bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT5"
   pass "T-1134: a TOML the generator does not own is left untouched in the out-dir"
 else
   fail "T-1134: a TOML the generator does not own is left untouched in the out-dir"
+fi
+
+# =============================================================================
+# fixture 6 (T-1135 AC7 fixed string 1): the generated developer_instructions
+# body for the fifth role, codex-reviewer, is byte-identical to
+# agents/codex-reviewer.md's own content, and neither model nor
+# model_reasoning_effort is emitted under the shipped default binding.
+# =============================================================================
+printf '\n--- fixture 6 (T-1135): codex-reviewer developer_instructions body ---\n'
+OUT6="$T/out6"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT6" >"$T/gen6.out" 2>"$T/gen6.err"; then
+  F6="$OUT6/shell-team-codex-reviewer.toml"
+  ok=1
+  if [ -s "$F6" ]; then
+    awk -v k="developer_instructions = '''" 'f{print} $0==k{f=1}' "$F6" > "$T/raw6"
+    sed '$d' "$T/raw6" > "$T/body6"
+    awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n==2{print}' "$REPO_ROOT/agents/codex-reviewer.md" > "$T/src6"
+    cmp -s "$T/body6" "$T/src6" || ok=0
+    tail -n 1 "$F6" | grep -Fxq -- "'''" || ok=0
+    grep -Fxq -- 'name = "shell-team-codex-reviewer"' "$F6" || ok=0
+    { grep -q '^model = ' "$F6" || grep -q '^model_reasoning_effort = ' "$F6"; } && ok=0
+  else
+    ok=0
+  fi
+  if [ "$ok" -eq 1 ]; then
+    pass "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md"
+  else
+    fail "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md"
+  fi
+else
+  fail "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md (generator refused: $(cat "$T/gen6.err"))"
+fi
+
+# =============================================================================
+# fixture 7 (T-1135 AC7 fixed string 2/3): the Claude-side review recipe's
+# capture shape (D3 — stream-json, one JSON object per line, each carrying a
+# "type" key) is accepted by the unmodified bin/codex-capture.sh --publish
+# unchanged, and a jsonl carrying no typed event at all is refused.
+# =============================================================================
+printf '\n--- fixture 7 (T-1135): Claude stream-json capture shape at codex-capture.sh ---\n'
+CC="$REPO_ROOT/bin/codex-capture.sh"
+RVDIR="$T/rv7"
+mkdir -p "$RVDIR"
+P1="$(bash "$CC" --alloc --stem t1135claudecapok --reviews-dir "$RVDIR" 2>"$T/alloc7.err")"
+if [ -n "$P1" ]; then
+  O1="$(printf '%s\n' "$P1" | sed -n 1p)"
+  J1="$(printf '%s\n' "$P1" | sed -n 2p)"
+  printf '%s\n' \
+    '{"type":"system","subtype":"init"}' \
+    '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"reviewing"}]}}' \
+    '{"type":"result","subtype":"success","is_error":false,"duration_ms":4567,"total_cost_usd":0.1234,"usage":{"total_tokens":890},"result":"APPROVE"}' \
+    > "$J1"
+  tail -n 1 "$J1" > "$O1"
+  if bash "$CC" --publish --stem t1135claudecapok --publish-out "$O1" --publish-jsonl "$J1" --reviews-dir "$RVDIR" >/dev/null 2>"$T/pub7.err" \
+    && [ -s "$RVDIR/t1135claudecapok.txt" ] && [ -s "$RVDIR/t1135claudecapok.jsonl" ]; then
+    pass "T-1135: a Claude stream-json-shaped capture passes codex-capture.sh --publish unchanged"
+  else
+    fail "T-1135: a Claude stream-json-shaped capture passes codex-capture.sh --publish unchanged ($(cat "$T/pub7.err"))"
+  fi
+else
+  fail "T-1135: a Claude stream-json-shaped capture passes codex-capture.sh --publish unchanged (alloc refused: $(cat "$T/alloc7.err"))"
+fi
+
+P2="$(bash "$CC" --alloc --stem t1135claudecapbad --reviews-dir "$RVDIR" 2>"$T/alloc7b.err")"
+if [ -n "$P2" ]; then
+  O2="$(printf '%s\n' "$P2" | sed -n 1p)"
+  J2="$(printf '%s\n' "$P2" | sed -n 2p)"
+  printf '%s\n' 'Not logged in · Please run /login' > "$J2"
+  printf 'x\n' > "$O2"
+  if bash "$CC" --publish --stem t1135claudecapbad --publish-out "$O2" --publish-jsonl "$J2" --reviews-dir "$RVDIR" >/dev/null 2>&1; then
+    fail "T-1135: a capture whose jsonl carries no typed event is refused by codex-capture.sh --publish (publish did not refuse)"
+  else
+    if [ ! -e "$RVDIR/t1135claudecapbad.txt" ] && [ ! -e "$RVDIR/t1135claudecapbad.jsonl" ]; then
+      pass "T-1135: a capture whose jsonl carries no typed event is refused by codex-capture.sh --publish"
+    else
+      fail "T-1135: a capture whose jsonl carries no typed event is refused by codex-capture.sh --publish (a canonical file was published anyway)"
+    fi
+  fi
+else
+  fail "T-1135: a capture whose jsonl carries no typed event is refused by codex-capture.sh --publish (alloc refused: $(cat "$T/alloc7b.err"))"
+fi
+
+# =============================================================================
+# fixture 8 (T-1135 AC7 fixed string 4 / AC12 live half): a reviewer span row
+# built from a Claude JSON result's own usage/duration_ms/total_cost_usd
+# fields is accepted by bin/log-run.sh, recorded with provider claude.
+# =============================================================================
+printf '\n--- fixture 8 (T-1135): a reviewer span row from a Claude JSON result ---\n'
+LOGRUN="$REPO_ROOT/bin/log-run.sh"
+RUNSDIR8="$T/runs8"
+mkdir -p "$RUNSDIR8"
+CLAUDE_RESULT='{"type":"result","subtype":"success","is_error":false,"duration_ms":4567,"total_cost_usd":0.1234,"usage":{"total_tokens":890},"result":"APPROVE"}'
+TOK8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"total_tokens":\([0-9]*\).*/\1/p')"
+DUR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"duration_ms":\([0-9]*\).*/\1/p')"
+USD8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"total_cost_usd":\([0-9.]*\).*/\1/p')"
+if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span codex-reviewer --phase review \
+    --iteration 0 --attempt 0 --status success --tokens "$TOK8" --duration-ms "$DUR8" --usd "$USD8" \
+    --provider claude --adapter claude-cli >/dev/null 2>"$T/lr8.err"; then
+  ROWFILE8="$RUNSDIR8/t1135loop.jsonl"
+  if [ -s "$ROWFILE8" ] && [ "$(wc -l < "$ROWFILE8" | tr -d ' ')" -eq 1 ] \
+    && grep -Fq '"tokens":890' "$ROWFILE8" \
+    && grep -Fq '"duration_ms":4567' "$ROWFILE8" \
+    && grep -Fq '"usd":0.1234' "$ROWFILE8" \
+    && grep -Fq '"provider":"claude"' "$ROWFILE8" \
+    && grep -Fq '"adapter":"claude-cli"' "$ROWFILE8"; then
+    pass "T-1135: a reviewer span row from a Claude JSON result is accepted by log-run.sh"
+  else
+    fail "T-1135: a reviewer span row from a Claude JSON result is accepted by log-run.sh (row shape mismatch: $(cat "$ROWFILE8" 2>/dev/null)"
+  fi
+else
+  fail "T-1135: a reviewer span row from a Claude JSON result is accepted by log-run.sh (log-run.sh refused: $(cat "$T/lr8.err"))"
+fi
+
+# =============================================================================
+# extra (T-1135): --roles token validation (issue #487 hardening ii) — a
+# path-shaped token is refused with nothing written, a legal two-role subset
+# generates exactly that subset.
+# =============================================================================
+printf '\n--- extra (T-1135): --roles token validation ---\n'
+OUT9="$T/out9"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT9" --roles 'pm-spec ../evil' >/dev/null 2>&1; then
+  fail "T-1135 extra: a path-shaped --roles token is refused (generator did not refuse)"
+else
+  n="$(count_toml "$OUT9" '*.toml')"
+  if [ "$n" -eq 0 ]; then
+    pass "T-1135 extra: a path-shaped --roles token is refused with no file written"
+  else
+    fail "T-1135 extra: a path-shaped --roles token is refused with no file written (found $n stray file(s))"
+  fi
+fi
+OUT9B="$T/out9b"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT9B" --roles 'pm-spec engineer' >/dev/null 2>"$T/gen9b.err" \
+  && [ "$(find "$OUT9B" -name 'shell-team-*.toml' | wc -l | tr -d ' ')" -eq 2 ]; then
+  pass "T-1135 extra: a legal two-role --roles subset generates exactly that subset"
+else
+  fail "T-1135 extra: a legal two-role --roles subset generates exactly that subset ($(cat "$T/gen9b.err"))"
+fi
+
+# =============================================================================
+# extra (T-1135): --root / no longer collapses to the current directory
+# (issue #487 hardening i) — refused, while --root . in the same run
+# succeeds, proving the refusal is narrower than "any root is rejected".
+# =============================================================================
+printf '\n--- extra (T-1135): --root / is refused rather than collapsed to cwd ---\n'
+OUT10="$T/out10"
+if bash "$GEN" --root / --out-dir "$OUT10" >/dev/null 2>&1; then
+  fail "T-1135 extra: --root / is refused (generator did not refuse)"
+else
+  n="$(count_toml "$OUT10" '*.toml')"
+  if [ "$n" -eq 0 ]; then
+    pass "T-1135 extra: --root / is refused with no file written"
+  else
+    fail "T-1135 extra: --root / is refused with no file written (found $n stray file(s))"
+  fi
+fi
+OUT10B="$T/out10b"
+if bash "$GEN" --root . --out-dir "$OUT10B" >/dev/null 2>"$T/gen10b.err"; then
+  pass "T-1135 extra: --root . still succeeds in the same run --root / was refused"
+else
+  fail "T-1135 extra: --root . still succeeds in the same run --root / was refused ($(cat "$T/gen10b.err"))"
+fi
+
+# =============================================================================
+# extra (T-1135): the out-dir carries only *.toml entries after a default
+# run (issue #487 hardening iii/D6 — per-file staged write, never a stray
+# staging artifact left behind), and the write pass uses mv onto OUT_DIR
+# rather than a direct redirect (source-text lock).
+# =============================================================================
+printf '\n--- extra (T-1135): per-file staged write leaves no non-toml residue ---\n'
+OUT11="$T/out11"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT11" >/dev/null 2>&1
+if [ "$(find "$OUT11" -mindepth 1 ! -name '*.toml' | wc -l | tr -d ' ')" -eq 0 ]; then
+  pass "T-1135 extra: a default run leaves only *.toml entries in the out-dir"
+else
+  fail "T-1135 extra: a default run leaves only *.toml entries in the out-dir"
+fi
+# shellcheck disable=SC2016  # single-quoted grep patterns matching source text, not shell expansions
+if [ "$(grep -c 'mv .*OUT_DIR' "$GEN" || true)" -ge 1 ] && [ "$(grep -c '> *"\$OUT_DIR/shell-team-' "$GEN" || true)" -eq 0 ]; then
+  pass "T-1135 extra: the write pass renames onto OUT_DIR rather than redirecting directly onto the final name"
+else
+  fail "T-1135 extra: the write pass renames onto OUT_DIR rather than redirecting directly onto the final name"
+fi
+
+# =============================================================================
+# extra (T-1135): the first listed role failing validation emits no
+# "unbound variable" diagnostic under bash 3.2's set -u (issue #487
+# hardening iv), while still refusing non-zero with nothing written.
+# =============================================================================
+printf '\n--- extra (T-1135): first-role failure under set -u emits no unbound-variable noise ---\n'
+FR12="$(sed -n 's/^ROLES="\([^ ]*\).*$/\1/p' "$GEN" | head -1)"
+R12="$T/r12"
+mkdir -p "$R12/agents"
+cp "$REPO_ROOT"/agents/*.md "$R12/agents/"
+printf 'no frontmatter at all\n' > "$R12/agents/$FR12.md"
+OUT12="$T/out12"
+if bash "$GEN" --root "$R12" --out-dir "$OUT12" >/dev/null 2>"$T/gen12.err"; then
+  fail "T-1135 extra: a first-listed-role failure still refuses (generator did not refuse)"
+else
+  n="$(count_toml "$OUT12" '*.toml')"
+  if grep -Fq -- 'unbound variable' "$T/gen12.err"; then
+    fail "T-1135 extra: a first-listed-role failure emits no unbound-variable noise (found: $(cat "$T/gen12.err"))"
+  elif [ "$n" -ne 0 ]; then
+    fail "T-1135 extra: a first-listed-role failure writes nothing (found $n stray file(s))"
+  else
+    pass "T-1135 extra: a first-listed-role failure emits no unbound-variable noise and writes nothing"
+  fi
 fi
 
 # =============================================================================

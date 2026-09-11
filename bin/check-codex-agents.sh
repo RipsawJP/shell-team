@@ -2,14 +2,17 @@
 # check-codex-agents.sh — verify that a Codex-agents out-dir stays in sync
 # with a fresh run of its check-only sibling generator, gen-codex-agents.sh
 # (T-1134; GitHub issue #484;
-# .shell-team/specs/T-1134-codex-host-slice1.md).
+# .shell-team/specs/T-1134-codex-host-slice1.md). T-1135 (GitHub issue #493;
+# .shell-team/specs/T-1135-codex-host-slice2.md) adds codex-reviewer as a
+# fifth default role, inside this script's own authority exactly like the
+# other four — no special-casing.
 #
 # check-only: this script NEVER writes into --out-dir and NEVER writes into
 # --root — the same D6 design bin/check-prompt-sync.sh already established
 # for its own generator/checker pair (T-039/T-040), applied here: a
 # checker with a "fix" mode is one flag away from writing during a check.
 #
-# Method: regenerate --root's four shipped roles into a scratch out-dir
+# Method: regenerate --root's five shipped roles into a scratch out-dir
 # (mktemp -d under ${TMPDIR:-/tmp}) with bin/gen-codex-agents.sh, then
 # compare (`cmp`) each of --out-dir's own shell-team-<role>.toml files
 # against the freshly regenerated one:
@@ -36,7 +39,7 @@
 #               gen-codex-agents.sh's own default, deliberately independent
 #               of --root.
 #   --roles     forwarded to gen-codex-agents.sh unchanged (default: the
-#               four roles gen-codex-agents.sh itself defaults to)
+#               five roles gen-codex-agents.sh itself defaults to)
 #
 # Exit: 0 = --out-dir is in sync with --root's current agents/*.md; 1 =
 #       drift, a missing expected file, or an extra shell-team-*.toml file
@@ -63,14 +66,14 @@ SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
 ROOT=""
 OUT_DIR=""
-ROLES="tech-lead pm-spec engineer qa-verifier"
+ROLES="tech-lead pm-spec engineer qa-verifier codex-reviewer"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --root)     [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --out-dir)  [ "$#" -ge 2 ] || die "--out-dir requires a value"; shift; OUT_DIR="$1"; shift ;;
     --roles)    [ "$#" -ge 2 ] || die "--roles requires a value"; shift; ROLES="$1"; shift ;;
-    --help|-h)  sed -n '2,45p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)  sed -n '2,48p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
 done

@@ -371,14 +371,20 @@ executor は fallback ではなく `BLOCKED` になるため、未測定の認�
 
 ## Codex CLI から shell-team を使う
 
-slice 1（T-1134）により、Codex CLI セッションからこのループの
-`pm-spec` → `engineer` → `qa-verifier` チェーンを `READY_FOR_REVIEW` まで
-駆動できる——dispatch のどこにも Claude Code プロセスは登場しない。
-`codex-reviewer` 自身の `APPROVE` はこの slice ではまだ Claude Code host 側で
-走るため、Codex CLI 単独の実行では両ゲートまでは届かない。`agents/**` は
+Codex CLI セッションから、このループの Specify → Implement → Validate →
+Review のチェーン全体を `READY_FOR_MERGE`、両ゲート green まで駆動できる
+ようになった——dispatch のどこにも Claude Code の *プロセス* は登場しない。
+slice 1（T-1134）は `pm-spec` → `engineer` → `qa-verifier` チェーン
+（`tech-lead` も含む）を `READY_FOR_REVIEW` まで配線し、slice 2（T-1135）が
+`codex-reviewer` を 5 つ目の生成役割として追加し、そのレビューを Codex では
+なく Claude 上で走らせることで残りのギャップを閉じる——Codex CLI host が
+「そうではない」provider が Claude だから。このループが前提とする
+cross-provider の性質は host を切り替えても保たれる。`agents/**` は
 このために複製・分岐されることは一切ない: generator が未改変の
 `agents/<role>.md` から役割ごとに 1 つの Codex custom-agent TOML を導出する
 ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
+役割名 `codex-reviewer` は両 host で変わらない——ここでは歴史的な名前に
+過ぎず、実際にレビューするのは Codex ではなく Claude である（手順 9 参照）。
 
 1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
    `codex plugin list` が `shell-team` を厳密に `installed, enabled` と
@@ -411,21 +417,25 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`
    だった。checkout でも、どちらの host でも構わない。
 
-   **特定した root に `bin/gen-codex-agents.sh` が無ければ、その
-   インストールは古い**——この Codex host 機能が出荷される前に
-   インストールされたということ。この機能自体には比較対象にできる
-   独立したバージョン番号が無い（専用リリースではなく通常の plugin
-   リリースの一部として出荷されるため）ので、ファイルの有無そのものが
-   チェックになる——「このドキュメントが出荷しているものと同じか
-   それ以上のバージョン」の具体的な代用である。`codex plugin
-   marketplace upgrade <marketplace>` を実行する（`codex plugin
+   **特定した root に `bin/gen-codex-agents.sh` が無い、あるいはその
+   スクリプト自身の既定役割リストにまだ `codex-reviewer` が含まれていない
+   （そのため手順 3 が `shell-team-codex-reviewer.toml` を生成しない）
+   場合、そのインストールは古い**——この Codex host 機能自体が出荷される
+   前、あるいはこの 5 つ目の役割が追加される前にインストールされた
+   ということ。どちらの機能にも比較対象にできる独立したバージョン番号が
+   無い（専用リリースではなく通常の plugin リリースの一部として出荷
+   されるため)ので、ファイルの有無、そして `bin/check-codex-agents.sh`
+   が 5 つ目の役割の欠落を報告することが、「このドキュメントが出荷して
+   いるものと同じかそれ以上のバージョン」の具体的な代用である。`codex
+   plugin marketplace upgrade <marketplace>` を実行する（`codex plugin
    marketplace upgrade --help`、`codex-cli 0.154.0` での説明は
    "Refresh configured Git marketplace snapshots"——`<marketplace>` を
    省略すると設定済みの Git marketplace 全てを upgrade する）。それでも
-   ファイルが無ければ、`codex plugin add shell-team@ripsawjp` をもう一度
-   実行する。あるいは、両方を飛ばして直前に既に挙げたもう一つの
-   代替——この repository の checkout を `<plugin root>` として使う——を
-   選んでもよい。こちらはインストールも upgrade も一切不要。
+   ファイルが無い、あるいはまだ古いままなら、`codex plugin add
+   shell-team@ripsawjp` をもう一度実行する。あるいは、両方を飛ばして
+   直前に既に挙げたもう一つの代替——この repository の checkout を
+   `<plugin root>` として使う——を選んでもよい。こちらはインストールも
+   upgrade も一切不要。
 3. **自分自身のシェルから generator を実行する**——adopt した
    repository 自身の root で:
 
@@ -438,15 +448,15 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    自身の `--root` の既定値はその plugin root、`--out-dir` の既定値は
    `$PWD/.codex/agents` なので、上で `--out-dir` を明示しているのは
    分かりやすさのためであって必須ではない）。`agents/tech-lead.md`・
-   `agents/pm-spec.md`・`agents/engineer.md`・`agents/qa-verifier.md` を
-   読み、役割ごとの `shell-team-<role>.toml` を `.codex/agents/` に
-   1 つずつ書き出す（別の場所に出したい場合は `--out-dir` を渡す。
-   `--root` は `agents/` を持つディレクトリを指す——shell-team の稼働
-   ベースディレクトリではない。上記のとおり plugin root が特定できる
-   限り明示する必要はない）。このコマンドは Codex CLI セッションの外、
-   自分自身のシェルから実行する——これが既定かつ最も単純な経路。
-   Codex 自身にこのコマンドをセッション内で実行させたい場合は手順 6 を
-   見ること——`.git/` への書き込みを拒否するのと同じ sandbox が、
+   `agents/pm-spec.md`・`agents/engineer.md`・`agents/qa-verifier.md`・
+   `agents/codex-reviewer.md` を読み、役割ごとの `shell-team-<role>.toml`
+   ——合計 5 つ——を `.codex/agents/` に書き出す（別の場所に出したい場合は
+   `--out-dir` を渡す。`--root` は `agents/` を持つディレクトリを指す
+   ——shell-team の稼働ベースディレクトリではない。上記のとおり plugin
+   root が特定できる限り明示する必要はない）。このコマンドは Codex CLI
+   セッションの外、自分自身のシェルから実行する——これが既定かつ最も
+   単純な経路。Codex 自身にこのコマンドをセッション内で実行させたい場合は
+   手順 6 を見ること——`.git/` への書き込みを拒否するのと同じ sandbox が、
    `.codex/` 自体の作成も拒否する。
 4. **自分自身の repository の `.gitignore` に `.codex/agents` を追加し、
    ループを開始する前にその変更を commit する**（この repository
@@ -479,7 +489,7 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 3 を
    自分自身のシェルからではなくセッション内で実行しようとしたときに
    `gen-codex-agents.sh` 自身の `--out-dir` への `mkdir -p` を止める。
-   `check-codex-agents.sh`（手順 8）は `--out-dir` を一切作成しない——
+   `check-codex-agents.sh`（手順 10）は `--out-dir` を一切作成しない——
    スクラッチ再生成と比較読み取りするだけなので、セッション内で実行しても
    この付与は不要。手順 3 を（既定として書いているとおり）自分自身の
    シェルから実行すれば、`.codex` の拒否は一切発生しない——役割自身の
@@ -493,48 +503,89 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    sandbox 全体を失う代償を伴う。（Codex 自身のもう一つの設定
    ディレクトリ `.agents` も同様に拒否されるが、このループはそこには
    何も書き込まない。）
-7. その repository で Codex CLI セッションを開始し、Codex 自身の
+7. **Claude 側のレビュー pass が必要とする sandbox network access を
+   許可する（T-1135）——許可しない場合の症状も正しく読む。** 実測
+   （codex-cli 0.154.0、Claude Code CLI 2.1.268）: sandbox の既定値
+   `sandbox_workspace_write.network_access = false` のもとでは、手順 9 の
+   レビュー pass が実行する `claude -p` の invocation は `Not logged in ·
+   Please run /login` で失敗する——これは sandbox が outbound network
+   access を拒否している症状であって、認証の問題では**ない**。`/login`
+   を実行しても何も直らない。network を許可するには `codex` の
+   invocation に `-c
+   'sandbox_workspace_write.network_access=true'` を付けるか、Codex の
+   `config.toml` の `[sandbox_workspace_write]` に同等の
+   `network_access = true` エントリを設定する。`--sandbox
+   danger-full-access` でも通るが、sandbox 全体を失う代償を伴い、他に
+   必要な場面はない。
+8. **`codex` を起動する前に `<plugin root>/bin` を `PATH` に export する
+   （T-1135）。** spawn された Codex custom agent は親プロセス自身の
+   `PATH` を継承するので、`codex` を起動するシェルで（セッション内から
+   ではなく、起動する**前に**）`export PATH="<plugin root>/bin:$PATH"`
+   を実行しておくことが、spawn された役割の裸の名前による `bin/*.sh`
+   呼び出し（`team-paths.sh`・`check-acs.sh`・`check-handoff.sh` など、
+   役割プロースが実際に呼んでいるとおりの名前）をセッション内で実際に
+   解決可能にする。この手順を省略しても役割プロースの内容自体は変わらない
+   ——変わるのは、それらの呼び出しがスクリプトを見つけられるかどうかで
+   ある。
+9. その repository で Codex CLI セッションを開始し、Codex 自身の
    `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
-   `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`）を
-   spawn して役割を dispatch する——host ごとの dispatch 文言（
-   `skills/run/SKILL.md` に splice 済み）は
-   `templates/prompt-blocks/host-dispatch.md` を参照。
-8. **役割ファイルを編集した後、またはプラグインをアップグレードした後は、
-   手順 3 と同じコマンドを再実行する。**
-   生成された TOML はコミットされず（`.gitignore` が `.codex/agents` を
-   カバーする）、`agents/*.md` が変わった瞬間に stale になる。
-   `bash "<plugin root>/bin/check-codex-agents.sh"` は何も書き込まずに
-   現在のソースとの drift を報告するので、再実行が必要かを機械的に
-   確認できる。これは自分自身のシェルから実行しても、Codex にセッション内
-   で実行させても構わない——`--out-dir` を比較のために読み取るだけで、
-   作成も書き込みもしないため、`.codex` の writable-root 付与は不要。
+   `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`・
+   `shell-team-codex-reviewer`）を spawn して役割を dispatch する——host
+   ごとの dispatch 文言（`skills/run/SKILL.md` に splice 済み）は
+   `templates/prompt-blocks/host-dispatch.md` を参照——`codex-reviewer` が
+   2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
+   `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
+   host も Codex CLI セッションを一度も離れない。
+10. **役割ファイルを編集した後、プラグインをアップグレードした後、または
+    自分自身の `binding.conf` や `TEAM_RUN_BASE` を変更した後は、手順 3 と
+    同じコマンドを再実行する。** 生成された TOML は解決済みの binding row
+    （各役割がどの provider・model・effort・adapter に bind されるか）にも
+    依存するため、役割ファイルが変わっていなくても rebind によって手順 3 が
+    生成すべき内容は変わる——そして `bin/check-codex-agents.sh` は drift を
+    報告するだけで、**なぜ**それが起きたかは説明しない。生成された TOML は
+    コミットされず（`.gitignore` が `.codex/agents` をカバーする）、この
+    3 つのいずれかが変わった瞬間に stale になる。
+    `bash "<plugin root>/bin/check-codex-agents.sh"` は何も書き込まずに
+    現在のソースとの drift を報告するので、再実行が必要かを機械的に
+    確認できる。これは自分自身のシェルから実行しても、Codex にセッション内
+    で実行させても構わない——`--out-dir` を比較のために読み取るだけで、
+    作成も書き込みもしないため、`.codex` の writable-root 付与は不要。
 
 **誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
 `sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
 導出した「意図された write scope」の宣言的な記述に過ぎない——**enforcement
 boundary ではない**: 実行時は親の Codex セッション自身の sandbox が支配し、
-生成された agent の `sandbox_mode` の値が何であれそれは変わらない。
-`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
+生成された agent の `sandbox_mode` の値が何であれそれは変わらない——
+`codex-reviewer` 自身の生成された `workspace-write` の値も例外ではない。
+この host 上でのその実際の read-only 性は、手順 9 の `claude -p` invocation
+自身の `--tools` / `--disallowedTools` フラグから来るのであって、この
+key からではない——そしてそれらのフラグは、その 1 回の pass を read-only に
+保ち、adopter 自身の Claude Code 設定をこの実行から締め出す configuration
+であって、sandbox ではなく、ここでの記述もそれを sandbox として扱っては
+いない。`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
 この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
 上記の writable-roots の手順でのみ回避できる。同じ sandbox のポリシーは
 `.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 3 の
 generator を自分自身のシェルからではなくセッション内で実行することを
 妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は手順 6 を見ること。
-手順 8 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
-セッション内で実行してもこの付与は不要。またこの slice は
-`READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
-reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
+手順 10 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
+セッション内で実行してもこの付与は不要。spawn された役割が実際にどの
+model・reasoning effort で走るか: 出荷時の既定 binding では、5 つの役割
+いずれについても `model` も `model_reasoning_effort` も emit されないため、
+それぞれが親の Codex セッション自身の設定を継承する——`binding.conf` の
+row が役割を実 model と非 `-` の effort を持つ Codex adapter へ rebind
+すれば、両方とも上書きされる（役割ごと）——`bin/gen-codex-agents.sh` が
+そのように bind された役割に対して既に行っているのと同じ扱いである。
 spawn された役割自身のコマンド実行は、`bin/` が自分自身の実行コンテキスト
-から到達可能であること（`PATH` 上にあるか、checkout を root とした
-`cwd` であること）を前提としており——役割プロースは `team-paths.sh`・
-`check-acs.sh` など `bin/*.sh` のスクリプトを裸の名前で呼ぶ——手順 3 の
-一度きりの generator bootstrap はそれを提供せず、本質的な修正が入るまでは
-Codex-host セッション自身が spawn する役割から `<plugin root>/bin` を
-到達可能にする必要がある。この plugin のリリース版が既にインストール
-済みのホストでは、spawn された役割が偶然その既存インストール版経由で
-`bin/*.sh` を解決できることがある——これは保証されたメカニズムではなく、
-このブランチ自身の `<plugin root>/bin` に実際に到達できたことを裏付ける
-ものでもない。本質的な修正は issue #486 で追跡している。
+から到達可能であること——手順 8 の `PATH` export か、checkout を root と
+した `cwd` であること——を前提としており、手順 3 の一度きりの generator
+bootstrap はそれ自体を提供しない。手順 8 を省略すると、役割プロース自体は
+何も変わっていなくても、spawn された役割自身の `bin/*.sh` 呼び出しは
+セッション内で解決されないままになる。この plugin のリリース版が既に
+インストール済みのホストでは、spawn された役割が偶然その既存インストール
+版経由で `bin/*.sh` を解決できることがある——これは保証されたメカニズム
+ではなく、このブランチ自身の `<plugin root>/bin` に実際に到達できたことを
+裏付けるものでもない。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
