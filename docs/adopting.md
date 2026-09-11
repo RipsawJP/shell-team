@@ -520,10 +520,12 @@ context (`PATH`, or a checkout-rooted `cwd`) — the role prose calls
 `team-paths.sh`, `check-acs.sh` and other `bin/*.sh` scripts by bare name
 — and step 3's one-time generator bootstrap does not provide that; until
 the substantive fix lands, the Codex-host session has to make
-`<plugin root>/bin` reachable to the roles it spawns (for example by
-prepending it to `PATH` in the session's own shell commands, which is
-what every measured live run here did), and the substantive fix is
-tracked as issue #486.
+`<plugin root>/bin` reachable to the roles it spawns. On a host where a
+released version of this plugin is already installed, a spawned role may
+resolve `bin/*.sh` through that installed copy by chance — this is not a
+guaranteed mechanism, and it does not confirm the branch's own
+`<plugin root>/bin` was actually reached. The substantive fix is tracked
+as issue #486.
 
 ## Conversational usage (no slash commands)
 
