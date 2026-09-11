@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1135** the cross-provider review gate runs on the Codex CLI host, so a documented runbook alone carries a Codex-hosted run to both gates green — `READY_FOR_QA` — spec: .shell-team/specs/T-1135-codex-host-slice2.md
+- [ ] **T-1135** the cross-provider review gate runs on the Codex CLI host, so a documented runbook alone carries a Codex-hosted run to both gates green — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1135-codex-host-slice2.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #493, relayed verbatim into pm-spec in the task brief by the coordinating session, which holds the primary copy. Slice 2 of two; slice 1 (T-1134, issue #484) merged unversioned via PR #489 and is already on `develop` at the branch point. Closes #486; picks up #487 (four generator hardenings, since the generator is being touched) and #488 (two docs sentences in the same section) as this task's two droppable components. Out of scope and staying as their own issues: #485's repository-wide `PATH`-claim sweep, #431's binding-row grammar, telemetry for the Codex-spawned roles, and #491. Sprint `codex-both-gates`, operator-approved lightweight mode A2 — pm-authored spec, one freeze with wording mutable, no spec review, no per-task freeze or blast-radius sweep (one two-arm sweep at release), five-line hand-offs. Release-tier premise on record: **MINOR**, approved at planning on 2026-09-11 under the headline "run the shell-team loop from Codex CLI to both gates with cross-provider review preserved", with both the headline test and the default-reachability test ruled met. Roadmap M0 rule carried into the spec's Non-goals: no new checker, no new gate, no new status flag, no new phase, and `bin/check-invocation-path.sh`'s `wrapper-hosted` admission kept as is. The spec declares `- user-visible: yes` on the new adopter-facing capability plus its adopter-facing docs surface, which is the adopter-docs trigger and not a tier verdict.
@@ -210,6 +210,36 @@ The new docs step 7 (Claude Code CLI installed-and-authenticated prerequisite) i
 - Failure: `pii-shape-violation` — `bash bin/check-pii-shapes.sh --base develop` → `FINDING pattern=home-path path=.shell-team/provenance/T-1135.md line=69`, exit 1
 - Reproduction: `$ bash bin/check-pii-shapes.sh --base develop` → `FINDING pattern=home-path path=.shell-team/provenance/T-1135.md line=69` (expected: `check-pii-shapes: clean (no PII-shaped bytes found)`, exit 0)
 - Suggested next step: reword the illustrative quote on `.shell-team/provenance/T-1135.md:69` (the `` "`$HOME` is still a dollar sign followed by `HOME` rather than a path like `<home>/...`" `` grounding text) to avoid the literal `<home>/…` shape — the substance of the decision entry is otherwise sound and does not need to change.
+
+
+### QA verdict — T-1135 (qa-verifier, round 3)
+
+**Narrow re-verification, HEAD `7414879`.** `git diff 881ddda..7414879 --stat` (own-run) confirms exactly two files changed, 4 insertions/4 deletions: `.shell-team/provenance/T-1135.md` (1 line) and `.shell-team/todo.md` (3 lines: the board flag, and my own round-2 verdict text at two sites that had quoted the same illustrative fragment). Read all four edited sites directly (`git diff` above, full hunks): every one replaces the illustrative home-directory-shaped fragment the round-2 finding named with the sanctioned `<home>/...` placeholder and nothing else — the provenance decision's substance (what was measured, the exact probe transcript, the conclusion that the four hazard sequences reached the model unexpanded) is byte-identical apart from that one substitution, and my own round-2 verdict's Finding/Suggested-next-step text is likewise unchanged in substance. Confirms the coordinator's own description; this was a pure normalization, not a content edit.
+
+- `bash bin/check-pii-shapes.sh --base develop` (own-run) → `check-pii-shapes: clean (no PII-shaped bytes found)`, exit 0. The round-2 finding is closed.
+- `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh .shell-team/specs/T-1135-codex-host-slice2.md` (own-run) → `12 passed, 0 failed, 1 skipped, 0 unrecognized` (AC13 SKIP by design) — unchanged from rounds 1–2.
+- `bash bin/check-intent.sh .shell-team/specs/T-1135-codex-host-slice2.md .shell-team/todo.md` (own-run) → `aligned: T-1135 v1 (c377ee2131d920aff01fdb33f2ab84c9c94fa8ca) matches …` — frozen intent block untouched, hash unchanged from every prior round.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1135.md` (own-run) → `conformant: … (17 decision entries, 0 sentinel)` — same count as round 2, confirming the fix was a text substitution inside an existing entry, not a new/removed decision.
+- `bash bin/check-handoff.sh .shell-team/todo.md` (own-run) → exit 0.
+
+**Round 2's live evidence carries in full.** `git diff 881ddda..7414879 --name-only -- agents/ templates/ docs/ bin/ tests/ skills/` (own-run) → empty — zero deliverable files (the reviewer role file, the host-dispatch recipe block, the runbook docs, the generator/checker scripts, the fixture suite) changed since round 2's live walk. Per this task's own Notes-for-QA convention (the same one round 2 itself relied on for row 2's mechanism), a live walk's evidence stands unless the round's diff touches the file(s) that walk exercised — none does here. Carried forward, unchanged:
+
+- The full loop re-walk on fixture task `T-1136`: `READY_FOR_MERGE` reached, `check-handoff` exit 0, review record naming provider `claude`, published `<stem>.{txt,jsonl}` pair, zero Agent-tool invocations (confirmed from both the Codex event stream and the Claude capture's own tool-use blocks), reviewer reached by spawning the generated `shell-team-codex-reviewer` agent — all under bare-first-token `codex`/`claude` invocations and `--sandbox workspace-write` (no `danger-full-access`).
+- Probe (a) (`<PROMPT_FILE>` hazard-character test against the actual spawned reviewer): the four hazard sequences reached the model literal and unexpanded, confirmed directly from the raw `stream-json` capture's own `result` field.
+- Probe (b) (adversarial host branch against the actual spawned reviewer): the deliberately broken fixture diff triggered the primary pass's Blocker and the adversarial pass, mechanically confirmed to run via the Claude recipe (never a second `codex exec`) under the `T-<task-id>-codex-adversarial` stem shape.
+- Row table — **walked**: rows 1, 3, 5, 7, 8, 9 (rows 7 and 8 walked fresh under the corrected recipe in round 2, not carried from round 1). **Describe-only (not walked)**: rows 2, 4, 6, 10, and the new docs step 7 (Claude Code CLI installed-and-authenticated prerequisite).
+- The two required disclosures and the third volunteered one from round 2 (plugin root = this checkout by path; `clamping SessionEnd hook timeout to 3s` = confirmed noise; Claude's own "Sandboxing is disabled" message not observed) all stand unchanged, since nothing that would affect them changed.
+
+No new live walk was performed this round, per the coordinator's own instruction — this verdict's only new evidence is the four re-confirmation commands above, all of which are cheap re-runs against an unchanged deliverable.
+
+**Overall verdict: PASS.**
+
+- Task: T-1135 → READY_FOR_REVIEW
+- Tests: static suite 12 passed, 0 failed, 1 skipped (AC13, by design) — command: `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh .shell-team/specs/T-1135-codex-host-slice2.md`; round-2's fixture suite count (35 passed, 0 failed) carries unchanged, since `tests/codex-agents/run.sh` is untouched by this round's diff — command: `git diff 881ddda..7414879 --name-only -- tests/codex-agents/run.sh` (empty)
+- Acceptance criteria: 12/12 checked off mechanically, plus AC13 verified live in round 2 and carried forward per the no-deliverable-diff confirmation above — command: `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh .shell-team/specs/T-1135-codex-host-slice2.md`
+- Verification ceiling: real-environment — verifies every criterion at or below that level; none above this ceiling
+- Edge cases tried: none new this round (narrow re-verification only, per the coordinator's own scoping); round 1/round 2's edge cases and probes stand as recorded above
+- Risk notes for reviewer: this round's own change is a pure textual normalization (an illustrative path fragment, in a provenance grounding quote and in my own round-2 verdict prose) — no code, docs, spec or test content changed; the reviewer's own re-verification can reasonably scope to confirming that normalization plus re-running the static gates, rather than repeating round 2's full live walk.
 
 ### Engineer hand-off — T-1134 (engineer, mode A2 — 5-line form)
 
