@@ -558,11 +558,23 @@ boundary ではない**: 実行時は親の Codex セッション自身の sandb
 生成された agent の `sandbox_mode` の値が何であれそれは変わらない——
 `codex-reviewer` 自身の生成された `workspace-write` の値も例外ではない。
 この host 上でのその実際の read-only 性は、手順 9 の `claude -p` invocation
-自身の `--tools` / `--disallowedTools` フラグから来るのであって、この
-key からではない——そしてそれらのフラグは、その 1 回の pass を read-only に
-保ち、adopter 自身の Claude Code 設定をこの実行から締め出す configuration
-であって、sandbox ではなく、ここでの記述もそれを sandbox として扱っては
-いない。`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
+自身の `--permission-mode dontAsk` と、その `--allowedTools` の git 限定
+allowlist から来るのであって、`sandbox_mode` からでも `--tools` /
+`--disallowedTools` 単体からでもない——実測（Claude Code CLI 2.1.268）:
+`--allowedTools` だけでは一覧にない `Bash` コマンドがそのまま実行できて
+しまった（adopter 自身の permission mode がそれを決めていたため）。その
+同じ呼び出しを実際に harness の拒否に変えたのは `--permission-mode
+dontAsk` だけだった。`--strict-mcp-config` は `--tools` が一切届かない
+別の穴を塞ぐ: これが無いと、adopter 自身の設定にある MCP tool——書き込み
+可能なものも含め——がこの pass に露出したままになる。MCP tool は
+`--tools` の built-in 語彙の外にあるため。この組み合わせが、その 1 回の
+pass を実際に閉じ込め、adopter 自身の Claude Code 設定をこの実行から
+締め出す configuration であって、sandbox ではなく、ここでの記述もそれを
+sandbox として扱ってはいない。Claude Code 自身の sandbox 層は、この
+invocation 自体が Codex の sandbox の内側で走る時に初期化に失敗すること
+がある（実測: `Sandbox is enabled but failed to initialize … Sandboxing
+is disabled for the rest of this session`）——これが起きても、この pass
+を実際に閉じ込めているものは変わらない。`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
 この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
 上記の writable-roots の手順でのみ回避できる。同じ sandbox のポリシーは
 `.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 3 の

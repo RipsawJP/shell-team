@@ -550,11 +550,24 @@ own intended write scope, derived from its `agents/<role>.md` frontmatter
 session's own sandbox governs at runtime, whatever a generated agent's
 `sandbox_mode` value says — `codex-reviewer`'s own generated
 `workspace-write` value included; its actual read-only confinement on this
-host comes from the `claude -p` invocation's own `--tools` /
-`--disallowedTools` flags in step 9, never from this key, and those flags
-are a configuration that keeps that one pass read-only and keeps the
-adopter's own Claude Code settings out of the run — not a sandbox, and no
-claim here treats it as one. Nor is `--sandbox workspace-write`'s own
+host comes from the `claude -p` invocation's own `--permission-mode
+dontAsk` plus its `--allowedTools` git-only allowlist in step 9, never
+from `sandbox_mode` and never from `--tools`/`--disallowedTools` alone —
+measured (Claude Code CLI 2.1.268): `--allowedTools` by itself let an
+unlisted `Bash` command run anyway, because the adopter's own permission
+mode decided it, and only `--permission-mode dontAsk` turned that same
+call into a harness denial. `--strict-mcp-config` closes a second gap
+`--tools` does not reach at all: without it, every MCP tool from the
+adopter's own configuration — including write-capable ones — stayed
+exposed to the pass, since MCP tools sit outside `--tools`'s built-in
+vocabulary. This combination is a configuration that keeps that one pass
+confined and keeps the adopter's own Claude Code settings out of the run
+— not a sandbox, and no claim here treats it as one; Claude Code's own
+sandbox layer can itself fail to initialize when this invocation runs
+inside a Codex sandbox (`Sandbox is enabled but failed to initialize …
+Sandboxing is disabled for the rest of this session`, measured on this
+host), which changes nothing about what actually confines this pass.
+Nor is `--sandbox workspace-write`'s own
 refusal of `.git/` writes something this plugin can suppress — it is Codex
 CLI's own policy, worked around only by the writable-roots step above. The
 same sandbox policy refuses creating or writing `.codex/` itself, which
