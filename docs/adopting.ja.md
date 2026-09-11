@@ -410,12 +410,22 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    自分自身のシェルから実行する——これが既定かつ最も単純な経路。
    Codex 自身にこのコマンドをセッション内で実行させたい場合は手順 3 を
    見ること——`.git/` への書き込みを拒否するのと同じ sandbox が、
-   `.codex/` 自体の作成も拒否する。
+   `.codex/` 自体の作成も拒否する。このループを走らせる前に、**自分自身の**
+   repository の `.gitignore` に `.codex/agents` を追加する（この repository
+   自身のエントリを踏襲する）——生成された TOML は再現可能でコミット対象
+   ではなく、un-ignore のまま放置した `.codex/agents/` は `git status
+   --short` を非空にし、ループ自身の T-073 clean-tree チェックを
+   Implement-to-Validate の継ぎ目で引っかける。
 2. **セッションを開始する前に、その repository へ Codex trust を付与する。**
    Codex がプロジェクトレベルの custom agent を `<repo>/.codex/agents/` から
    発見するのは、repository が trusted な場合に限る——untrusted な状態や
    `--skip-git-repo-check` での実行では、`gen-codex-agents.sh` が既に何を
    書き出していても、これらの agent は一切見えない。
+   `-c 'projects."<repo>".trust_level="trusted"'` を `codex` の invocation
+   に付けて付与する（`<repo>` はここでも adopt した repository 自身の
+   **絶対パス**——下の手順 3 の writable-roots オーバーライドと同じ
+   placeholder）。あるいは Codex の `config.toml` に同等の
+   `[projects."<repo>"]` `trust_level = "trusted"` エントリを設定してもよい。
 3. **`.git` への sandbox 書き込みを許可する——さらに、Codex 自身が
    手順 1 の generator をセッション内で実行する場合に限り `.codex` も。**
    実測（codex-cli 0.154.0）:

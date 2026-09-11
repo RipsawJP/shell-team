@@ -93,12 +93,13 @@ else
   fi
 fi
 
-# --- adversarial coverage: the three other refusal classes (not one of AC7's
+# --- adversarial coverage: the four other refusal classes (not one of AC7's
 #     five fixed strings, but the same Input space classes 6-8 the generator
-#     itself must refuse) --------------------------------------------------
-printf '\n--- extra: the remaining three refusal classes (Input space 6-8) ---\n'
+#     itself must refuse — nul is the same class 7 as ctrl, exercised as its
+#     own fixture because it is the class round-1 review found unrefused) --
+printf '\n--- extra: the remaining four refusal classes (Input space 6-8, nul included) ---\n'
 i=0
-for bad in noeol ctrl nofm; do
+for bad in noeol ctrl nul nofm; do
   i=$((i + 1))
   R="$T/rx$i"
   mkdir -p "$R/agents"
@@ -106,6 +107,7 @@ for bad in noeol ctrl nofm; do
   case "$bad" in
     noeol) printf "%s" "a line ending in a quote '" >> "$R/agents/pm-spec.md" ;;
     ctrl)  printf 'a\014b\n' >> "$R/agents/pm-spec.md" ;;
+    nul)   printf 'a\000b\n' >> "$R/agents/pm-spec.md" ;;
     nofm)  printf 'no frontmatter at all\n' > "$R/agents/pm-spec.md" ;;
   esac
   OX="$T/ox$i"

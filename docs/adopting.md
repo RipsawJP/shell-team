@@ -400,12 +400,22 @@ second, Codex-shaped copy of it.
    session — the default and simplest path. If you instead have Codex
    itself run this command inside a session, see step 3: the same
    sandbox that refuses `.git/` writes also refuses creating `.codex/`
-   itself.
+   itself. Add `.codex/agents` to **your own** repository's `.gitignore`
+   before running this loop in it (mirror this repository's own entry) —
+   the generated TOMLs are reproducible, not committed, and an untracked
+   `.codex/agents/` left un-ignored makes `git status --short` non-empty,
+   which trips the loop's own T-073 clean-tree check at the
+   Implement-to-Validate seam.
 2. **Grant the repository Codex trust before starting a session in it.**
    Codex discovers a project-level custom agent from `<repo>/.codex/agents/`
    only when the repository is trusted — an untrusted, or
    `--skip-git-repo-check`, run never sees these agents at all, whatever
-   `gen-codex-agents.sh` already wrote there.
+   `gen-codex-agents.sh` already wrote there. Grant it with
+   `-c 'projects."<repo>".trust_level="trusted"'` on the `codex` invocation
+   (`<repo>` here is the adopted repository's own **absolute** path — the
+   same placeholder step 3's writable-roots override below uses), or the
+   equivalent `[projects."<repo>"]` `trust_level = "trusted"` entry under
+   your Codex `config.toml`.
 3. **Grant the sandbox write access to `.git` — and, only if Codex itself
    runs step 1's generator inside the session, to `.codex` too.**
    Measured (codex-cli 0.154.0): `codex exec --sandbox

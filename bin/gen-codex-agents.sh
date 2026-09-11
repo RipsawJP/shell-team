@@ -200,6 +200,20 @@ for role in "${ROLES_ARR[@]}"; do
   SRC="$ROOT/agents/$role.md"
   [ -f "$SRC" ] && [ -r "$SRC" ] || fail "cannot read role file: $SRC"
 
+  # Input class 7 (NUL, checked first and separately from the rest of the
+  # control-character range below): bash's own $'\x00' ANSI-C quoting
+  # truncates at the first NUL byte when it builds an argv entry, so a
+  # single `grep -q $'[...\x00...]'` invocation can never actually search
+  # for a NUL — the byte silently drops out of the pattern before grep
+  # ever receives it (this is why the range below starts at \x01, and why
+  # it must NOT be "fixed" by just prepending \x00 to that same pattern).
+  # Detected instead by byte count: deleting every NUL with `tr` and
+  # comparing the resulting length to the source's own length never
+  # depends on passing a NUL through argv.
+  src_len="$(wc -c < "$SRC" | tr -d ' ')"
+  nonul_len="$(LC_ALL=C tr -d '\000' < "$SRC" | wc -c | tr -d ' ')"
+  [ "$nonul_len" = "$src_len" ] || fail "role file contains a NUL byte (0x00), a control character other than tab and newline that a TOML literal string cannot carry: $SRC"
+
   first_line="$(head -n 1 "$SRC")"
   [ "$first_line" = "---" ] || fail "role file has no frontmatter opening '---' as its first line: $SRC"
 
@@ -233,11 +247,16 @@ for role in "${ROLES_ARR[@]}"; do
   last_nl="$(tail -c1 "$SRC" | wc -l | tr -d ' ')"
   [ "$last_nl" = "1" ] || fail "role file does not end with a trailing newline: $SRC"
 
-  # Input class 7: no control character other than tab (0x09) and newline
-  # (0x0A) anywhere in the source, a lone carriage return (0x0D) included.
-  # Explicit byte ranges under LC_ALL=C — NOT [[:cntrl:]]/[[:space:]], which
-  # would let 0x0C/0x0B/0x0D slip through as "space" (design note, freeze
-  # sweep 2026-09-10).
+  # Input class 7 (continued): no control character other than tab (0x09)
+  # and newline (0x0A) anywhere in the source, a lone carriage return
+  # (0x0D) included. NUL (0x00) is this same class and was already refused
+  # above, separately, for the argv-truncation reason given there. Explicit
+  # byte ranges under LC_ALL=C — NOT [[:cntrl:]]/[[:space:]], which would
+  # let 0x0C/0x0B/0x0D slip through as "space" (design note, freeze sweep
+  # 2026-09-10). Deliberately still starts at \x01, not \x00: adding \x00
+  # to this bracket expression looks like the obvious one-line fix but does
+  # nothing, since the pattern argument itself would already be truncated
+  # before grep runs.
   if LC_ALL=C grep -q $'[\x01\x02\x03\x04\x05\x06\x07\x08\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x7f]' "$SRC"; then
     fail "role file contains a control character other than tab and newline (a lone carriage return included): $SRC"
   fi
