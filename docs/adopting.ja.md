@@ -524,6 +524,15 @@ generator を自分自身のシェルからではなくセッション内で実�
 セッション内で実行してもこの付与は不要。またこの slice は
 `READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
 reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
+spawn された役割自身のコマンド実行は、`bin/` が自分自身の実行コンテキスト
+から到達可能であること（`PATH` 上にあるか、checkout を root とした
+`cwd` であること）を前提としており——役割プロースは `team-paths.sh`・
+`check-acs.sh` など `bin/*.sh` のスクリプトを裸の名前で呼ぶ——手順 3 の
+一度きりの generator bootstrap はそれを提供せず、本質的な修正が入るまでは
+Codex-host セッション自身が spawn する役割から `<plugin root>/bin` を
+到達可能にする必要があり（例えばセッション自身のシェルコマンドで `PATH`
+の先頭に追加する、というのが実測した全ての live run が実際に行った方法
+である）、本質的な修正は issue #486 で追跡している。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 

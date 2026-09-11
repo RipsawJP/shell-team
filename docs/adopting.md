@@ -514,7 +514,16 @@ to `.codex`. Step 8's checker never creates or writes `--out-dir` — it
 only reads it to compare against a scratch regeneration — so it needs no
 such grant, in-session or not. And this slice stops at
 `READY_FOR_REVIEW`: no Claude-backed reviewer runs on the Codex host yet,
-so a Codex CLI run alone never reaches both gates green.
+so a Codex CLI run alone never reaches both gates green. A spawned role's
+own command execution assumes `bin/` is reachable from its own execution
+context (`PATH`, or a checkout-rooted `cwd`) — the role prose calls
+`team-paths.sh`, `check-acs.sh` and other `bin/*.sh` scripts by bare name
+— and step 3's one-time generator bootstrap does not provide that; until
+the substantive fix lands, the Codex-host session has to make
+`<plugin root>/bin` reachable to the roles it spawns (for example by
+prepending it to `PATH` in the session's own shell commands, which is
+what every measured live run here did), and the substantive fix is
+tracked as issue #486.
 
 ## Conversational usage (no slash commands)
 
