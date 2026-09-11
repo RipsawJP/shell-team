@@ -371,16 +371,34 @@ generator derives one Codex custom-agent TOML per role from the unmodified
 `agents/<role>.md`, so both hosts read the same role prose rather than a
 second, Codex-shaped copy of it.
 
-1. **Locate the installed plugin root, then run the generator from the
-   adopted repository's own root.** Do not rely on `bin/` being on `PATH` —
-   measured false for an installed plugin, on either host: a fresh session
-   with `shell-team` installed and enabled carries no plugin `bin/`
-   directory on `PATH` at all. Find the plugin root instead — Codex CLI:
-   the `SOURCE` column of `codex plugin list`
-   (`<home>/.codex/plugins/cache/<marketplace>/shell-team/<version>/`);
-   Claude Code: `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`;
-   a checkout of this repository works too. Then, from the adopted
-   repository's own root, run:
+1. **Install the plugin into Codex CLI**, if `codex plugin list` does not
+   already report `shell-team` as installed:
+
+   ```
+   codex plugin marketplace add RipsawJP/shell-team
+   codex plugin add shell-team@ripsawjp
+   ```
+
+   (subcommand names read from `codex plugin --help` on `codex-cli 0.154.0`
+   — the same two-step shape as this project's Claude Code
+   `/plugin marketplace add` / `/plugin install` slash commands). Skip this
+   step if the plugin already shows as installed.
+2. **Locate the installed plugin root — read the value your own host
+   reports, never assume a fixed layout.** Do not rely on `bin/` being on
+   `PATH` — measured false for an installed plugin, on either host: a
+   fresh session with `shell-team` installed and enabled carries no plugin
+   `bin/` directory on `PATH` at all. Codex CLI: use the exact `SOURCE`
+   column value `codex plugin list` prints for `shell-team`, whatever shape
+   it has on your host — on the host this was measured against, that value
+   was the marketplace clone itself,
+   `<home>/.codex/.tmp/marketplaces/<marketplace>`, **not** a versioned
+   `plugins/cache` path, so do not assume either shape without checking.
+   Claude Code: likewise read the cache path that exists on your own
+   machine rather than assuming one — on the measured host it was
+   `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`. A
+   checkout of this repository works too, on either host.
+3. **Run the generator from your own shell**, from the adopted
+   repository's own root:
 
    ```
    bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
@@ -398,26 +416,29 @@ second, Codex-shaped copy of it.
    only needs setting explicitly if the plugin root cannot be located as
    above). Run this command from your own shell, outside any Codex CLI
    session — the default and simplest path. If you instead have Codex
-   itself run this command inside a session, see step 3: the same
+   itself run this command inside a session, see step 6: the same
    sandbox that refuses `.git/` writes also refuses creating `.codex/`
-   itself. Add `.codex/agents` to **your own** repository's `.gitignore`
-   before running this loop in it (mirror this repository's own entry) —
-   the generated TOMLs are reproducible, not committed, and an untracked
-   `.codex/agents/` left un-ignored makes `git status --short` non-empty,
-   which trips the loop's own T-073 clean-tree check at the
-   Implement-to-Validate seam.
-2. **Grant the repository Codex trust before starting a session in it.**
+   itself.
+4. **Add `.codex/agents` to your own repository's `.gitignore`, and commit
+   that change before starting the loop** (mirror this repository's own
+   entry) — or, if you would rather not touch a tracked file at all, add
+   the entry to `.git/info/exclude` instead, which needs no commit. The
+   generated TOMLs are reproducible, not committed, and either an
+   untracked `.codex/agents/` left un-ignored, or a `.gitignore` edit left
+   uncommitted, makes `git status --short` non-empty, which trips the
+   loop's own T-073 clean-tree check at the Implement-to-Validate seam.
+5. **Grant the repository Codex trust before starting a session in it.**
    Codex discovers a project-level custom agent from `<repo>/.codex/agents/`
    only when the repository is trusted — an untrusted, or
    `--skip-git-repo-check`, run never sees these agents at all, whatever
-   `gen-codex-agents.sh` already wrote there. Grant it with
+   step 3 already wrote there. Grant it with
    `-c 'projects."<repo>".trust_level="trusted"'` on the `codex` invocation
    (`<repo>` here is the adopted repository's own **absolute** path — the
-   same placeholder step 3's writable-roots override below uses), or the
+   same placeholder step 6's writable-roots override below uses), or the
    equivalent `[projects."<repo>"]` `trust_level = "trusted"` entry under
    your Codex `config.toml`.
-3. **Grant the sandbox write access to `.git` — and, only if Codex itself
-   runs step 1's generator inside the session, to `.codex` too.**
+6. **Grant the sandbox write access to `.git` — and, only if Codex itself
+   runs step 3's generator inside the session, to `.codex` too.**
    Measured (codex-cli 0.154.0): `codex exec --sandbox
    workspace-write` refuses every write under `.git/` (`Operation not
    permitted`, exit 128) regardless of actual filesystem permissions —
@@ -426,38 +447,37 @@ second, Codex-shaped copy of it.
    (`mkdir: .codex: Operation not permitted`), the same policy applied to
    a second, Codex-owned directory name — which blocks
    `gen-codex-agents.sh`'s own `mkdir -p` of `--out-dir` when Codex runs
-   step 1 inside the session rather than from your own shell.
-   `check-codex-agents.sh` (step 5) never creates `--out-dir` — it only
-   reads it, comparing it against a scratch regeneration — so it needs no
-   such grant even when Codex runs it in-session. Running step 1 from
-   your own shell — the default path it already describes — avoids the
-   `.codex` refusal entirely, since only a role's own commit needs `.git`
-   write access. Add whichever directories apply to the sandbox's
-   writable roots on the invocation —
+   step 3 inside the session rather than from your own shell. Step 8's
+   checker never creates `--out-dir` — it only reads it, comparing it
+   against a scratch regeneration — so it needs no such grant even when
+   Codex runs it in-session. Running step 3 from your own shell — the
+   default path it already describes — avoids the `.codex` refusal
+   entirely, since only a role's own commit needs `.git` write access. Add
+   whichever directories apply to the sandbox's writable roots on the
+   invocation —
    `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` for
    commits alone, or
    `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
-   if Codex also runs step 1 inside the session — or the same
+   if Codex also runs step 3 inside the session — or the same
    key under `[sandbox_workspace_write]` in your Codex `config.toml`;
    `--sandbox danger-full-access` also works, at the cost of the whole
    sandbox. (Codex's own configuration directory, `.agents`, is refused
    the same way; nothing in this loop writes to it.)
-4. Start a Codex CLI session in the repository and dispatch a role by
+7. Start a Codex CLI session in the repository and dispatch a role by
    spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
    `shell-team-engineer`, `shell-team-qa-verifier`) with Codex's own
    `spawn_agent` tool — see `templates/prompt-blocks/host-dispatch.md`
    (spliced into `skills/run/SKILL.md`) for the per-host dispatch text this
    loop's own phase list reads.
-5. **Re-run the same located-plugin-root command after editing a role
-   file, or after a plugin upgrade.** The generated TOMLs are not committed
-   (`.gitignore` covers `.codex/agents`) and go stale the moment
-   `agents/*.md` changes under them.
-   `bash "<plugin root>/bin/check-codex-agents.sh"` reports the drift
-   against the current source, writing nothing, so it is the mechanical
-   way to find out a re-run is due. Run this from your own shell or have
-   Codex run it inside the session — either way needs no `.codex`
-   writable-root grant, since it only reads `--out-dir` to compare
-   against a scratch regeneration and never creates or writes it.
+8. **Re-run step 3's command after editing a role file, or after a plugin
+   upgrade.** The generated TOMLs are not committed (`.gitignore` covers
+   `.codex/agents`) and go stale the moment `agents/*.md` changes under
+   them. `bash "<plugin root>/bin/check-codex-agents.sh"` reports the
+   drift against the current source, writing nothing, so it is the
+   mechanical way to find out a re-run is due. Run this from your own
+   shell or have Codex run it inside the session — either way needs no
+   `.codex` writable-root grant, since it only reads `--out-dir` to
+   compare against a scratch regeneration and never creates or writes it.
 
 **Honest limits, stated plainly rather than left for you to discover.** Each
 generated agent's `sandbox_mode` is declarative documentation of that role's
@@ -468,9 +488,9 @@ session's own sandbox governs at runtime, whatever a generated agent's
 of `.git/` writes something this plugin can suppress — it is Codex CLI's
 own policy, worked around only by the writable-roots step above. The same
 sandbox policy refuses creating or writing `.codex/` itself, which blocks
-Codex from running step 1's generator inside a session rather than from
-your own shell — see step 3 for the same writable-roots remedy, extended
-to `.codex`. Step 5's checker never creates or writes `--out-dir` — it
+Codex from running step 3's generator inside a session rather than from
+your own shell — see step 6 for the same writable-roots remedy, extended
+to `.codex`. Step 8's checker never creates or writes `--out-dir` — it
 only reads it to compare against a scratch regeneration — so it needs no
 such grant, in-session or not. And this slice stops at
 `READY_FOR_REVIEW`: no Claude-backed reviewer runs on the Codex host yet,
