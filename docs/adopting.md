@@ -372,7 +372,10 @@ generator derives one Codex custom-agent TOML per role from the unmodified
 second, Codex-shaped copy of it.
 
 1. **Install the plugin into Codex CLI**, if `codex plugin list` does not
-   already report `shell-team` as installed:
+   already report `shell-team` as `installed, enabled` — that exact STATUS
+   value, not merely present in the list: the same column also prints
+   `not installed` for other plugins on the same host, and a disabled
+   entry would pass a looser "shows up" reading while still being unusable:
 
    ```
    codex plugin marketplace add RipsawJP/shell-team
@@ -382,7 +385,9 @@ second, Codex-shaped copy of it.
    (subcommand names read from `codex plugin --help` on `codex-cli 0.154.0`
    — the same two-step shape as this project's Claude Code
    `/plugin marketplace add` / `/plugin install` slash commands). Skip this
-   step if the plugin already shows as installed.
+   step if the plugin already shows `installed, enabled`. That status alone
+   does not mean the install is current — see step 2 for the one further
+   check and the remedy if it is not.
 2. **Locate the installed plugin root — read the value your own host
    reports, never assume a fixed layout.** Do not rely on `bin/` being on
    `PATH` — measured false for an installed plugin, on either host: a
@@ -397,6 +402,21 @@ second, Codex-shaped copy of it.
    machine rather than assuming one — on the measured host it was
    `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`. A
    checkout of this repository works too, on either host.
+
+   **If the located root has no `bin/gen-codex-agents.sh`, the install is
+   stale** — installed before this Codex-host feature shipped. This
+   feature has no version number of its own to check against (it ships as
+   part of an ordinary plugin release, not a dedicated one), so the
+   file's own presence is the check — the concrete stand-in for "a
+   version at or above the one these docs ship with." Run `codex plugin
+   marketplace upgrade <marketplace>` (`codex plugin marketplace upgrade
+   --help` on `codex-cli 0.154.0` describes it as "Refresh configured Git
+   marketplace snapshots"; omit `<marketplace>` to upgrade every
+   configured Git marketplace) and, if the file is still missing
+   afterward, run `codex plugin add shell-team@ripsawjp` again. Or skip
+   both and reach for the other fallback already named just above: a
+   checkout of this repository as `<plugin root>` needs no install or
+   upgrade at all.
 3. **Run the generator from your own shell**, from the adopted
    repository's own root:
 

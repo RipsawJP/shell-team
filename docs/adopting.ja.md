@@ -381,8 +381,10 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
 ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
 
 1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
-   `codex plugin list` が `shell-team` を既にインストール済みと報告している
-   場合はこの手順は不要:
+   `codex plugin list` が `shell-team` を厳密に `installed, enabled` と
+   報告している場合のみ、この手順は不要——単に一覧に現れているだけでは
+   不十分: 同じ列は他の plugin に対して `not installed` も出力するし、
+   無効化された状態は「一覧に現れている」という緩い読み方だと見逃す:
 
    ```
    codex plugin marketplace add RipsawJP/shell-team
@@ -392,6 +394,8 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    （サブコマンド名は `codex-cli 0.154.0` の `codex plugin --help` から
    確認したもの——この repository の Claude Code 向け `/plugin marketplace
    add` / `/plugin install` スラッシュコマンドと同じ 2 段階の形）。
+   `installed, enabled` と出ていても、それだけではインストールが最新とは
+   限らない——確認方法と対処は手順 2 を見ること。
 2. **インストール済み plugin の root を特定する——自分の host が報告した
    値をそのまま読み、固定のパターンを仮定しない。** `bin/` が `PATH` に
    載っているという前提は使わない——インストール済み plugin では
@@ -406,6 +410,22 @@ slice 1（T-1134）により、Codex CLI セッションからこのループの
    マシンに実在する cache パスを読む——実測した host では
    `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`
    だった。checkout でも、どちらの host でも構わない。
+
+   **特定した root に `bin/gen-codex-agents.sh` が無ければ、その
+   インストールは古い**——この Codex host 機能が出荷される前に
+   インストールされたということ。この機能自体には比較対象にできる
+   独立したバージョン番号が無い（専用リリースではなく通常の plugin
+   リリースの一部として出荷されるため）ので、ファイルの有無そのものが
+   チェックになる——「このドキュメントが出荷しているものと同じか
+   それ以上のバージョン」の具体的な代用である。`codex plugin
+   marketplace upgrade <marketplace>` を実行する（`codex plugin
+   marketplace upgrade --help`、`codex-cli 0.154.0` での説明は
+   "Refresh configured Git marketplace snapshots"——`<marketplace>` を
+   省略すると設定済みの Git marketplace 全てを upgrade する）。それでも
+   ファイルが無ければ、`codex plugin add shell-team@ripsawjp` をもう一度
+   実行する。あるいは、両方を飛ばして直前に既に挙げたもう一つの
+   代替——この repository の checkout を `<plugin root>` として使う——を
+   選んでもよい。こちらはインストールも upgrade も一切不要。
 3. **自分自身のシェルから generator を実行する**——adopt した
    repository 自身の root で:
 
