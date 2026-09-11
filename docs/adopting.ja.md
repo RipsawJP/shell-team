@@ -369,6 +369,173 @@ executor は fallback ではなく `BLOCKED` になるため、未測定の認�
 証拠であり、そのような読み取りが一度も起きなかったという証拠では
 決してない。
 
+## Codex CLI から shell-team を使う
+
+slice 1（T-1134）により、Codex CLI セッションからこのループの
+`pm-spec` → `engineer` → `qa-verifier` チェーンを `READY_FOR_REVIEW` まで
+駆動できる——dispatch のどこにも Claude Code プロセスは登場しない。
+`codex-reviewer` 自身の `APPROVE` はこの slice ではまだ Claude Code host 側で
+走るため、Codex CLI 単独の実行では両ゲートまでは届かない。`agents/**` は
+このために複製・分岐されることは一切ない: generator が未改変の
+`agents/<role>.md` から役割ごとに 1 つの Codex custom-agent TOML を導出する
+ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
+
+1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
+   `codex plugin list` が `shell-team` を厳密に `installed, enabled` と
+   報告している場合のみ、この手順は不要——単に一覧に現れているだけでは
+   不十分: 同じ列は他の plugin に対して `not installed` も出力するし、
+   無効化された状態は「一覧に現れている」という緩い読み方だと見逃す:
+
+   ```
+   codex plugin marketplace add RipsawJP/shell-team
+   codex plugin add shell-team@ripsawjp
+   ```
+
+   （サブコマンド名は `codex-cli 0.154.0` の `codex plugin --help` から
+   確認したもの——この repository の Claude Code 向け `/plugin marketplace
+   add` / `/plugin install` スラッシュコマンドと同じ 2 段階の形）。
+   `installed, enabled` と出ていても、それだけではインストールが最新とは
+   限らない——確認方法と対処は手順 2 を見ること。
+2. **インストール済み plugin の root を特定する——自分の host が報告した
+   値をそのまま読み、固定のパターンを仮定しない。** `bin/` が `PATH` に
+   載っているという前提は使わない——インストール済み plugin では
+   どちらの host でも実測で偽と分かっている: `shell-team` を
+   インストール・有効化した状態で新規にセッションを開いても、plugin の
+   `bin/` ディレクトリは `PATH` に一切載らない。Codex CLI: `codex plugin
+   list` が `shell-team` に対して出力する `SOURCE` 列の値をそのまま使う
+   ——それがどんな形であっても。実測した host ではこの値は marketplace
+   自身の clone、`<home>/.codex/.tmp/marketplaces/<marketplace>` であり、
+   バージョン付きの `plugins/cache` パスでは**なかった**——確認せずに
+   どちらの形も仮定しないこと。Claude Code: 同様に、仮定せず自分の
+   マシンに実在する cache パスを読む——実測した host では
+   `<home>/.claude/plugins/cache/<marketplace>/shell-team/<version>/`
+   だった。checkout でも、どちらの host でも構わない。
+
+   **特定した root に `bin/gen-codex-agents.sh` が無ければ、その
+   インストールは古い**——この Codex host 機能が出荷される前に
+   インストールされたということ。この機能自体には比較対象にできる
+   独立したバージョン番号が無い（専用リリースではなく通常の plugin
+   リリースの一部として出荷されるため）ので、ファイルの有無そのものが
+   チェックになる——「このドキュメントが出荷しているものと同じか
+   それ以上のバージョン」の具体的な代用である。`codex plugin
+   marketplace upgrade <marketplace>` を実行する（`codex plugin
+   marketplace upgrade --help`、`codex-cli 0.154.0` での説明は
+   "Refresh configured Git marketplace snapshots"——`<marketplace>` を
+   省略すると設定済みの Git marketplace 全てを upgrade する）。それでも
+   ファイルが無ければ、`codex plugin add shell-team@ripsawjp` をもう一度
+   実行する。あるいは、両方を飛ばして直前に既に挙げたもう一つの
+   代替——この repository の checkout を `<plugin root>` として使う——を
+   選んでもよい。こちらはインストールも upgrade も一切不要。
+3. **自分自身のシェルから generator を実行する**——adopt した
+   repository 自身の root で:
+
+   ```
+   bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+   ```
+
+   （シェルのカレントディレクトリが adopt した repository である限り、
+   フラグを一切付けない同一コマンドでも動く——`gen-codex-agents.sh`
+   自身の `--root` の既定値はその plugin root、`--out-dir` の既定値は
+   `$PWD/.codex/agents` なので、上で `--out-dir` を明示しているのは
+   分かりやすさのためであって必須ではない）。`agents/tech-lead.md`・
+   `agents/pm-spec.md`・`agents/engineer.md`・`agents/qa-verifier.md` を
+   読み、役割ごとの `shell-team-<role>.toml` を `.codex/agents/` に
+   1 つずつ書き出す（別の場所に出したい場合は `--out-dir` を渡す。
+   `--root` は `agents/` を持つディレクトリを指す——shell-team の稼働
+   ベースディレクトリではない。上記のとおり plugin root が特定できる
+   限り明示する必要はない）。このコマンドは Codex CLI セッションの外、
+   自分自身のシェルから実行する——これが既定かつ最も単純な経路。
+   Codex 自身にこのコマンドをセッション内で実行させたい場合は手順 6 を
+   見ること——`.git/` への書き込みを拒否するのと同じ sandbox が、
+   `.codex/` 自体の作成も拒否する。
+4. **自分自身の repository の `.gitignore` に `.codex/agents` を追加し、
+   ループを開始する前にその変更を commit する**（この repository
+   自身のエントリを踏襲する）——あるいは、tracked file に一切触れたく
+   なければ代わりに `.git/info/exclude` にエントリを追加してもよい
+   （commit 不要）。生成された TOML は再現可能でコミット対象ではなく、
+   un-ignore のまま放置した `.codex/agents/`、あるいは commit されない
+   ままの `.gitignore` の変更は、どちらも `git status --short` を
+   非空にし、ループ自身の T-073 clean-tree チェックを
+   Implement-to-Validate の継ぎ目で引っかける。
+5. **セッションを開始する前に、その repository へ Codex trust を付与する。**
+   Codex がプロジェクトレベルの custom agent を `<repo>/.codex/agents/` から
+   発見するのは、repository が trusted な場合に限る——untrusted な状態や
+   `--skip-git-repo-check` での実行では、手順 3 が既に何を
+   書き出していても、これらの agent は一切見えない。
+   `-c 'projects."<repo>".trust_level="trusted"'` を `codex` の invocation
+   に付けて付与する（`<repo>` はここでも adopt した repository 自身の
+   **絶対パス**——下の手順 6 の writable-roots オーバーライドと同じ
+   placeholder）。あるいは Codex の `config.toml` に同等の
+   `[projects."<repo>"]` `trust_level = "trusted"` エントリを設定してもよい。
+6. **`.git` への sandbox 書き込みを許可する——さらに、Codex 自身が
+   手順 3 の generator をセッション内で実行する場合に限り `.codex` も。**
+   実測（codex-cli 0.154.0）:
+   `codex exec --sandbox workspace-write` は実際のファイルシステム権限に
+   関係なく `.git/` 配下へのあらゆる書き込みを拒否し
+   （`Operation not permitted`、exit 128）——これは `engineer` が
+   `READY_FOR_QA` 前に行う commit 自体を止める——さらに、もう一つの
+   Codex 自身の設定ディレクトリ名に対して同じポリシーを適用し、
+   `.codex/` 自体の作成・書き込みも別途拒否する
+   （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 3 を
+   自分自身のシェルからではなくセッション内で実行しようとしたときに
+   `gen-codex-agents.sh` 自身の `--out-dir` への `mkdir -p` を止める。
+   `check-codex-agents.sh`（手順 8）は `--out-dir` を一切作成しない——
+   スクラッチ再生成と比較読み取りするだけなので、セッション内で実行しても
+   この付与は不要。手順 3 を（既定として書いているとおり）自分自身の
+   シェルから実行すれば、`.codex` の拒否は一切発生しない——役割自身の
+   commit だけが `.git` への書き込みを必要とするため。該当する方を
+   invocation の sandbox writable roots に追加する——commit だけなら
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'`、
+   Codex 自身が手順 3 をセッション内で実行するなら
+   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
+   ——または Codex の `config.toml` の `[sandbox_workspace_write]` に
+   同じキーを設定する。`--sandbox danger-full-access` でも通るが、
+   sandbox 全体を失う代償を伴う。（Codex 自身のもう一つの設定
+   ディレクトリ `.agents` も同様に拒否されるが、このループはそこには
+   何も書き込まない。）
+7. その repository で Codex CLI セッションを開始し、Codex 自身の
+   `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
+   `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`）を
+   spawn して役割を dispatch する——host ごとの dispatch 文言（
+   `skills/run/SKILL.md` に splice 済み）は
+   `templates/prompt-blocks/host-dispatch.md` を参照。
+8. **役割ファイルを編集した後、またはプラグインをアップグレードした後は、
+   手順 3 と同じコマンドを再実行する。**
+   生成された TOML はコミットされず（`.gitignore` が `.codex/agents` を
+   カバーする）、`agents/*.md` が変わった瞬間に stale になる。
+   `bash "<plugin root>/bin/check-codex-agents.sh"` は何も書き込まずに
+   現在のソースとの drift を報告するので、再実行が必要かを機械的に
+   確認できる。これは自分自身のシェルから実行しても、Codex にセッション内
+   で実行させても構わない——`--out-dir` を比較のために読み取るだけで、
+   作成も書き込みもしないため、`.codex` の writable-root 付与は不要。
+
+**誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
+`sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
+導出した「意図された write scope」の宣言的な記述に過ぎない——**enforcement
+boundary ではない**: 実行時は親の Codex セッション自身の sandbox が支配し、
+生成された agent の `sandbox_mode` の値が何であれそれは変わらない。
+`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
+この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
+上記の writable-roots の手順でのみ回避できる。同じ sandbox のポリシーは
+`.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 3 の
+generator を自分自身のシェルからではなくセッション内で実行することを
+妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は手順 6 を見ること。
+手順 8 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
+セッション内で実行してもこの付与は不要。またこの slice は
+`READY_FOR_REVIEW` で止まる: Codex host 上ではまだ Claude-backed
+reviewer が走らないため、Codex CLI 単独では両ゲート green には決して届かない。
+spawn された役割自身のコマンド実行は、`bin/` が自分自身の実行コンテキスト
+から到達可能であること（`PATH` 上にあるか、checkout を root とした
+`cwd` であること）を前提としており——役割プロースは `team-paths.sh`・
+`check-acs.sh` など `bin/*.sh` のスクリプトを裸の名前で呼ぶ——手順 3 の
+一度きりの generator bootstrap はそれを提供せず、本質的な修正が入るまでは
+Codex-host セッション自身が spawn する役割から `<plugin root>/bin` を
+到達可能にする必要がある。この plugin のリリース版が既にインストール
+済みのホストでは、spawn された役割が偶然その既存インストール版経由で
+`bin/*.sh` を解決できることがある——これは保証されたメカニズムではなく、
+このブランチ自身の `<plugin root>/bin` に実際に到達できたことを裏付ける
+ものでもない。本質的な修正は issue #486 で追跡している。
+
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
 やりたいことを普通の言葉で伝えて、メインの Claude セッションにチームへ委譲させる
