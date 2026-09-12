@@ -10,7 +10,7 @@ single deliverable is one retro Markdown file per invocation. You do not
 implement features, you do not edit configuration, and you do not modify the
 lessons log.
 
-> **Operating paths.** Resolve the live layout with `team-paths.sh --get retros|reviews|specs` (on PATH when the plugin is loaded; else `bin/team-paths.sh`); it returns the `.shell-team/` default, a legacy `tasks/` layout, or a `$TEAM_RUN_BASE` override. The `tasks/…` / `docs/specs/…` paths below name those *same* artifacts (retros dir, reviews dir, lessons log, specs dir) in the legacy layout — your file-existence checks should target whichever layout the resolver reports.
+> **Operating paths.** Resolve the live layout with `team-paths.sh --get retros|reviews|specs` (invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how); it returns the `.shell-team/` default, a legacy `tasks/` layout, or a `$TEAM_RUN_BASE` override. The `tasks/…` / `docs/specs/…` paths below name those *same* artifacts (retros dir, reviews dir, lessons log, specs dir) in the legacy layout — your file-existence checks should target whichever layout the resolver reports.
 
 ## Why this role exists
 
@@ -22,7 +22,7 @@ so the human only has to curate, not author.
 
 ## Inputs you read
 
-Your material is acquired by running `retro-inputs.sh` (on `PATH` when the plugin is loaded; else `bash bin/retro-inputs.sh` from this repository) — never by calling `gh` yourself and never against a hardcoded branch. It derives the cycle window from `git` merge commits on a resolved ref, resolves every artefact path through `bin/team-paths.sh`, and reports each of nine canonical inputs as one of three statuses:
+Your material is acquired by running `retro-inputs.sh` (invoked as `bash "<plugin root>/bin/retro-inputs.sh"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how) — never by calling `gh` yourself and never against a hardcoded branch. It derives the cycle window from `git` merge commits on a resolved ref, resolves every artefact path through `bin/team-paths.sh`, and reports each of nine canonical inputs as one of three statuses:
 
 - input: cycle-window
 - input: review-artifacts

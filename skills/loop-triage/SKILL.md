@@ -10,8 +10,11 @@ step of the "outer loop": find what the shell-team pipeline might pick up next.
 may live under `.shell-team/` (default), a legacy `tasks/` layout, or a
 `$TEAM_RUN_BASE` override). `discover-work.sh` self-resolves its board/specs, so
 you don't pass them. For any path *you* write or read directly, resolve it **in
-the same shell call** with `$(team-paths.sh --get KEY)` (on PATH when the plugin
-is loaded; else `bin/team-paths.sh`) — do **not** rely on a previously
+the same shell call** with `$(team-paths.sh --get KEY)` (invoked as
+`bash "<plugin root>/bin/team-paths.sh"` — never assumed to be on `PATH`, even
+with the plugin loaded; read `<plugin root>` from what your host reports, see
+`docs/adopting.md`'s "Locate the installed plugin root" step for how) — do
+**not** rely on a previously
 `eval`-exported `$TEAM_*`, because env vars do not persist across separate Bash
 tool calls.
 
@@ -29,7 +32,10 @@ Do this:
 
    (`discover-work.sh` self-resolves the board for de-dup; no `--todo` needed.)
 
-   It is on PATH when the plugin is loaded; otherwise call `bin/discover-work.sh`.
+   Invoke it as `bash "<plugin root>/bin/discover-work.sh"` — never assumed to
+   be on `PATH`, even with the plugin loaded; read `<plugin root>` from what
+   your host reports, see `docs/adopting.md`'s "Locate the installed plugin
+   root" step for how.
    Pass `--base <branch>` / `--label <label>` only if the user asked for a
    non-default branch or triage label. The script prints `- [ ] **T-000** ...`
    candidate lines plus `# note:` lines (sources skipped, truncation, etc.).

@@ -11,7 +11,7 @@ invocation. You do not implement features, you do not edit configuration, you do
 not modify the lessons log, and — most importantly — you **never edit the board**
 (`tasks/todo.md`). Promotion of a candidate onto the board is a human decision.
 
-> **Operating paths.** Resolve the live layout with `team-paths.sh --get runs|specs|todo` (on PATH when the plugin is loaded; else `bin/team-paths.sh`); it returns the `.shell-team/` default, a legacy `tasks/` layout, or a `$TEAM_RUN_BASE` override. The `tasks/…` / `docs/specs/…` paths named below refer to those *same* artifacts in the legacy layout — your file-existence checks should target whichever layout the resolver reports.
+> **Operating paths.** Resolve the live layout with `team-paths.sh --get runs|specs|todo` (invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how); it returns the `.shell-team/` default, a legacy `tasks/` layout, or a `$TEAM_RUN_BASE` override. The `tasks/…` / `docs/specs/…` paths named below refer to those *same* artifacts in the legacy layout — your file-existence checks should target whichever layout the resolver reports.
 
 ## Why this role exists
 
