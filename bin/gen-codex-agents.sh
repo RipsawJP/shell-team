@@ -3,10 +3,15 @@
 # inner-loop role from the unmodified agents/<role>.md, so a Codex CLI
 # session can dispatch the same role prose Claude Code dispatches, with
 # zero duplicated bytes of role prose anywhere (T-1134; GitHub issue #484;
-# .shell-team/specs/T-1134-codex-host-slice1.md).
+# .shell-team/specs/T-1134-codex-host-slice1.md). T-1135 (GitHub issue #493;
+# .shell-team/specs/T-1135-codex-host-slice2.md) adds codex-reviewer as a
+# fifth default role — generated exactly like the other four, from its own
+# unmodified agents/codex-reviewer.md, with no special-casing anywhere in
+# this script.
 #
-# For each role in ROLES (default: tech-lead pm-spec engineer qa-verifier —
-# the Specify-to-Validate chain, per D2 in the spec above):
+# For each role in ROLES (default: tech-lead pm-spec engineer qa-verifier
+# codex-reviewer — the Specify-to-Validate-to-Review chain, per D2 in
+# T-1134's spec and AC1 in T-1135's):
 #   1. Read agents/<role>.md from --root, unmodified. Validate its
 #      frontmatter has both a `---` opener and closer, that its
 #      `description:` field is non-empty and carries no `"` or `\` (a TOML
@@ -86,16 +91,20 @@
 #               Codex session, is the default and avoids this entirely; see
 #               docs/adopting.md's "Using shell-team from Codex CLI" step 3
 #               for the writable-roots form when Codex must run it in-session.
-#   --roles     space-separated role-list override (default: the four
+#   --roles     space-separated role-list override (default: the five
 #               roles this task's Goal names: "tech-lead pm-spec engineer
-#               qa-verifier")
+#               qa-verifier codex-reviewer"). Each token must match
+#               ^[a-z][a-z0-9-]*$ (the same shape agents/<role>.md's own
+#               `name:` frontmatter values already use) — a token outside
+#               that shape refuses the WHOLE run (--roles item 2 of T-1135
+#               issue #487's hardenings), nothing written to --out-dir.
 #   --help, -h  show this header and exit 0
 #
 # Exit: 0 = generated (every requested role); 1 = a source role file cannot
 #       be faithfully carried by a TOML multi-line literal string, or its
 #       frontmatter is malformed — nothing written to --out-dir; 2 = usage
-#       error or the executor binding did not resolve — nothing written to
-#       --out-dir.
+#       error, a malformed --roles token, or the executor binding did not
+#       resolve — nothing written to --out-dir.
 
 set -euo pipefail
 
@@ -120,14 +129,14 @@ SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
 ROOT=""
 OUT_DIR=""
-ROLES="tech-lead pm-spec engineer qa-verifier"
+ROLES="tech-lead pm-spec engineer qa-verifier codex-reviewer"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --root)     [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --out-dir)  [ "$#" -ge 2 ] || die "--out-dir requires a value"; shift; OUT_DIR="$1"; shift ;;
     --roles)    [ "$#" -ge 2 ] || die "--roles requires a value"; shift; ROLES="$1"; shift ;;
-    --help|-h)  sed -n '2,98p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)  sed -n '2,107p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
 done
@@ -139,7 +148,11 @@ done
 [ -n "$ROOT" ] || ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
 [ -d "$ROOT" ] || die "root path is not a directory: $ROOT"
-ROOT="${ROOT%/}"
+# T-1135 issue #487 hardening (i): stripping a trailing slash unconditionally
+# turns "/" into "" and then, by the fallback line below, right back into
+# "." — silently collapsing the filesystem root to the current directory
+# instead of refusing it. "/" is the one value this strip must leave alone.
+[ "$ROOT" = "/" ] || ROOT="${ROOT%/}"
 [ -n "$ROOT" ] || ROOT="."
 # --out-dir default: the caller's OWN current directory, deliberately
 # independent of --root (see header comment above).
@@ -186,14 +199,50 @@ trim() {  # prints $1 with leading/trailing whitespace stripped
 #     refusal). CONTENT_FILES/CONTENT_ROLE stay parallel arrays (this
 #     repo's bin/ scripts avoid associative arrays for bash 3.2 portability
 #     — see bin/resolve-executor.sh's own indexed-array lookups).
-# shellcheck disable=SC2206  # ROLES is a fixed, simple space-separated word list
+# T-1135 review round-2 minor (m2, issue #487 hardening ii closure): word-
+# split ROLES WITHOUT pathname expansion. An unquoted `($ROLES)` array
+# assignment performs BOTH word-splitting and glob expansion; a `--roles`
+# value containing a shell glob character (e.g. `*`) would expand against
+# --out-dir's own directory listing before the role-shape validation below
+# ever runs, so refusal so far depended on the expanded filenames
+# themselves happening to fail that validation — not on this line refusing
+# the glob shape itself. `set -f` (noglob) brackets the split so only
+# word-splitting occurs; `set +f` restores normal globbing immediately
+# after, before anything else in this script relies on it.
+set -f
+# shellcheck disable=SC2206  # ROLES is a fixed, simple space-separated word list; set -f above suppresses glob expansion
 ROLES_ARR=($ROLES)
+set +f
 [ "${#ROLES_ARR[@]}" -ge 1 ] || die "--roles produced an empty role list"
+
+# T-1135 issue #487 hardening (ii): validate every --roles token BEFORE
+# anything is built or written, against the same role-identifier shape
+# agents/<role>.md's own `name:` frontmatter values already use
+# (^[a-z][a-z0-9-]*$) — refusing a stray path-shaped or option-shaped token
+# (e.g. "../evil") outright rather than letting it reach a filesystem path
+# built from it below.
+for __role_tok in "${ROLES_ARR[@]}"; do
+  case "$__role_tok" in
+    [a-z]*) : ;;
+    *) die "--roles token is not a valid role identifier (must match ^[a-z][a-z0-9-]*\$): $__role_tok" ;;
+  esac
+  case "$__role_tok" in
+    *[!a-z0-9-]*) die "--roles token is not a valid role identifier (must match ^[a-z][a-z0-9-]*\$): $__role_tok" ;;
+  esac
+done
 
 CONTENT_FILES=()
 CONTENT_ROLE=()
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
-cleanup() { rm -f "${CONTENT_FILES[@]}" 2>/dev/null || true; }
+# T-1135 issue #487 hardening (iv): under bash 3.2's `set -u`, expanding
+# "${CONTENT_FILES[@]}" while the array is still empty (the first requested
+# role fails validation before any CONTENT_FILE is ever appended) raises
+# "unbound variable" from the trap itself, masking the real refusal message
+# with a spurious one. The `+"${CONTENT_FILES[@]}"` alternate-value form
+# expands to nothing when the array is unset/empty instead of erroring,
+# which bash 3.2 accepts, so this same rm -f line runs (as a no-op) with or
+# without the array ever having been populated.
+cleanup() { rm -f "${CONTENT_FILES[@]+"${CONTENT_FILES[@]}"}" 2>/dev/null || true; }
 trap cleanup EXIT
 
 for role in "${ROLES_ARR[@]}"; do
@@ -317,10 +366,35 @@ done
 #     this generator's own shell-team-<role>.toml files are ever touched;
 #     any other file already in --out-dir (an adopter's own Codex agent, or
 #     a stale file this run does not own) is left exactly as found. -------
+# T-1135 issue #487 hardening (iii)/D6: per-file staged write. Each file is
+# written to a temp name INSIDE --out-dir (same filesystem, so the mv below
+# is an atomic rename) and only then moved onto its final shell-team-<role>
+# name — never a direct redirect onto the final name, and never a
+# whole-directory stage-and-swap (which would delete an adopter's own,
+# non-shell-team-* Codex agent TOMLs already in --out-dir).
 mkdir -p "$OUT_DIR" || die "cannot create out-dir: $OUT_DIR"
+
+# T-1135 review round-2 minor (m1): refuse BEFORE any rename if a requested
+# role's own final path already exists as something other than a regular
+# file (most concretely: a directory of that name). `mv` onto an existing
+# directory silently moves the staged file INSIDE it and still exits 0, so
+# the expected TOML at that path would simply never be written while this
+# generator still reports success. Checked for every requested role in its
+# own pass, before pass 2 writes (or stages) any of them, so this refusal
+# is whole-run and nothing is written — the same no-partial-output
+# discipline pass 1's own validation already holds to.
+for role in "${CONTENT_ROLE[@]}"; do
+  TARGET="$OUT_DIR/shell-team-$role.toml"
+  if [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; then
+    die "refusing to write: $TARGET already exists and is not a regular file (cannot rename a generated TOML onto it)"
+  fi
+done
+
 idx=0
 for role in "${CONTENT_ROLE[@]}"; do
-  cat "${CONTENT_FILES[$idx]}" > "$OUT_DIR/shell-team-$role.toml"
+  STAGE_FILE="$(mktemp "$OUT_DIR/.gen-codex-agents.$role.XXXXXX")" || die "cannot create a staging file in out-dir: $OUT_DIR"
+  cat "${CONTENT_FILES[$idx]}" > "$STAGE_FILE"
+  mv "$STAGE_FILE" "$OUT_DIR/shell-team-$role.toml"
   printf 'gen-codex-agents: generated %s/shell-team-%s.toml\n' "$OUT_DIR" "$role"
   idx=$((idx + 1))
 done
