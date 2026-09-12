@@ -84,10 +84,12 @@ With the plugin loaded, `bin/` being on `PATH` is **observed in this
 checkout's own sessions, not guaranteed**: plugin load and `PATH` injection are
 separate mechanisms (measured 2026-09-11 — a resumed `claude --continue
 --plugin-dir ./` session loaded the checkout plugin while the Bash tool's
-`PATH` did not carry `<checkout>/bin`). When it does resolve, call scripts by
-bare name (`check-handoff.sh …`) rather than `bash bin/…`, so what you
-exercise matches what adopters run; when it does not, fall back to `bash
-bin/<script>` from the checkout root.
+`PATH` did not carry `<checkout>/bin`). When it does resolve, calling scripts
+by bare name (`check-handoff.sh …`) is a convenience of this checkout, not a
+claim about how an adopter invokes anything; when it does not, fall back to
+`bash bin/<script>` from the checkout root. An adopter's own invocation is
+neither of these — it is `bash "<plugin root>/bin/<script>"`, documented in
+`docs/adopting.md`.
 
 ## Branches and pull requests
 
