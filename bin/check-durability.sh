@@ -108,7 +108,7 @@ die() {  # $1 = classification (usage|structural); $2 = message; exit 2
 fail_usage()      { die usage "$1"; }
 fail_structural() { die structural "$1"; }
 fail_not_durable() {  # $1 = reason token (closed set); $2 = plain-language body naming the record and the ref
-  printf 'check-durability: not-durable: %s: %s — this hand-off is not durable. A required record is not durably observable yet — never committed, edited since, or, where a hidden base dir is the cause, a misconfiguration the loop does not support; see docs/adopting.md, "Where the operating files live," for the one-line re-include in that case.\n' "$1" "$2" >&2 || true
+  printf 'check-durability: not-durable: %s: %s — this hand-off is not durable.\n' "$1" "$2" >&2 || true
   exit 1
 }
 

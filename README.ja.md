@@ -57,7 +57,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 **`.shell-team/` を git に載せるかを最初に決めてください。** プラグインはルートの `.gitignore` を編集しないため、base dir は repo 内で *untracked* として現れます（無視されるのは中の run テレメトリのみ。自己完結した `<base>/.gitignore` による）。どちらの選択も想定されており、プラグインが代わりに決めることはありません：
 
 - **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）
-- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。ただし global 側はマシン全体に効くため、後から「この repo ではボードを追跡したい」と決めた repo でも base dir が隠れる上、このループの耐久性ゲートは恒久的に `not-durable` を返すようになり、hand-off はそのマシン上にしか残らなくなる — その代償を避けたいだけなら repo 側の `.gitignore` を優先する。その 1 repo だけ復帰させるには root の `.gitignore` に `!.shell-team/` を書く（repo 側のパターンが global ファイルより優先される）。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
+- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。どちらを選んでも base dir は untracked のままで、このループの耐久性ゲートが反応するのは untracked という状態そのものであって、どちらの ignore ルールがそれを作ったかではない — base dir が untracked なら耐久性ゲートは恒久的に `not-durable` を返し、hand-off はそのマシン上にしか残らなくなる。この代償は repo 側の `.gitignore` を選んでも同じく発生する。repo 側の行が実際に避けるのは適用範囲の広さだけで、global 側はマシン上の他の全 repo でも base dir を隠してしまい、後から「この repo ではボードを追跡したい」と決めても、その repo 自身の root `.gitignore` に `!.shell-team/` を明示的に書いて戻さない限り隠れたままになる（repo 側のパターンが global ファイルより優先される）— だからこそ repo 側の行のほうが適用範囲が狭く取り消しやすい選択なのであって、耐久性の代償そのものを避ける手段ではない。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
 
 詳細・更新・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
