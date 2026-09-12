@@ -80,9 +80,14 @@ Load the plugin from a checkout:
 claude --plugin-dir ./     # then /reload-plugins after editing agents, skills or bin
 ```
 
-With the plugin loaded, `bin/` is on `PATH`. Call scripts by bare name
-(`check-handoff.sh …`) rather than `bash bin/…`, so what you exercise matches
-what adopters run.
+With the plugin loaded, `bin/` being on `PATH` is **observed in this
+checkout's own sessions, not guaranteed**: plugin load and `PATH` injection are
+separate mechanisms (measured 2026-09-11 — a resumed `claude --continue
+--plugin-dir ./` session loaded the checkout plugin while the Bash tool's
+`PATH` did not carry `<checkout>/bin`). When it does resolve, call scripts by
+bare name (`check-handoff.sh …`) rather than `bash bin/…`, so what you
+exercise matches what adopters run; when it does not, fall back to `bash
+bin/<script>` from the checkout root.
 
 ## Branches and pull requests
 
