@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1137** a globally-hidden base dir reads as the misconfiguration it is: the README states the durability consequence and `not-durable` refuses instead of describing a steady state — `READY_FOR_QA` — spec: .shell-team/specs/T-1137-excludes-detection.md
+- [ ] **T-1137** a globally-hidden base dir reads as the misconfiguration it is: the README states the durability consequence and `not-durable` refuses instead of describing a steady state — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1137-excludes-detection.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: GitHub issue #475, relayed verbatim into pm-spec in the task brief by the coordinating session, which holds the primary copy. Stacked on `feature/invocation-policy` (T-1136, PR #501 open, unmerged); this task's PR also targets `develop`. Sprint `codex-b-ticket` successor, operator-approved lightweight mode A2 — pm-authored spec, one freeze with wording mutable, no spec review, no per-task freeze or blast-radius sweep (one two-arm sweep at release), five-line hand-offs. Release-tier premise on record: **PATCH**, approved at sprint planning 2026-09-12 14:29 JST. The spec declares `- user-visible: yes` on the adopter-facing README and refusal-message change plus its adopter-facing docs surface, which is the adopter-docs trigger and not a tier verdict. **#475 is only partially closed under the ruled scope** — gaps 1 and 3 ship, gap 2 is refused; see `- scope-ruling` below, whose disposition includes recording that refusal on #475 by comment at close-out.
@@ -92,6 +92,56 @@ Observed: same. Expected: a sentence that does not tell someone who simply forgo
 - Status flag: `READY_FOR_QA`.
 
 Notes for QA: the reworked sentence is disjunctive by design — it lists the three causes the closed reason-token set can actually mean (never committed / edited since / hidden by an ignore rule, the last one scoped with "where … is the cause") rather than a per-token variant, per the Pre-commitment's "Named fragile component" note and the spec's D3/D4/D5. Please re-run your own live five-token reproduction independently rather than trusting this table.
+
+### QA verdict — T-1137 (round 2)
+
+**Verdict: PASS → READY_FOR_REVIEW.** Own-run throughout; nothing accepted from the hand-off unverified. `B = git merge-base feature/invocation-policy HEAD` = `9985f1c` (re-confirmed: `git show-ref --verify --quiet refs/heads/feature/invocation-policy; echo $?` → 0).
+
+- `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1137-excludes-detection.md 2>&1 | tail -1` → `check-acs: 9 passed, 0 failed, 0 skipped, 0 unrecognized (.shell-team/specs/T-1137-excludes-detection.md)`. Acceptance criteria: 9/9 checked off mechanically.
+- `bash bin/check-intent.sh .shell-team/specs/T-1137-excludes-detection.md .shell-team/todo.md` → `aligned: T-1137 v1 (3da4a8b44e26ad23443698f0a22e065d2fd1cc74)` — same hash as round 1; frozen intent-block untouched.
+- `bash tests/check-durability/run.sh > "$TMPDIR/qa_cd.log" 2>&1; echo exit=$?` → exit=0; `grep -c '^PASS:' "$TMPDIR/qa_cd.log"` → 33; `grep -c '^FAIL:' "$TMPDIR/qa_cd.log"` → 0. `bash tests/team-init/run.sh` → exit 0 (all PASS). `bash tests/errexit-safe/run.sh` → exit 0 (all PASS, including its own guard mutation self-check).
+- `shellcheck --version` → `0.11.0` (matches `.github/workflows/check-handoff.yml`'s `SHELLCHECK_VERSION` pin, re-confirmed directly against the workflow file). `shellcheck bin/check-durability.sh` → clean, exit 0.
+- `bash bin/check-provenance.sh .shell-team/provenance/T-1137.md` → `conformant: .shell-team/provenance/T-1137.md (4 decision entries, 0 sentinel)`. Derivation block: re-ran the embedded `- reproduce:` command, diffed byte-for-byte against the embedded `<!-- BEGIN/END derivation: t1137-refusal-text-readers -->` block — `diff` exit 0, no difference.
+- `bash bin/check-interventions.sh --task T-1137 .shell-team/interventions/T-1137.md` → `conformant: .shell-team/interventions/T-1137.md (3 entries, 0 sentinel)`.
+- `bash bin/check-handoff.sh .shell-team/todo.md` → exit 0.
+- `bash bin/check-pii-shapes.sh --base 9985f1cdda6a26ee408a0bafb618add91c4005fb` → `clean (no PII-shaped bytes found)`.
+
+**CI parity (T-1133).** Repo carries `.github/workflows/check-handoff.yml`. Diffed the recipe's `## CI parity` `shellcheck` argument-list bullet against the workflow file's own `shellcheck` step line byte-for-byte — identical, no drift, no engineer refresh owed this round. Reverse-mapped the edit surface (`bin/check-durability.sh`, `.shell-team/todo.md`, `.shell-team/provenance/T-1137.md`) to the CI-wired steps that read it and ran each directly: `bash tests/check-durability/run.sh` (above, 33/33 PASS); the workflow's "Dogfood check-durability" step, `bash bin/check-durability.sh --phase implement --task T-1048 --ref HEAD` → `check-durability: durable: 4 record(s) for phase implement, task T-1048, observed in HEAD`, exit 0 — the passing-path stdout shape is unaffected by the `printf` edit, run for real against this repository's own T-1048 records, not a fixture; the workflow's "Dogfood check-board-headings" step, `bash bin/check-board-headings.sh "$(bash bin/team-paths.sh --get todo)" --base origin/develop` → exit 0. Nothing in the reverse-mapped set required a deploy, cloud credential or container build.
+
+**Five-token re-reproduction (round 2's central question).** Fresh scratch repos under `$TMPDIR`, `core.excludesFile /dev/null`, no `.gitignore` except where the token itself concerns one, run directly against HEAD's `bin/check-durability.sh`. Current sentence: `A required record is not durably observable yet — never committed, edited since, or, where a hidden base dir is the cause, a misconfiguration the loop does not support; see docs/adopting.md, "Where the operating files live," for the one-line re-include in that case.`
+
+1. `no-recorded-commit` (unborn repo, zero commits) — reproduced live, exit 1. "never committed" holds: nothing has ever been committed. No disjunct asserts anything false.
+2. `missing-working-file` (record never authored) — reproduced live, exit 1. "never committed" holds: a file never authored was never committed either.
+3. `not-in-recorded-commit`, hidden-base-dir cause (partial `.shell-team/*.md` rule, AC2's own fixture) — reproduced live, exit 1. "where a hidden base dir is the cause, a misconfiguration" applies correctly; the remedy pointer is scoped "in that case," so it is not asserted for the other tokens.
+4. `not-in-recorded-commit`, non-ignore cause (record created but never `git add`ed, no gitignore file present at all) — reproduced live as an adversarial fixture beyond the closed five-token enumeration, same reason token, different cause. Exit 1. "never committed" still holds; the conditional ignore-rule clause is correctly not asserted (it is scoped by "where … is the cause" and this fixture's cause is not a hidden base dir). No overclaim.
+5. `uncommitted-change` (committed record edited, not re-committed) — reproduced live, exit 1. "edited since" holds.
+6. `untracked-opt-out` (`durability-mode` declares `working-tree-only`, never committed) — reproduced live, exit 1. "never committed" holds.
+
+No disjunct asserted anything the checker did not observe, across all six fixtures. Round 1's `docs-overclaim` finding is closed.
+
+**The two Goal properties round 2 asks me to judge.**
+- *Can the message still be quoted as an acceptable steady state?* No. The appended sentence sits after the pre-existing, unmodified `this hand-off is not durable.` — a strong, unambiguous refusal T-1048 already froze and this task does not touch. The appended sentence's "yet" is a temporal marker on an already-negative verdict, not a softening of it, and it never states the condition is acceptable or that the loop will proceed. For the #475 scenario (hidden base dir) it now names the condition "a misconfiguration the loop does not support," materially stronger than the pre-task wording an orchestrating session could quote as "a known environment constraint." This closes the Problem statement's failure mode. This is inherently a semantic judgment, not a mechanical one — flagging it for the cross-provider reviewer's independent read too.
+- *Does it name a hidden base dir as a misconfiguration with the remedy pointer conditional on that cause?* Yes — "where a hidden base dir is the cause, a misconfiguration the loop does not support ... for the one-line re-include **in that case**." Both the misconfiguration framing and the remedy pointer are explicitly scoped to the hidden-base-dir branch, never asserted unconditionally.
+
+**Regression guard.** AC3's verdict surface (exit 0/1/2, all five reason tokens present, `durable:` line, `this hand-off is not durable.` intact as a substring) and the forbidden literals (`check-ignore`, `.shell-team`, `tasks/`) absent from the non-comment body: confirmed by `check-acs.sh`'s AC3 PASS above and directly — `grep -v '^[[:space:]]*#' bin/check-durability.sh | grep -E 'check-ignore|\.shell-team|(^|[^-])tasks/'` → no matches. Durable path re-run live against this repository's own real T-1048 records (CI-parity section above) — unaffected, exit 0.
+
+**README AC1 recheck** (unchanged since round 1, per the brief's item 4): `README.md:60` / `README.ja.md:60` still say the same three things — global route hides the base dir even where later wanted; every durability gate reports `not-durable` permanently there; hand-off stays local-only to that machine — with the same remedy (prefer the repo-level `.gitignore`; `!.shell-team/` re-inclusion), each in its own file's register. Equivalent, unchanged; not touched by this rework.
+
+**Summarized sources.** Intent-block hash unchanged from round 1 (`3da4a8b44e26ad23443698f0a22e065d2fd1cc74`, identical `check-intent.sh` output both rounds), so `## Summarized sources` is byte-identical to what round 1's verdict already checked source-by-source against its own bytes (10 entries, no flattened distinction found). Not reopened here: neither this round's diff nor its new provenance decision touches a summarized claim.
+
+**Adversarial fixture synthesis.** Class 1 (beyond-happy-path) is this round's own six live reproductions above, asserting the final defended state (each disjunct's truth value in the emitted sentence) rather than only that a refusal fired. Classes 2/3 not applicable (no new regex or Markdown parsing in this diff). Class 4 (test-harness short-circuit) — every `- check:` line, suite and dogfood step above ran exactly as written, no stub, no override.
+
+**Not owed, confirmed rather than assumed:** gap 2 stays refused (`## Scope ruling`, unchanged); T-1046 AC1–AC3 stay pre-existing red at this branch point (merge-point-scoped, not this task's business, unchanged from round 1).
+
+**Regressions:** none found. `git status --short` clean throughout this verification except this board append; every scratch fixture ran under `$TMPDIR`, never against the checked-out working tree.
+
+### QA verdict: PASS
+- Task: T-1137 → READY_FOR_REVIEW
+- Tests: `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1137-excludes-detection.md 2>&1 | tail -1` → 9 passed, 0 failed, 0 skipped, 0 unrecognized; `bash tests/check-durability/run.sh > "$TMPDIR/qa_cd.log" 2>&1; grep -c '^PASS:' "$TMPDIR/qa_cd.log"` → 33 passed, `grep -c '^FAIL:' "$TMPDIR/qa_cd.log"` → 0; `bash tests/team-init/run.sh` and `bash tests/errexit-safe/run.sh` → both exit 0
+- Acceptance criteria: 9/9 checked off — `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1137-excludes-detection.md 2>&1 | tail -1`
+- Verification ceiling: unit-and-static — every criterion here is a fixed-string read of a committed file or of a named ref's committed blob, a committed-blob byte comparison, a checker's exit status, a bash fixture suite, or a scratch-repository probe built from `git init` and `git commit` alone. Nothing requires a third-party CLI, a network call or a second host, so no criterion sits above the declared ceiling and no `- above-ceiling:` sub-bullet appears — verifies every criterion at or below that level; none above this ceiling.
+- Edge cases tried: five closed reason tokens (`no-recorded-commit`, `missing-working-file`, `not-in-recorded-commit` hidden-base-dir cause, `uncommitted-change`, `untracked-opt-out`) plus an adversarial `not-in-recorded-commit` without any ignore rule (a forgotten `git add`), all within `## Input space`'s reachable classes — no out-of-input-space exemption needed
+- Risk notes for reviewer: the "no longer quotable as an acceptable steady state" judgment (above) is a semantic call, not a mechanical one — please form an independent read; no test-only edits made this round
 
 ### Engineer hand-off — T-1136 (engineer, mode A2 — 5-line form)
 
