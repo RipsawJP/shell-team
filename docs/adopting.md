@@ -201,12 +201,12 @@ you want to assign specific executors to all six:
    a literal `-`, never by omitting the field (only the effort column
    spells "unset" that way — the model column always needs a leading
    alphanumeric).
-3. `bash check-binding.sh --config <base>/binding.conf` — with the plugin
-   loaded, `bin/` is on `PATH`, so this resolves with no `bin/` prefix;
-   inside a checkout with no plugin loaded, run `bash bin/check-binding.sh
-   ...` instead.
-4. `bash resolve-executor.sh --print-resolved` (same `bin/`-on-`PATH` note
-   as step 3) — this resolves all six roles' effective bindings but runs
+3. `bash "<plugin root>/bin/check-binding.sh" --config <base>/binding.conf` —
+   never assumed to be on `PATH`, even with the plugin loaded; read
+   `<plugin root>` from what your host reports (see the "Locate the
+   installed plugin root" step in the Codex CLI section below for how).
+4. `bash "<plugin root>/bin/resolve-executor.sh" --print-resolved` (same
+   `<plugin root>` note as step 3) — this resolves all six roles' effective bindings but runs
    **no availability probe at all**. `resolve-executor.sh --role <role>`
    goes further, but only for an **out-of-process** provider (`codex`) —
    checking `codex --version` is observable on `PATH` and then running
@@ -503,16 +503,22 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
 7. **Confirm Claude Code CLI is installed and authenticated on this host
    — outside any Codex session, before you rely on it inside one
    (T-1135).** The review pass (steps 8 and 10) runs a real `claude -p`
-   **child process**; if Claude Code CLI is not installed on this host,
-   or is installed but not authenticated, that process fails with `Not
-   logged in · Please run /login` regardless of the Codex sandbox's own
-   network setting — and this time `/login` genuinely is the fix. Verify
-   this once, in an ordinary shell with no Codex sandbox involved at all:
-   `claude -p "reply with the single word ok"` should print `ok` and exit
-   `0`. If it instead reports a login prompt or an authentication error,
-   resolve that first (`claude /login`, or your organization's own Claude
-   Code provisioning) — step 8's network grant cannot substitute for this
-   prerequisite, and granting it will not fix an authentication failure.
+   **child process**, and its absence and its authentication are two
+   different failure modes with two different symptoms — check the binary
+   first: `command -v claude`. If that reports nothing (exit 1), the CLI
+   is simply not installed, and the shell fails the invocation with
+   `command not found` before any application message is ever produced —
+   install it first. If `command -v claude` finds it but it is not
+   authenticated, the `claude -p` process instead fails with `Not logged
+   in · Please run /login`, regardless of the Codex sandbox's own network
+   setting — and this time `/login` genuinely is the fix. Verify
+   authentication once, in an ordinary shell with no Codex sandbox
+   involved at all: `claude -p "reply with the single word ok"` should
+   print `ok` and exit `0`. If it instead reports a login prompt or an
+   authentication error, resolve that first (`claude /login`, or your
+   organization's own Claude Code provisioning) — step 8's network grant
+   cannot substitute for either of these prerequisites, and granting it
+   will not fix a missing binary or an authentication failure.
 8. **Grant the sandbox network access the Claude-side review pass needs
    (T-1135), and tell its `Not logged in` apart from step 7's.** Measured
    (codex-cli 0.154.0, Claude Code CLI 2.1.268): at the sandbox's default
