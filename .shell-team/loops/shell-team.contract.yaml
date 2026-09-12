@@ -27,7 +27,7 @@ action:
   description: one PM -> Engineer -> QA -> Codex-Reviewer pass over the task, advancing the tasks/todo.md status flag at each phase gate
 
 budget:
-  max_iterations: 3        # QA allows 2 retries, so up to 3 implement->verify passes
+  max_iterations: 6        # operator ruling 2026-09-11: 3 stopped a converging loop 5 times on T-1134; cap raised, STOP escalations carry the 3 convergence indicators (#491)
   max_wallclock_min: 0     # untracked (host-dependent)
   max_subagents: 5         # tech-lead, pm-spec, engineer, qa-verifier, codex-reviewer
   max_usd: 0               # untracked (host-dependent)
