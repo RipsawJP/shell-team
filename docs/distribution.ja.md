@@ -26,7 +26,7 @@ claude plugin marketplace add RipsawJP/shell-team
 claude plugin install shell-team@ripsawjp --scope user
 ```
 
-プラグインの各エージェントは `/shell-team:<agent>`、スキルは `/shell-team:<skill>`（例: `/shell-team:run`）として解決され、`bin/` スクリプトはプラグイン有効時に `PATH` に追加されます。
+プラグインの各エージェントは `/shell-team:<agent>`、スキルは `/shell-team:<skill>`（例: `/shell-team:run`）として解決され、`bin/` スクリプトは `bash "<plugin root>/bin/<script>"` として起動します——プラグインが有効でも `PATH` に載るとは限りません。`<plugin root>` は自ホストの報告値から読んでください（[adopting.ja.md](adopting.ja.md) の "Locate the installed plugin root" 手順を参照）。
 
 ## ターゲットリポジトリへの導入
 

@@ -203,12 +203,12 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    1 行）を編集する。`effort` は位置的に必須で、「値なし」はフィールド
    を省略せず常にリテラル `-` で綴る。この「未設定」の綴り方は effort
    列だけのもので、model 列は常に英数字始まりが必要。
-3. `bash check-binding.sh --config <base>/binding.conf` を実行する。
-   プラグインをロードしていれば `bin/` は `PATH` に載るので `bin/`
-   接頭辞なしで解決する。プラグインをロードしていないチェックアウト内
-   では `bash bin/check-binding.sh ...` を使う。
-4. `bash resolve-executor.sh --print-resolved` を実行する（step 3 と
-   同じ `bin/`-on-`PATH` の注記が当てはまる）。これは 6 役割すべての
+3. `bash "<plugin root>/bin/check-binding.sh" --config <base>/binding.conf`
+   を実行する。プラグインをロードしていても `PATH` に載るとは限らない
+   ——`<plugin root>` は自ホストの報告値から読む（下の Codex CLI 節の
+   "Locate the installed plugin root" 手順を参照）。
+4. `bash "<plugin root>/bin/resolve-executor.sh" --print-resolved` を実行
+   する（step 3 と同じ `<plugin root>` の注記が当てはまる）。これは 6 役割すべての
    有効な紐付けを解決するが、**availability probe を一切行わない**。
    `resolve-executor.sh --role <role>` はさらに検査するが、その probe の
    中身は紐付けられた provider によって決まる。**out-of-process** な
@@ -511,16 +511,21 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
 7. **この host に Claude Code CLI が既にインストール・認証済みであることを
    ——Codex セッションの外で、それを内側で当てにする前に——確認する
    （T-1135）。** レビュー pass（手順 8 と 10）は実際に `claude -p` の
-   **子プロセス**を走らせる。この host に Claude Code CLI がインストール
-   されていない、あるいはインストール済みでも認証されていない場合、
-   Codex sandbox 自身の network 設定に関係なくそのプロセスは `Not logged
+   **子プロセス**を走らせるが、「インストールされていない」と「認証され
+   ていない」は別の失敗モードで症状も別——まずバイナリの有無を
+   `command -v claude` で確認する。何も返らなければ（exit 1）CLI 自体が
+   無いということで、シェルはアプリ側のメッセージが出る前に
+   `command not found` で失敗する——先にインストールする。
+   `command -v claude` が見つけたのに未認証なら、`claude -p` の
+   プロセスは Codex sandbox 自身の network 設定に関係なく `Not logged
    in · Please run /login` で失敗する——そしてこの場合は本当に `/login`
-   が対処法である。これを一度、Codex sandbox を一切介さない普通のシェルで
-   確認する: `claude -p "reply with the single word ok"` は `ok` を出力し
-   exit `0` になるはず。もしログインプロンプトや認証エラーが出るなら、
-   まずそれを解決する（`claude /login`、あるいは自組織の Claude Code
-   provisioning 手順）——手順 8 の network 許可はこの前提条件の代わりには
-   ならず、それを許可しても認証の失敗は直らない。
+   が対処法である。認証をこれで一度、Codex sandbox を一切介さない普通の
+   シェルで確認する: `claude -p "reply with the single word ok"` は `ok`
+   を出力し exit `0` になるはず。もしログインプロンプトや認証エラーが
+   出るなら、まずそれを解決する（`claude /login`、あるいは自組織の
+   Claude Code provisioning 手順）——手順 8 の network 許可はこの
+   どちらの前提条件の代わりにもならず、それを許可してもバイナリ不在や
+   認証の失敗は直らない。
 8. **Claude 側のレビュー pass が必要とする sandbox network access を
    許可する（T-1135）——そしてその `Not logged in` を手順 7 のものと
    区別する。** 実測（codex-cli 0.154.0、Claude Code CLI 2.1.268）:

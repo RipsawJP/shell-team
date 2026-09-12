@@ -233,7 +233,6 @@ done
 
 CONTENT_FILES=()
 CONTENT_ROLE=()
-# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
 # T-1135 issue #487 hardening (iv): under bash 3.2's `set -u`, expanding
 # "${CONTENT_FILES[@]}" while the array is still empty (the first requested
 # role fails validation before any CONTENT_FILE is ever appended) raises
@@ -242,7 +241,22 @@ CONTENT_ROLE=()
 # expands to nothing when the array is unset/empty instead of erroring,
 # which bash 3.2 accepts, so this same rm -f line runs (as a no-op) with or
 # without the array ever having been populated.
-cleanup() { rm -f "${CONTENT_FILES[@]+"${CONTENT_FILES[@]}"}" 2>/dev/null || true; }
+#
+# T-1136 #494 item 2: CUR_STAGE_FILE tracks pass 2's own current per-role
+# staging file (set right after mktemp, cleared right after mv succeeds) so
+# this same trap also removes a mid-write staging residue if `mv` — the
+# generator's only rename — fails partway through. `${CUR_STAGE_FILE:-}`
+# is the same set -u-safe alternate-value idiom the CONTENT_FILES guard
+# above already uses, so a bash 3.2 run before pass 2 ever sets the
+# variable does not itself raise "unbound variable" from inside the trap.
+CUR_STAGE_FILE=""
+# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
+cleanup() {
+  rm -f "${CONTENT_FILES[@]+"${CONTENT_FILES[@]}"}" 2>/dev/null || true
+  if [ -n "${CUR_STAGE_FILE:-}" ]; then
+    rm -f "$CUR_STAGE_FILE" 2>/dev/null || true
+  fi
+}
 trap cleanup EXIT
 
 for role in "${ROLES_ARR[@]}"; do
@@ -393,8 +407,10 @@ done
 idx=0
 for role in "${CONTENT_ROLE[@]}"; do
   STAGE_FILE="$(mktemp "$OUT_DIR/.gen-codex-agents.$role.XXXXXX")" || die "cannot create a staging file in out-dir: $OUT_DIR"
+  CUR_STAGE_FILE="$STAGE_FILE"
   cat "${CONTENT_FILES[$idx]}" > "$STAGE_FILE"
   mv "$STAGE_FILE" "$OUT_DIR/shell-team-$role.toml"
+  CUR_STAGE_FILE=""
   printf 'gen-codex-agents: generated %s/shell-team-%s.toml\n' "$OUT_DIR" "$role"
   idx=$((idx + 1))
 done

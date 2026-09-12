@@ -1,1 +1,1 @@
-on PATH when the plugin is loaded; else
+invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how

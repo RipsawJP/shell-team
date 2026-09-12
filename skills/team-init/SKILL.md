@@ -16,8 +16,10 @@ Do this:
    ```
 
    (Add `--force` only if the user explicitly wants existing scaffold files
-   overwritten.) The script is on PATH when the plugin is loaded; otherwise call
-   it by its repo path `bin/team-init.sh`.
+   overwritten.) Invoke it as `bash "<plugin root>/bin/team-init.sh"` — never
+   assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>`
+   from what your host reports, see `docs/adopting.md`'s "Locate the installed
+   plugin root" step for how.
 
 2. **Report what it did.** Echo the `created:` / `updated:` / `skipped` lines and
    the closing summary so the user sees exactly which files were scaffolded vs.
