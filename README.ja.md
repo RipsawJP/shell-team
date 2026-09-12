@@ -57,7 +57,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 **`.shell-team/` を git に載せるかを最初に決めてください。** プラグインはルートの `.gitignore` を編集しないため、base dir は repo 内で *untracked* として現れます（無視されるのは中の run テレメトリのみ。自己完結した `<base>/.gitignore` による）。どちらの選択も想定されており、プラグインが代わりに決めることはありません：
 
 - **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）
-- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。ただし global 側はマシン全体に効くため、後から「この repo ではボードを追跡したい」と決めた repo でも base dir が隠れる。その 1 repo だけ復帰させるには root の `.gitignore` に `!.shell-team/` を書く（repo 側のパターンが global ファイルより優先される）。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
+- **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。どちらを選んでも base dir は untracked のままで、このループの耐久性ゲートが反応するのは untracked という状態そのものであって、どちらの ignore ルールがそれを作ったかではない — base dir が untracked なら耐久性ゲートは恒久的に `not-durable` を返し、hand-off はそのマシン上にしか残らなくなる。この代償は repo 側の `.gitignore` を選んでも同じく発生する。repo 側の行が実際に避けるのは適用範囲の広さだけで、global 側はマシン上の他の全 repo でも base dir を隠してしまい、後から「この repo ではボードを追跡したい」と決めても、その repo 自身の root `.gitignore` に `!.shell-team/` を明示的に書いて戻さない限り隠れたままになる（repo 側のパターンが global ファイルより優先される）— だからこそ repo 側の行のほうが適用範囲が狭く取り消しやすい選択なのであって、耐久性の代償そのものを避ける手段ではない。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
 
 詳細・更新・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
@@ -131,7 +131,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 │   ├── review-response/SKILL.md     # /shell-team:review-response（受領レビュー指摘のトリアージ）
 │   ├── team-init/SKILL.md           # /shell-team:team-init（リポを scaffold）
 │   └── loop-triage/SKILL.md         # /shell-team:loop-triage（作業を発見）
-├── bin/                             # プラグイン有効時すべて PATH に載る
+├── bin/                             # `bash "<plugin root>/bin/<script>"` として起動
 │   ├── check-handoff.sh             # tasks/todo.md ハンドオフ linter
 │   ├── check-contract.sh            # Loop 契約スキーマ linter
 │   ├── loop-guard.sh                # 実行時 BUDGET/STOP enforcement
@@ -245,7 +245,7 @@ resolution が制御していない（`tech-lead` を除くいずれの役割に
 bash gen-loop-replay.sh <run-id>
 ```
 
-（プラグインをロードしていれば `bin/` は `PATH` に載るので、`bash gen-loop-replay.sh` はそこから解決される — 実行ビットには依存しない。`bin/` 接頭辞も自前の `PATH` 設定も不要。）ページは `<runs>/replay-<run-id>.html` に生成される。ここでの `<runs>` は、このリポジトリで `bin/team-paths.sh --get runs` が解決するディレクトリで、すでに `git-ignore` 済みなので ignore ファイルに追記する必要はない。別の場所に書き出したいときは `--out <path>` を渡す。
+（`bash "<plugin root>/bin/gen-loop-replay.sh" <run-id>` として起動する——プラグインをロードしていても `PATH` に載るとは限らない。`<plugin root>` は自ホストの報告値から読む。詳細は `docs/adopting.md` の "Locate the installed plugin root" 手順を参照。）ページは `<runs>/replay-<run-id>.html` に生成される。ここでの `<runs>` は、このリポジトリで `bin/team-paths.sh --get runs` が解決するディレクトリで、すでに `git-ignore` 済みなので ignore ファイルに追記する必要はない。別の場所に書き出したいときは `--out <path>` を渡す。
 
 **注意**: board-flag のレールが点灯するのは、その run の `handoff` イベントが board flag を裸のトークンとして `--label` に載せている場合だけ（`READY_FOR_ARCH` … `READY_FOR_MERGE`）— この convention がどこで作られるかは `skills/run/SKILL.md` を参照。それらのラベルが無い run（依然として大多数のケース）では、代わりに empty-state のキャプションが表示される。
 
@@ -269,7 +269,7 @@ pin された `LC_ALL=C` collation の下で実行し、record がそのまま�
 bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
 ```
 
-（プラグインをロードしていれば `bin/` は `PATH` に載るので、`bash derive-populations.sh` はそこから解決される——実行ビットには依存しない。`bin/` 接頭辞は不要——`## run のリプレイ` が `gen-loop-replay.sh` に対して文書化している convention と同じ。）各 `--set name=command` 行はキャプチャされ、重複排除され、gap のない・重複のないメンバーシップ signature へ分割される。`--accept-status name=csv` は、既定の `0` に加えて 1 つの名前付き集合に対して追加で受理する exit status を宣言する（「`git grep` はマッチなしで exit `1`」のケース）。完全な文法は `bash derive-populations.sh --help` を参照。
+（`bash "<plugin root>/bin/derive-populations.sh"` として起動する——プラグインをロードしていても `PATH` に載るとは限らない。`<plugin root>` は自ホストの報告値から読む——`## run のリプレイ` が `gen-loop-replay.sh` に対して文書化している convention と同じ。）各 `--set name=command` 行はキャプチャされ、重複排除され、gap のない・重複のないメンバーシップ signature へ分割される。`--accept-status name=csv` は、既定の `0` に加えて 1 つの名前付き集合に対して追加で受理する exit status を宣言する（「`git grep` はマッチなしで exit `1`」のケース）。完全な文法は `bash derive-populations.sh --help` を参照。
 
 構造的な識別子——`--label`・`--set` の name・`--accept-status` の name——はすべて `^[A-Za-z0-9][A-Za-z0-9_-]*$` に一致しなければならない: 制御文字・`+`（emit される signature が集合名を連結するのに使うバイト）・空白のいずれも不可。`--set` のコマンドは `pipefail` の下で実行されるので、パイプライン途中の正当な非ゼロ exit（例えば `git grep pattern | sort` でマッチが無い場合）はまさに `--accept-status name=1` が宣言のために存在するケースにあたる。
 

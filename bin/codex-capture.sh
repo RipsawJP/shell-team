@@ -83,9 +83,12 @@
 # `--alloc`'s first stdout line and its own stdout+stderr to the second.
 #
 # Reviews dir resolution: `--reviews-dir` if given, else `team-paths.sh --get
-# reviews` — bare on PATH when the plugin is loaded, else the cwd-relative
-# `bin/team-paths.sh` (2026-06-17 lesson: self-resolve from the CALLER's cwd
-# — the adopted/target repo — never `cd` to this script's own repo root).
+# reviews`, tried bare on PATH first (`command -v team-paths.sh`), then
+# falling back to the cwd-relative `bin/team-paths.sh`, and dying with a
+# clear error if neither resolves — PATH is never assumed to carry it, and
+# there is no third, plugin-root-relative fallback in this resolver
+# (2026-06-17 lesson: self-resolve from the CALLER's cwd — the adopted/target
+# repo — never `cd` to this script's own repo root).
 #
 # Exit codes:
 #   0  success — `--alloc`: both raws allocated, their paths printed.
