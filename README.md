@@ -131,7 +131,7 @@ It also works standalone, one agent or skill at a time, when you want to be expl
 │   ├── review-response/SKILL.md     # /shell-team:review-response (triage received review feedback)
 │   ├── team-init/SKILL.md           # /shell-team:team-init (scaffold a repo)
 │   └── loop-triage/SKILL.md         # /shell-team:loop-triage (discover work)
-├── bin/                             # all on PATH while the plugin is enabled
+├── bin/                             # invoke as `bash "<plugin root>/bin/<script>"`
 │   ├── check-handoff.sh             # tasks/todo.md hand-off linter
 │   ├── check-contract.sh            # loop-contract schema linter
 │   ├── loop-guard.sh                # runtime BUDGET/STOP enforcement
@@ -237,7 +237,7 @@ Generate one:
 bash gen-loop-replay.sh <run-id>
 ```
 
-(with the plugin loaded, `bin/` is on `PATH`, so `bash gen-loop-replay.sh` resolves it there regardless of the executable bit — no `bin/` prefix and no `PATH` setup of your own needed.) The page lands at `<runs>/replay-<run-id>.html`, where `<runs>` is whatever `bin/team-paths.sh --get runs` resolves for this repo — it is already `git-ignore`d, so there is nothing to add to an ignore file. Pass `--out <path>` to write it somewhere else instead.
+(invoke it as `bash "<plugin root>/bin/gen-loop-replay.sh" <run-id>` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how.) The page lands at `<runs>/replay-<run-id>.html`, where `<runs>` is whatever `bin/team-paths.sh --get runs` resolves for this repo — it is already `git-ignore`d, so there is nothing to add to an ignore file. Pass `--out <path>` to write it somewhere else instead.
 
 **Caveat**: the board-flag rail only lights for a run whose `handoff` events carry the board flag on `--label` as a bare token (`READY_FOR_ARCH` … `READY_FOR_MERGE`) — see `skills/run/SKILL.md` for where that convention is produced. A run recorded without those labels — still the dominant case — shows the empty-state caption instead.
 
@@ -262,7 +262,7 @@ command that regenerates it.
 bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
 ```
 
-(with the plugin loaded, `bin/` is on `PATH`, so `bash derive-populations.sh` resolves it there regardless of the executable bit — no `bin/` prefix needed, the same convention `## Replaying a run` documents for `gen-loop-replay.sh`.) Each `--set name=command` line is captured, deduplicated and partitioned into a gap-free, overlap-free membership signature; `--accept-status name=csv` declares additional exit statuses accepted for one named set beyond the default of `0` (the "`git grep` exits `1` for no match" case). `bash derive-populations.sh --help` documents the full grammar.
+(invoke it as `bash "<plugin root>/bin/derive-populations.sh"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, the same convention `## Replaying a run` documents for `gen-loop-replay.sh`.) Each `--set name=command` line is captured, deduplicated and partitioned into a gap-free, overlap-free membership signature; `--accept-status name=csv` declares additional exit statuses accepted for one named set beyond the default of `0` (the "`git grep` exits `1` for no match" case). `bash derive-populations.sh --help` documents the full grammar.
 
 Every structural identifier — `--label`, a `--set` name, an `--accept-status` name — must match `^[A-Za-z0-9][A-Za-z0-9_-]*$`: no control character, no `+` (the byte the emitted signature joins set names with), no whitespace. A `--set` command runs under `pipefail`, so a legitimate mid-pipeline non-zero exit (e.g. `git grep pattern | sort` when nothing matches) is exactly the case `--accept-status name=1` exists to declare acceptable.
 

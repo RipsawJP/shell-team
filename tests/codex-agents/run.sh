@@ -657,6 +657,39 @@ else
   fail "T-1134 extra: check-codex-agents.sh --help exits 0"
 fi
 
+# =============================================================================
+# extra (T-1136, #494 item 2): a mid-write `mv` failure leaves no staging
+# residue in the out-dir (the cleanup trap's own coverage of pass 2, not
+# just pass 1's CONTENT_FILES scratch) — reproducing AC7's shim probe here
+# so a regression is caught by this suite without needing check-acs.sh.
+# =============================================================================
+printf '\n--- extra (T-1136): a mid-write mv failure leaves no staging residue ---\n'
+SHIMDIR="$T/mvshim"
+mkdir -p "$SHIMDIR"
+printf '#!/bin/sh\nexit 1\n' > "$SHIMDIR/mv"
+chmod +x "$SHIMDIR/mv"
+OUT16="$T/out16"
+mkdir -p "$OUT16"
+if PATH="$SHIMDIR:$PATH" bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT16" >/dev/null 2>&1; then
+  fail "T-1136 extra: a mid-write mv failure is refused (generator did not refuse under the mv shim)"
+elif [ "$(find "$OUT16" -name '.gen-codex-agents.*' | wc -l | tr -d ' ')" -eq 0 ] \
+  && [ "$(find "$OUT16" -name 'shell-team-*.toml' | wc -l | tr -d ' ')" -eq 0 ]; then
+  pass "T-1136 extra: a mid-write mv failure leaves no staging residue and no partial TOML"
+else
+  fail "T-1136 extra: a mid-write mv failure leaves no staging residue and no partial TOML (residue found)"
+fi
+# Positive control in the same run: the identical invocation with no shim
+# still succeeds and leaves only the expected *.toml entries — proving the
+# refusal above is narrower than "this script now always fails".
+OUT17="$T/out17"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT17" >/dev/null 2>&1 \
+  && [ "$(find "$OUT17" -name 'shell-team-*.toml' | wc -l | tr -d ' ')" -ge 1 ] \
+  && [ "$(find "$OUT17" -name '.gen-codex-agents.*' | wc -l | tr -d ' ')" -eq 0 ]; then
+  pass "T-1136 extra: the same invocation without the mv shim still succeeds cleanly"
+else
+  fail "T-1136 extra: the same invocation without the mv shim still succeeds cleanly"
+fi
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'codex-agents suite: all assertions passed\n'

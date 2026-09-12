@@ -83,8 +83,9 @@ set -euo pipefail
 
 # `check:` commands run from the caller's current working directory by default,
 # so an adopted/target repo is checked against ITSELF — not against the repo this
-# script happens to live in (it is on PATH when the plugin is loaded, so its own
-# location is the plugin repo, not the repo under test). `--root <dir>` overrides
+# script happens to live in (invoked as `bash "<plugin root>/bin/check-acs.sh"`,
+# never assumed to be on PATH even with the plugin loaded, so its own location
+# is the plugin repo, not the repo under test). `--root <dir>` overrides
 # the directory explicitly. Self-host CI invokes from the repo root, so the
 # default (cwd) equals the repo root there — unchanged behavior.
 DRY_RUN=0

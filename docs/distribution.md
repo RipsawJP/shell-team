@@ -26,7 +26,7 @@ claude plugin marketplace add RipsawJP/shell-team
 claude plugin install shell-team@ripsawjp --scope user
 ```
 
-The plugin's agents resolve as `/shell-team:<agent>`, skills as `/shell-team:<skill>` (e.g. `/shell-team:run`), and `bin/` scripts are added to `PATH` while the plugin is enabled.
+The plugin's agents resolve as `/shell-team:<agent>`, skills as `/shell-team:<skill>` (e.g. `/shell-team:run`), and `bin/` scripts are invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even while the plugin is enabled; read `<plugin root>` from what your host reports, see [adopting.md](adopting.md)'s "Locate the installed plugin root" step for how.
 
 ## Adopt in a target repo
 
