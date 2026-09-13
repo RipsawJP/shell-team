@@ -35,7 +35,34 @@
 #   - no two passes anywhere in the record naming the same raw-capture stem
 #     (the cross-round collision this task exists to close);
 #   - every verdict-heading section carrying at least one complete pass
-#     block, once the record carries any input-fidelity field at all.
+#     block, once the record carries any input-fidelity field at all;
+#   - a FIFTH, OPTIONAL per-pass field (T-1138, issue #508):
+#     self-detected-host — validate-if-present, never required, joining
+#     FIELD_RE as a fifth alternative and nothing else: the four-field
+#     presence test stays exactly as it was, so a pass declared only by
+#     this field still refuses field-missing, and a pass whose four fields
+#     sit under one heading while this field sits under another still
+#     refuses section-incomplete (the existing per-id/per-section machinery
+#     applies to it unchanged, D5). Grammar:
+#       self-detected-host (<pass>): claude-code | codex-cli — <ground>
+#     — at most once per pass id (else self-detected-host-duplicate); its
+#     first token inside the closed pair claude-code/codex-cli, followed by
+#     the literal ' — ' separator (byte-exact, D8 — the same separator
+#     bin/check-handoff.sh:87 and bin/check-count-claims.sh:7 already use)
+#     and a non-empty ground after it (else self-detected-host-vocabulary,
+#     a single token covering all three near-miss shapes: an outside-pair
+#     token, a missing separator, an empty ground — D6); and one cross-
+#     field refusal, self-detected-host-contradiction, when the pass
+#     declares codex-cli while that same pass's executor-invocation begins,
+#     after normalizing leading whitespace, with the two whitespace-
+#     delimited tokens codex then exec (D4 — anchored on the first two
+#     tokens, never a substring, so a claude -p invocation whose prompt
+#     text merely discusses "codex exec" is never refused). What this does
+#     NOT close: whether the declared classification is actually true — a
+#     role that forges claude-code while running as a spawned Codex agent
+#     is undetectable from committed bytes, because no record artifact
+#     carries host ground truth (see agents/codex-reviewer.md's own
+#     disclosure of this limit).
 #
 # It never judges the content of the verbatim executor-invocation field
 # beyond non-emptiness and single-line-ness (DP-6/DP-7; two records
@@ -232,7 +259,7 @@ section_of() {
 # (AC8's continuation-line case). A real scan failure is distinguished
 # from a clean "no fields found" the same way the heading scan above
 # is. ------------------------------------------------------------------
-FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
+FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture|self-detected-host)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
 grep -nE -- "$FIELD_RE" "$RECORD" > "$WORK/matches" 2>"$WORK/matches.err" && fgx=0 || fgx=$?
 [ "$fgx" -le 1 ] || die "record-unreadable: scanning $RECORD for input-fidelity fields failed"
 
@@ -317,6 +344,125 @@ while IFS= read -r id; do
       ;;
     *) fail "briefing-fidelity-vocabulary: pass id '$id' has a briefing-fidelity first token outside the closed set carried/not-carried/not-applicable" ;;
   esac
+
+  # --- self-detected-host (T-1138, issue #508): a FIFTH, OPTIONAL per-pass
+  # field. Validate-if-present only — a pass carrying none of it is
+  # conformant, so every check below is gated on the field actually
+  # appearing for this id. At most once per pass id; its first token
+  # inside the closed pair claude-code/codex-cli, followed by the literal
+  # ' — ' (em dash, space-delimited, D8) separator and a non-empty ground;
+  # and one cross-field refusal when a codex-cli declaration sits beside
+  # an executor-invocation that itself begins codex exec (D4). No refusal
+  # message below echoes a byte of either field's value — only the pass id
+  # and the refusal token are named, the same no-echo discipline every
+  # other refusal in this script already follows. -----------------------
+  sdh_n=$(awk -F'\t' -v id="$id" '$2=="self-detected-host" && $3==id' "$WORK/fields" | grep -c . || true)
+
+  if [ "$sdh_n" -gt 1 ]; then
+    fail "self-detected-host-duplicate: pass id '$id' carries more than one self-detected-host line"
+  fi
+
+  if [ "$sdh_n" -eq 1 ]; then
+    sdh_val=$(awk -F'\t' -v id="$id" '$2=="self-detected-host" && $3==id {print $4; exit}' "$WORK/fields")
+
+    # Normalize leading whitespace/tabs on the RAW value before splitting
+    # (Gotcha 1, round-2 rework): FIELD_RE consumes only one optional
+    # space after the colon, so a value can legitimately arrive with
+    # leading whitespace still attached, exactly the shape the ei_norm
+    # loop below already handles for executor-invocation. Mirrors that
+    # loop rather than a character class, per Gotcha 5.
+    while :; do
+      case "$sdh_val" in
+        ' '*|$'\t'*) sdh_val="${sdh_val#?}" ;;
+        *) break ;;
+      esac
+    done
+
+    # Split on the FIRST occurrence of the literal ' — ' separator, byte
+    # exact (never a character class, per Gotcha 5): %% removes the
+    # longest matching suffix, which is anchored at the first occurrence
+    # of the separator (a longer match starts earlier); # removes the
+    # shortest matching prefix, anchored at that same first occurrence —
+    # so token and ground agree on where the split falls even when the
+    # ground text itself later contains the separator's own bytes. Extra
+    # whitespace the author typed between the token and the separator
+    # (e.g. "claude-code  — ground") still locates the same first
+    # occurrence, because the separator's own leading space only
+    # consumes the one space immediately before the em dash — any
+    # further whitespace survives as a TRAILING remainder on the token,
+    # trimmed below.
+    case "$sdh_val" in
+      *' — '*)
+        sdh_token="${sdh_val%% — *}"
+        sdh_ground="${sdh_val#* — }"
+        ;;
+      *)
+        sdh_token="$sdh_val"
+        sdh_ground=""
+        ;;
+    esac
+
+    # Trim trailing whitespace/tabs from the token (the mirror % form of
+    # the leading-strip loop above), so whitespace typed between the
+    # token and the separator does not defeat the exact-match vocabulary
+    # comparison below.
+    while :; do
+      case "$sdh_token" in
+        *' '|*$'\t') sdh_token="${sdh_token%?}" ;;
+        *) break ;;
+      esac
+    done
+
+    case "$sdh_token" in
+      claude-code|codex-cli) : ;;
+      *) fail "self-detected-host-vocabulary: pass id '$id' has a self-detected-host value whose first token is outside the closed pair claude-code/codex-cli, or is missing the required ' — ' separator" ;;
+    esac
+
+    # Non-blank ground, not merely non-empty: [ -n ] tests byte length,
+    # so a separator followed only by whitespace ("codex-cli —    ")
+    # previously passed despite carrying no actual observation. Strip
+    # leading whitespace/tabs from a scratch copy and test THAT for
+    # emptiness — sdh_ground itself is left untouched, since a leading
+    # space in a real ground ("— ground text") is legitimate content
+    # (Input space, variant 3) and is never trimmed from the value the
+    # rest of the checker (or a future consumer) would read.
+    sdh_ground_blank_test="$sdh_ground"
+    while :; do
+      case "$sdh_ground_blank_test" in
+        ' '*|$'\t'*) sdh_ground_blank_test="${sdh_ground_blank_test#?}" ;;
+        *) break ;;
+      esac
+    done
+    [ -n "$sdh_ground_blank_test" ] || fail "self-detected-host-vocabulary: pass id '$id' has an empty ground after its self-detected-host separator"
+
+    if [ "$sdh_token" = "codex-cli" ]; then
+      # Cross-field contradiction (D4): normalize leading whitespace on
+      # the executor-invocation value (FIELD_RE consumes only one
+      # optional space after the colon, so a value can legitimately carry
+      # more), then compare its first two whitespace-delimited tokens —
+      # never a substring search, which would wrongly refuse a claude -p
+      # invocation whose prompt text merely discusses "codex exec".
+      ei_norm="$ei_val"
+      while :; do
+        case "$ei_norm" in
+          ' '*|$'\t'*) ei_norm="${ei_norm#?}" ;;
+          *) break ;;
+        esac
+      done
+      ei_tok1="${ei_norm%% *}"
+      ei_rest="${ei_norm#"$ei_tok1"}"
+      while :; do
+        case "$ei_rest" in
+          ' '*|$'\t'*) ei_rest="${ei_rest#?}" ;;
+          *) break ;;
+        esac
+      done
+      ei_tok2="${ei_rest%% *}"
+      if [ "$ei_tok1" = "codex" ] && [ "$ei_tok2" = "exec" ]; then
+        fail "self-detected-host-contradiction: pass id '$id' declares self-detected-host codex-cli while its executor-invocation begins with the two tokens codex exec"
+      fi
+    fi
+  fi
 
   case "$rc_val" in
     "$TASK_ID"-*) : ;;

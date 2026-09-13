@@ -624,6 +624,29 @@ that installed copy by chance — this is not a guaranteed mechanism, and it
 does not confirm the branch's own `<plugin root>/bin` was actually
 reached.
 
+**The self-detected-host observable (T-1138, issue #508).** After step 10,
+read what `codex-reviewer`'s own review record actually says, rather than
+assuming the host switch above worked: on a genuine Codex CLI host the
+review pass runs as a single `claude -p` invocation, its telemetry span is
+logged with `--provider claude` (a `claude`-provider span, never a
+`codex`-provider one), and the record's own `self-detected-host` field reads
+`codex-cli`. A `codex exec` invocation recorded there — with or without a
+`self-detected-host` line beside it — means the cross-provider property this
+whole mechanism exists for was silently lost, even when the printed verdict
+is `APPROVE`: reviewing Codex's own output through Codex again is exactly the
+same-family blind spot this role exists to avoid. One shape is disclosed
+rather than checked: whether a spawned Codex custom agent
+(`shell-team-codex-reviewer`, the agent step 10 dispatches via
+`spawn_agent`) sets `CODEX_THREAD_ID` — the one observation the role's own
+ladder reads — is **unmeasured** from this repository's own checkout, since
+that shape cannot be reproduced from a Claude Code session; read the spawned
+agent's own recorded `self-detected-host` ground on your own run to close
+that gap yourself. (Relayed, not a measurement this repository made: one
+adopter run reported a roughly 45-minute nested `codex exec` stall
+preceding a wrong self-classification on this exact seam — background only,
+named here as the symptom that motivated this field, and nothing above
+depends on it.)
+
 ## Conversational usage (no slash commands)
 
 You can also just describe what you want in plain language and let the main Claude
@@ -1152,15 +1175,39 @@ can be edited by any role at any point in a task's life.
 ## Recording review-input fidelity
 
 Each executor pass a review record's verdict section names states four
-things under one opaque pass id, and `bin/check-review-input.sh` (T-1104,
-issue #335) validates the grammar fail-closed: the pass's
-**executor-invocation** — the verbatim argv rendered on a single line —
-its **pass-role** from the closed set `generation` / `confirmation`, a
-**briefing-fidelity** statement whose first token is `carried` /
-`not-carried` / `not-applicable` followed by a non-empty explanation, and
-the **raw-capture** stem that pass published. A record carrying zero such
-fields — every record already committed today — exits 0: the requirement
-is forward-only.
+required things under one opaque pass id, plus one optional fifth, and
+`bin/check-review-input.sh` (T-1104, issue #335) validates the grammar
+fail-closed: the pass's **executor-invocation** — the verbatim argv
+rendered on a single line — its **pass-role** from the closed set
+`generation` / `confirmation`, a **briefing-fidelity** statement whose
+first token is `carried` / `not-carried` / `not-applicable` followed by a
+non-empty explanation, and the **raw-capture** stem that pass published. A
+record carrying zero such fields — every record already committed today —
+exits 0: the requirement is forward-only.
+
+**The fifth, optional field: `self-detected-host` (T-1138, issue #508).**
+A pass may additionally carry
+`self-detected-host (<pass>): claude-code | codex-cli — <ground>` — never
+required, and a conformant four-field pass with no such line stays
+conformant forever. Its first token is closed to the pair `claude-code` /
+`codex-cli` (the review role's own decision about which host it believed
+it was running on — see `agents/codex-reviewer.md`'s ladder); its ground,
+after the literal ` — ` separator, names the observation that decision
+turned on (a variable's name and whether it was set), never that
+variable's value. Three refusals, each naming a pass id and never echoing
+a field's bytes: `self-detected-host-vocabulary` (a first token outside
+the closed pair, a missing separator, or an empty ground),
+`self-detected-host-duplicate` (more than one such line for one pass id),
+and `self-detected-host-contradiction` (a pass declaring `codex-cli` whose
+own `executor-invocation` begins, first two whitespace-delimited tokens,
+with `codex exec` — anchored on those two tokens, never a substring, so a
+`claude -p` invocation whose prompt text merely discusses `codex exec` is
+never refused). **What this does not close**: whether the declared
+classification is actually true. A role that declares `claude-code` while
+actually running as a spawned Codex custom agent is undetectable from this
+record — no field here carries host ground truth, and the same role writes
+every one of them; the one direction committed bytes actually settle is
+the contradiction above, and nothing else.
 
 **What the verbatim field must never carry.** The `executor-invocation`
 value is real argv, and it lands in permanently tracked git history. It

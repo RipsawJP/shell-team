@@ -628,6 +628,31 @@ bootstrap はそれ自体を提供しない。手順 9 を省略すると、役�
 ではなく、このブランチ自身の `<plugin root>/bin` に実際に到達できたことを
 裏付けるものでもない。
 
+**self-detected-host という観測可能な事実（T-1138、issue #508）。** 手順 10
+の後、上の host 切り替えが実際に機能したと仮定するのではなく、
+`codex-reviewer` 自身のレビュー記録が実際に何と書いているかを読むこと:
+本物の Codex CLI host では、レビュー pass は単一の `claude -p` invocation
+として走り、その telemetry span は `--provider claude`（`claude` provider
+の span であり `codex` provider の span では決してない）で記録され、記録
+自身の `self-detected-host` フィールドは `codex-cli` と読める。そこに
+`codex exec` の invocation が記録されている——`self-detected-host` 行の
+有無に関わらず——ということは、このメカニズム全体が存在する理由である
+cross-provider の性質が、たとえ表示された verdict が `APPROVE` であっても
+静かに失われたということである: Codex 自身の出力を Codex で再びレビュー
+することは、この役割がまさに避けるために存在する同一系統の盲点そのもの
+である。1 つの形だけは、チェックされるのではなく開示されている: spawn
+された Codex custom agent（手順 10 が `spawn_agent` で dispatch する
+`shell-team-codex-reviewer` の形）が `CODEX_THREAD_ID` を設定するか——
+この役割自身の ladder が読む唯一の観測——は、この repository 自身の
+checkout からは**未計測**である。その形は Claude Code セッションから
+再現できないため——このギャップを自分で閉じるには、自分自身の実行で
+spawn された agent 自身が記録した `self-detected-host` の ground を読む
+こと。（relayed であり、この repository が測定したものではない: ある
+adopter の実行では、まさにこの継ぎ目でおよそ 45 分間のネストされた
+`codex exec` stall が誤った自己分類に先行して起きたと報告されている——
+背景情報に過ぎず、この field を動機付けた症状として記しているだけで、
+上記のいずれもこれに依存していない。）
+
 ## 会話駆動での使い方（スラッシュコマンド無し）
 
 やりたいことを普通の言葉で伝えて、メインの Claude セッションにチームへ委譲させる
@@ -1108,15 +1133,41 @@ exit status も変えない）。
 ## review-input fidelity を記録する
 
 review record の verdict section が名指す各 executor pass は、1 つの
-opaque な pass id の下に 4 つの情報を持ち、`bin/check-review-input.sh`
-（T-1104・issue #335）がその grammar を fail-closed に検証する。4 つと
-は、pass の **executor-invocation**（1 行に rendered された verbatim な
-argv）、closed set `generation` / `confirmation` から選ぶ **pass-role**、
+opaque な pass id の下に 4 つの必須情報、プラス任意の 5 つ目を持ち、
+`bin/check-review-input.sh`（T-1104・issue #335）がその grammar を
+fail-closed に検証する。必須の 4 つとは、pass の
+**executor-invocation**（1 行に rendered された verbatim な argv）、
+closed set `generation` / `confirmation` から選ぶ **pass-role**、
 先頭 token が `carried` / `not-carried` / `not-applicable` のいずれかで
 後に非空の説明が続く **briefing-fidelity**、そしてその pass が publish
 した **raw-capture** stem である。これらの field を 1 つも持たない
 record——今日すでに commit されている全 record がこれに当たる——は exit 0
 になる。この要件は forward-only である。
+
+**5 つ目の任意 field: `self-detected-host`（T-1138、issue #508）。** pass
+は追加で
+`self-detected-host (<pass>): claude-code | codex-cli — <ground>` を
+持つことができる——決して必須ではなく、この行を持たない conformant な
+4 field の pass は今後も永久に conformant である。先頭 token は closed
+pair `claude-code` / `codex-cli` に限られる（review 役割自身がどちらの
+host で走っていると判断したかという決定そのもの——`agents/codex-reviewer.md`
+自身の ladder を参照）。その ground は、リテラルな ` — ` 区切り記号の後に、
+その決定が何の observation に基づいたか——どの変数か、そしてそれが
+set されていたかどうか——を記す。その変数の値そのものは決して記さない。
+refusal は 3 種類で、いずれも pass id を名指すのみで field の byte を
+決して echo しない: `self-detected-host-vocabulary`（先頭 token が
+closed pair の外、区切り記号が無い、あるいは ground が空)、
+`self-detected-host-duplicate`（1 つの pass id に対しこの行が複数)、
+`self-detected-host-contradiction`（`codex-cli` を宣言した pass 自身の
+`executor-invocation` が、空白区切りの先頭 2 token として `codex exec`
+で始まる場合——その 2 token に anchored であって決して部分文字列一致では
+ない。したがって、prompt の本文中でたまたま `codex exec` に言及している
+だけの `claude -p` invocation は決して refuse されない)。**これが閉じない
+もの**: 宣言された分類が実際に真かどうか。`claude-code` と宣言しつつ実際には
+spawn された Codex custom agent として走っている役割は、この record からは
+検出不能である——ここにあるどの field も host の ground truth を持たず、
+すべての field を同じ役割自身が書いているため。committed byte が実際に
+確定できる方向は上記の contradiction 1 つだけであり、それ以外にはない。
 
 **verbatim field が決して持ってはならないもの。** `executor-invocation`
 の値は実際の argv であり、永続的に tracked な git history に残る。
