@@ -396,10 +396,17 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
 
    (subcommand names read from `codex plugin --help` on `codex-cli 0.154.0`
    — the same two-step shape as this project's Claude Code
-   `/plugin marketplace add` / `/plugin install` slash commands). Skip this
-   step if the plugin already shows `installed, enabled`. That status alone
-   does not mean the install is current — see step 2 for the one further
-   check and the remedy if it is not.
+   `/plugin marketplace add` / `/plugin install` slash commands). If
+   `codex plugin list` already reports `shell-team` as `installed, enabled`,
+   do not skip yet: run `codex plugin marketplace upgrade <marketplace>`
+   and compare `codex plugin list`'s `VERSION` column against the release
+   you intend to run — step 2's own staleness test only checks whether
+   `bin/gen-codex-agents.sh` and its full role list are present, and a
+   one-release-behind install already has both, so nothing in that
+   presence test can see a version gap. If that comparison shows an
+   older release than the one you intend to run, the install is stale:
+   take step 2's remedy. If it matches, skip the install commands
+   above; if the plugin was not yet installed at all, run them instead.
 2. **Locate the installed plugin root — read the value your own host
    reports, never assume a fixed layout.** Do not rely on `bin/` being on
    `PATH` — measured false for an installed plugin, on either host: a
@@ -558,7 +565,22 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
     phase list reads, including the `claude -p` recipe `codex-reviewer`
     runs instead of a second Codex pass. Its `APPROVE` reaches
     `READY_FOR_MERGE` — both gates green — without either host ever
-    leaving the Codex CLI session.
+    leaving the Codex CLI session. When `pm-spec` writes the spec file, it
+    names it `<specs dir>/<task-id>-<slug>.md` — a rule, not a precedent:
+    `bin/check-durability.sh`'s `specs` registry row depends on the
+    task-id prefix to resolve a task's own spec unambiguously, and a spec
+    named without it reads as `missing-working-file`. Once `APPROVE`
+    reaches `READY_FOR_MERGE`, the session stops there — the shipped
+    loop's one behaviour, and the only one this runbook describes: both
+    `merge` and `push` are human gates under the shipped default loop
+    contract (`human_gate: [merge, push]` in
+    `<base>/loops/shell-team.contract.yaml`, the file `team-init`
+    scaffolds from `templates/shell-team.contract.yaml` — where both
+    gates are declared), and the run skill's own `push-go` liveness gate
+    hands the push to the human independently of that list. **The
+    human** pushes the branch and opens the pull request against the
+    base the spec names, and the merge — and the merge GO — stay the
+    human's.
 11. **Re-run step 3's command** after editing a role file, after a plugin
     upgrade, or after changing your own `binding.conf` or `TEAM_RUN_BASE`:
     the generated TOML also depends on the resolved binding row (which
@@ -623,6 +645,37 @@ plugin is already installed, a spawned role may resolve `bin/*.sh` through
 that installed copy by chance — this is not a guaranteed mechanism, and it
 does not confirm the branch's own `<plugin root>/bin` was actually
 reached.
+
+**The self-detected-host observable (T-1138, issue #508).** After step 10,
+read what `codex-reviewer`'s own review record actually says, rather than
+assuming the host switch above worked: on a genuine Codex CLI host the
+review pass runs as a single `claude -p` invocation, its telemetry span is
+logged with `--provider claude` (a `claude`-provider span, never a
+`codex`-provider one), and the record's own `self-detected-host` field reads
+`codex-cli`. A `codex exec` invocation recorded there — with or without a
+`self-detected-host` line beside it — means the cross-provider property this
+whole mechanism exists for was silently lost, even when the printed verdict
+is `APPROVE`: reviewing Codex's own output through Codex again is exactly the
+same-family blind spot this role exists to avoid. One shape is disclosed
+rather than checked: whether a spawned Codex custom agent
+(`shell-team-codex-reviewer`, the agent step 10 dispatches via
+`spawn_agent`) sets `CODEX_THREAD_ID` — the one observation the role's own
+ladder reads — is **unmeasured** from this repository's own checkout, since
+that shape cannot be reproduced from a Claude Code session; read the spawned
+agent's own recorded `self-detected-host` ground on your own run to close
+that gap yourself. (Relayed, not a measurement this repository made: one
+adopter run reported a roughly 45-minute nested `codex exec` stall
+preceding a wrong self-classification on this exact seam — background only,
+named here as the symptom that motivated this field, and nothing above
+depends on it.)
+
+**A standing grant lets a mechanics-only re-freeze skip the per-instance
+human GO.** See `docs/tuning-oversight.md`'s `## Who may re-freeze a
+frozen intent block` for what a `class-M` repair covers and how
+`bin/check-refreeze-class.sh` draws the mechanical boundary; if you want
+one, record your own grant in your own checkout's `CLAUDE.local.md` —
+this project ships no transcription of it and invents none on your
+behalf.
 
 ## Conversational usage (no slash commands)
 
@@ -1152,15 +1205,39 @@ can be edited by any role at any point in a task's life.
 ## Recording review-input fidelity
 
 Each executor pass a review record's verdict section names states four
-things under one opaque pass id, and `bin/check-review-input.sh` (T-1104,
-issue #335) validates the grammar fail-closed: the pass's
-**executor-invocation** — the verbatim argv rendered on a single line —
-its **pass-role** from the closed set `generation` / `confirmation`, a
-**briefing-fidelity** statement whose first token is `carried` /
-`not-carried` / `not-applicable` followed by a non-empty explanation, and
-the **raw-capture** stem that pass published. A record carrying zero such
-fields — every record already committed today — exits 0: the requirement
-is forward-only.
+required things under one opaque pass id, plus one optional fifth, and
+`bin/check-review-input.sh` (T-1104, issue #335) validates the grammar
+fail-closed: the pass's **executor-invocation** — the verbatim argv
+rendered on a single line — its **pass-role** from the closed set
+`generation` / `confirmation`, a **briefing-fidelity** statement whose
+first token is `carried` / `not-carried` / `not-applicable` followed by a
+non-empty explanation, and the **raw-capture** stem that pass published. A
+record carrying zero such fields — every record already committed today —
+exits 0: the requirement is forward-only.
+
+**The fifth, optional field: `self-detected-host` (T-1138, issue #508).**
+A pass may additionally carry
+`self-detected-host (<pass>): claude-code | codex-cli — <ground>` — never
+required, and a conformant four-field pass with no such line stays
+conformant forever. Its first token is closed to the pair `claude-code` /
+`codex-cli` (the review role's own decision about which host it believed
+it was running on — see `agents/codex-reviewer.md`'s ladder); its ground,
+after the literal ` — ` separator, names the observation that decision
+turned on (a variable's name and whether it was set), never that
+variable's value. Three refusals, each naming a pass id and never echoing
+a field's bytes: `self-detected-host-vocabulary` (a first token outside
+the closed pair, a missing separator, or an empty ground),
+`self-detected-host-duplicate` (more than one such line for one pass id),
+and `self-detected-host-contradiction` (a pass declaring `codex-cli` whose
+own `executor-invocation` begins, first two whitespace-delimited tokens,
+with `codex exec` — anchored on those two tokens, never a substring, so a
+`claude -p` invocation whose prompt text merely discusses `codex exec` is
+never refused). **What this does not close**: whether the declared
+classification is actually true. A role that declares `claude-code` while
+actually running as a spawned Codex custom agent is undetectable from this
+record — no field here carries host ground truth, and the same role writes
+every one of them; the one direction committed bytes actually settle is
+the contradiction above, and nothing else.
 
 **What the verbatim field must never carry.** The `executor-invocation`
 value is real argv, and it lands in permanently tracked git history. It

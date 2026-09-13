@@ -287,4 +287,140 @@ if printf '%s' "$out2" | grep -Fq -- "$MARKER"; then
 fi
 pass "no-echo case 2: marker never echoed (collision path, marker in the raw-capture field)"
 
+# ============================================================================
+# self-detected-host — the optional fifth per-pass field (T-1138, issue #508)
+# ============================================================================
+
+# Legacy record: a conformant four-field pass with no self-detected-host
+# line at all still exits 0 — the field is validate-if-present, never
+# required, and every already-committed record today is in this class.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; } > "$T/sdh-legacy.md"
+assert_case "self-detected-host: a legacy four-field record with no fifth field exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-legacy.md" --task T-000
+
+# Per-pass optional: one pass carries the field, a sibling pass does not.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; \
+  printf '  - self-detected-host (p1): claude-code — CODEX_THREAD_ID was not set in this shell\n'; \
+  printf '  - executor-invocation (p2): codex exec review --base develop\n  - pass-role (p2): confirmation\n  - briefing-fidelity (p2): carried - x\n  - raw-capture (p2): T-000-codex-adversarial\n'; } > "$T/sdh-mixed.md"
+assert_case "self-detected-host: per-pass optional (one pass carries it, a sibling does not) exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-mixed.md" --task T-000
+
+# Accepting arm (a): codex-cli beside a claude -p invocation whose LATER
+# text merely contains the literal string "codex exec" — a substring rule
+# would wrongly refuse this; the token-anchored rule must not.
+{ hdr; printf -- '  - executor-invocation (p1): claude -p --output-format stream-json --prompt-file p.txt describing what codex exec would have read\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-accept-a.md"
+assert_case "self-detected-host: codex-cli beside a claude -p invocation whose prompt text mentions codex exec exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-accept-a.md" --task T-000
+
+# Accepting arm (b): claude-code beside an invocation beginning codex exec
+# — the shipped Claude-host behaviour, and not a contradiction (the b run
+# #4 direction this mechanism deliberately cannot catch).
+{ hdr; printf -- '  - executor-invocation (p1): codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): claude-code — CODEX_THREAD_ID was not set in this shell\n'; } > "$T/sdh-accept-b.md"
+assert_case "self-detected-host: claude-code beside a codex-exec invocation exits 0 (shipped Claude-host shape, not a contradiction)" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-accept-b.md" --task T-000
+
+# Accepting arm (c): codex-cli beside an invocation whose first token is
+# codexify — whole-token comparison, never a prefix match.
+{ hdr; printf -- '  - executor-invocation (p1): codexify exec --sandbox read-only --cd .\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-accept-c.md"
+assert_case "self-detected-host: codex-cli beside a codexify-first-token invocation exits 0 (whole-token match, never a prefix)" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-accept-c.md" --task T-000
+
+# Refusal: self-detected-host-vocabulary — three shapes, one token.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): claude-cli — ground stated here\n'; } > "$T/sdh-vocab-a.md"
+assert_case "self-detected-host-vocabulary: near-miss first token 'claude-cli'" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-vocab-a.md" --task T-000
+
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): codex-cli\n'; } > "$T/sdh-vocab-b.md"
+assert_case "self-detected-host-vocabulary: missing separator entirely" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-vocab-b.md" --task T-000
+
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): codex-cli — \n'; } > "$T/sdh-vocab-c.md"
+assert_case "self-detected-host-vocabulary: separator present with an empty ground" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-vocab-c.md" --task T-000
+
+# Refusal: self-detected-host-duplicate — two lines under one pass id.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): codex-cli — ground one\n  - self-detected-host (p1): claude-code — ground two\n'; } > "$T/sdh-dup.md"
+assert_case "self-detected-host-duplicate: two lines under one pass id" 1 self-detected-host-duplicate -- \
+  bash "$SCRIPT" --record "$T/sdh-dup.md" --task T-000
+
+# Refusal: self-detected-host-contradiction — codex-cli declared beside an
+# executor-invocation beginning codex exec, with and without leading
+# whitespace before the first token (D4's normalization requirement).
+{ hdr; printf -- '  - executor-invocation (p1): codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-contra-a.md"
+assert_case "self-detected-host-contradiction: codex-cli beside a codex-exec invocation" 1 self-detected-host-contradiction -- \
+  bash "$SCRIPT" --record "$T/sdh-contra-a.md" --task T-000
+
+{ hdr; printf -- '  - executor-invocation (p1):    codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-contra-b.md"
+assert_case "self-detected-host-contradiction: same, with leading whitespace before the invocation's first token" 1 self-detected-host-contradiction -- \
+  bash "$SCRIPT" --record "$T/sdh-contra-b.md" --task T-000
+
+# ============================================================================
+# self-detected-host — round-2 rework (review REQUEST_CHANGES, Blocker: the
+# value's own leading whitespace was never normalized before the vocabulary
+# comparison). Seven variants, each the whitespace shape named in the
+# rework briefing, in the briefing's own order.
+# ============================================================================
+
+# Variant 1 (Blocker, live-reproduced by the reviewer): leading whitespace
+# BEFORE the token, surviving because FIELD_RE consumes only one optional
+# space after the colon. Two spaces after the colon here — one consumed by
+# FIELD_RE, one landing at the front of the captured value. Must be
+# ACCEPTED (this is the false-refusal direction the Pre-commitment prices
+# above silence).
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1):  claude-code — CODEX_THREAD_ID was not set in this shell\n'; } > "$T/sdh-ws-1-leading-before-token.md"
+assert_case "self-detected-host whitespace variant 1: leading whitespace before the token (two spaces after the colon) exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-1-leading-before-token.md" --task T-000
+
+# Variant 2: trailing whitespace AFTER the token, BEFORE the separator —
+# "claude-code   — ground" (three extra spaces before the em dash). The
+# grammar is "first token inside the closed pair, then ' — '"; extra
+# whitespace between them must not defeat the exact-match comparison.
+# Must be ACCEPTED.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): claude-code   — ground stated here\n'; } > "$T/sdh-ws-2-trailing-before-sep.md"
+assert_case "self-detected-host whitespace variant 2: trailing whitespace between the token and the separator exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-2-trailing-before-sep.md" --task T-000
+
+# Variant 3: leading whitespace IN THE GROUND — "claude-code —   ground
+# text" (three spaces after the separator, before the ground text). The
+# ground itself is non-blank, so this must be ACCEPTED; the ground's own
+# leading whitespace is legitimate content and is never trimmed from the
+# value.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): claude-code —   ground text with leading spaces\n'; } > "$T/sdh-ws-3-leading-in-ground.md"
+assert_case "self-detected-host whitespace variant 3: leading whitespace in a non-blank ground exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-3-leading-in-ground.md" --task T-000
+
+# Variant 4 (Minor): a whitespace-ONLY ground — "claude-code —    " (the
+# separator followed only by spaces, no ground text at all). [ -n ] tests
+# byte length, not content; must REFUSE self-detected-host-vocabulary
+# because there is no non-whitespace byte after the separator.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): claude-code —    \n'; } > "$T/sdh-ws-4-whitespace-only-ground.md"
+assert_case "self-detected-host whitespace variant 4: a whitespace-only ground refuses self-detected-host-vocabulary" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-4-whitespace-only-ground.md" --task T-000
+
+# Variant 5: trailing whitespace AFTER a non-blank ground — "claude-code —
+# ground text   " (trailing spaces at end of line). Must be ACCEPTED; the
+# ground carries real content regardless of trailing whitespace.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): claude-code — ground text   \n'; } > "$T/sdh-ws-5-trailing-after-ground.md"
+assert_case "self-detected-host whitespace variant 5: trailing whitespace after a non-blank ground exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-5-trailing-after-ground.md" --task T-000
+
+# Variant 6: leading whitespace before the token on a codex-cli
+# declaration, beside an executor-invocation beginning codex exec — the
+# normalization must not let the contradiction rule miss its token. Must
+# still REFUSE self-detected-host-contradiction (leading whitespace on the
+# self-detected-host side, as opposed to sdh-contra-b's leading whitespace
+# on the executor-invocation side above).
+{ hdr; printf -- '  - executor-invocation (p1): codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1):  codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-ws-6-leading-before-token-contradiction.md"
+assert_case "self-detected-host whitespace variant 6: leading whitespace before a codex-cli token still refuses self-detected-host-contradiction" 1 self-detected-host-contradiction -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-6-leading-before-token-contradiction.md" --task T-000
+
+# Variant 7 (ordering lock): a literal TAB embedded in the self-detected-host
+# value must refuse field-grammar — the generic embedded-TAB shape rule
+# (bin/check-review-input.sh:~289-294) fires before any self-detected-host-
+# specific check runs, exactly as it already does for the other four
+# fields (the "a literal tab in a field value" case above).
+printf '## Codex review\n\n### Codex Review verdict: APPROVE\n- Task: T-000\n  - executor-invocation (p1): codex exec review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - x\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — ground\twith an embedded tab byte\n' > "$T/sdh-ws-7-embedded-tab.md"
+assert_case "self-detected-host whitespace variant 7: an embedded tab in the value refuses field-grammar before any self-detected-host-specific check runs" 1 field-grammar -- \
+  bash "$SCRIPT" --record "$T/sdh-ws-7-embedded-tab.md" --task T-000
+
 printf '\nAll check-review-input assertions passed.\n'
