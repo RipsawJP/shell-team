@@ -403,10 +403,10 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    you intend to run — step 2's own staleness test only checks whether
    `bin/gen-codex-agents.sh` and its full role list are present, and a
    one-release-behind install already has both, so nothing in that
-   presence test can see a version gap. Only once that comparison is
-   done, skip the install commands above; if the plugin was not yet
-   installed at all, run them, then see step 2 for the one further check
-   and the remedy if the version is still stale.
+   presence test can see a version gap. If that comparison shows an
+   older release than the one you intend to run, the install is stale:
+   take step 2's remedy. If it matches, skip the install commands
+   above; if the plugin was not yet installed at all, run them instead.
 2. **Locate the installed plugin root — read the value your own host
    reports, never assume a fixed layout.** Do not rely on `bin/` being on
    `PATH` — measured false for an installed plugin, on either host: a
@@ -570,15 +570,17 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
     `bin/check-durability.sh`'s `specs` registry row depends on the
     task-id prefix to resolve a task's own spec unambiguously, and a spec
     named without it reads as `missing-working-file`. Once `APPROVE`
-    reaches `READY_FOR_MERGE`, what happens next depends on the loop
-    contract's own `human_gate` list (`<base>/loops/shell-team.contract.yaml`,
-    the file `team-init` scaffolds from `templates/shell-team.contract.yaml`).
-    Under the shipped default, both `merge` and `push` are human gates, so
-    the session stops there: **the human** pushes the branch and opens the
-    pull request against the base the spec names. A contract whose
-    `human_gate` list omits `push` lets the session push the branch and
-    open the pull request itself. Either way, the merge — and the merge
-    GO — stay the human's.
+    reaches `READY_FOR_MERGE`, the session stops there — the shipped
+    loop's one behaviour, and the only one this runbook describes: both
+    `merge` and `push` are human gates under the shipped default loop
+    contract (`human_gate: [merge, push]` in
+    `<base>/loops/shell-team.contract.yaml`, the file `team-init`
+    scaffolds from `templates/shell-team.contract.yaml` — where both
+    gates are declared), and the run skill's own `push-go` liveness gate
+    hands the push to the human independently of that list. **The
+    human** pushes the branch and opens the pull request against the
+    base the spec names, and the merge — and the merge GO — stay the
+    human's.
 11. **Re-run step 3's command** after editing a role file, after a plugin
     upgrade, or after changing your own `binding.conf` or `TEAM_RUN_BASE`:
     the generated TOML also depends on the resolved binding row (which

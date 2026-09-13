@@ -398,11 +398,12 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
    `VERSION` 列を自分が実行したいリリースと比較すること——手順 2 自身の
    staleness テストは `bin/gen-codex-agents.sh` の存在とその役割リストを
    見る **presence** テストに過ぎず、ファイルも役割リストも既に揃っている
-   1 リリース遅れのインストールをこれだけでは見分けられない。この比較を
-   済ませて初めて、以下のインストールコマンドを飛ばしてよい——単に
-   一覧に現れているだけでは不十分: 同じ列は他の plugin に対して
-   `not installed` も出力するし、無効化された状態は「一覧に現れている」
-   という緩い読み方だと見逃す:
+   1 リリース遅れのインストールをこれだけでは見分けられない。比較の
+   結果、実行したいリリースより古い `VERSION` であれば、そのインストール
+   は古い——手順 2 の対処を行うこと。一致していれば、以下のインストール
+   コマンドを飛ばしてよい——単に一覧に現れているだけでは不十分: 同じ列は
+   他の plugin に対して `not installed` も出力するし、無効化された状態は
+   「一覧に現れている」という緩い読み方だと見逃す:
 
    ```
    codex plugin marketplace add RipsawJP/shell-team
@@ -411,8 +412,8 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
 
    （サブコマンド名は `codex-cli 0.154.0` の `codex plugin --help` から
    確認したもの——この repository の Claude Code 向け `/plugin marketplace
-   add` / `/plugin install` スラッシュコマンドと同じ 2 段階の形）。
-   確認方法と対処は手順 2 を見ること。
+   add` / `/plugin install` スラッシュコマンドと同じ 2 段階の形）。まだ
+   インストールされていなければ、上記のコマンドを実行すること。
 2. **インストール済み plugin の root を特定する——自分の host が報告した
    値をそのまま読み、固定のパターンを仮定しない。** `bin/` が `PATH` に
    載っているという前提は使わない——インストール済み plugin では
@@ -576,15 +577,15 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
     `bin/check-durability.sh` の `specs` レジストリ行は task-id
     プレフィックスを頼りにタスクのスペックを一意に解決しており、それを
     欠くスペックは `missing-working-file` と読まれる。`APPROVE` が
-    `READY_FOR_MERGE`——両ゲート green——に届いた後に何が起こるかは、
-    loop contract 自身の `human_gate` リスト
-    （`<base>/loops/shell-team.contract.yaml`。`team-init` が
-    `templates/shell-team.contract.yaml` から生成するファイル）次第
-    である。出荷時の既定では `merge` と `push` の両方が human gate
-    なので、セッションはそこで止まる: **人間**がブランチを push し、
-    スペックが指定する base に対してプルリクエストを開く。
-    `human_gate` リストから `push` を外した contract では、セッション
-    自身がブランチを push してプルリクエストを開く。いずれの場合も、
+    `READY_FOR_MERGE`——両ゲート green——に届いた後、セッションはそこで
+    止まる——これがこの runbook が記述する、出荷済みループの唯一の
+    挙動である: 出荷時の既定 loop contract の下では `merge` と `push`
+    の両方が human gate であり（`<base>/loops/shell-team.contract.yaml`
+    の `human_gate: [merge, push]`。`team-init` が
+    `templates/shell-team.contract.yaml` から生成するファイルで、両方の
+    gate はそこで宣言されている）、run skill 自身の `push-go` liveness
+    gate がそのリストとは独立に push を人間へ渡す。**人間**がブランチを
+    push し、スペックが指定する base に対してプルリクエストを開き、
     マージ——そしてマージの GO——は人間のものであり続ける。
 11. **役割ファイルを編集した後、プラグインをアップグレードした後、または
     自分自身の `binding.conf` や `TEAM_RUN_BASE` を変更した後は、手順 3 と
