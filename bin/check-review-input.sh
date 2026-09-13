@@ -365,13 +365,32 @@ while IFS= read -r id; do
   if [ "$sdh_n" -eq 1 ]; then
     sdh_val=$(awk -F'\t' -v id="$id" '$2=="self-detected-host" && $3==id {print $4; exit}' "$WORK/fields")
 
+    # Normalize leading whitespace/tabs on the RAW value before splitting
+    # (Gotcha 1, round-2 rework): FIELD_RE consumes only one optional
+    # space after the colon, so a value can legitimately arrive with
+    # leading whitespace still attached, exactly the shape the ei_norm
+    # loop below already handles for executor-invocation. Mirrors that
+    # loop rather than a character class, per Gotcha 5.
+    while :; do
+      case "$sdh_val" in
+        ' '*|$'\t'*) sdh_val="${sdh_val#?}" ;;
+        *) break ;;
+      esac
+    done
+
     # Split on the FIRST occurrence of the literal ' — ' separator, byte
     # exact (never a character class, per Gotcha 5): %% removes the
     # longest matching suffix, which is anchored at the first occurrence
     # of the separator (a longer match starts earlier); # removes the
     # shortest matching prefix, anchored at that same first occurrence —
     # so token and ground agree on where the split falls even when the
-    # ground text itself later contains the separator's own bytes.
+    # ground text itself later contains the separator's own bytes. Extra
+    # whitespace the author typed between the token and the separator
+    # (e.g. "claude-code  — ground") still locates the same first
+    # occurrence, because the separator's own leading space only
+    # consumes the one space immediately before the em dash — any
+    # further whitespace survives as a TRAILING remainder on the token,
+    # trimmed below.
     case "$sdh_val" in
       *' — '*)
         sdh_token="${sdh_val%% — *}"
@@ -383,11 +402,38 @@ while IFS= read -r id; do
         ;;
     esac
 
+    # Trim trailing whitespace/tabs from the token (the mirror % form of
+    # the leading-strip loop above), so whitespace typed between the
+    # token and the separator does not defeat the exact-match vocabulary
+    # comparison below.
+    while :; do
+      case "$sdh_token" in
+        *' '|*$'\t') sdh_token="${sdh_token%?}" ;;
+        *) break ;;
+      esac
+    done
+
     case "$sdh_token" in
       claude-code|codex-cli) : ;;
       *) fail "self-detected-host-vocabulary: pass id '$id' has a self-detected-host value whose first token is outside the closed pair claude-code/codex-cli, or is missing the required ' — ' separator" ;;
     esac
-    [ -n "$sdh_ground" ] || fail "self-detected-host-vocabulary: pass id '$id' has an empty ground after its self-detected-host separator"
+
+    # Non-blank ground, not merely non-empty: [ -n ] tests byte length,
+    # so a separator followed only by whitespace ("codex-cli —    ")
+    # previously passed despite carrying no actual observation. Strip
+    # leading whitespace/tabs from a scratch copy and test THAT for
+    # emptiness — sdh_ground itself is left untouched, since a leading
+    # space in a real ground ("— ground text") is legitimate content
+    # (Input space, variant 3) and is never trimmed from the value the
+    # rest of the checker (or a future consumer) would read.
+    sdh_ground_blank_test="$sdh_ground"
+    while :; do
+      case "$sdh_ground_blank_test" in
+        ' '*|$'\t'*) sdh_ground_blank_test="${sdh_ground_blank_test#?}" ;;
+        *) break ;;
+      esac
+    done
+    [ -n "$sdh_ground_blank_test" ] || fail "self-detected-host-vocabulary: pass id '$id' has an empty ground after its self-detected-host separator"
 
     if [ "$sdh_token" = "codex-cli" ]; then
       # Cross-field contradiction (D4): normalize leading whitespace on
