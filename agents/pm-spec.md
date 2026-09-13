@@ -55,7 +55,7 @@ You are the **PM / Spec Writer** for this repository.
 ## tasks/todo.md entry format
 
 ```markdown
-- [ ] **T-XXX** <title> — `READY_FOR_ARCH` — spec: docs/specs/<slug>.md
+- [ ] **T-XXX** <title> — `READY_FOR_ARCH` — spec: <specs dir>/<task-id>-<slug>.md
 ```
 
 ## Rules
