@@ -396,10 +396,17 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
 
    (subcommand names read from `codex plugin --help` on `codex-cli 0.154.0`
    — the same two-step shape as this project's Claude Code
-   `/plugin marketplace add` / `/plugin install` slash commands). Skip this
-   step if the plugin already shows `installed, enabled`. That status alone
-   does not mean the install is current — see step 2 for the one further
-   check and the remedy if it is not.
+   `/plugin marketplace add` / `/plugin install` slash commands). If
+   `codex plugin list` already reports `shell-team` as `installed, enabled`,
+   do not skip yet: run `codex plugin marketplace upgrade <marketplace>`
+   and compare `codex plugin list`'s `VERSION` column against the release
+   you intend to run — step 2's own staleness test only checks whether
+   `bin/gen-codex-agents.sh` and its full role list are present, and a
+   one-release-behind install already has both, so nothing in that
+   presence test can see a version gap. If that comparison shows an
+   older release than the one you intend to run, the install is stale:
+   take step 2's remedy. If it matches, skip the install commands
+   above; if the plugin was not yet installed at all, run them instead.
 2. **Locate the installed plugin root — read the value your own host
    reports, never assume a fixed layout.** Do not rely on `bin/` being on
    `PATH` — measured false for an installed plugin, on either host: a
@@ -558,7 +565,22 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
     phase list reads, including the `claude -p` recipe `codex-reviewer`
     runs instead of a second Codex pass. Its `APPROVE` reaches
     `READY_FOR_MERGE` — both gates green — without either host ever
-    leaving the Codex CLI session.
+    leaving the Codex CLI session. When `pm-spec` writes the spec file, it
+    names it `<specs dir>/<task-id>-<slug>.md` — a rule, not a precedent:
+    `bin/check-durability.sh`'s `specs` registry row depends on the
+    task-id prefix to resolve a task's own spec unambiguously, and a spec
+    named without it reads as `missing-working-file`. Once `APPROVE`
+    reaches `READY_FOR_MERGE`, the session stops there — the shipped
+    loop's one behaviour, and the only one this runbook describes: both
+    `merge` and `push` are human gates under the shipped default loop
+    contract (`human_gate: [merge, push]` in
+    `<base>/loops/shell-team.contract.yaml`, the file `team-init`
+    scaffolds from `templates/shell-team.contract.yaml` — where both
+    gates are declared), and the run skill's own `push-go` liveness gate
+    hands the push to the human independently of that list. **The
+    human** pushes the branch and opens the pull request against the
+    base the spec names, and the merge — and the merge GO — stay the
+    human's.
 11. **Re-run step 3's command** after editing a role file, after a plugin
     upgrade, or after changing your own `binding.conf` or `TEAM_RUN_BASE`:
     the generated TOML also depends on the resolved binding row (which
@@ -646,6 +668,14 @@ adopter run reported a roughly 45-minute nested `codex exec` stall
 preceding a wrong self-classification on this exact seam — background only,
 named here as the symptom that motivated this field, and nothing above
 depends on it.)
+
+**A standing grant lets a mechanics-only re-freeze skip the per-instance
+human GO.** See `docs/tuning-oversight.md`'s `## Who may re-freeze a
+frozen intent block` for what a `class-M` repair covers and how
+`bin/check-refreeze-class.sh` draws the mechanical boundary; if you want
+one, record your own grant in your own checkout's `CLAUDE.local.md` —
+this project ships no transcription of it and invents none on your
+behalf.
 
 ## Conversational usage (no slash commands)
 

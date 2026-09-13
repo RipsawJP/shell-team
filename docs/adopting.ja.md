@@ -393,9 +393,17 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
 
 1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
    `codex plugin list` が `shell-team` を厳密に `installed, enabled` と
-   報告している場合のみ、この手順は不要——単に一覧に現れているだけでは
-   不十分: 同じ列は他の plugin に対して `not installed` も出力するし、
-   無効化された状態は「一覧に現れている」という緩い読み方だと見逃す:
+   報告していても、まだこの手順を終えたと思わないこと: `codex plugin
+   marketplace upgrade <marketplace>` を実行し、`codex plugin list` の
+   `VERSION` 列を自分が実行したいリリースと比較すること——手順 2 自身の
+   staleness テストは `bin/gen-codex-agents.sh` の存在とその役割リストを
+   見る **presence** テストに過ぎず、ファイルも役割リストも既に揃っている
+   1 リリース遅れのインストールをこれだけでは見分けられない。比較の
+   結果、実行したいリリースより古い `VERSION` であれば、そのインストール
+   は古い——手順 2 の対処を行うこと。一致していれば、以下のインストール
+   コマンドを飛ばしてよい——単に一覧に現れているだけでは不十分: 同じ列は
+   他の plugin に対して `not installed` も出力するし、無効化された状態は
+   「一覧に現れている」という緩い読み方だと見逃す:
 
    ```
    codex plugin marketplace add RipsawJP/shell-team
@@ -404,9 +412,8 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
 
    （サブコマンド名は `codex-cli 0.154.0` の `codex plugin --help` から
    確認したもの——この repository の Claude Code 向け `/plugin marketplace
-   add` / `/plugin install` スラッシュコマンドと同じ 2 段階の形）。
-   `installed, enabled` と出ていても、それだけではインストールが最新とは
-   限らない——確認方法と対処は手順 2 を見ること。
+   add` / `/plugin install` スラッシュコマンドと同じ 2 段階の形）。まだ
+   インストールされていなければ、上記のコマンドを実行すること。
 2. **インストール済み plugin の root を特定する——自分の host が報告した
    値をそのまま読み、固定のパターンを仮定しない。** `bin/` が `PATH` に
    載っているという前提は使わない——インストール済み plugin では
@@ -564,7 +571,22 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
     `templates/prompt-blocks/host-dispatch.md` を参照——`codex-reviewer` が
     2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
     `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
-    host も Codex CLI セッションを一度も離れない。
+    host も Codex CLI セッションを一度も離れない。`pm-spec` がスペック
+    ファイルを書き出すときは `<specs dir>/<task-id>-<slug>.md` という
+    名前にする——これは precedent ではなく規則である:
+    `bin/check-durability.sh` の `specs` レジストリ行は task-id
+    プレフィックスを頼りにタスクのスペックを一意に解決しており、それを
+    欠くスペックは `missing-working-file` と読まれる。`APPROVE` が
+    `READY_FOR_MERGE`——両ゲート green——に届いた後、セッションはそこで
+    止まる——これがこの runbook が記述する、出荷済みループの唯一の
+    挙動である: 出荷時の既定 loop contract の下では `merge` と `push`
+    の両方が human gate であり（`<base>/loops/shell-team.contract.yaml`
+    の `human_gate: [merge, push]`。`team-init` が
+    `templates/shell-team.contract.yaml` から生成するファイルで、両方の
+    gate はそこで宣言されている）、run skill 自身の `push-go` liveness
+    gate がそのリストとは独立に push を人間へ渡す。**人間**がブランチを
+    push し、スペックが指定する base に対してプルリクエストを開き、
+    マージ——そしてマージの GO——は人間のものであり続ける。
 11. **役割ファイルを編集した後、プラグインをアップグレードした後、または
     自分自身の `binding.conf` や `TEAM_RUN_BASE` を変更した後は、手順 3 と
     同じコマンドを再実行する。** 生成された TOML は解決済みの binding row
@@ -652,6 +674,14 @@ adopter の実行では、まさにこの継ぎ目でおよそ 45 分間のネ�
 `codex exec` stall が誤った自己分類に先行して起きたと報告されている——
 背景情報に過ぎず、この field を動機付けた症状として記しているだけで、
 上記のいずれもこれに依存していない。）
+
+**mechanics のみの re-freeze は standing grant があれば per-instance の
+人間 GO を省略できる。** どの `class-M` 修正が対象で
+`bin/check-refreeze-class.sh` がその境界をどう機械的に引くかは
+`docs/tuning-oversight.ja.md` の「凍結された intent block を誰が
+再凍結してよいか」節を参照——grant を持ちたい場合は自分自身の
+checkout の `CLAUDE.local.md` に記録すること。このプロジェクトは
+その grant の文面を出荷物には転記せず、代わりに発明することもしない。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 

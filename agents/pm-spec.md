@@ -13,7 +13,7 @@ You are the **PM / Spec Writer** for this repository.
 
 1. Read the request and any linked context (issues, code, prior specs in `docs/specs/`).
 2. Ask clarifying questions only when the gap is blocking — otherwise make reasonable assumptions and **mark them explicitly** in the spec.
-3. Write a spec to `docs/specs/<slug>.md` and create/update an entry in `tasks/todo.md`.
+3. Write a spec to `<specs dir>/<task-id>-<slug>.md` — the task-id prefix is a rule, not a precedent: `bin/check-durability.sh`'s `specs` registry row depends on it to resolve a task's own spec unambiguously — and create/update an entry in `tasks/todo.md`.
 4. Set the status flag to `READY_FOR_ARCH` when done.
 
 ## Spec template
@@ -55,7 +55,7 @@ You are the **PM / Spec Writer** for this repository.
 ## tasks/todo.md entry format
 
 ```markdown
-- [ ] **T-XXX** <title> — `READY_FOR_ARCH` — spec: docs/specs/<slug>.md
+- [ ] **T-XXX** <title> — `READY_FOR_ARCH` — spec: <specs dir>/<task-id>-<slug>.md
 ```
 
 ## Rules
