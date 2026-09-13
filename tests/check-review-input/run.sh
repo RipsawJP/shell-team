@@ -287,4 +287,71 @@ if printf '%s' "$out2" | grep -Fq -- "$MARKER"; then
 fi
 pass "no-echo case 2: marker never echoed (collision path, marker in the raw-capture field)"
 
+# ============================================================================
+# self-detected-host — the optional fifth per-pass field (T-1138, issue #508)
+# ============================================================================
+
+# Legacy record: a conformant four-field pass with no self-detected-host
+# line at all still exits 0 — the field is validate-if-present, never
+# required, and every already-committed record today is in this class.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; } > "$T/sdh-legacy.md"
+assert_case "self-detected-host: a legacy four-field record with no fifth field exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-legacy.md" --task T-000
+
+# Per-pass optional: one pass carries the field, a sibling pass does not.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; \
+  printf '  - self-detected-host (p1): claude-code — CODEX_THREAD_ID was not set in this shell\n'; \
+  printf '  - executor-invocation (p2): codex exec review --base develop\n  - pass-role (p2): confirmation\n  - briefing-fidelity (p2): carried - x\n  - raw-capture (p2): T-000-codex-adversarial\n'; } > "$T/sdh-mixed.md"
+assert_case "self-detected-host: per-pass optional (one pass carries it, a sibling does not) exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-mixed.md" --task T-000
+
+# Accepting arm (a): codex-cli beside a claude -p invocation whose LATER
+# text merely contains the literal string "codex exec" — a substring rule
+# would wrongly refuse this; the token-anchored rule must not.
+{ hdr; printf -- '  - executor-invocation (p1): claude -p --output-format stream-json --prompt-file p.txt describing what codex exec would have read\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-accept-a.md"
+assert_case "self-detected-host: codex-cli beside a claude -p invocation whose prompt text mentions codex exec exits 0" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-accept-a.md" --task T-000
+
+# Accepting arm (b): claude-code beside an invocation beginning codex exec
+# — the shipped Claude-host behaviour, and not a contradiction (the b run
+# #4 direction this mechanism deliberately cannot catch).
+{ hdr; printf -- '  - executor-invocation (p1): codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): claude-code — CODEX_THREAD_ID was not set in this shell\n'; } > "$T/sdh-accept-b.md"
+assert_case "self-detected-host: claude-code beside a codex-exec invocation exits 0 (shipped Claude-host shape, not a contradiction)" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-accept-b.md" --task T-000
+
+# Accepting arm (c): codex-cli beside an invocation whose first token is
+# codexify — whole-token comparison, never a prefix match.
+{ hdr; printf -- '  - executor-invocation (p1): codexify exec --sandbox read-only --cd .\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-accept-c.md"
+assert_case "self-detected-host: codex-cli beside a codexify-first-token invocation exits 0 (whole-token match, never a prefix)" 0 "" -- \
+  bash "$SCRIPT" --record "$T/sdh-accept-c.md" --task T-000
+
+# Refusal: self-detected-host-vocabulary — three shapes, one token.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): claude-cli — ground stated here\n'; } > "$T/sdh-vocab-a.md"
+assert_case "self-detected-host-vocabulary: near-miss first token 'claude-cli'" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-vocab-a.md" --task T-000
+
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): codex-cli\n'; } > "$T/sdh-vocab-b.md"
+assert_case "self-detected-host-vocabulary: missing separator entirely" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-vocab-b.md" --task T-000
+
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): codex-cli — \n'; } > "$T/sdh-vocab-c.md"
+assert_case "self-detected-host-vocabulary: separator present with an empty ground" 1 self-detected-host-vocabulary -- \
+  bash "$SCRIPT" --record "$T/sdh-vocab-c.md" --task T-000
+
+# Refusal: self-detected-host-duplicate — two lines under one pass id.
+{ hdr; printf '%s\n%s\n%s\n%s\n' "$f1" "$f2" "$f3" "$f4"; printf -- '  - self-detected-host (p1): codex-cli — ground one\n  - self-detected-host (p1): claude-code — ground two\n'; } > "$T/sdh-dup.md"
+assert_case "self-detected-host-duplicate: two lines under one pass id" 1 self-detected-host-duplicate -- \
+  bash "$SCRIPT" --record "$T/sdh-dup.md" --task T-000
+
+# Refusal: self-detected-host-contradiction — codex-cli declared beside an
+# executor-invocation beginning codex exec, with and without leading
+# whitespace before the first token (D4's normalization requirement).
+{ hdr; printf -- '  - executor-invocation (p1): codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-contra-a.md"
+assert_case "self-detected-host-contradiction: codex-cli beside a codex-exec invocation" 1 self-detected-host-contradiction -- \
+  bash "$SCRIPT" --record "$T/sdh-contra-a.md" --task T-000
+
+{ hdr; printf -- '  - executor-invocation (p1):    codex exec --sandbox read-only --cd . review --base develop\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n  - self-detected-host (p1): codex-cli — CODEX_THREAD_ID was set in this shell before any launch\n'; } > "$T/sdh-contra-b.md"
+assert_case "self-detected-host-contradiction: same, with leading whitespace before the invocation's first token" 1 self-detected-host-contradiction -- \
+  bash "$SCRIPT" --record "$T/sdh-contra-b.md" --task T-000
+
 printf '\nAll check-review-input assertions passed.\n'
