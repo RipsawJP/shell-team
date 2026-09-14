@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1142** one rule for how a behaviour-neutral change to committed records is described, stated once in the contribution guide and mirrored into both changelog self-descriptions — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1142-records-maintenance-rule.md
+- [ ] **T-1142** one rule for how a behaviour-neutral change to committed records is described, stated once in the contribution guide and mirrored into both changelog self-descriptions — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1142-records-maintenance-rule.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked: branched from the tip of the predecessor branch feature/526-records-by-role-prompt-block (open PR #531); merges at the sprint batch GO after that PR
@@ -28,6 +28,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - intent-hash (v1): 141c33a0661a5a0791aacc1e52687904629de2ac
   - count: tracker-key-opt-in-findings (round 2) — 203 — command: B=$(git merge-base feature/526-records-by-role-prompt-block HEAD); PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --base "$B" 2>&1 | grep -c '^FINDING'
   - count: ac11d-reachable-checks (round 2) — 102 matches across 43 spec files — command: B=$(git merge-base feature/526-records-by-role-prompt-block HEAD); git grep -n -E -- '^[[:space:]]+- check:.*(CONTRIBUTING\.md|CHANGELOG\.md|CHANGELOG\.ja\.md)' "$B" -- .shell-team/specs | wc -l
+  - fast-follow disposition (2026-09-15): the frozen `- verification-ceiling:` sentence's incomplete criteria enumeration — filed as issue #532 (exhaustive-or-`all` rule plus a freeze-read refusal, forward only); the stale board `- count:` value beside its own re-derivation command — waived: a snapshot next to the command that re-derives it, no consumer reads the numeral; the freeze-attestation inventory naming one criterion for another — waived: descriptive text with no downstream reader, the criterion set itself is validated by `check-intent` and `check-acs`.
 
 ### EN/JA symmetry audit — T-1142
 
