@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1142** one rule for how a behaviour-neutral change to committed records is described, stated once in the contribution guide and mirrored into both changelog self-descriptions — `READY_FOR_QA` — spec: .shell-team/specs/T-1142-records-maintenance-rule.md
+- [ ] **T-1142** one rule for how a behaviour-neutral change to committed records is described, stated once in the contribution guide and mirrored into both changelog self-descriptions — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1142-records-maintenance-rule.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked: branched from the tip of the predecessor branch feature/526-records-by-role-prompt-block (open PR #531); merges at the sprint batch GO after that PR
@@ -463,6 +463,15 @@ Both derivation blocks above were run through `bin/check-pii-shapes.sh --all` be
 
 Fresh re-run of the unaffected round-1 checks, this round: `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh --root "$PWD" .shell-team/specs/T-1142-records-maintenance-rule.md 2>&1 | tail -3` → `check-acs: 10 passed, 0 failed, 1 skipped, 0 unrecognized`. `bash bin/check-readme-version.sh README.md README.ja.md` → exit 0. `bash bin/check-pii-shapes.sh --base "$B"` (no opt-in) → `clean (no PII-shaped bytes found)`. `git diff --numstat "$B"...HEAD -- CONTRIBUTING.md CHANGELOG.md CHANGELOG.ja.md` → `2 0 CHANGELOG.ja.md`, `2 0 CHANGELOG.md`, `8 0 CONTRIBUTING.md` (unchanged). `bash bin/check-intent.sh .shell-team/specs/T-1142-records-maintenance-rule.md .shell-team/todo.md` → `aligned: T-1142 v1 (141c33a0661a5a0791aacc1e52687904629de2ac)` (unchanged, frozen block untouched). `bash bin/check-provenance.sh .shell-team/provenance/T-1142.md` → conformant, 1 decision entry (unchanged). `bash bin/check-pii-shapes.sh --all` (self-check on this round's own edit, before commit) → clean. `TD=$(bash bin/team-paths.sh --get todo); bash bin/check-handoff.sh "$TD"` → exit 0. `bash bin/check-board-headings.sh "$TD" --base "$(git merge-base develop HEAD)"` → exit 0.
 
+
+### QA verdict: PASS — T-1142 (round 2)
+
+- Task: T-1142 → READY_FOR_REVIEW
+- Tests: none under `tests/` for this task (`no-mechanism` verification class); `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh --root "$PWD" .shell-team/specs/T-1142-records-maintenance-rule.md` → `check-acs: 10 passed, 0 failed, 1 skipped, 0 unrecognized` (independently re-run this round, unchanged from round 1) — full detail in `.shell-team/reviews/T-1142.md`
+- Acceptance criteria: 10/10 AC1–AC10 re-confirmed; AC11's two corrected items independently re-derived rather than accepted — the tracker-key opt-in count (`bin/derive-populations.sh`, my own run: 188 board / 14 spec / 1 review / 0 deliverables, union 203 — byte-for-byte match to the hand-off) and the AC11(d) downstream sweep (my own full, non-sampled re-run of all 102 reachable `- check:` lines against HEAD and a scratch `git clone --shared` at the branch point: `pairs: 102`, `changed-verdict: 0`, `head-fail: 60`, `base-fail: 60` — exact match); every added line across this task's five own record files independently checked against the checker's own tracker-key regex (17 hits, all `DP-N`/`UTF-8`, none a real key)
+- Verification ceiling: unit-and-static — this verdict verifies every criterion at or below that level; none above this ceiling
+- Edge cases tried: none new this round (round-2 diff is `.shell-team/todo.md`-only); round 1's added-text read and EN/JA symmetry-table verification stand unchanged, confirmed by `git diff b60778c..HEAD` touching neither the three deliverable files nor the board's audit table
+- Risk notes for reviewer: this round's own two `- count:` sub-bullets use `bin/derive-populations.sh`'s marker-block form per the accounting-claim discipline; both were independently re-executed by me (not merely re-read) and reproduce exactly. Round 1's root cause — a hand-off sentence describing a command's output without having run it — was for two separate claims in the same hand-off; nothing else in the round-1 or round-2 hand-off asserts an unexecuted count, per my own audit above and in `.shell-team/reviews/T-1142.md`.
 
 ### Engineer hand-off — T-1141 (engineer, mode A2 — 5-line form)
 
