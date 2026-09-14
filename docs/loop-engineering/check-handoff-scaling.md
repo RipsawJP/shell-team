@@ -134,7 +134,7 @@ Three trials were run per stage per condition; the value recorded is the
 - condition: board_lines 2793 — `wc -l scratch/realboard-base.md` → `2793 scratch/realboard-base.md`
 - condition: active_span 8 lines / 1209 bytes, measured at the branch-point blob — immediately before this task's own board entry was appended, `## Active` held only two leftover `### Local test result` blocks and no task entry at all (the same event `.shell-team/todo.md`'s own T-1070 entry and this spec's `## Assumptions` record); re-measured here rather than transcribed: `awk '/^## Active[[:space:]]*$/ && !seen{seen=1;f=1;next} f&&/^## /{exit} f' scratch/realboard-base.md | wc -lc` → `8` lines / `1209` bytes.
 - condition: trials 3 — every `elapsed_ms` figure in this note is the median of 3 trials at the stated condition; `## Profile`'s two before/after totals and `## Scaling`'s twelve cells all follow this same 3-trial-median protocol.
-- condition: host_os Darwin 25.5.0 arm64 (`uname -a`: `Darwin ME24022.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun 9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122 arm64`).
+- condition: host_os Darwin 25.5.0 arm64 (`uname -a`: `Darwin <host>.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun 9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122 arm64`).
 
 **How the second bash floor was obtained.** This host ships only `/bin/bash`
 3.2.57 (no `timeout` either, matching this spec's own `## Input space`); no
