@@ -84,6 +84,30 @@
 #                     apart from the label chain above — the mathematical
 #                     complement of the false positive this guard exists to
 #                     close, not a separable gap in it.
+#   host-local        a workstation host name in the machine-local form: a
+#                     name token immediately followed by the .local suffix.
+#                     On in the shipped default. A per-repository
+#                     configuration file name of the <name>.local.<ext>
+#                     class is excluded by a named class rather than by a
+#                     list of file names, and the placeholder form
+#                     <host>.local is a non-match by construction, same
+#                     convention as the other placeholder forms above.
+#   tracker-key       an issue-tracker key: an upper-case letters-only
+#                     namespace of two to ten characters, a hyphen, and a
+#                     digit run. This rule is off in the shipped default
+#                     and must be enabled explicitly — set
+#                     PII_CHECK_TRACKER_KEY to a non-empty value in the
+#                     environment — because a
+#                     single-character namespace and a namespace containing
+#                     a digit are excluded by the outline itself (keeping
+#                     this repository's own task-id convention clean by
+#                     construction), but the remaining same-outline
+#                     population is dominated by this plugin's own
+#                     design-point label vocabulary and cannot be separated
+#                     from a real tracker key by any shape; enabling the
+#                     rule accepts that vocabulary as declared, disclosed
+#                     noise rather than chasing it with a prefix allow-list
+#                     (see docs/pii-controls.md).
 #
 # Mechanism (DP-4, v4's premise change): this script NEVER parses git's
 # textual diff rendering. A rendering is a human-facing format whose framing
@@ -161,6 +185,31 @@
 # this script's own path and any path under tests/check-pii-shapes/ are
 # never listed and stay runtime-generated (DP-1); a shape in either is still
 # reported (AC13).
+#
+# DP-11 (host-local suffix, on by default): a name token immediately
+# followed by the machine-local host suffix is a finding unless the
+# character immediately after the suffix continues a file name (a dot, then
+# an extension) — the RE_HOST_LOCAL_OUTLINE / RE_HOST_LOCAL pair below is
+# the same broad-outline-plus-narrowing-requirement shape RE_HOME_PATH_RAW /
+# RE_HOME_PATH_BOUNDARY already establish. A per-repository configuration
+# file name of the <name>.local.<ext> class is excluded by that narrowing
+# requirement, never by a list of file names, and the placeholder form
+# <host>.local is a non-match by construction: the outline's name class
+# admits no `<`/`>`.
+#
+# DP-12 (tracker-key opt-in, off by default): an upper-case letters-only
+# namespace of two to ten characters, a hyphen, and a digit run is a
+# finding only when PII_CHECK_TRACKER_KEY is set to a non-empty value in
+# the environment — an environment-carried opt-in, reachable by every
+# fixture-suite helper without a signature change, since a forked child
+# process inherits its parent's environment. Left off in the shipped
+# default because the remaining same-outline population, once a
+# single-character namespace and a digit-bearing namespace are excluded by
+# the outline itself (RE_TRACKER_KEY_OUTLINE / RE_TRACKER_KEY_NAMESPACE
+# below), is dominated by this plugin's own design-point label vocabulary
+# and cannot be separated from a real tracker key by any shape; the
+# accepted-noise class this creates is declared in docs/pii-controls.md
+# rather than chased with a prefix allow-list.
 #
 # DP-1: no PII-shaped byte enters this tree. Every fixture the test suite
 # uses is assembled at runtime, under mktemp, from fragments — never
@@ -272,10 +321,11 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 
 # --- pattern + exclusion definitions -----------------------------------------
 # Each rule lives on its own assignment line so a fixture suite can
-# neutralise exactly one at a time by rewriting that one line. There are
-# eleven independently load-bearing rules: seven patterns, plus four
-# exclusions (the domain-anchored noreply rule, the plain web-flow address,
-# the reserved-domain rule, and the home-path boundary rule).
+# neutralise exactly one at a time by rewriting that one line. The
+# independently load-bearing rules — every pattern this script matches, plus
+# every exclusion that narrows one — are enumerated in the anchoring/boundary
+# inventory immediately below, rather than counted here as a fixed numeral a
+# later addition would immediately falsify.
 #
 # Anchoring/boundary inventory (round 3 review requirement — every regex
 # this script ships, audited mechanically): how each end is anchored, what
@@ -429,6 +479,42 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     from that population. The placeholder form (a session segment
 #     written `<session-uuid>`) is a non-match by construction, same
 #     convention as AC9's other placeholder forms.
+#   RE_HOST_LOCAL_OUTLINE  (T-1140) the broad reachability half: a name
+#     token (letters, digits, hyphens) immediately followed by the
+#     `.local` suffix, with no right-side boundary at all — reaches a bare
+#     host name and a configuration file name carrying its extension
+#     alike. Not itself a reported pattern id; read out of this script's
+#     own source by the fixture suite's precondition idiom, the same role
+#     `RE_HOME_PATH_RAW` plays for home-path, so a negative-control fixture
+#     can be proven to genuinely REACH this outline while still being
+#     excluded by the requirement composed on top of it below.
+#   RE_HOST_LOCAL  (T-1140) composes `RE_HOST_LOCAL_OUTLINE` with a
+#     right-side requirement: end-of-line, or a character that is NOT a
+#     letter, digit, or dot, immediately after the suffix. A configuration
+#     file name of the `<name>.local.<ext>` class is immediately followed
+#     by a dot, so it never reaches this composed form — excluded by this
+#     named requirement, never by a list of file names; a bare host name at
+#     end-of-line, or followed by punctuation, still fires. The
+#     placeholder form `<host>.local` is a non-match by construction: the
+#     outline's name class admits no `<`/`>`, same convention as AC9's
+#     other placeholder forms.
+#   RE_TRACKER_KEY_OUTLINE  (T-1140) the broad reachability half: an
+#     upper-case letter followed by up to nine more upper-case letters or
+#     digits, a hyphen, and a digit run — reaches a single-character
+#     namespace and a namespace containing a digit alike. Not itself a
+#     reported pattern id; read out of this script's own source by the
+#     fixture suite's precondition idiom, same role as
+#     `RE_HOST_LOCAL_OUTLINE` above.
+#   RE_TRACKER_KEY_NAMESPACE  (T-1140) the requirement that narrows the
+#     outline above: an upper-case, letters-only run of two to ten
+#     characters. Excludes a single-character namespace (this
+#     repository's own task-id convention, `T-<digits>`, among them) and a
+#     namespace carrying a digit (a line-range or label reference, e.g.
+#     `L194-199`) by construction, neither by an enumerated list.
+#   RE_TRACKER_KEY  (T-1140) composes `RE_TRACKER_KEY_NAMESPACE` with a
+#     literal hyphen and a digit run. Off in the shipped default; reported
+#     only when `PII_CHECK_TRACKER_KEY` is set to a non-empty value in the
+#     environment (see `scan_content_file()` below).
 #
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
 RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9.-])'
@@ -460,6 +546,19 @@ RE_HOME_ENCODED='[-_](Users|home)[-_][A-Za-z0-9_.-]*[A-Za-z0-9.][A-Za-z0-9_.-]*[
 # RE_TEMP_SESSION_ROOT inventory entry above (T-1101)
 RE_TEMP_SESSION_ROOT='(/private/tmp/|/tmp/|/var/folders/)[A-Za-z0-9_./=-]*'
 RE_TEMP_SESSION="${RE_TEMP_SESSION_ROOT}[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+# shellcheck disable=SC2016  # the reachable-outline half only — see the
+# RE_HOST_LOCAL_OUTLINE inventory entry above (T-1140, DP-11)
+RE_HOST_LOCAL_OUTLINE='[A-Za-z0-9][A-Za-z0-9-]*\.local'
+RE_HOST_LOCAL="${RE_HOST_LOCAL_OUTLINE}(\$|[^A-Za-z0-9.])"
+# shellcheck disable=SC2016,SC2034  # SC2016: single-quoted regex, not a
+# variable expansion; SC2034: never referenced by this script itself — read
+# out of the source by the fixture suite's precondition idiom only (see the
+# RE_TRACKER_KEY_OUTLINE inventory entry above, T-1140, DP-12)
+RE_TRACKER_KEY_OUTLINE='[A-Z][A-Z0-9]{0,9}-[0-9]+'
+# shellcheck disable=SC2016  # the requirement that narrows the outline
+# above — see the RE_TRACKER_KEY_NAMESPACE inventory entry above (T-1140)
+RE_TRACKER_KEY_NAMESPACE='[A-Z]{2,10}'
+RE_TRACKER_KEY="${RE_TRACKER_KEY_NAMESPACE}-[0-9]+"
 
 # --- known-shapes list (DP-8) ------------------------------------------------
 # Per-file only — no directory entry, no glob, no pattern. Fixtures that
@@ -552,6 +651,13 @@ scan_content_file() {
   report_pattern_lines temp-session "$path" "$file" "$RE_TEMP_SESSION"
   report_pattern_lines private-key "$path" "$file" "$RE_PRIVATE_KEY"
   report_pattern_lines token "$path" "$file" "$RE_TOKEN"
+  report_pattern_lines host-local "$path" "$file" "$RE_HOST_LOCAL"
+  # tracker-key is off in the shipped default (DP-12); an environment-carried
+  # opt-in reaches it without a signature change, since every fixture-suite
+  # helper's forked child inherits the environment (T-1140 DP-5).
+  if [ -n "${PII_CHECK_TRACKER_KEY:-}" ]; then
+    report_pattern_lines tracker-key "$path" "$file" "$RE_TRACKER_KEY"
+  fi
   scan_email_candidates "$path" "$file"
 }
 
