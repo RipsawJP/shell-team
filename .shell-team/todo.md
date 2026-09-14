@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1140** the issue-tracker key and the machine-local host name become mechanical findings: one shape on by default with a named-class exclusion, one off by default behind an explicit opt-in — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1140-tracker-key-and-host-local-shapes.md
+- [ ] **T-1140** the issue-tracker key and the machine-local host name become mechanical findings: one shape on by default with a named-class exclusion, one off by default behind an explicit opt-in — `READY_FOR_ENG` — spec: .shell-team/specs/T-1140-tracker-key-and-host-local-shapes.md
   - entry-mode: pm-authored
   - spec-review: none
   - count: re-assignment-lines-at-branch-point — 13 — command: B=$(git merge-base develop HEAD); git show "$B:bin/check-pii-shapes.sh" | grep -cE '^RE_[A-Z0-9_]+='
@@ -35,6 +35,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v2, 2026-09-14): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH (unchanged from v1: the class-M delta is confined to one `- check:` line, so no declaration moved) — grounds: re-confirmation only; `- user-visible: yes` and `- verification-class: mechanism` are byte-identical to v1.
   - freeze-attestation (v2, 2026-09-14): lines=16/16 sweep=mutual-satisfiability verdict=14P/2F owner=coordinating session (Fable 5.1 orchestrator). All 16 `- check:` lines ran live under `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh` against the post-implementation tree (HEAD = `f5d64fd`): AC1–AC14 PASS; AC15 and AC16 FAIL only for the absence of `.shell-team/reviews/T-1140.md`, the review record QA and the reviewer author — structurally satisfiable the moment that file exists. Cross-join re-read against the v1 disclosed reds: none remain. Oversight gate `check-oversight.sh --seam specify-seam --task T-1140` exit 0 at this re-freeze (the standing grant removes only the per-instance human GO, never the governed seam's gate).
   - intent-hash (v2): a5979dabe2b97d26146e7b95fe39fd56794e0642
+  - linked review finding (2026-09-14, round 1): Codex Reviewer `REQUEST_CHANGES` — Blocker: `RE_TRACKER_KEY` has no left boundary, so a digit-bearing namespace is reported through its letters-only tail (`A1BC-2` reports as `BC-2`), defeating the declared exclusion; Major 1: the same rule has no right boundary after the digit run and an over-length namespace fires truncated; Major 2: `RE_HOST_LOCAL`'s right side admits a hyphen continuation (`host.local-suffix` fires); Major 3: AC11's repaired filter exempts that hyphen continuation while the rule reports it — the rule's boundary and the audit filter must agree. Root-cause class for all four: boundary anchoring of the two new rules. record: `.shell-team/reviews/T-1140.md` (`### Codex Review verdict: REQUEST_CHANGES`, round 1).
 
 
 ### Engineer hand-off — T-1140 (engineer, mode A2 — 5-line form)
