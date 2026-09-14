@@ -46,6 +46,10 @@
 #   - AC27: text/binary is decided by the NUL byte, not printability
 #   - AC28: the home-path URL false positive stays closed
 #   - AC29: --all never silently skips
+#   - T-1140 AC2/AC3/AC4/AC5/AC7/AC11/AC14: the host-local and tracker-key
+#     pattern ids — POS/NEG pairs, mutation and meta duties, the
+#     outline-half negative-control preconditions, the opt-in triad, the
+#     new placeholder form, and each rule's shape family
 #
 # Temp roots live under $TMPDIR (2026-07-06 lesson: bare macOS mktemp can
 # ignore /tmp in a sandbox); no process substitution (2026-07-06 lesson);
@@ -798,6 +802,334 @@ fi
 rm -f "$TOKEN_PREFIX_MUT"
 
 # =============================================================================
+# POS/NEG pair: host-local (T-1140)
+# negative control: a per-repository configuration file name stays clean
+# precondition: the negative control reaches the host-local outline but not
+# its reported rule
+# family: hyphenated and digit-bearing host tokens at every reachable left
+# boundary
+# =============================================================================
+printf '\n--- POS/NEG pair: host-local ---\n'
+printf '\n--- negative control: a per-repository configuration file name stays clean ---\n'
+printf '\n--- precondition: each host-local negative control reaches the host-local outline but not its reported rule ---\n'
+printf '\n--- family: the host-local rule fires on hyphenated and digit-bearing host tokens at every reachable left boundary ---\n'
+
+HL_N1="wor"; HL_N2="kstation"
+HL_NAME="${HL_N1}${HL_N2}"
+HL_POS_LINE="prompt at ${HL_NAME}.local for the build"
+# Near-miss negative: the ONE feature added — a configuration-file extension
+# right after the suffix, so the composed rule's right-side requirement
+# excludes it (DP-2's named class).
+HL_NEG_LINE="config at ${HL_NAME}.local.md holds the setting"
+
+HL_POS_REPO="$(new_repo)"; HL_POS_BASE="$(git -C "$HL_POS_REPO" rev-parse HEAD)"
+add_fixture_line "$HL_POS_REPO" "pos.txt" "$HL_POS_LINE"
+assert_finding "POS/NEG pair: host-local (positive reported as pattern=host-local)" \
+  "host-local" "$HL_POS_REPO" "$HL_POS_BASE"
+
+HL_NEG_REPO="$(new_repo)"; HL_NEG_BASE="$(git -C "$HL_NEG_REPO" rev-parse HEAD)"
+add_fixture_line "$HL_NEG_REPO" "neg.txt" "$HL_NEG_LINE"
+assert_clean "POS/NEG pair: host-local (near-miss negative NOT reported)" \
+  "$HL_NEG_REPO" "$HL_NEG_BASE"
+assert_clean "negative control: a per-repository configuration file name stays clean" \
+  "$HL_NEG_REPO" "$HL_NEG_BASE"
+
+RE_HOST_LOCAL_OUTLINE_FOR_TEST="$(grep '^RE_HOST_LOCAL_OUTLINE=' "$BIN" | sed -E "s/^RE_HOST_LOCAL_OUTLINE='(.*)'\$/\\1/")"
+[ -n "$RE_HOST_LOCAL_OUTLINE_FOR_TEST" ] || fail "precondition: could not read RE_HOST_LOCAL_OUTLINE out of $BIN"
+
+assert_reaches_host_local_outline() {  # $1 = label suffix, $2 = line
+  local label="precondition: each host-local negative control reaches the host-local outline but not its reported rule ($1)" line="$2"
+  printf '%s\n' "$line" > "$WORK/precond-host-local.txt"
+  if grep -qoE -- "$RE_HOST_LOCAL_OUTLINE_FOR_TEST" "$WORK/precond-host-local.txt"; then
+    pass "$label"
+  else
+    fail "$label (line did not reach the host-local outline at all: $line)"
+  fi
+}
+assert_reaches_host_local_outline "config-file" "$HL_NEG_LINE"
+
+# Family: a hyphenated host token and a digit-bearing host token, each
+# reached at line start, after a space, and after a prompt-style separator.
+HL_HYPHEN="build-agent"
+HL_DIGIT="host2"
+HL_FAM_LINES=(
+  "${HL_HYPHEN}.local"
+  "backup at ${HL_HYPHEN}.local now"
+  "\$ ${HL_HYPHEN}.local"
+  "${HL_DIGIT}.local"
+  "backup at ${HL_DIGIT}.local now"
+  "\$ ${HL_DIGIT}.local"
+)
+HL_FAM_REPO="$(new_repo)"; HL_FAM_BASE="$(git -C "$HL_FAM_REPO" rev-parse HEAD)"
+add_fixture_lines "$HL_FAM_REPO" "family.txt" "${HL_FAM_LINES[@]}"
+set +e
+HL_FAM_OUT="$(cd "$HL_FAM_REPO" && bash "$BIN" --base "$HL_FAM_BASE" 2>&1)"
+HL_FAM_RC=$?
+set -e
+HL_FAM_HITS="$(printf '%s\n' "$HL_FAM_OUT" | grep -c '^FINDING pattern=host-local path=family\.txt' || true)"
+if [ "$HL_FAM_RC" -eq 1 ] && [ "$HL_FAM_HITS" = "${#HL_FAM_LINES[@]}" ]; then
+  pass "family: the host-local rule fires on hyphenated and digit-bearing host tokens at every reachable left boundary"
+else
+  fail "family: the host-local rule fires on hyphenated and digit-bearing host tokens at every reachable left boundary (rc=$HL_FAM_RC hits=$HL_FAM_HITS out=$HL_FAM_OUT)"
+fi
+# (host-local's mutation and meta assertions run later, alongside the
+# shipped patterns' own — assert_neutralised_pattern_unreported and
+# assert_meta_fails are defined further down this file.)
+
+# =============================================================================
+# POS/NEG pair: tracker-key (T-1140) — off in the shipped default, so every
+# assertion below that expects a REPORT runs with PII_CHECK_TRACKER_KEY
+# exported for the duration of that one call; assertions that expect clean
+# regardless of the opt-in are noted where the opt-in is deliberately left
+# unset.
+# negative control: a single-character namespace stays clean with
+# tracker-key enabled
+# negative control: a namespace containing a digit stays clean with
+# tracker-key enabled
+# precondition: each negative control reaches the tracker-key outline but
+# not its reported rule
+# family: the namespace-length and issue-number-length range the rule
+# claims
+# =============================================================================
+printf '\n--- POS/NEG pair: tracker-key ---\n'
+printf '\n--- negative control: a single-character namespace stays clean with tracker-key enabled ---\n'
+printf '\n--- negative control: a namespace containing a digit stays clean with tracker-key enabled ---\n'
+printf '\n--- precondition: each tracker-key negative control reaches the tracker-key outline but not its reported rule ---\n'
+printf '\n--- family: the tracker-key rule fires across the namespace-length and issue-number-length range it claims ---\n'
+
+TK_NS1="X"; TK_NS2="Y"
+TK_KEY_NS="${TK_NS1}${TK_NS2}"
+TK_KEY_NUM="7"
+TK_KEY_POS_LINE="reference ${TK_KEY_NS}-${TK_KEY_NUM} filed"
+
+# Near-miss negatives: the outline reached, the composed rule excluded —
+# a single-character namespace, and a namespace carrying a digit.
+TKK_SINGLE_NS="T"; TKK_SINGLE_NUM="42"
+TKK_SINGLE_LINE="see ${TKK_SINGLE_NS}-${TKK_SINGLE_NUM} for details"
+TKK_DIGIT_NS1="L"; TKK_DIGIT_NS2="194"
+TKK_DIGIT_NS="${TKK_DIGIT_NS1}${TKK_DIGIT_NS2}"
+TKK_DIGIT_NUM="199"
+TKK_DIGIT_LINE="range ${TKK_DIGIT_NS}-${TKK_DIGIT_NUM} covers it"
+
+TK_POS_REPO2="$(new_repo)"; TK_POS_BASE2="$(git -C "$TK_POS_REPO2" rev-parse HEAD)"
+add_fixture_line "$TK_POS_REPO2" "pos.txt" "$TK_KEY_POS_LINE"
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "POS/NEG pair: tracker-key (positive reported as pattern=tracker-key)" \
+  "tracker-key" "$TK_POS_REPO2" "$TK_POS_BASE2"
+unset PII_CHECK_TRACKER_KEY
+
+TKK_SINGLE_REPO="$(new_repo)"; TKK_SINGLE_BASE="$(git -C "$TKK_SINGLE_REPO" rev-parse HEAD)"
+add_fixture_line "$TKK_SINGLE_REPO" "single.txt" "$TKK_SINGLE_LINE"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "POS/NEG pair: tracker-key (near-miss negative, single-character namespace, NOT reported)" \
+  "$TKK_SINGLE_REPO" "$TKK_SINGLE_BASE"
+assert_clean "negative control: a single-character namespace stays clean with tracker-key enabled" \
+  "$TKK_SINGLE_REPO" "$TKK_SINGLE_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+TKK_DIGIT_REPO="$(new_repo)"; TKK_DIGIT_BASE="$(git -C "$TKK_DIGIT_REPO" rev-parse HEAD)"
+add_fixture_line "$TKK_DIGIT_REPO" "digitns.txt" "$TKK_DIGIT_LINE"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "POS/NEG pair: tracker-key (near-miss negative, digit-bearing namespace, NOT reported)" \
+  "$TKK_DIGIT_REPO" "$TKK_DIGIT_BASE"
+assert_clean "negative control: a namespace containing a digit stays clean with tracker-key enabled" \
+  "$TKK_DIGIT_REPO" "$TKK_DIGIT_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+RE_TRACKER_KEY_OUTLINE_FOR_TEST="$(grep '^RE_TRACKER_KEY_OUTLINE=' "$BIN" | sed -E "s/^RE_TRACKER_KEY_OUTLINE='(.*)'\$/\\1/")"
+[ -n "$RE_TRACKER_KEY_OUTLINE_FOR_TEST" ] || fail "precondition: could not read RE_TRACKER_KEY_OUTLINE out of $BIN"
+
+assert_reaches_tracker_key_outline() {  # $1 = label suffix, $2 = line
+  local label="precondition: each tracker-key negative control reaches the tracker-key outline but not its reported rule ($1)" line="$2"
+  printf '%s\n' "$line" > "$WORK/precond-tracker-key.txt"
+  if grep -qoE -- "$RE_TRACKER_KEY_OUTLINE_FOR_TEST" "$WORK/precond-tracker-key.txt"; then
+    pass "$label"
+  else
+    fail "$label (line did not reach the tracker-key outline at all: $line)"
+  fi
+}
+assert_reaches_tracker_key_outline "single-character-namespace" "$TKK_SINGLE_LINE"
+assert_reaches_tracker_key_outline "digit-bearing-namespace" "$TKK_DIGIT_LINE"
+
+# Family: the short and long ends of the namespace-length range (two and ten
+# letters) crossed with a single-digit and a many-digit issue number.
+TK_FAM_SHORT_NS="AB"
+TK_FAM_LONG_NS="ABCDEFGHIJ"
+TK_FAM_SHORT_NUM="1"
+TK_FAM_LONG_NUM="1234567890"
+TK_FAM_LINES=(
+  "${TK_FAM_SHORT_NS}-${TK_FAM_SHORT_NUM}"
+  "${TK_FAM_SHORT_NS}-${TK_FAM_LONG_NUM}"
+  "${TK_FAM_LONG_NS}-${TK_FAM_SHORT_NUM}"
+  "${TK_FAM_LONG_NS}-${TK_FAM_LONG_NUM}"
+)
+TK_FAM_REPO="$(new_repo)"; TK_FAM_BASE="$(git -C "$TK_FAM_REPO" rev-parse HEAD)"
+add_fixture_lines "$TK_FAM_REPO" "family.txt" "${TK_FAM_LINES[@]}"
+export PII_CHECK_TRACKER_KEY=1
+set +e
+TK_FAM_OUT="$(cd "$TK_FAM_REPO" && bash "$BIN" --base "$TK_FAM_BASE" 2>&1)"
+TK_FAM_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+TK_FAM_HITS="$(printf '%s\n' "$TK_FAM_OUT" | grep -c '^FINDING pattern=tracker-key path=family\.txt' || true)"
+if [ "$TK_FAM_RC" -eq 1 ] && [ "$TK_FAM_HITS" = "${#TK_FAM_LINES[@]}" ]; then
+  pass "family: the tracker-key rule fires across the namespace-length and issue-number-length range it claims"
+else
+  fail "family: the tracker-key rule fires across the namespace-length and issue-number-length range it claims (rc=$TK_FAM_RC hits=$TK_FAM_HITS out=$TK_FAM_OUT)"
+fi
+# (tracker-key's mutation and meta assertions run later, alongside the
+# shipped patterns' own — see the mutation/meta sections further down.)
+
+# =============================================================================
+# regression: round-1 review findings on RE_TRACKER_KEY's and
+# RE_HOST_LOCAL's boundary anchoring (T-1140 round 2). Each of the four
+# findings reproduced here as its own throwaway fixture, assembled from
+# fragments (DP-1: no PII-shaped byte enters this tree), plus the two
+# right-boundary positives the Major finding's own suggested fix implies.
+# =============================================================================
+printf '\n--- regression: tracker-key boundary anchoring (round-1 findings) ---\n'
+
+# Blocker: a digit-bearing namespace must stay entirely clean, not merely
+# under its own full spelling — the round-1 composed rule reported this
+# one through its letters-only tail.
+RGT_DBN_N1="A1"; RGT_DBN_N2="BC"
+RGT_DBN_NS="${RGT_DBN_N1}${RGT_DBN_N2}"
+RGT_DBN_REPO="$(new_repo)"; RGT_DBN_BASE="$(git -C "$RGT_DBN_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_DBN_REPO" "regress-dbn.txt" \
+  "note: ${RGT_DBN_NS}-2 is just a line-range style reference, not a tracker key"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: a digit-bearing namespace stays clean through its letters-only tail too (Blocker, round 1)" \
+  "$RGT_DBN_REPO" "$RGT_DBN_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Major: a real trailing continuation past the digit run must not be
+# truncated into a reported match.
+RGT_RB_NS="AB"; RGT_RB_NUM="123"; RGT_RB_TAIL="abc"
+RGT_RB_REPO="$(new_repo)"; RGT_RB_BASE="$(git -C "$RGT_RB_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_RB_REPO" "regress-rightbound.txt" \
+  "note ${RGT_RB_NS}-${RGT_RB_NUM}${RGT_RB_TAIL} trailing"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: a token continuing past the digit run is not truncated into a finding (Major, round 1)" \
+  "$RGT_RB_REPO" "$RGT_RB_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Major: an over-length (11-letter) namespace must not fire via a
+# truncated 10-letter tail.
+RGT_OL_N1="ABCDE"; RGT_OL_N2="FGHIJK"
+RGT_OL_NS="${RGT_OL_N1}${RGT_OL_N2}"
+RGT_OL_REPO="$(new_repo)"; RGT_OL_BASE="$(git -C "$RGT_OL_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_OL_REPO" "regress-overlong.txt" "note ${RGT_OL_NS}-1 test"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: an over-length namespace does not fire via a truncated tail (Major, round 1)" \
+  "$RGT_OL_REPO" "$RGT_OL_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Right-boundary positives implied by the Major's own suggested fix: a
+# genuine key immediately followed by punctuation still reports; the same
+# key immediately followed by more alphanumeric text does not.
+RGT_POS_NS="AB"; RGT_POS_NUM="12"
+RGT_DOT_REPO="$(new_repo)"; RGT_DOT_BASE="$(git -C "$RGT_DOT_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_DOT_REPO" "dot.txt" "${RGT_POS_NS}-${RGT_POS_NUM}."
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "regression: right-boundary positive, a trailing period still reports" \
+  "tracker-key" "$RGT_DOT_REPO" "$RGT_DOT_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+RGT_COMMA_REPO="$(new_repo)"; RGT_COMMA_BASE="$(git -C "$RGT_COMMA_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_COMMA_REPO" "comma.txt" "${RGT_POS_NS}-${RGT_POS_NUM},"
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "regression: right-boundary positive, a trailing comma still reports" \
+  "tracker-key" "$RGT_COMMA_REPO" "$RGT_COMMA_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+RGT_ALNUM_REPO="$(new_repo)"; RGT_ALNUM_BASE="$(git -C "$RGT_ALNUM_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_ALNUM_REPO" "alnum.txt" "${RGT_POS_NS}-${RGT_POS_NUM}abc"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: right-boundary negative, trailing alphanumeric text stays clean" \
+  "$RGT_ALNUM_REPO" "$RGT_ALNUM_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+printf '\n--- regression: host-local boundary anchoring (round-1 findings) ---\n'
+
+# Major: a hyphen-continued token after the suffix must not fire — the
+# round-1 composed rule treated a hyphen as a valid terminator, now
+# provably inconsistent with AC11's own residual-candidate audit filter
+# for the identical shape (the class-M v2 finding).
+RGH_HYPH_N1="ho"; RGH_HYPH_N2="st"
+RGH_HYPH_NAME="${RGH_HYPH_N1}${RGH_HYPH_N2}"
+RGH_HYPH_TAIL="suffix"
+RGH_HYPH_REPO="$(new_repo)"; RGH_HYPH_BASE="$(git -C "$RGH_HYPH_REPO" rev-parse HEAD)"
+add_fixture_line "$RGH_HYPH_REPO" "regress-hyphencont.txt" \
+  "see ${RGH_HYPH_NAME}.local-${RGH_HYPH_TAIL} here"
+assert_clean "regression: a hyphen-continued token after the suffix stays clean (Major, round 1)" \
+  "$RGH_HYPH_REPO" "$RGH_HYPH_BASE"
+
+# Minor: an underscore-joined two-word identifier must not report the
+# word after the underscore as an embedded host name.
+RGH_US_N1="foo"; RGH_US_N2="bar"
+RGH_US_REPO="$(new_repo)"; RGH_US_BASE="$(git -C "$RGH_US_REPO" rev-parse HEAD)"
+add_fixture_line "$RGH_US_REPO" "regress-underscore.txt" "${RGH_US_N1}_${RGH_US_N2}.local end"
+assert_clean "regression: an underscore-joined identifier does not report its embedded suffix (Minor, round 1)" \
+  "$RGH_US_REPO" "$RGH_US_BASE"
+
+# =============================================================================
+# opt-in: tracker-key is off in the shipped default, fires when explicitly
+# enabled, and enabling it changes no other pattern id's verdict (AC7,
+# T-1140)
+# =============================================================================
+printf '\n--- opt-in: the tracker-key rule is silent in the shipped default mode ---\n'
+printf '\n--- opt-in: the tracker-key rule fires when it is explicitly enabled ---\n'
+printf '\n--- opt-in: enabling the tracker-key rule changes no other pattern id verdict ---\n'
+
+OI_TRACKER_NS1="P"; OI_TRACKER_NS2="Q"
+OI_TRACKER_NS="${OI_TRACKER_NS1}${OI_TRACKER_NS2}"
+OI_TRACKER_NUM="9"
+OI_TRACKER_LINE="reference ${OI_TRACKER_NS}-${OI_TRACKER_NUM} filed"
+OI_HOME_N1="da"; OI_HOME_N2="na"
+OI_HOME_NAME="${OI_HOME_N1}${OI_HOME_N2}"
+OI_HOME_LINE="backup at /Users/${OI_HOME_NAME}/notes.txt"
+# host-local content in the same mixed fixture (round-2 broadening, review
+# Minor): the opt-in must leave host-local's own verdict alone too, not
+# only home-path's.
+OI_HOST_N1="wor"; OI_HOST_N2="kstation"
+OI_HOST_NAME="${OI_HOST_N1}${OI_HOST_N2}"
+OI_HOST_LINE="prompt at ${OI_HOST_NAME}.local for the build"
+
+OI_REPO="$(new_repo)"; OI_BASE="$(git -C "$OI_REPO" rev-parse HEAD)"
+add_fixture_lines "$OI_REPO" "mixed.txt" "$OI_TRACKER_LINE" "$OI_HOME_LINE" "$OI_HOST_LINE"
+
+run_checker "$OI_REPO" "$OI_BASE"
+OI_DEFAULT_OUT="$OUT"; OI_DEFAULT_RC="$RC"
+if [ "$OI_DEFAULT_RC" -eq 1 ] \
+   && printf '%s\n' "$OI_DEFAULT_OUT" | grep -qE 'pattern=home-path path=mixed\.txt' \
+   && ! printf '%s\n' "$OI_DEFAULT_OUT" | grep -qE 'pattern=tracker-key path=mixed\.txt'; then
+  pass "opt-in: the tracker-key rule is silent in the shipped default mode"
+else
+  fail "opt-in: the tracker-key rule is silent in the shipped default mode (rc=$OI_DEFAULT_RC out=$OI_DEFAULT_OUT)"
+fi
+
+export PII_CHECK_TRACKER_KEY=1
+run_checker "$OI_REPO" "$OI_BASE"
+unset PII_CHECK_TRACKER_KEY
+OI_ENABLED_OUT="$OUT"; OI_ENABLED_RC="$RC"
+if [ "$OI_ENABLED_RC" -eq 1 ] && printf '%s\n' "$OI_ENABLED_OUT" | grep -qE 'pattern=tracker-key path=mixed\.txt'; then
+  pass "opt-in: the tracker-key rule fires when it is explicitly enabled"
+else
+  fail "opt-in: the tracker-key rule fires when it is explicitly enabled (rc=$OI_ENABLED_RC out=$OI_ENABLED_OUT)"
+fi
+
+OI_DEFAULT_HOME_HITS="$(printf '%s\n' "$OI_DEFAULT_OUT" | grep -c '^FINDING pattern=home-path path=mixed\.txt' || true)"
+OI_ENABLED_HOME_HITS="$(printf '%s\n' "$OI_ENABLED_OUT" | grep -c '^FINDING pattern=home-path path=mixed\.txt' || true)"
+OI_DEFAULT_HOSTLOCAL_HITS="$(printf '%s\n' "$OI_DEFAULT_OUT" | grep -c '^FINDING pattern=host-local path=mixed\.txt' || true)"
+OI_ENABLED_HOSTLOCAL_HITS="$(printf '%s\n' "$OI_ENABLED_OUT" | grep -c '^FINDING pattern=host-local path=mixed\.txt' || true)"
+if [ "$OI_ENABLED_HOME_HITS" = "$OI_DEFAULT_HOME_HITS" ] && [ "$OI_DEFAULT_HOME_HITS" -gt 0 ] \
+   && [ "$OI_ENABLED_HOSTLOCAL_HITS" = "$OI_DEFAULT_HOSTLOCAL_HITS" ] && [ "$OI_DEFAULT_HOSTLOCAL_HITS" -gt 0 ]; then
+  pass "opt-in: enabling the tracker-key rule changes no other pattern id verdict"
+else
+  fail "opt-in: enabling the tracker-key rule changes no other pattern id verdict (default home-hits=$OI_DEFAULT_HOME_HITS enabled home-hits=$OI_ENABLED_HOME_HITS default host-local-hits=$OI_DEFAULT_HOSTLOCAL_HITS enabled host-local-hits=$OI_ENABLED_HOSTLOCAL_HITS)"
+fi
+
+# =============================================================================
 # placeholder forms are not findings (AC9, T-1101-extended) — a permanent
 # false-positive regression case: the four documented placeholder forms
 # T-111 already ships, together with the two this task introduces
@@ -821,6 +1153,13 @@ git -C "$PH_REPO" -c user.email="$GIT_ID_EMAIL" -c user.name="$GIT_ID_NAME" \
   commit -q -m "fixture: placeholders.md"
 assert_clean "placeholder forms are not findings (all six documented forms, one change, clean)" \
   "$PH_REPO" "$PH_BASE"
+
+# Added alongside the label above (T-1140), never rewording it: the host
+# placeholder form this task documents, `<host>.local`, in its own fixture.
+PH_HOST_REPO="$(new_repo)"; PH_HOST_BASE="$(git -C "$PH_HOST_REPO" rev-parse HEAD)"
+add_fixture_line "$PH_HOST_REPO" "hostplaceholder.md" "example: <host>.local for the machine name"
+assert_clean "placeholder forms are not findings (the host placeholder form, clean)" \
+  "$PH_HOST_REPO" "$PH_HOST_BASE"
 
 # =============================================================================
 # boundary (AC28 / DP-5 final narrow form, DP-10 bias-toward-firing):
@@ -1015,6 +1354,14 @@ assert_neutralised_pattern_unreported RE_HOME_ENCODED \
 assert_neutralised_pattern_unreported RE_TEMP_SESSION_ROOT \
   "mutation: pattern is load-bearing (temp-session neutralised -> its own positive fixture reports nothing)" \
   "$TS_POS_REPO" "$TS_POS_BASE"
+assert_neutralised_pattern_unreported RE_HOST_LOCAL_OUTLINE \
+  "mutation: pattern is load-bearing (host-local neutralised -> its own positive fixture reports nothing)" \
+  "$HL_POS_REPO" "$HL_POS_BASE"
+export PII_CHECK_TRACKER_KEY=1
+assert_neutralised_pattern_unreported RE_TRACKER_KEY_NAMESPACE \
+  "mutation: pattern is load-bearing (tracker-key neutralised -> its own positive fixture reports nothing)" \
+  "$TK_POS_REPO2" "$TK_POS_BASE2"
+unset PII_CHECK_TRACKER_KEY
 
 # =============================================================================
 # mutation: each exclusion is load-bearing (AC10, vacuity guard / detector
@@ -1132,6 +1479,12 @@ assert_meta_fails home-encoded "$HE_NEG_REPO" "$HE_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (home-encoded)"
 assert_meta_fails temp-session "$TS_NEG_REPO" "$TS_NEG_BASE" \
   "meta: neutralised positive fixture makes the assertion FAIL (temp-session)"
+assert_meta_fails host-local "$HL_NEG_REPO" "$HL_NEG_BASE" \
+  "meta: neutralised positive fixture makes the assertion FAIL (host-local)"
+export PII_CHECK_TRACKER_KEY=1
+assert_meta_fails tracker-key "$TKK_SINGLE_REPO" "$TKK_SINGLE_BASE" \
+  "meta: neutralised positive fixture makes the assertion FAIL (tracker-key)"
+unset PII_CHECK_TRACKER_KEY
 
 # =============================================================================
 # no-allowlist: finding reported even for the checker own path (AC13)
@@ -1315,6 +1668,48 @@ if [ "$GITLINK_ALL_RC" -eq 0 ] && printf '%s\n' "$GITLINK_ALL_OUT" | grep -qF 'c
 else
   fail "gitlink: --all mode (round 3 regression lock) (rc=$GITLINK_ALL_RC out=$GITLINK_ALL_OUT)"
 fi
+
+# =============================================================================
+# retro external-run form (T-1141): a retro written in
+# docs/templates/retro-template.md's "external-run" shape — citing a run
+# that happened outside this repository as `orchestrator record` and
+# nothing more specific — is clean under the shape checker with the
+# default-on host-local rule active and the tracker-key opt-in enabled, and
+# a paired positive control (same fixture, one named reference restored)
+# proves the same fixture path actually reaches the scan (DP-4: a negative
+# control alone cannot distinguish "clean" from "never inspected"). Both
+# fixtures are assembled at runtime, never stored under this directory
+# (AC8 / DP-4 / DP-1 continued).
+# =============================================================================
+printf '\n--- negative control: a retro in the template external-run form is clean with host-local on and tracker-key enabled ---\n'
+printf '\n--- positive control: the same retro fixture carrying a named reference reports under the opt-in ---\n'
+
+RP_LINE1="Cycle scope, external run: the adopter repository's own cycle, relayed as orchestrator record"
+RP_LINE2="Pull requests, external run: orchestrator record"
+
+RP_CLEAN_REPO="$(new_repo)"; RP_CLEAN_BASE="$(git -C "$RP_CLEAN_REPO" rev-parse HEAD)"
+add_fixture_lines "$RP_CLEAN_REPO" "retro-external-run.md" "$RP_LINE1" "$RP_LINE2"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "negative control: a retro in the template external-run form is clean with host-local on and tracker-key enabled" \
+  "$RP_CLEAN_REPO" "$RP_CLEAN_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Same fixture path, one named reference restored — a two-letter namespace
+# plus a hyphen and digits, the tracker-key shape — to prove this fixture
+# path actually reaches the scan rather than being clean because it was
+# never inspected. Assembled from fragments, following the pre-existing
+# TK_KEY_POS_LINE convention above: no line in this source file ever spells
+# the finished shape as a single committed literal.
+RP_POS_NS1="A"; RP_POS_NS2="B"
+RP_POS_NS="${RP_POS_NS1}${RP_POS_NS2}"
+RP_POS_NUM="123"
+RP_POS_LINE="reference ${RP_POS_NS}-${RP_POS_NUM} filed"
+RP_POS_REPO="$(new_repo)"; RP_POS_BASE="$(git -C "$RP_POS_REPO" rev-parse HEAD)"
+add_fixture_lines "$RP_POS_REPO" "retro-external-run.md" "$RP_LINE1" "$RP_LINE2" "$RP_POS_LINE"
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "positive control: the same retro fixture carrying a named reference reports under the opt-in" \
+  "tracker-key" "$RP_POS_REPO" "$RP_POS_BASE"
+unset PII_CHECK_TRACKER_KEY
 
 # =============================================================================
 # temp hygiene: every throwaway repo is created inside the trap-cleaned

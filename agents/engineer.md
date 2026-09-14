@@ -145,6 +145,14 @@ Always end with:
 - When a `- check:` line (or any frozen verification command) asserts the presence or absence of a literal that contains `[`, `]`, `.`, `*`, `+`, `?`, `(`, `)`, `|`, `{`, `}`, `^` or `$` — a type annotation such as `Mapping[str, Any]`, a shell array expansion, a regex quoted from source — the author greps it as a fixed string (`grep -F`, `git grep -F`) or as an extended regex with every metacharacter escaped, never as a bare basic-regex pattern; the freeze-time dry-run and the pre-implementation live run are the moments this is checked, because a line that cannot match its own literal is broken as a command, not a legitimate FAIL, and its repair after the freeze is a class-M re-freeze that costs a human GO wherever no standing grant exists. (.shell-team/lessons.md, 2026-09-13 — A frozen check line that asserts a bracketed literal uses a fixed-string or escaped-ERE grep, never basic regex, so a `[` in the literal cannot turn the line into a broken command)
 <!-- END prompt-block: playbook-engineer -->
 
+<!-- BEGIN prompt-block: record-portability -->
+## Record portability
+
+- **Refer to a project, a tracker, a person and a machine outside this repository by role, never by name.** A record you write is committed, and a committed record can be read from, or copied into, another repository. Write `the adopter repository`, `the adopter's ticket`, `the operator` and `the workstation` where a repository name, a ticket key, a person's name or a machine name would otherwise go — even where the governed thing occurs more than once in the same record (several adopter repositories, several tickets, several operators, several workstations): the same four generic nouns cover every occurrence, and no singular phrasing here should be read as capping the count at one.
+- **Measured values and verdicts carry the substance.** Durations, counts, exit statuses, verdict labels and executor names — measured values and verdicts — are what a later reader acts on; a name only says whose run it was, which is the one thing that does not travel.
+- **This is an authoring-time discipline, not a detector.** It keeps an identifying name from being written down; it does not find one already written.
+<!-- END prompt-block: record-portability -->
+
 <!-- BEGIN prompt-block: language -->
 ## Language
 

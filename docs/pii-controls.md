@@ -55,6 +55,17 @@ Generic, publishable shapes, each identified by a stable pattern id:
   real `sk-` key sitting immediately after a letter or a digit with no
   separator, since one character of left context cannot tell the two apart
   — every other boundary this gate reaches still fires.
+- `host-local` — a workstation host name in the machine-local form: a name
+  token immediately followed by the `.local` suffix (the placeholder form
+  `<host>.local` is deliberately not a match). On in the shipped default. A
+  per-repository configuration file name of the `<name>.local.<ext>` class
+  is excluded by a named class, never by a list of file names.
+- `tracker-key` — an issue-tracker key: an upper-case letters-only namespace
+  of two to ten characters, a hyphen, and a digit run. Off in the shipped
+  default (see below to enable it); a single-character namespace and a
+  namespace containing a digit are excluded by the outline itself, which is
+  what keeps this repository's own task-id convention clean by
+  construction.
 
 ## Running it
 
@@ -62,6 +73,13 @@ Generic, publishable shapes, each identified by a stable pattern id:
 bin/check-pii-shapes.sh                 # change-scoped against the default base
 bin/check-pii-shapes.sh --base develop  # change-scoped against an explicit ref
 bin/check-pii-shapes.sh --all           # full-tree audit (see below)
+```
+
+`tracker-key` is off in the shipped default; set `PII_CHECK_TRACKER_KEY` to a
+non-empty value in the environment to enable it for a run:
+
+```bash
+PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh
 ```
 
 Exit codes: `0` clean, `1` one or more findings, `2` usage or structural
@@ -82,6 +100,9 @@ change.
 
 - Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.
 - The patterns that would match named entities cannot live in this public repository, because the patterns themselves are the sensitive data; they belong in an operator-local check outside the repo.
+- The tracker-key rule is off in the shipped default and must be enabled explicitly, because a project-label convention this plugin itself teaches shares the same outline; with it enabled, standards identifiers of the same outline (a character-set or digest name, a date-format or vulnerability id, an RFC or HTTP status spelling) are reported as accepted noise, and the resolution is triage at the authoring site, never a prefix allow-list in this checker.
+- A configuration file name of the <name>.local.<ext> class is not reported as a host name, and a bare host name carrying no machine-local suffix is not covered at all.
+- The tracker-key and host-local rules match a generic outline, not a named entity: no pattern naming a specific customer, host or project ships in this repository, so the named-entity limitation above still holds.
 - Semantic sensitivity — a design decision or a context from which a reader can infer a business relationship — is not a PII shape and is not covered.
 - Image content is not inspected; metadata only, if anything.
 - The deliberate shape-bearing fixtures under tests/ are carried by the test-locked known-shapes list, so --all exits 0 on this tree; --all remains an audit flag and is deliberately not a required CI check.
