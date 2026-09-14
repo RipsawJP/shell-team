@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1141** one canonical rule for naming what lies outside the repository a record lives in, stated once and machine-verified in six role prompts — `READY_FOR_QA` — spec: .shell-team/specs/T-1141-record-portability-block.md
+- [ ] **T-1141** one canonical rule for naming what lies outside the repository a record lives in, stated once and machine-verified in six role prompts — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1141-record-portability-block.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked: branched from the tip of the predecessor branch feature/525-pii-shapes-tracker-key-host-local (open PR #529); merges at the sprint batch GO after that PR
@@ -94,6 +94,16 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 - Failure: this round's own new content re-introduces the exact violation Codex's round-1 Major named. `.shell-team/todo.md` line 83 (this round's own "Files changed" bullet, added by commit `bbdfcf5`) quotes the old fixture assignment as a bare literal while describing that it has been replaced — restating the identical finished tracker-key-shaped example value the fixture used to commit, in a fresh, new site, immediately beside the very commit meant to close the class. Three of the four originally-named sites are genuinely fixed (independently re-verified: the fixture is now fragmented across three variables interpolated only at point of use, the provenance quote is gone, and this QA record's own round-2 quote is gone); this fourth instance is new.
 - Also corrected: the round-3 hand-off's own count claim ("1918 findings, down from 1921") does not reproduce. Independently measured: branch-point baseline (`6f606ff`) = 1902; current tree (`bbdfcf5`) = 1921 — a net **increase** of 19 since the branch point, not a decrease to 1918. Of those 19 (all precisely located in `.shell-team/reviews/T-1141.md`'s round-3 section, mechanically derived from `git diff` hunks, not eyeballed): 18 are the already-ratified design-point-label/encoding-name accepted-noise class (benign, no action needed, confirmed by location not by re-quoting); exactly 1 is the genuine defect above.
 - Suggested next step: edit `.shell-team/todo.md` line 83's "Files changed" bullet to describe the old assignment by construction/location (e.g., "the positive-control assignment at the old line 1701, which committed the finished shape as a single bare literal") rather than quoting it; re-run `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` and confirm the count returns to 1902 + 18 = 1920 (the 18 accepted-noise sites, unaffected) with no report at that line. No other file needs to change — the fixture, provenance, and QA-record fixes from this round are correct and should not be redone.
+
+### QA verdict: PASS — T-1141 (round 4)
+
+- Task: T-1141 → READY_FOR_REVIEW
+- Tests: unchanged since round 3 (no code/spec/fixture/provenance content changed — confirmed by `git diff 0e6dd83..HEAD --stat` touching only the board and the interventions ledger); round 1's/2's/3's mechanical results (prompt-sync, retro, codex-agents, provenance, fixture suite, mutation self-checks) stand and are cited by reference in `.shell-team/reviews/T-1141.md`
+- Acceptance criteria: `check-acs` 13 passed, 0 failed, 1 skipped (unchanged); `check-intent` aligned; `check-interventions --task T-1141` conformant (1 entry, 0 sentinel — the `same-class-2` recurrence and its disposition); `check-handoff`/`check-board-headings` both exit 0. `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` now reports 1918 (down from round 3's 1921, delta exactly −3, matching the three lines fixed) — mechanically re-derived which findings sit inside lines this task's own diff added: 18, all the already-ratified design-point-label/encoding-name accepted-noise class, zero genuine defects; the three previously-flagged sites (this task's own round-3 quote, and two lines belonging to a much-earlier, already-merged predecessor task) are all confirmed gone, each checked at its own file:line rather than accepted on the hand-off's own say-so
+- Verification ceiling: unit-and-static — this verdict verifies every criterion at or below that level; none above this ceiling
+- Edge cases tried: none new this round (round-4 diff is board-and-interventions-only); classified every finding within this task's own added content by construction rather than by re-quoting, including catching and correcting one instance in my own first draft of this round's writeup before committing
+- Risk notes for reviewer: `.shell-team/provenance/T-1140.md` and `.shell-team/reviews/T-1140.md` (outside this task's change set) still carry the predecessor task's own historical fixture-example vocabulary several times over — confirmed out of scope (not in this task's scope-lock allow-list, AC10/AC12 both still PASS) and untouched by any round of this task
+
 
 
 ### Engineer hand-off — T-1140 (engineer, mode A2 — 5-line form)
