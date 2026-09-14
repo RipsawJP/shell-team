@@ -1697,8 +1697,13 @@ unset PII_CHECK_TRACKER_KEY
 # Same fixture path, one named reference restored — a two-letter namespace
 # plus a hyphen and digits, the tracker-key shape — to prove this fixture
 # path actually reaches the scan rather than being clean because it was
-# never inspected.
-RP_POS_LINE="reference AB-123 filed"
+# never inspected. Assembled from fragments, following the pre-existing
+# TK_KEY_POS_LINE convention above: no line in this source file ever spells
+# the finished shape as a single committed literal.
+RP_POS_NS1="A"; RP_POS_NS2="B"
+RP_POS_NS="${RP_POS_NS1}${RP_POS_NS2}"
+RP_POS_NUM="123"
+RP_POS_LINE="reference ${RP_POS_NS}-${RP_POS_NUM} filed"
 RP_POS_REPO="$(new_repo)"; RP_POS_BASE="$(git -C "$RP_POS_REPO" rev-parse HEAD)"
 add_fixture_lines "$RP_POS_REPO" "retro-external-run.md" "$RP_LINE1" "$RP_LINE2" "$RP_POS_LINE"
 export PII_CHECK_TRACKER_KEY=1
