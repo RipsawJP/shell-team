@@ -6,8 +6,13 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.6.4**
+  - **PII 形状ゲートが環境由来の形状を 2 つ追加で報告します。** `bin/check-pii-shapes.sh` に `host-local`（出荷時の既定で有効。名前トークン直後に machine-local のホスト接尾辞が続く形。`<name>.local.<ext>` 形の設定ファイル名は名前つきクラスで除外し、プレースホルダ `<host>.local` は構成上一致しない）と `tracker-key`（出荷時の既定では無効。`PII_CHECK_TRACKER_KEY` で有効化。2〜10 文字の大文字のみの名前空間・ハイフン・数字の形で、1 文字の名前空間と数字を含む名前空間は形状自体で除外）が加わります。両規則は両側に境界を持ち、より長いトークンの内側で一致が始まったり終わったりしません。ヘッダ・`--help`・両 adopter ドキュメントが id・opt-in・opt-in が伴う許容雑音クラスを列挙します。
+  - **記録は、その repo の外にあるものを名前でなく役割で呼びます。** 正典 prompt block 1 本を `marker` mode で記録を書く 6 role に登録し、規則と 4 つの一般名詞（adopter repository・adopter のチケット・operator・workstation）を述べ、記録の実質を運ぶのは計測値と verdict だと明記します。レトロ作成者の入力契約に、別 repo の run を中継する場合の境界（計測値と verdict のみ・出典は「orchestrator record」）が加わり、レトロテンプレートが外部 run の一般形を示します。
+  - **コミット済み記録の保守だけを行う変更は「records maintenance」とだけ記述します。** `CONTRIBUTING.md` が「How changes get merged」でこの規則を述べ、「Cutting a release」から参照し、両 CHANGELOG の自己宣言が同じ規則を持ちます。
+  - Records maintenance.
 - **v2.6.3**
-  - **保守リリース。** 一部のループ記録と loop-engineering のノート 1 本の記述をプレースホルダ表記に正規化しました。スクリプト・エージェント・スキル・テンプレートの挙動はこのリリースでは変わりません。
+  - Records maintenance.
 - **v2.6.2**
   - **`codex-reviewer` が「自分はどのホスト上で動いていると判断したか」を記録し、`bin/check-review-input.sh` がコミット済みバイトで判定できる唯一の矛盾を拒否するようになりました。** ロールの host-conditional note に実測済みのはしごが加わります: 何かを起動する前に自分のシェルで `CODEX_THREAD_ID` が set なら Codex CLI ホスト＝`claude -p` レシピ、unset または読めなければ Claude Code ホスト＝従来どおりの `codex exec` 経路で、拒否にはなりません。ロールはその分類を pass ごとに任意の第 5 フィールド `self-detected-host (<pass>): claude-code | codex-cli — <ground>` として review record に書きます。ground は変数名と set/unset だけを書き、値は書きません。checker はこのフィールドが存在する時だけ検証し（コミット済みの record は全て通過し続けます）、`codex-cli` と宣言しながら `executor-invocation` が `codex exec` の 2 トークンで始まる pass を拒否します。両 adopter ガイドは、Codex ホストの運用者が自分で読める観測を述べます: そこに `codex exec` の review が記録されていれば、verdict が `APPROVE` でも cross-provider は失われています。限界も同じ場所で明言します: spawn された Codex custom agent が `CODEX_THREAD_ID` を持つかは未計測であり、実際は spawn された Codex agent なのに `claude-code` と宣言するロールは checker では捕まえられません（record にホストの ground truth を持つ成分が無いためです）。
   - **Codex ホストの runbook が、最初の実 adopter run で計測された 4 つの穴を閉じます。** 手順 1 は、マーケットプレースを設定済みの読者に、インストールを skip する前に `codex plugin marketplace upgrade <marketplace>` を実行して `codex plugin list` の `VERSION` 列を実行したいリリースと比較するよう指示し、3 つの結果ごとの対処を書きます（手順 2 の presence テストは 1 リリース遅れを見分けられないため）。スペックのファイル名規則 `<specs dir>/<task-id>-<slug>.md` は、それに依存する消費者 `bin/check-durability.sh` の名前とともに、runbook と `agents/pm-spec.md` 自身の authoring 指示の両方に規則として明記されます。手順 10 は `READY_FOR_MERGE` 後の出荷ループの唯一の挙動を述べます: 出荷 contract では `push` と `merge` の両方が人間ゲートなのでセッションはそこで止まり、人間がブランチを push してプルリクエストを開き、マージとマージの GO も人間のものです。1 段落が `docs/tuning-oversight.ja.md` の再凍結節を指し、standing の `class-M` grant が存在することと、それをどこに記録するかが分かるようにします。
