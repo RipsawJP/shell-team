@@ -2,6 +2,8 @@
 
 Release history of the `shell-team` plugin — one bullet per release, newest first. Release history first moved out of `README.md`'s Versioning section into this file, and was later fully rewritten (reordered to newest-first, split into sub-bullets, and scrubbed of internal task/issue references) as part of public-release preparation; new release entries land here as part of this project's release process.
 
+A change that alters no behaviour and touches only committed records is described here as records maintenance, and nothing more — not what the records said before, not what was changed in them, not counts, not locations, however many records the change touches; the diff is the record of what changed. A release whose changes are all of that kind takes a single housekeeping line.
+
 日本語版: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
 - **v2.6.3**

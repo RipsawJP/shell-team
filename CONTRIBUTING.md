@@ -33,6 +33,13 @@ missing feature.
 In practice a contribution from outside is often re-shaped on its way in. That
 is the loop doing its job, not a verdict on the contribution.
 
+**A change that alters no behaviour and touches only committed records is
+described as records maintenance, and nothing more** — in the commit subject,
+in the pull-request title and body, and in the changelog entry. Not what the
+records said before, not what was changed in them, not counts, not locations,
+however many records the change touches: the diff is the record of what
+changed.
+
 ## About CI on your pull request
 
 Some checks in this repository test the shipped scripts — shellcheck, and the fixture suites under `tests/`. Others run a shipped script against this repository itself or against a shipped template, and those can fail for reasons that have nothing to do with your change.
@@ -107,6 +114,7 @@ The steps of a release, written from the release this repository has actually ru
 - **Measure the release before naming it.** `git log <previous-tag>..develop --oneline` is the content of the release, and the number follows semantic versioning applied to the surface this project declared stable at v1.0.0 — the plugin namespace and its command names.
 - **The version lives in exactly one tracked file.** `.claude-plugin/plugin.json` carries it, `.claude-plugin/marketplace.json` carries no version at any level, and CI compares the static version badge in both READMEs against that manifest — so the manifest and the two badges move together or the check fails.
 - **Prepare the release on its own branch off `develop`.** Bump the manifest version, move the version badge in both READMEs to match, and add the new entry to `CHANGELOG.md` and `CHANGELOG.ja.md` — newest entry first, describing behaviour a reader can observe, with no internal task or issue references, which is the style those files declare for themselves.
+- **A release whose changes are all records maintenance takes a single housekeeping line.** See `## How changes get merged` for what a description of such a change may say; this list adds no second rule, in the same way it delegates entry style to the files that declare it for themselves.
 - **Verify the changelog edit is pure addition before committing.** The new entry lands by insertion directly above the previous release's heading, and an edit anchored on that heading can silently consume it — that happened at v2.2.0, where the `v2.1.0` heading vanished and nine of its bullets leaked into the new release's body, caught only after publication. `git diff --numstat CHANGELOG.md CHANGELOG.ja.md` must report zero deleted lines; any deletion means the anchor was eaten, and the edit is redone rather than patched.
 - **Verify the preparation locally before pushing, in two passes.** `bash bin/check-readme-version.sh README.md README.ja.md` is the badge check, with the argument list CI itself uses, and it reads the working tree — so it is the only one of the three that means anything before the change is committed. The two named under "Confirming the CI check is green" above both read committed content — one enumerates the changed paths and reads each of them out of the commit, the other reads the commits themselves — so both belong after the preparation is committed, and neither can see an uncommitted edit.
 - **Land the preparation on `develop` through a pull request** and wait for the check to report a conclusion on it before merging, exactly as for any other change; a release has no board hygiene and no issue to close.
