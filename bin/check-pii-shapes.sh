@@ -481,40 +481,79 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 #     convention as AC9's other placeholder forms.
 #   RE_HOST_LOCAL_OUTLINE  (T-1140) the broad reachability half: a name
 #     token (letters, digits, hyphens) immediately followed by the
-#     `.local` suffix, with no right-side boundary at all — reaches a bare
-#     host name and a configuration file name carrying its extension
-#     alike. Not itself a reported pattern id; read out of this script's
-#     own source by the fixture suite's precondition idiom, the same role
+#     `.local` suffix, with no boundary at either end — reaches a bare host
+#     name, a configuration file name carrying its extension, and a token
+#     embedded inside a longer underscore-joined identifier alike. Not
+#     itself a reported pattern id; read out of this script's own source by
+#     the fixture suite's precondition idiom, the same role
 #     `RE_HOME_PATH_RAW` plays for home-path, so a negative-control fixture
 #     can be proven to genuinely REACH this outline while still being
-#     excluded by the requirement composed on top of it below.
-#   RE_HOST_LOCAL  (T-1140) composes `RE_HOST_LOCAL_OUTLINE` with a
-#     right-side requirement: end-of-line, or a character that is NOT a
-#     letter, digit, or dot, immediately after the suffix. A configuration
-#     file name of the `<name>.local.<ext>` class is immediately followed
-#     by a dot, so it never reaches this composed form — excluded by this
-#     named requirement, never by a list of file names; a bare host name at
-#     end-of-line, or followed by punctuation, still fires. The
-#     placeholder form `<host>.local` is a non-match by construction: the
-#     outline's name class admits no `<`/`>`, same convention as AC9's
-#     other placeholder forms.
+#     excluded by the requirements composed on top of it below.
+#   RE_HOST_LOCAL  (T-1140, round 2) composes `RE_HOST_LOCAL_OUTLINE` with
+#     a requirement on BOTH sides. Left: start-of-line, or a character
+#     that is NOT a letter, digit, or underscore, immediately before the
+#     name — closes a round-1 review Minor (an underscore-joined two-word
+#     identifier immediately before the suffix no longer reports the word
+#     after the underscore as if it were the whole host name; a genuine
+#     hyphenated host name is unaffected, because the hyphen is already
+#     part of the outline's own name class, so the whole token is what the
+#     leftmost match captures regardless). No literal reproduction of
+#     either shape is written here — see this rule's own fixture-suite
+#     assertions for a runtime-assembled example, per the PII-shape
+#     reporting convention (location and pattern id, never the flagged
+#     bytes, in any file this checker itself scans).
+#     Right: end-of-line, or a character that is NOT a letter, digit, dot,
+#     OR hyphen, immediately after the suffix. Round 1 shipped a right side
+#     that admitted a hyphen continuation as a terminator; round 2 closes
+#     that — a hyphen after the suffix now reads the same way a letter or
+#     digit already did: a file-name-shaped continuation, not a host-name
+#     boundary — which is also what brings this regex back into agreement
+#     with AC11's own residual-candidate audit filter (T-1140 class-M v2),
+#     which already treated a hyphen continuation as exempt. A configuration
+#     file name of
+#     the `<name>.local.<ext>` class is immediately followed by a dot, so
+#     it never reaches this composed form — excluded by this named
+#     requirement, never by a list of file names; a bare host name at
+#     end-of-line, or followed by punctuation other than a dot or hyphen,
+#     still fires. The placeholder form `<host>.local` is a non-match by
+#     construction: the outline's name class admits no `<`/`>`, same
+#     convention as AC9's other placeholder forms.
 #   RE_TRACKER_KEY_OUTLINE  (T-1140) the broad reachability half: an
 #     upper-case letter followed by up to nine more upper-case letters or
-#     digits, a hyphen, and a digit run — reaches a single-character
-#     namespace and a namespace containing a digit alike. Not itself a
-#     reported pattern id; read out of this script's own source by the
-#     fixture suite's precondition idiom, same role as
-#     `RE_HOST_LOCAL_OUTLINE` above.
+#     digits, a hyphen, and a digit run, with no boundary at either end —
+#     reaches a single-character namespace and a namespace containing a
+#     digit alike, and, carrying no boundary of its own, can also start or
+#     end strictly inside a longer token. Not itself a reported pattern id;
+#     read out of this script's own source by the fixture suite's
+#     precondition idiom, same role as `RE_HOST_LOCAL_OUTLINE` above.
 #   RE_TRACKER_KEY_NAMESPACE  (T-1140) the requirement that narrows the
 #     outline above: an upper-case, letters-only run of two to ten
 #     characters. Excludes a single-character namespace (this
 #     repository's own task-id convention, `T-<digits>`, among them) and a
 #     namespace carrying a digit (a line-range or label reference, e.g.
-#     `L194-199`) by construction, neither by an enumerated list.
-#   RE_TRACKER_KEY  (T-1140) composes `RE_TRACKER_KEY_NAMESPACE` with a
-#     literal hyphen and a digit run. Off in the shipped default; reported
-#     only when `PII_CHECK_TRACKER_KEY` is set to a non-empty value in the
-#     environment (see `scan_content_file()` below).
+#     `L194-199`) by construction, neither by an enumerated list — but,
+#     with no boundary requirement of its own, an unanchored search could
+#     still start the composed match strictly INSIDE a digit-bearing or an
+#     over-length namespace, at whatever offset first satisfies this class,
+#     defeating both exclusions by substring (round-1 review Blocker/Major:
+#     `A1BC-2` reported via its tail `BC-2`; an 11-letter namespace reported
+#     via a truncated 10-letter tail).
+#   RE_TRACKER_KEY  (T-1140, round 2) composes `RE_TRACKER_KEY_NAMESPACE`
+#     with a literal hyphen, a digit run, and a requirement on BOTH sides.
+#     Left: start-of-line, or a character that is NOT a letter or digit,
+#     immediately before the namespace — a digit or letter immediately
+#     before the candidate namespace means the match would start strictly
+#     inside a longer alnum run, which is exactly what the digit-bearing-
+#     namespace and over-length-namespace bypasses above rely on; this
+#     closes both, because neither bypass's earliest possible match
+#     position is ever preceded by a non-alnum character or a line start.
+#     Right: end-of-line, or a character that is NOT a letter or digit,
+#     immediately after the digit run — closes the round-1 review Major
+#     where a token continuing past the digit run (`AB-123abc`) still
+#     reported its `AB-123` prefix. Neither side uses `\b` (AC1). Off in
+#     the shipped default; reported only when `PII_CHECK_TRACKER_KEY` is
+#     set to a non-empty value in the environment (see
+#     `scan_content_file()` below).
 #
 # shellcheck disable=SC2016  # single-quoted regex text, not a variable expansion
 RE_HOME_PATH_BOUNDARY='(^|[^A-Za-z0-9.-])'
@@ -549,7 +588,7 @@ RE_TEMP_SESSION="${RE_TEMP_SESSION_ROOT}[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F
 # shellcheck disable=SC2016  # the reachable-outline half only — see the
 # RE_HOST_LOCAL_OUTLINE inventory entry above (T-1140, DP-11)
 RE_HOST_LOCAL_OUTLINE='[A-Za-z0-9][A-Za-z0-9-]*\.local'
-RE_HOST_LOCAL="${RE_HOST_LOCAL_OUTLINE}(\$|[^A-Za-z0-9.])"
+RE_HOST_LOCAL="(^|[^A-Za-z0-9_])${RE_HOST_LOCAL_OUTLINE}(\$|[^A-Za-z0-9.-])"
 # shellcheck disable=SC2016,SC2034  # SC2016: single-quoted regex, not a
 # variable expansion; SC2034: never referenced by this script itself — read
 # out of the source by the fixture suite's precondition idiom only (see the
@@ -558,7 +597,7 @@ RE_TRACKER_KEY_OUTLINE='[A-Z][A-Z0-9]{0,9}-[0-9]+'
 # shellcheck disable=SC2016  # the requirement that narrows the outline
 # above — see the RE_TRACKER_KEY_NAMESPACE inventory entry above (T-1140)
 RE_TRACKER_KEY_NAMESPACE='[A-Z]{2,10}'
-RE_TRACKER_KEY="${RE_TRACKER_KEY_NAMESPACE}-[0-9]+"
+RE_TRACKER_KEY="(^|[^A-Za-z0-9])${RE_TRACKER_KEY_NAMESPACE}-[0-9]+(\$|[^A-Za-z0-9])"
 
 # --- known-shapes list (DP-8) ------------------------------------------------
 # Per-file only — no directory entry, no glob, no pattern. Fixtures that

@@ -981,6 +981,98 @@ fi
 # shipped patterns' own — see the mutation/meta sections further down.)
 
 # =============================================================================
+# regression: round-1 review findings on RE_TRACKER_KEY's and
+# RE_HOST_LOCAL's boundary anchoring (T-1140 round 2). Each of the four
+# findings reproduced here as its own throwaway fixture, assembled from
+# fragments (DP-1: no PII-shaped byte enters this tree), plus the two
+# right-boundary positives the Major finding's own suggested fix implies.
+# =============================================================================
+printf '\n--- regression: tracker-key boundary anchoring (round-1 findings) ---\n'
+
+# Blocker: a digit-bearing namespace must stay entirely clean, not merely
+# under its own full spelling — the round-1 composed rule reported this
+# one through its letters-only tail.
+RGT_DBN_N1="A1"; RGT_DBN_N2="BC"
+RGT_DBN_NS="${RGT_DBN_N1}${RGT_DBN_N2}"
+RGT_DBN_REPO="$(new_repo)"; RGT_DBN_BASE="$(git -C "$RGT_DBN_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_DBN_REPO" "regress-dbn.txt" \
+  "note: ${RGT_DBN_NS}-2 is just a line-range style reference, not a tracker key"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: a digit-bearing namespace stays clean through its letters-only tail too (Blocker, round 1)" \
+  "$RGT_DBN_REPO" "$RGT_DBN_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Major: a real trailing continuation past the digit run must not be
+# truncated into a reported match.
+RGT_RB_NS="AB"; RGT_RB_NUM="123"; RGT_RB_TAIL="abc"
+RGT_RB_REPO="$(new_repo)"; RGT_RB_BASE="$(git -C "$RGT_RB_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_RB_REPO" "regress-rightbound.txt" \
+  "note ${RGT_RB_NS}-${RGT_RB_NUM}${RGT_RB_TAIL} trailing"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: a token continuing past the digit run is not truncated into a finding (Major, round 1)" \
+  "$RGT_RB_REPO" "$RGT_RB_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Major: an over-length (11-letter) namespace must not fire via a
+# truncated 10-letter tail.
+RGT_OL_N1="ABCDE"; RGT_OL_N2="FGHIJK"
+RGT_OL_NS="${RGT_OL_N1}${RGT_OL_N2}"
+RGT_OL_REPO="$(new_repo)"; RGT_OL_BASE="$(git -C "$RGT_OL_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_OL_REPO" "regress-overlong.txt" "note ${RGT_OL_NS}-1 test"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: an over-length namespace does not fire via a truncated tail (Major, round 1)" \
+  "$RGT_OL_REPO" "$RGT_OL_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Right-boundary positives implied by the Major's own suggested fix: a
+# genuine key immediately followed by punctuation still reports; the same
+# key immediately followed by more alphanumeric text does not.
+RGT_POS_NS="AB"; RGT_POS_NUM="12"
+RGT_DOT_REPO="$(new_repo)"; RGT_DOT_BASE="$(git -C "$RGT_DOT_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_DOT_REPO" "dot.txt" "${RGT_POS_NS}-${RGT_POS_NUM}."
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "regression: right-boundary positive, a trailing period still reports" \
+  "tracker-key" "$RGT_DOT_REPO" "$RGT_DOT_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+RGT_COMMA_REPO="$(new_repo)"; RGT_COMMA_BASE="$(git -C "$RGT_COMMA_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_COMMA_REPO" "comma.txt" "${RGT_POS_NS}-${RGT_POS_NUM},"
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "regression: right-boundary positive, a trailing comma still reports" \
+  "tracker-key" "$RGT_COMMA_REPO" "$RGT_COMMA_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+RGT_ALNUM_REPO="$(new_repo)"; RGT_ALNUM_BASE="$(git -C "$RGT_ALNUM_REPO" rev-parse HEAD)"
+add_fixture_line "$RGT_ALNUM_REPO" "alnum.txt" "${RGT_POS_NS}-${RGT_POS_NUM}abc"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "regression: right-boundary negative, trailing alphanumeric text stays clean" \
+  "$RGT_ALNUM_REPO" "$RGT_ALNUM_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+printf '\n--- regression: host-local boundary anchoring (round-1 findings) ---\n'
+
+# Major: a hyphen-continued token after the suffix must not fire — the
+# round-1 composed rule treated a hyphen as a valid terminator, now
+# provably inconsistent with AC11's own residual-candidate audit filter
+# for the identical shape (the class-M v2 finding).
+RGH_HYPH_N1="ho"; RGH_HYPH_N2="st"
+RGH_HYPH_NAME="${RGH_HYPH_N1}${RGH_HYPH_N2}"
+RGH_HYPH_TAIL="suffix"
+RGH_HYPH_REPO="$(new_repo)"; RGH_HYPH_BASE="$(git -C "$RGH_HYPH_REPO" rev-parse HEAD)"
+add_fixture_line "$RGH_HYPH_REPO" "regress-hyphencont.txt" \
+  "see ${RGH_HYPH_NAME}.local-${RGH_HYPH_TAIL} here"
+assert_clean "regression: a hyphen-continued token after the suffix stays clean (Major, round 1)" \
+  "$RGH_HYPH_REPO" "$RGH_HYPH_BASE"
+
+# Minor: an underscore-joined two-word identifier must not report the
+# word after the underscore as an embedded host name.
+RGH_US_N1="foo"; RGH_US_N2="bar"
+RGH_US_REPO="$(new_repo)"; RGH_US_BASE="$(git -C "$RGH_US_REPO" rev-parse HEAD)"
+add_fixture_line "$RGH_US_REPO" "regress-underscore.txt" "${RGH_US_N1}_${RGH_US_N2}.local end"
+assert_clean "regression: an underscore-joined identifier does not report its embedded suffix (Minor, round 1)" \
+  "$RGH_US_REPO" "$RGH_US_BASE"
+
+# =============================================================================
 # opt-in: tracker-key is off in the shipped default, fires when explicitly
 # enabled, and enabling it changes no other pattern id's verdict (AC7,
 # T-1140)
@@ -996,9 +1088,15 @@ OI_TRACKER_LINE="reference ${OI_TRACKER_NS}-${OI_TRACKER_NUM} filed"
 OI_HOME_N1="da"; OI_HOME_N2="na"
 OI_HOME_NAME="${OI_HOME_N1}${OI_HOME_N2}"
 OI_HOME_LINE="backup at /Users/${OI_HOME_NAME}/notes.txt"
+# host-local content in the same mixed fixture (round-2 broadening, review
+# Minor): the opt-in must leave host-local's own verdict alone too, not
+# only home-path's.
+OI_HOST_N1="wor"; OI_HOST_N2="kstation"
+OI_HOST_NAME="${OI_HOST_N1}${OI_HOST_N2}"
+OI_HOST_LINE="prompt at ${OI_HOST_NAME}.local for the build"
 
 OI_REPO="$(new_repo)"; OI_BASE="$(git -C "$OI_REPO" rev-parse HEAD)"
-add_fixture_lines "$OI_REPO" "mixed.txt" "$OI_TRACKER_LINE" "$OI_HOME_LINE"
+add_fixture_lines "$OI_REPO" "mixed.txt" "$OI_TRACKER_LINE" "$OI_HOME_LINE" "$OI_HOST_LINE"
 
 run_checker "$OI_REPO" "$OI_BASE"
 OI_DEFAULT_OUT="$OUT"; OI_DEFAULT_RC="$RC"
@@ -1022,10 +1120,13 @@ fi
 
 OI_DEFAULT_HOME_HITS="$(printf '%s\n' "$OI_DEFAULT_OUT" | grep -c '^FINDING pattern=home-path path=mixed\.txt' || true)"
 OI_ENABLED_HOME_HITS="$(printf '%s\n' "$OI_ENABLED_OUT" | grep -c '^FINDING pattern=home-path path=mixed\.txt' || true)"
-if [ "$OI_ENABLED_HOME_HITS" = "$OI_DEFAULT_HOME_HITS" ] && [ "$OI_DEFAULT_HOME_HITS" -gt 0 ]; then
+OI_DEFAULT_HOSTLOCAL_HITS="$(printf '%s\n' "$OI_DEFAULT_OUT" | grep -c '^FINDING pattern=host-local path=mixed\.txt' || true)"
+OI_ENABLED_HOSTLOCAL_HITS="$(printf '%s\n' "$OI_ENABLED_OUT" | grep -c '^FINDING pattern=host-local path=mixed\.txt' || true)"
+if [ "$OI_ENABLED_HOME_HITS" = "$OI_DEFAULT_HOME_HITS" ] && [ "$OI_DEFAULT_HOME_HITS" -gt 0 ] \
+   && [ "$OI_ENABLED_HOSTLOCAL_HITS" = "$OI_DEFAULT_HOSTLOCAL_HITS" ] && [ "$OI_DEFAULT_HOSTLOCAL_HITS" -gt 0 ]; then
   pass "opt-in: enabling the tracker-key rule changes no other pattern id verdict"
 else
-  fail "opt-in: enabling the tracker-key rule changes no other pattern id verdict (default hits=$OI_DEFAULT_HOME_HITS enabled hits=$OI_ENABLED_HOME_HITS)"
+  fail "opt-in: enabling the tracker-key rule changes no other pattern id verdict (default home-hits=$OI_DEFAULT_HOME_HITS enabled home-hits=$OI_ENABLED_HOME_HITS default host-local-hits=$OI_DEFAULT_HOSTLOCAL_HITS enabled host-local-hits=$OI_ENABLED_HOSTLOCAL_HITS)"
 fi
 
 # =============================================================================
