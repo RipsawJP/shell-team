@@ -1670,6 +1670,43 @@ else
 fi
 
 # =============================================================================
+# retro external-run form (T-1141): a retro written in
+# docs/templates/retro-template.md's "external-run" shape — citing a run
+# that happened outside this repository as `orchestrator record` and
+# nothing more specific — is clean under the shape checker with the
+# default-on host-local rule active and the tracker-key opt-in enabled, and
+# a paired positive control (same fixture, one named reference restored)
+# proves the same fixture path actually reaches the scan (DP-4: a negative
+# control alone cannot distinguish "clean" from "never inspected"). Both
+# fixtures are assembled at runtime, never stored under this directory
+# (AC8 / DP-4 / DP-1 continued).
+# =============================================================================
+printf '\n--- negative control: a retro in the template external-run form is clean with host-local on and tracker-key enabled ---\n'
+printf '\n--- positive control: the same retro fixture carrying a named reference reports under the opt-in ---\n'
+
+RP_LINE1="Cycle scope, external run: the adopter repository's own cycle, relayed as orchestrator record"
+RP_LINE2="Pull requests, external run: orchestrator record"
+
+RP_CLEAN_REPO="$(new_repo)"; RP_CLEAN_BASE="$(git -C "$RP_CLEAN_REPO" rev-parse HEAD)"
+add_fixture_lines "$RP_CLEAN_REPO" "retro-external-run.md" "$RP_LINE1" "$RP_LINE2"
+export PII_CHECK_TRACKER_KEY=1
+assert_clean "negative control: a retro in the template external-run form is clean with host-local on and tracker-key enabled" \
+  "$RP_CLEAN_REPO" "$RP_CLEAN_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# Same fixture path, one named reference restored — a two-letter namespace
+# plus a hyphen and digits, the tracker-key shape — to prove this fixture
+# path actually reaches the scan rather than being clean because it was
+# never inspected.
+RP_POS_LINE="reference AB-123 filed"
+RP_POS_REPO="$(new_repo)"; RP_POS_BASE="$(git -C "$RP_POS_REPO" rev-parse HEAD)"
+add_fixture_lines "$RP_POS_REPO" "retro-external-run.md" "$RP_LINE1" "$RP_LINE2" "$RP_POS_LINE"
+export PII_CHECK_TRACKER_KEY=1
+assert_finding "positive control: the same retro fixture carrying a named reference reports under the opt-in" \
+  "tracker-key" "$RP_POS_REPO" "$RP_POS_BASE"
+unset PII_CHECK_TRACKER_KEY
+
+# =============================================================================
 # temp hygiene: every throwaway repo is created inside the trap-cleaned
 # work dir (AC12)
 # =============================================================================

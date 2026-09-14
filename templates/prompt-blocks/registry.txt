@@ -54,3 +54,4 @@ contain dispatch-record.md                 agents/tech-lead.md skills/run/SKILL.
 contain means-ends-reflection.md           skills/run/SKILL.md skills/goal/SKILL.md
 contain alternate-executor-invocation.md   skills/run/SKILL.md
 contain host-dispatch.md                   skills/run/SKILL.md
+marker  record-portability.md              agents/scrum-master.md agents/pm-spec.md agents/engineer.md agents/qa-verifier.md agents/codex-reviewer.md agents/tech-lead.md

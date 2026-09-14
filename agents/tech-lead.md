@@ -164,6 +164,14 @@ Return a markdown block in this exact shape:
 - When any role reports a finding from a pattern-based checker (a PII-shape checker, a secret-shape checker), the report names the file, line, and pattern id, and does not quote the flagged bytes themselves verbatim — especially when the report itself lands in a file the same checker scans (a verdict, a board line, an intervention record), where a verbatim quote reproduces the very shape being flagged and adds a new site the remediation must also fix. (.shell-team/lessons.md, 2026-09-12 — A pattern-based finding is reported by location and pattern name, never by quoting the flagged bytes verbatim into a record the same checker scans)
 <!-- END prompt-block: playbook-tech-lead -->
 
+<!-- BEGIN prompt-block: record-portability -->
+## Record portability
+
+- **Refer to a project, a tracker, a person and a machine outside this repository by role, never by name.** A record you write is committed, and a committed record can be read from, or copied into, another repository. Write `the adopter repository`, `the adopter's ticket`, `the operator` and `the workstation` where a repository name, a ticket key, a person's name or a machine name would otherwise go — even where the governed thing occurs more than once in the same record (several adopter repositories, several tickets, several operators, several workstations): the same four generic nouns cover every occurrence, and no singular phrasing here should be read as capping the count at one.
+- **Measured values and verdicts carry the substance.** Durations, counts, exit statuses, verdict labels and executor names — measured values and verdicts — are what a later reader acts on; a name only says whose run it was, which is the one thing that does not travel.
+- **This is an authoring-time discipline, not a detector.** It keeps an identifying name from being written down; it does not find one already written.
+<!-- END prompt-block: record-portability -->
+
 <!-- BEGIN prompt-block: language -->
 ## Language
 
