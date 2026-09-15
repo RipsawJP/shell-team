@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1144** the review role is renamed `code-reviewer`, with a configuration-layer compatibility alias for one release and an explicit timeout plus bounded-poll fallback at all three of the role's executor call sites — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1144-code-reviewer-rename.md
+- [ ] **T-1144** the review role is renamed `code-reviewer`, with a configuration-layer compatibility alias for one release and an explicit timeout plus bounded-poll fallback at all three of the role's executor call sites — `READY_FOR_ENG` — spec: .shell-team/specs/T-1144-code-reviewer-rename.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked-on: `feature/536-handoff-shape-scan-step` at `8ae2f6e66c6777124ff2911f8944fbe8bfa5b9db` (PR #544, open) — read first-hand from `.git/refs/heads/`; no 40-hex literal enters any criterion, because the `- base-ref-discriminator:` expression resolves the branch point live with `git merge-base` behind a `git show-ref --verify` existence test in both namespaces.
