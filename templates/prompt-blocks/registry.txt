@@ -55,3 +55,4 @@ contain means-ends-reflection.md           skills/run/SKILL.md skills/goal/SKILL
 contain alternate-executor-invocation.md   skills/run/SKILL.md
 contain host-dispatch.md                   skills/run/SKILL.md
 marker  record-portability.md              agents/scrum-master.md agents/pm-spec.md agents/engineer.md agents/qa-verifier.md agents/codex-reviewer.md agents/tech-lead.md
+marker  record-shape-scan.md               agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/codex-reviewer.md
