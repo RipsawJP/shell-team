@@ -153,6 +153,21 @@ Always end with:
 - **This is an authoring-time discipline, not a detector.** It keeps an identifying name from being written down; it does not find one already written.
 <!-- END prompt-block: record-portability -->
 
+<!-- BEGIN prompt-block: record-shape-scan -->
+## Record shape scan before hand-off
+
+- **Before you write your hand-off, scan the record files you wrote or edited this round with the shipped shape checker, opt-in shapes enabled.** The scan reads the working tree, which is why it is the `--all` mode and not the change-scoped default: the default reads each changed path's committed blob, so a record you have not committed yet is invisible to it.
+
+  ```bash
+  PII_CHECK_TRACKER_KEY=1 bash "<plugin root>/bin/check-pii-shapes.sh" --all > "$out" 2>&1; rc=$?
+  ```
+
+- **Judge the filtered lines, never the bare exit status.** `--all` reports every path in the tree, so a `1` says something somewhere matched and says nothing about your own files. Read the `FINDING pattern=<id> path=<path> line=<n>` lines whose `path=` is one of the files you wrote this round. A `0` or a `1` is a scan that completed; a `2` is a scan that **did not complete**, and a scan that did not complete is never an absence of findings — fix the invocation and run it again.
+- **A hit on your own file is fixed in place before the hand-off is written** — by describing the shape in words, or by assembling it from fragments — never by quoting the bytes again and never by passing it to the next role. A hit the checker's own documents declare as **accepted noise** (this project's design-point label vocabulary and same-outline standards identifiers, under the opt-in) is classified as such in the summary line instead of being edited away.
+- **Quote the run's summary in your hand-off as one line**: `- shape-scan: rc=<rc> — <N> record path(s) written this round — <M> finding(s) on them, <K> classified accepted noise — command: <the exact command you ran>`. Every count carries the command that produced it, for the same reason every other count in a hand-off does; a round in which you wrote no record file still carries the line, with `<N>` zero.
+- **Report a finding by path, line and pattern id, never by quoting the flagged bytes** — the record you are writing is scanned by this same checker, so a verbatim quote adds a new site the fix has to reach too.
+<!-- END prompt-block: record-shape-scan -->
+
 <!-- BEGIN prompt-block: language -->
 ## Language
 

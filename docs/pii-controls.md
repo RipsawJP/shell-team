@@ -96,6 +96,27 @@ this repository; a newly added shape-bearing path anywhere else would still
 be reported. Use it locally when you want to sweep further than the current
 change.
 
+## When the loop runs it
+
+The four record-writing roles that carry a shell — the engineer, QA, the
+scrum-master and the cross-provider reviewer — run this checker once more of
+their own accord, right before writing their hand-off: `PII_CHECK_TRACKER_KEY=1
+bin/check-pii-shapes.sh --all`, with the opt-in enabled and in the `--all`
+mode rather than the change-scoped default. `--all` is the mode that reads
+the working tree; a record a round writes has not necessarily been committed
+yet at hand-off time, and the change-scoped default reads each changed
+path's committed blob, so it cannot see a record that is still uncommitted.
+
+The role filters the run's `FINDING pattern=<id> path=<path>` lines down to
+the paths it wrote or edited this round, fixes any hit on its own file in
+place before writing the hand-off, and quotes the run's outcome as one
+`- shape-scan:` line in that hand-off, carrying the finding count and the
+exact command run. This step is **not** wired into CI — `.github/workflows/
+check-handoff.yml` never sets `PII_CHECK_TRACKER_KEY` — so it is the only
+mechanical catch for the opt-in shapes; the change-scoped scan on every pull
+request is the separate, unconditional check for everything else this gate
+covers.
+
 ## What this gate does not cover
 
 - Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.

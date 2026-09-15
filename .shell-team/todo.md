@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1143** the shape scan becomes an executed hand-off step: one canonical prompt block, registered in marker mode against the four record-writing roles that have a shell, with the opt-in switch, the working-tree mode and the recorded summary line fixed once — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1143-handoff-shape-scan-step.md
+- [ ] **T-1143** the shape scan becomes an executed hand-off step: one canonical prompt block, registered in marker mode against the four record-writing roles that have a shell, with the opt-in switch, the working-tree mode and the recorded summary line fixed once — `READY_FOR_QA` — spec: .shell-team/specs/T-1143-handoff-shape-scan-step.md
   - entry-mode: pm-authored
   - spec-review: none
   - count: same-class-recurrence-sites-in-the-preceding-cycle — 4 — command: R=$(bash bin/team-paths.sh --get retros); awk '/^<!-- retro-section: problem -->$/,/^<!-- retro-section: try -->$/' "$R/2026-09-15-records-publishable.md" | grep -o '([1-4])' | sort -u | wc -l | tr -d ' '

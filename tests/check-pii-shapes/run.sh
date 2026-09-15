@@ -1712,6 +1712,72 @@ assert_finding "positive control: the same retro fixture carrying a named refere
 unset PII_CHECK_TRACKER_KEY
 
 # =============================================================================
+# hand-off shape scan (T-1143): proves the prescribed --all invocation for
+# the record-shape-scan prompt block does what the block claims, including
+# that the mode choice (decision point twelve) is load-bearing. The record
+# under test is written directly with printf and never committed — never
+# with add_fixture_line, which commits, defeating the whole point of the
+# round. As with the tracker-key fixtures above, the namespace and issue
+# number are assembled from fragments at runtime; no line here spells the
+# finished shape as a committed literal.
+# =============================================================================
+printf '\n--- hand-off shape scan ---\n'
+
+HOS_NS1="Q"; HOS_NS2="Z"
+HOS_NS="${HOS_NS1}${HOS_NS2}"
+HOS_NUM="42"
+HOS_LINE="reference ${HOS_NS}-${HOS_NUM} filed"
+HOS_RECORD_RELPATH="uncommitted-record.md"
+
+HOS_REPO="$(new_repo)"
+HOS_BASE="$(git -C "$HOS_REPO" rev-parse HEAD)"
+printf '%s\n' "$HOS_LINE" > "$HOS_REPO/$HOS_RECORD_RELPATH"
+
+# (a) --all reads the working tree, so the untracked, uncommitted record is
+# visible to the documented invocation.
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_ALL_OUT="$(cd "$HOS_REPO" && bash "$BIN" --all 2>&1)"
+HOS_ALL_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_ALL_RC" -eq 1 ] && printf '%s\n' "$HOS_ALL_OUT" | grep -qF -- "pattern=tracker-key path=${HOS_RECORD_RELPATH}"; then
+  pass "hand-off shape scan: an uncommitted record carrying the opt-in-only shape is reported by the documented --all invocation"
+else
+  fail "hand-off shape scan: an uncommitted record carrying the opt-in-only shape is reported by the documented --all invocation (rc=$HOS_ALL_RC out=$HOS_ALL_OUT)"
+fi
+
+# (b) load-bearing negative control: the change-scoped default reads each
+# changed path's committed blob, so the same uncommitted record — never
+# part of any commit — is invisible to it.
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_DIFF_OUT="$(cd "$HOS_REPO" && bash "$BIN" --base "$HOS_BASE" 2>&1)"
+HOS_DIFF_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_DIFF_RC" -eq 0 ] && ! printf '%s\n' "$HOS_DIFF_OUT" | grep -q '^FINDING'; then
+  pass "hand-off shape scan: the same uncommitted record is invisible to the change-scoped default, which reads committed blobs"
+else
+  fail "hand-off shape scan: the same uncommitted record is invisible to the change-scoped default, which reads committed blobs (rc=$HOS_DIFF_RC out=$HOS_DIFF_OUT)"
+fi
+
+# (c) fixed in place: describe the shape in words instead of quoting it, and
+# the same --all invocation reports nothing for that path.
+printf 'reference filed under its own tracking system, described in words\n' > "$HOS_REPO/$HOS_RECORD_RELPATH"
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_FIXED_OUT="$(cd "$HOS_REPO" && bash "$BIN" --all 2>&1)"
+HOS_FIXED_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_FIXED_RC" -eq 0 ] && ! printf '%s\n' "$HOS_FIXED_OUT" | grep -qF -- "path=${HOS_RECORD_RELPATH}"; then
+  pass "hand-off shape scan: the same record passes once the shape is described in words instead"
+else
+  fail "hand-off shape scan: the same record passes once the shape is described in words instead (rc=$HOS_FIXED_RC out=$HOS_FIXED_OUT)"
+fi
+
+# =============================================================================
 # temp hygiene: every throwaway repo is created inside the trap-cleaned
 # work dir (AC12)
 # =============================================================================
