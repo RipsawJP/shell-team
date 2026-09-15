@@ -122,6 +122,13 @@ project's design-point label vocabulary and same-outline standards
 identifiers, under the opt-in — is classified as such in the summary line
 rather than edited away.
 
+A scan whose invocation itself fails — a redirect or file-creation error, or
+an exit status of `2` — is a scan that did not complete, and a scan that did
+not complete is never read as an absence of findings; the role fixes the
+invocation and reruns it. The `- shape-scan:` line quoted in the hand-off is
+always from a run made after any hit on the role's own file has been fixed,
+never from the run that found it.
+
 ## What this gate does not cover
 
 - Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.
