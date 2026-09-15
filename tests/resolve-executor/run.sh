@@ -541,6 +541,56 @@ fi
 pass "alias: resolve-executor --role accepts the superseded spelling and reports the current name"
 
 # =============================================================================
+# stderr-shape regression (T-1144 round 2, codex-reviewer round-1 Major 1):
+# the delegated check-binding.sh call's stderr is separated from its
+# stdout by content, not inherited wholesale — exactly one line reaches
+# this script's own stderr on EVERY outcome, never two. A presence-only
+# `grep -qF` assertion (as every other binding-unresolved case above this
+# one in this suite uses) cannot catch a SECOND, extra line arriving
+# alongside the expected one — these two cases assert a LINE COUNT.
+# =============================================================================
+STDERR_SHAPE_ROOT="$TMP/stderr-shape"
+mkdir -p "$STDERR_SHAPE_ROOT/.shell-team"
+
+# (1) a refused host config unrelated to the role-token alias (a bare
+# unsupported schema version — the exact reproduction codex-reviewer used)
+# still produces exactly ONE stderr line: the delegated validator's own
+# line must NOT also leak through alongside this script's own refusal.
+printf 'schema v1\n' > "$STDERR_SHAPE_ROOT/.shell-team/binding.conf"
+rc=0
+( cd "$STDERR_SHAPE_ROOT" && bash "$RESOLVER" --print-resolved \
+    >"$TMP/stderr-shape-bad.out" 2>"$TMP/stderr-shape-bad.err" ) || rc=$?
+[ "$rc" -eq 2 ] || fail "stderr-shape-refused: expected exit 2, got $rc"
+[ ! -s "$TMP/stderr-shape-bad.out" ] || fail "stderr-shape-refused: expected zero stdout bytes"
+shape_bad_lines="$(wc -l < "$TMP/stderr-shape-bad.err" | tr -d ' ')"
+[ "$shape_bad_lines" = "1" ] \
+  || fail "stderr-shape-refused: expected exactly 1 stderr line, got $shape_bad_lines"
+grep -qF -- 'binding-unresolved' "$TMP/stderr-shape-bad.err" \
+  || fail "stderr-shape-refused: expected binding-unresolved on stderr"
+if grep -qF -- 'check-binding:' "$TMP/stderr-shape-bad.err"; then
+  fail "stderr-shape-refused: the delegated validator's own stderr line leaked through alongside this script's own refusal"
+fi
+pass "stderr-shape-refused — a refused host config unrelated to the alias still surfaces exactly one stderr line, never the delegated validator's line plus this script's own"
+
+# (2) an aliased row that resolves SUCCESSFULLY still produces exactly ONE
+# stderr line (the delegated validator's own deprecation notice), run from
+# a foreign scratch directory outside this repository, exactly as AC7(b)
+# exercises.
+sed 's/^bind code-reviewer /bind codex-reviewer /' "$REPO_ROOT/templates/binding-default.conf" \
+  > "$STDERR_SHAPE_ROOT/.shell-team/binding.conf"
+rc=0
+( cd "$STDERR_SHAPE_ROOT" && bash "$RESOLVER" --print-resolved \
+    >"$TMP/stderr-shape-ok.out" 2>"$TMP/stderr-shape-ok.err" ) || rc=$?
+[ "$rc" -eq 0 ] || fail "stderr-shape-aliased-success: expected exit 0, got $rc"
+[ -s "$TMP/stderr-shape-ok.out" ] || fail "stderr-shape-aliased-success: expected non-empty stdout"
+shape_ok_lines="$(wc -l < "$TMP/stderr-shape-ok.err" | tr -d ' ')"
+[ "$shape_ok_lines" = "1" ] \
+  || fail "stderr-shape-aliased-success: expected exactly 1 stderr line, got $shape_ok_lines"
+grep -qF -- 'deprecated' "$TMP/stderr-shape-ok.err" \
+  || fail "stderr-shape-aliased-success: expected the delegated validator's deprecation diagnostic on stderr"
+pass "stderr-shape-aliased-success — a successfully-resolved aliased role token surfaces exactly the delegated validator's own deprecation line, one line, nothing else"
+
+# =============================================================================
 # CI wiring this suite asserts (AC15 shape)
 # =============================================================================
 test -r "$WORKFLOW" || fail "ci-wiring: workflow file unreadable: $WORKFLOW"
