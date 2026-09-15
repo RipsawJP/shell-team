@@ -127,6 +127,15 @@ done
 
 # --- an extra shell-team-*.toml this run does not own is a violation; any
 #     other *.toml (an adopter's own Codex agent) is ignored outright. --
+# T-1144 (issue #524): one named basename inside that "extra" set gets a
+# specific hint rather than the generic message — shell-team-codex-reviewer
+# .toml is the file gen-codex-agents.sh wrote under the review role's own
+# superseded name before the rename. bin/gen-codex-agents.sh now removes it
+# by name on every run (see its own header); its surviving here means this
+# --out-dir has not been regenerated since the rename, and the generic
+# "extra" wording ("this generator does not own") reads as though the file
+# were unrelated cruft rather than a specific, named, one-time migration.
+LEGACY_CODEX_REVIEWER_BASENAME="shell-team-codex-reviewer.toml"
 if [ -d "$OUT_DIR" ]; then
   for f in "$OUT_DIR"/shell-team-*.toml; do
     [ -e "$f" ] || continue   # unmatched glob (no shell-team-*.toml files at all)
@@ -139,7 +148,11 @@ if [ -d "$OUT_DIR" ]; then
       fi
     done
     if [ "$owned" -eq 0 ]; then
-      emit "$f: an extra shell-team-*.toml this generator does not own for the requested role list ($ROLES)"
+      if [ "$base" = "$LEGACY_CODEX_REVIEWER_BASENAME" ]; then
+        emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run bin/gen-codex-agents.sh, which removes this file by name, or remove it by hand"
+      else
+        emit "$f: an extra shell-team-*.toml this generator does not own for the requested role list ($ROLES)"
+      fi
     fi
   done
 fi

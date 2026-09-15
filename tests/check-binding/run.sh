@@ -732,4 +732,43 @@ grep -qF -- 'codex-reviewer' "$aliasboth_err" \
   || fail "cb-alias-both-collision: expected the superseded spelling named on stderr"
 pass "alias: a binding.conf carrying both spellings is refused with a message naming the collision"
 
+# =============================================================================
+# alias diagnostic-ordering regression (T-1144 Codex round-2 Major 2): a
+# direct invocation's stderr is EXACTLY one line in both the aliased-success
+# and the both-spellings-refusal cases — a whole-file `wc -l`, never a
+# presence grep, because presence alone cannot tell "one line" apart from
+# "the deprecation notice plus a later refusal", which is exactly the shape
+# round 2 found: the deprecation printf fired unconditionally at
+# normalization time, before the later duplicate/collision walk could
+# discover the two rows collide, so a both-spellings config emitted two
+# lines against this script's own one-token-per-refusal contract.
+# =============================================================================
+n_aliasold_lines="$(wc -l < "$aliasold_err" | tr -d ' ')"
+[ "$n_aliasold_lines" = "1" ] \
+  || fail "cb-alias-superseded-deprecated-linecount: expected exactly 1 stderr line total, got $n_aliasold_lines: $(cat "$aliasold_err")"
+pass "cb-alias-superseded-deprecated-linecount: an aliased-success direct invocation emits exactly 1 stderr line"
+
+n_aliasboth_lines="$(wc -l < "$aliasboth_err" | tr -d ' ')"
+[ "$n_aliasboth_lines" = "1" ] \
+  || fail "cb-alias-both-collision-linecount: expected exactly 1 stderr line total, got $n_aliasboth_lines: $(cat "$aliasboth_err")"
+pass "cb-alias-both-collision-linecount: a both-spellings direct invocation emits exactly 1 stderr line"
+
+# Control: an ordinary, alias-unrelated refusal is ALSO exactly one stderr
+# line — proves the invariant this fix restores ("a diagnostic is emitted
+# only once the whole input has validated, and never on a refusal path") is
+# general, not a special case wired only for the alias.
+badschema="$TMP/badschema.conf"
+sed 's/^schema 1$/schema 99/' "$base" > "$badschema"
+badschema_out="$TMP/badschema.out"; badschema_err="$TMP/badschema.err"
+set +e
+bash "$CHECKER" --config "$badschema" --print-binding > "$badschema_out" 2> "$badschema_err"
+badschema_rc=$?
+set -e
+[ "$badschema_rc" -ne 0 ] || fail "cb-bad-schema-linecount: expected a non-zero exit"
+[ ! -s "$badschema_out" ] || fail "cb-bad-schema-linecount: expected zero stdout bytes"
+n_badschema_lines="$(wc -l < "$badschema_err" | tr -d ' ')"
+[ "$n_badschema_lines" = "1" ] \
+  || fail "cb-bad-schema-linecount: expected exactly 1 stderr line total, got $n_badschema_lines: $(cat "$badschema_err")"
+pass "cb-bad-schema-linecount: an ordinary (non-alias) refusal is also exactly 1 stderr line"
+
 printf 'check-binding suite: all cases passed\n'

@@ -690,6 +690,78 @@ else
   fail "T-1136 extra: the same invocation without the mv shim still succeeds cleanly"
 fi
 
+# =============================================================================
+# extra (T-1144, issue #524): the review role's rename leaves an
+# adopter-generated shell-team-codex-reviewer.toml behind under the
+# superseded basename; the generator removes it by name on regeneration,
+# and the checker names it with a specific hint when it survives
+# un-regenerated (Codex review round-2 Major 1).
+# =============================================================================
+printf '\n--- extra (T-1144): legacy shell-team-codex-reviewer.toml migration ---\n'
+LEGACY_BASENAME="shell-team-codex-reviewer.toml"
+
+# Fixture A: a fresh generator run, seeded afterward with the legacy file
+# (simulating a released pre-rename generation), then regenerated. The
+# legacy file must be gone and the out-dir back in sync.
+OUT18="$T/out18"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT18" >/dev/null 2>&1
+cp "$OUT18/shell-team-engineer.toml" "$OUT18/$LEGACY_BASENAME"
+[ -f "$OUT18/$LEGACY_BASENAME" ] \
+  || fail "T-1144 extra: fixture control failed — could not seed the legacy basename"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT18" >"$T/gen18.out" 2>"$T/gen18.err"; then
+  if [ -e "$OUT18/$LEGACY_BASENAME" ]; then
+    fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (file still present)"
+  elif ! grep -qF -- "$LEGACY_BASENAME" "$T/gen18.err"; then
+    fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (no stderr notice naming it: $(cat "$T/gen18.err"))"
+  elif ! bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT18" >"$T/chk18.out" 2>"$T/chk18.err"; then
+    fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (out-dir not back in sync: $(cat "$T/chk18.err"))"
+  else
+    pass "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration, and the out-dir is back in sync"
+  fi
+else
+  fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (regeneration itself failed: $(cat "$T/gen18.err"))"
+fi
+# Idempotency: a second regeneration with the legacy file already gone is a
+# clean no-op re-run of the removal step (not a refusal, not a re-hit).
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT18" >/dev/null 2>"$T/gen18b.err"; then
+  fail "T-1144 extra: a second regeneration after the legacy file is already gone still succeeds ($(cat "$T/gen18b.err"))"
+else
+  pass "T-1144 extra: a second regeneration after the legacy file is already gone is idempotent"
+fi
+
+# Fixture B: the checker's own specific hint when the legacy file survives
+# un-regenerated (an out-dir the generator has not touched since the
+# rename) — distinct from the generic "extra" message an unrelated stray
+# *.toml still gets.
+OUT19="$T/out19"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT19" >/dev/null 2>&1
+cp "$OUT19/shell-team-engineer.toml" "$OUT19/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT19" >"$T/chk19.out" 2>"$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (checker did not refuse)"
+elif ! grep -qF -- "$LEGACY_BASENAME" "$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (basename not named: $(cat "$T/chk19.err"))"
+elif ! grep -qF -- 'codex-reviewer' "$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (superseded role name not mentioned: $(cat "$T/chk19.err"))"
+elif grep -qF -- 'this generator does not own for the requested role list' "$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (fell through to the generic 'extra' message instead: $(cat "$T/chk19.err"))"
+else
+  pass "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint, distinct from the generic 'extra' message"
+fi
+# Regression control: an unrelated stray *.toml still gets the generic
+# message, proving the specific hint is scoped to the one named basename.
+OUT20="$T/out20"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT20" >/dev/null 2>&1
+cp "$OUT20/shell-team-engineer.toml" "$OUT20/shell-team-some-other-role.toml"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT20" >"$T/chk20.out" 2>"$T/chk20.err"; then
+  fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (checker did not refuse)"
+elif grep -qF -- 'codex-reviewer' "$T/chk20.err"; then
+  fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (got the legacy-specific hint instead: $(cat "$T/chk20.err"))"
+elif ! grep -qF -- 'this generator does not own for the requested role list' "$T/chk20.err"; then
+  fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (generic message missing: $(cat "$T/chk20.err"))"
+else
+  pass "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message, unaffected by the legacy-basename hint"
+fi
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'codex-agents suite: all assertions passed\n'

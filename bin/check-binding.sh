@@ -365,6 +365,19 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
   BIND_ROLE=() BIND_PROVIDER=() BIND_MODEL=() BIND_EFFORT=() BIND_ADAPTER=()
   BIND_ROLE_ORIG=()
   BOUND_LINES=()
+  # T-1144 round 3 (Codex round-2 Major 2): the alias deprecation line is
+  # BUFFERED here, never printed inline, and flushed only at the very end of
+  # this function (after every refuse()-capable check below — the six-role
+  # completeness loop included — has already returned without exiting).
+  # Every refusal in this file exits the process outright via refuse(), so
+  # any refusal reached after a row is buffered simply discards this array
+  # along with the rest of the process's state: a refused both-spellings
+  # config (the `collision` case) never reaches the flush below, and a
+  # refused config never carries a stray `deprecated` line alongside its one
+  # refusal token. This is the general invariant the finding names — a
+  # diagnostic is emitted only once the whole input has validated, and never
+  # on a refusal path — not a fix scoped to this one alias.
+  DEPRECATION_NOTICES=()
   local role provider model effort adapter seen reg_provider role_orig di
   lineno=0
   while IFS= read -r raw || [ -n "$raw" ]; do
@@ -396,8 +409,13 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     role_orig="$role"
     if [ "$role" = "$SUPERSEDED_REVIEWER_ROLE" ]; then
       role="code-reviewer"
-      printf 'check-binding: deprecated: role token '\''%s'\'' in %s is accepted as an alias for '\''%s'\'' — rewrite this binding.conf before the alias is removed in the next release\n' \
-        "$SUPERSEDED_REVIEWER_ROLE" "$cfg" "code-reviewer" >&2 || true
+      # Buffered, not printed here (see DEPRECATION_NOTICES above): this row
+      # may still collide with an already-bound 'code-reviewer' row further
+      # down in the same file, or the six-role completeness check below may
+      # still fail for an unrelated reason — either refuses the whole run,
+      # and neither may coexist with this line on stderr.
+      DEPRECATION_NOTICES+=("$(printf 'check-binding: deprecated: role token '\''%s'\'' in %s is accepted as an alias for '\''%s'\'' — rewrite this binding.conf before the alias is removed in the next release' \
+        "$SUPERSEDED_REVIEWER_ROLE" "$cfg" "code-reviewer")")
     fi
     if ! [[ "$provider" =~ $ROLE_RE ]] || [ "${#provider}" -gt "$MAXLEN" ]; then
       refuse bad-token 1 "malformed provider token: $provider"
@@ -464,6 +482,16 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     while IFS= read -r sorted || [ -n "$sorted" ]; do
       [ -n "$sorted" ] && CANON_LINES+=("$sorted")
     done <<< "$sorted_text"
+  fi
+
+  # --- flush the buffered deprecation notice(s), only now that every
+  #     refuse()-capable check above (including the six-role completeness
+  #     loop just above) has returned without exiting the process. This is
+  #     the ONLY place this function writes to stderr on a path that is not
+  #     a refusal, and it is unconditionally the last thing this function
+  #     does — nothing after this point can still refuse.
+  if [ "${#DEPRECATION_NOTICES[@]}" -gt 0 ]; then
+    printf '%s\n' "${DEPRECATION_NOTICES[@]}" >&2 || true
   fi
 }
 

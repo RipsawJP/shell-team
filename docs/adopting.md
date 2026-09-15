@@ -1353,7 +1353,12 @@ does it reach a copy of `templates/CLAUDE-routing-snippet.md` you have
 already pasted into your own `CLAUDE.md`: that copy is yours, in your own
 repository, and nothing this project ships can edit it for you — read the
 routing snippet in the current release and update your own copy by hand if
-it still names the superseded role.
+it still names the superseded role. Nor does it clean up a
+`.codex/agents/shell-team-codex-reviewer.toml` a previous release already
+generated under the superseded name: `bin/gen-codex-agents.sh` removes that
+one legacy basename by name the next time you run it, and
+`bin/check-codex-agents.sh` names it explicitly, with the same remedy, if
+it survives un-regenerated.
 
 **Removal.** This alias is scoped to one release cycle: it ships in the
 release that carries this rename and is removed in the next release after

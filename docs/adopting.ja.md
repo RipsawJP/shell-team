@@ -1310,7 +1310,11 @@ harness 自身の sub-agent の改名ではない: `agents/code-reviewer.md` が
 コピーにも alias は届かない——そのコピーはあなた自身のリポジトリにある
 あなた自身のものであり、この project が出荷するものでは編集できない。現行
 リリースの routing snippet を読み、旧ロール名のままなら自分のコピーを手で
-更新してほしい。
+更新してほしい。以前のリリースがすでに生成した
+`.codex/agents/shell-team-codex-reviewer.toml` の後片付けも alias は行わない——
+`bin/gen-codex-agents.sh` は次回実行時にこの旧 basename を名指しで削除し、
+再生成されないまま残っている場合は `bin/check-codex-agents.sh` が同じ対処法とともに
+それを明示的に名指しする。
 
 **削除。** この alias は一リリース周期に限定されている: この改名を含むリリースで
 出荷され、次のリリースで削除される。あなた自身の `binding.conf` や scripted な
