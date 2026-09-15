@@ -43,7 +43,9 @@
 #     tokens/duration totals above already use).
 #   review: <span>#<seq>=<relation> ... (or "(none)") — one token PER
 #     reviewer span (never one boolean per run), in input order. The
-#     reviewer role set is {codex-reviewer}; the authoring role set is
+#     reviewer role set is {code-reviewer, codex-reviewer} (T-1144, issue
+#     #524: both tokens, so historical telemetry under the superseded
+#     spelling still rolls up); the authoring role set is
 #     {engineer} (T-1058 DP6). A reviewer span's counterpart is the nearest
 #     PRECEDING authoring span in the same run in input order (no sort: this
 #     reporter already buffers in file/line order and adds none). <relation>
@@ -127,7 +129,7 @@ field_num() {
 # (which names the role the relation is defined over), never on `phase`
 # (which names where in the loop the call happened).
 AUTHOR_ROLES=(engineer)
-REVIEWER_ROLES=(codex-reviewer)
+REVIEWER_ROLES=(code-reviewer codex-reviewer)
 is_author_role() {
   local want="$1" r
   for r in "${AUTHOR_ROLES[@]}"; do [[ "$r" == "$want" ]] && return 0; done

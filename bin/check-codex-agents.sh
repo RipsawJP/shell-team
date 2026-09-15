@@ -3,7 +3,7 @@
 # with a fresh run of its check-only sibling generator, gen-codex-agents.sh
 # (T-1134; GitHub issue #484;
 # .shell-team/specs/T-1134-codex-host-slice1.md). T-1135 (GitHub issue #493;
-# .shell-team/specs/T-1135-codex-host-slice2.md) adds codex-reviewer as a
+# .shell-team/specs/T-1135-codex-host-slice2.md) adds code-reviewer as a
 # fifth default role, inside this script's own authority exactly like the
 # other four — no special-casing.
 #
@@ -66,7 +66,7 @@ SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
 ROOT=""
 OUT_DIR=""
-ROLES="tech-lead pm-spec engineer qa-verifier codex-reviewer"
+ROLES="tech-lead pm-spec engineer qa-verifier code-reviewer"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in

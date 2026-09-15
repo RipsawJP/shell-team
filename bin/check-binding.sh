@@ -13,8 +13,15 @@
 # Grammar: a required `schema <version>` line, followed by exactly one
 # `bind <role> <provider> <model> <effort|-> <adapter>` row for each of
 # the six inner-loop roles (tech-lead, pm-spec, engineer, qa-verifier,
-# codex-reviewer, ui-designer) — no more, no fewer. `#` comment lines and
+# code-reviewer, ui-designer) — no more, no fewer. `#` comment lines and
 # blank lines are skipped; row order and extra whitespace do not matter.
+#
+# Alias (T-1144, issue #524): a `bind` row's role field carrying the
+# superseded spelling `codex-reviewer` is accepted and normalized to
+# `code-reviewer` before the six-row / duplicate-role re-assertions below,
+# with exactly one deprecation line on stderr; a config carrying `bind`
+# rows for BOTH spellings is refused with a `collision` token naming both.
+# The alias is one release's compatibility shim, not a second role.
 #
 # Usage:
 #   check-binding.sh [--config PATH] [--adapters PATH]
@@ -179,7 +186,11 @@ print_help() {
 ROLE_RE='^[a-z][a-z0-9-]*$'
 MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 MAXLEN=64
-SIX_ROLES=(tech-lead pm-spec engineer qa-verifier codex-reviewer ui-designer)
+SIX_ROLES=(tech-lead pm-spec engineer qa-verifier code-reviewer ui-designer)
+# T-1144 (issue #524): the superseded role spelling, accepted as a
+# config-layer alias for one release and normalized to SIX_ROLES's own
+# `code-reviewer` entry before any duplicate/six-row re-assertion runs.
+SUPERSEDED_REVIEWER_ROLE="codex-reviewer"
 SUPPORTED_SCHEMA_VERSIONS=(1)
 SUPPORTED_LOCK_VERSIONS=(1)
 
@@ -352,8 +363,9 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
 
   # Pass 2: every remaining substantive line, in file order.
   BIND_ROLE=() BIND_PROVIDER=() BIND_MODEL=() BIND_EFFORT=() BIND_ADAPTER=()
+  BIND_ROLE_ORIG=()
   BOUND_LINES=()
-  local role provider model effort adapter seen reg_provider
+  local role provider model effort adapter seen reg_provider role_orig di
   lineno=0
   while IFS= read -r raw || [ -n "$raw" ]; do
     lineno=$((lineno + 1))
@@ -374,6 +386,19 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     if ! [[ "$role" =~ $ROLE_RE ]] || [ "${#role}" -gt "$MAXLEN" ]; then
       refuse bad-token 1 "malformed role token: $role"
     fi
+    # T-1144 (issue #524) — normalize the superseded role spelling to the
+    # current one BEFORE role_in_six / duplicate / six-row re-assertions,
+    # so a v2.6.x-shaped row resolves and a both-spellings row collides
+    # rather than being reported as an ordinary duplicate. role_orig is
+    # the pre-normalization token, kept only to tell a genuine collision
+    # (two different original spellings landing on one role) apart from
+    # an ordinary same-spelling duplicate below.
+    role_orig="$role"
+    if [ "$role" = "$SUPERSEDED_REVIEWER_ROLE" ]; then
+      role="code-reviewer"
+      printf 'check-binding: deprecated: role token '\''%s'\'' in %s is accepted as an alias for '\''%s'\'' — rewrite this binding.conf before the alias is removed in the next release\n' \
+        "$SUPERSEDED_REVIEWER_ROLE" "$cfg" "code-reviewer" >&2 || true
+    fi
     if ! [[ "$provider" =~ $ROLE_RE ]] || [ "${#provider}" -gt "$MAXLEN" ]; then
       refuse bad-token 1 "malformed provider token: $provider"
     fi
@@ -392,10 +417,15 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     role_in_six "$role" || refuse unknown-role 1 "role is not one of the six inner-loop roles: $role"
 
     if [ "${#BIND_ROLE[@]}" -gt 0 ]; then
+      di=0
       for seen in "${BIND_ROLE[@]}"; do
         if [ "$seen" = "$role" ]; then
+          if [ "${BIND_ROLE_ORIG[$di]}" != "$role_orig" ]; then
+            refuse collision 1 "role token collision in $cfg: rows for 'code-reviewer' and 'codex-reviewer' both resolve to the same role — remove the superseded spelling"
+          fi
           refuse duplicate-role 1 "role bound more than once: $role"
         fi
+        di=$((di + 1))
       done
     fi
 
@@ -408,6 +438,7 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     fi
 
     BIND_ROLE+=("$role")
+    BIND_ROLE_ORIG+=("$role_orig")
     BIND_PROVIDER+=("$provider")
     BIND_MODEL+=("$model")
     BIND_EFFORT+=("$effort")

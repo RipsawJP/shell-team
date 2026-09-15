@@ -48,12 +48,12 @@ resolver reports for this repo.
 ## Review is cross-provider (Codex)
 
 Review running on Codex is the **shipped default**, not an unconditional
-invariant: `codex-reviewer` ships bound to Codex CLI because a model
+invariant: `code-reviewer` ships bound to Codex CLI because a model
 reviewing output from its own family shares its **blind spots**. A task is
 done only when both the QA pass (`READY_FOR_REVIEW`) and the cross-provider
 Codex review (`READY_FOR_MERGE`) clear.
 
-A host-authored `binding.conf` may **rebind** `codex-reviewer` to a
+A host-authored `binding.conf` may **rebind** `code-reviewer` to a
 same-family executor. Doing so changes which executor `bin/resolve-executor.sh`
 resolves and which value telemetry records for the role; it does not wire up
 an alternate-executor invocation path, and the loop **does not guarantee**

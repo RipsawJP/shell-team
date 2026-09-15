@@ -33,10 +33,10 @@ one people read.
 - **Keep `tools:` minimal** in every agent's frontmatter. Widening a role's tool
   access needs a stated reason in the pull request.
 - **The reviewer's cross-provider binding is the shipped default, not an
-  unconditional invariant.** `codex-reviewer` ships bound to the Codex CLI in
+  unconditional invariant.** `code-reviewer` ships bound to the Codex CLI in
   the plugin's shipped `templates/binding-default.conf` because a model
   reviewing output from its own family shares its blind spots. A host may
-  rebind `codex-reviewer` to a same-family executor in its own `binding.conf`;
+  rebind `code-reviewer` to a same-family executor in its own `binding.conf`;
   doing so changes which executor `bin/resolve-executor.sh` resolves and which
   value telemetry records for the role — it does not wire up an
   alternate-executor invocation path, and the loop does not guarantee

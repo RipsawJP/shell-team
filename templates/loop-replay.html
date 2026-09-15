@@ -17,7 +17,7 @@
     --agent-human:hsl(30 78% 42%); --agent-orchestrator:hsl(270 55% 48%);
     --agent-tech-lead:hsl(235 60% 50%); --agent-pm-spec:hsl(305 55% 42%);
     --agent-engineer:hsl(65 75% 32%); --agent-qa-verifier:hsl(200 65% 42%);
-    --agent-codex-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
+    --agent-code-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
     /* T-1012: a roster id outside the six known agents (an adopter's own
        agent names) gets this neutral, reused text token — deliberately not a
        new hue, so it sits outside every identity color band. */
@@ -36,7 +36,7 @@
       --agent-human:hsl(30 85% 62%); --agent-orchestrator:hsl(270 70% 72%);
       --agent-tech-lead:hsl(235 78% 74%); --agent-pm-spec:hsl(305 70% 70%);
       --agent-engineer:hsl(65 78% 60%); --agent-qa-verifier:hsl(200 78% 66%);
-      --agent-codex-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
+      --agent-code-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
       --agent-unknown: var(--text-faint);
     }
   }
@@ -52,7 +52,7 @@
     --agent-human:hsl(30 85% 62%); --agent-orchestrator:hsl(270 70% 72%);
     --agent-tech-lead:hsl(235 78% 74%); --agent-pm-spec:hsl(305 70% 70%);
     --agent-engineer:hsl(65 78% 60%); --agent-qa-verifier:hsl(200 78% 66%);
-    --agent-codex-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
+    --agent-code-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
     --agent-unknown: var(--text-faint);
   }
   :root[data-theme="light"]{
@@ -67,7 +67,7 @@
     --agent-human:hsl(30 78% 42%); --agent-orchestrator:hsl(270 55% 48%);
     --agent-tech-lead:hsl(235 60% 50%); --agent-pm-spec:hsl(305 55% 42%);
     --agent-engineer:hsl(65 75% 32%); --agent-qa-verifier:hsl(200 65% 42%);
-    --agent-codex-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
+    --agent-code-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
     --agent-unknown: var(--text-faint);
   }
 
@@ -413,15 +413,15 @@
   /* ---------------- roster: the six known ids UNION every distinct `span`
      value present (D3) — orchestrator/human stay structural, never derived,
      since they are this loop's topology and emit no spans themselves. ---------------- */
-  var KNOWN_RING_AGENTS = ["tech-lead","pm-spec","engineer","qa-verifier","codex-reviewer","ui-designer"];
-  var KNOWN_COLOR_IDS = { "human":1, "orchestrator":1, "tech-lead":1, "pm-spec":1, "engineer":1, "qa-verifier":1, "codex-reviewer":1, "ui-designer":1 };
+  var KNOWN_RING_AGENTS = ["tech-lead","pm-spec","engineer","qa-verifier","code-reviewer","ui-designer"];
+  var KNOWN_COLOR_IDS = { "human":1, "orchestrator":1, "tech-lead":1, "pm-spec":1, "engineer":1, "qa-verifier":1, "code-reviewer":1, "ui-designer":1 };
   var STATIC_AGENTS = [
     {"id":"orchestrator","label":"Orchestrator","note_ja":"メインセッション。指示の発行・ゲート判定・board 更新・PR/マージ","note_en":"Main session. Issues instructions, judges gates, updates the board, merges PRs."},
     {"id":"tech-lead","label":"Tech Lead","note_ja":"Routing Map（計画）","note_en":"Routing Map (planning)"},
     {"id":"pm-spec","label":"PM / Spec","note_ja":"spec 起草・AC 定義","note_en":"Drafts the spec, defines acceptance criteria"},
     {"id":"engineer","label":"Engineer","note_ja":"実装・rework","note_en":"Implementation, rework"},
     {"id":"qa-verifier","label":"QA","note_ja":"経験的検証（実行レンズ）","note_en":"Empirical verification (the execution lens)"},
-    {"id":"codex-reviewer","label":"Codex Reviewer","note_ja":"cross-provider レビュー（静的レンズ・別モデル系列）","note_en":"Cross-provider review (the static-analysis lens, a different model family)"},
+    {"id":"code-reviewer","label":"Codex Reviewer","note_ja":"cross-provider レビュー（静的レンズ・別モデル系列）","note_en":"Cross-provider review (the static-analysis lens, a different model family)"},
     {"id":"human","label":"Human","note_ja":"merge GO（Phase A では全マージに人間の GO）","note_en":"Merge GO (in Phase A, every merge needs a human's GO)"}
   ];
   var agentById = {};
@@ -857,7 +857,7 @@
     document.getElementById("agentLegendHeading").textContent = T().legendAgentsTitle;
     var el = document.getElementById("agentLegendGrid");
     el.innerHTML = "";
-    var ids = ["human","orchestrator","tech-lead","pm-spec","engineer","qa-verifier","codex-reviewer"];
+    var ids = ["human","orchestrator","tech-lead","pm-spec","engineer","qa-verifier","code-reviewer"];
     ids.forEach(function(id){
       var row = document.createElement("div");
       row.className = "legend-row";

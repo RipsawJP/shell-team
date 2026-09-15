@@ -121,7 +121,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 │   ├── ui-designer.md               # UI 作業時のみデザイン担当（frontend-design Skill・任意依存）
 │   ├── engineer.md                  # 実装（既定 non-worktree・並列時のみ opt-in 隔離）
 │   ├── qa-verifier.md               # テスト実行 / 受け入れ条件チェック
-│   ├── codex-reviewer.md            # Codex CLI 別プロバイダレビュー
+│   ├── code-reviewer.md            # Codex CLI 別プロバイダレビュー
 │   ├── scrum-master.md              # retro / lessons 生成
 │   └── triage-orchestrator.md       # 外側ループの triage 統合（propose-only）
 ├── skills/
@@ -157,7 +157,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 [Design]    ui-designer     → （UI 時のみ）design note  新フラグなし
 [Implement] engineer        → コード + テスト          READY_FOR_QA
 [Validate]  qa-verifier     → 実行 + 条件チェック       READY_FOR_REVIEW
-[Review]    codex-reviewer  → Codex CLI の判定         READY_FOR_MERGE
+[Review]    code-reviewer  → Codex CLI の判定         READY_FOR_MERGE
 ```
 
 `[Design]` は**条件付き**（UI 作業時のみ `ui-designer` が参加）。新しい status flag は持たず、design note の存在で順序を担保する。`frontend-design` Skill は任意依存（未インストール時は内蔵指針に縮退モード明示で fallback）。
@@ -175,7 +175,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 - **状況依存ディスパッチ記録** — `tech-lead` の Routing Map が、タスクの implement フェーズと verify フェーズをどの機構で走らせるかを軸ごとに決定し、オーケストレーターがその決定をタスクのボードエントリへクローズド語彙の文法 `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>` のサブ箇条書きとして転記する。`bin/close-out.sh` は存在する各サブ箇条書きを検証し、不整合な記録（別の軸の値、重複した軸、クローズドセット外の軸、不正な modality、priced-line の接頭辞を持たない ground）は refuse する——1 つも無いエントリはそのまま close-out できる。あるタスクの検証責務が fixture-suite の半分とメカニズムクラスの full-population diff の半分を束ねている場合、`verify-fixture` と `verify-mechanism` の refinement キーが単一の `verify` 行の代わりに各半分を独立に値付けする——エントリは親の `verify` キーかその refinement の 1 つ以上のどちらかを記録し、両方を記録することはない。`bin/close-out.sh` はさらに、Active の flag がまだ `READY_FOR_MERGE`（cross-provider review が APPROVE 時に書く唯一の状態）でないエントリの昇格を拒否し（exit 1、ボードは byte 単位で無変更）、`--issue` が省略された場合は `develop` へのマージが issue を自動クローズしない旨を 1 行のノートとして出力する（手動クローズ手順を黙ってスキップする代わりに）。
 - **クロスタスク dispatch-reflection** — 上記の dispatch record を転記する前に、オーケストレーターは直前のタスクのボードエントリを一読し、軸ごとにこのタスクがそれを踏襲したか乖離したかを記録する: `- dispatch-reflection: <axis> — <predecessor> — <repeat|differs|no-predecessor-row> — <ground>`。タスクに前段が全く無い場合は軸ごとの行の代わりに `- dispatch-reflection: all — no-predecessor — no-predecessor-row — <ground>` の 1 行のみを記録する。`bin/check-entry-mode.sh` はこのファミリーが存在する時にそれを検証する——エントリ自身の dispatch 行が記録する各軸に対応する reflection 行が無ければならず、同じ軸が 2 回現れてはならず、記された verdict は前段エントリ自身が記録したその軸の値と一致していなければならない（前段は board の active セクション・done セクションのどちらかでちょうど 1 件の top-level エントリへ解決される）——一方、reflection 行を 1 つも持たないエントリはそのまま通る。
 - **spec authorship も dispatch 軸の一つ** — `specify` 軸は `pm-authored`（出荷時デフォルト: `pm-spec` が spec を書く）と `operator-authored`（coordinating session が既に spec を書いている状態。典型的には judgment-density のボトルネックにより authorship を委譲する価値が無い場合——[spec を誰が書くかを選ぶ](docs/adopting.ja.md#spec-を誰が書くかを選ぶt-1091)を参照）の 2 値に閉じている。どちらの場合も loop の machinery——freeze sweep・2 つの review gate・interventions ledger——はそのまま走る。`operator-authored` 側では `pm-spec` が author ではなく conformance formatter として参加する。
-- **Specify seam での spec review も dispatch 軸の一つ** — `docs/loop-engineering/specify-seam-review.md` で定義・値付けされる `spec-review` 軸は `none`（出荷時デフォルト）と `cross-provider`（freeze sweep の後・intent hash を記録する前に、spec の domain 前提を追加で 1 回 `codex-reviewer` に読ませる。spec の正しさがこの repo 自身では測定できない domain 前提に依存している時に elect する——[Specify seam で spec review を elect する](docs/adopting.ja.md#specify-seam-で-spec-review-を-elect-するt-1092)を参照）の 2 値に閉じている。elect された spec review は loop の 2 つの gate のどちらでもなく、どちらの代わりにもならない。
+- **Specify seam での spec review も dispatch 軸の一つ** — `docs/loop-engineering/specify-seam-review.md` で定義・値付けされる `spec-review` 軸は `none`（出荷時デフォルト）と `cross-provider`（freeze sweep の後・intent hash を記録する前に、spec の domain 前提を追加で 1 回 `code-reviewer` に読ませる。spec の正しさがこの repo 自身では測定できない domain 前提に依存している時に elect する——[Specify seam で spec review を elect する](docs/adopting.ja.md#specify-seam-で-spec-review-を-elect-するt-1092)を参照）の 2 値に閉じている。elect された spec review は loop の 2 つの gate のどちらでもなく、どちらの代わりにもならない。
 - **宣言された verification ceiling** — すべての spec は `- verification-ceiling: unit-and-static | real-environment` の 1 行で、その spec に対して QA が実際に到達できるレベルを宣言し、それを超える criterion があれば自分自身の `- above-ceiling:` サブ箇条で名指しする。QA の PASS block と board の `READY_FOR_REVIEW` 行の両方が宣言値をそのまま carry するため、green flag は bare な green ではなく「このレベルまでは green」と読める——[verification ceiling を宣言する](docs/adopting.ja.md#verification-ceiling-を宣言する)を参照。
 - **並行 worktree の reconcile** — 2 つ以上の engineer インスタンスがそれぞれ自分の linked worktree にディスジョイントな作業をコミット済みの時、`bin/land-worktree.sh` が各 worker を 1 つの coordinator ブランチへ、決して奪い取らないロック（既定 10 秒の有界待機、`TEAM_LAND_LOCK_TIMEOUT` で上書き可能）の背後で順に land させ、path レベルの衝突があれば land せず refuse する。あくまで opt-in — いつ使うかは run skill 自身の `reconcile-step` 節が定める。保証は path レベル・テキストレベルのみ：worker 間の意味的・インターフェース的な独立性は保証しない。
 - **オプトイン triage** — `/shell-team:loop-triage`（`bin/discover-work.sh`）は read-only：CI 失敗 / open PR / ラベル付き issue を見つけて todo 候補を*提案*する（ボードは編集しない）。
@@ -186,7 +186,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 ## 役割と executor の紐付け
 
 6 つの inner-loop 役割 — `tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
-`codex-reviewer`・`ui-designer` — は、`<base>/binding.conf` を通じて
+`code-reviewer`・`ui-designer` — は、`<base>/binding.conf` を通じて
 それぞれ executor（provider + model + effort + adapter）を host が個別に
 割り当てられる。host 設定が無い場合は、プラグイン**出荷時の既定**
 `templates/binding-default.conf` が使われる。手順・設定の文法・
@@ -218,14 +218,14 @@ write 権限または propose 権限を持つ役割が同じ形で紐付けら�
 （報告のみの軸）の例示として、`tech-lead` を除くすべての役割について:
 model は今なお役割自身の `agents/<role>.md` の pin から来る（issue
 **#236** はその pin の退役を追跡するが、対象は `claude-cli` に紐付く
-5 役割のみで `codex-reviewer` は除外）。宣言された effort（#420） はもはや adapter
+5 役割のみで `code-reviewer` は除外）。宣言された effort（#420） はもはや adapter
 を問わず一様ではない——どちらの話になるかは **dispatch の形**にも左右
 される：`tech-lead` の別経路——`codex-cli` の recipe を通じて
 `sandbox-read-only` で dispatch される——では値が実際の呼び出しに
 **適用**される（`-c model_reasoning_effort=<value>` として、その adapter
 自身の `cli-config-override` 宣言に紐付く）#420。それ以外の
-`codex-cli` の行——出荷時既定の `codex-reviewer` 自身の行を含め、これは
-自身の `agents/codex-reviewer.md` を通じて `wrapper-hosted` で dispatch
+`codex-cli` の行——出荷時既定の `code-reviewer` 自身の行を含め、これは
+自身の `agents/code-reviewer.md` を通じて `wrapper-hosted` で dispatch
 され、その recipe の行を一切受け取らない——と、すべての `claude-cli` の
 行は、**記録**されるだけで何にも適用されない。executor レベルの経路は
 resolution が制御していない（`tech-lead` を除くいずれの役割についても）。紐付けられた
@@ -266,7 +266,7 @@ pin された `LC_ALL=C` collation の下で実行し、record がそのまま�
 正確なコマンドを持つ `- reproduce: <command>` 行が付く。
 
 ```bash
-bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
+bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l code-reviewer agents/*.md"
 ```
 
 （`bash "<plugin root>/bin/derive-populations.sh"` として起動する——プラグインをロードしていても `PATH` に載るとは限らない。`<plugin root>` は自ホストの報告値から読む——`## run のリプレイ` が `gen-loop-replay.sh` に対して文書化している convention と同じ。）各 `--set name=command` 行はキャプチャされ、重複排除され、gap のない・重複のないメンバーシップ signature へ分割される。`--accept-status name=csv` は、既定の `0` に加えて 1 つの名前付き集合に対して追加で受理する exit status を宣言する（「`git grep` はマッチなしで exit `1`」のケース）。完全な文法は `bash derive-populations.sh --help` を参照。
@@ -308,7 +308,7 @@ stderr に警告を出す（refuse は決してせず、exit status も変えな
 - **真実源はファイルのみ**：`tasks/todo.md` ＋ status flag がエージェント間の単一の真実源。
 - **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身も同じ既定レイアウトで動くので、自分の board・specs・retros も `.shell-team/` 配下にある。resolver は、base dir 集約より前にチームを導入したリポのために legacy な `tasks/` + `docs/specs/` レイアウトも今なお検出・対応する——本ドキュメント群が `tasks/…` / `docs/specs/…` と書いている箇所は、その legacy レイアウトでの同じ artifact を指す。[docs/adopting.md](docs/adopting.md) 参照。
 - **Engineer は既定で non-worktree**：編集は現在の feature ブランチに直接着地する。並列実装時のみ orchestrator が起動時に `isolation: worktree` を opt-in。
-- **別プロバイダレビューの Codex 紐付けは「出荷時の既定」**：`codex-reviewer` は既定で Codex CLI に紐付けられている。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `codex-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。Codex CLI が使えない場合は Claude にフォールバックせず `BLOCKED` を返す。
+- **別プロバイダレビューの Codex 紐付けは「出荷時の既定」**：`code-reviewer` は既定で Codex CLI に紐付けられている。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。Codex CLI が使えない場合は Claude にフォールバックせず `BLOCKED` を返す。
 
 ## バージョニング
 

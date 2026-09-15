@@ -6,7 +6,7 @@
 # `.txt` (DP6) and its `provider` value must equal the provider
 # templates/binding-adapters.txt registers for that adapter token. The
 # generalized invocation pattern this definition describes is the one
-# agents/codex-reviewer.md already runs: a bare-first-token
+# agents/code-reviewer.md already runs: a bare-first-token
 # `codex exec --sandbox read-only --cd <repo> ...` call whose request is a
 # prompt and whose working dir is an argv value, with results returned as
 # files (an `-o` last-message capture, a JSONL event stream) and as board

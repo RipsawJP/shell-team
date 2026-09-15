@@ -64,7 +64,7 @@ a_valid_binding() {
     'bind engineer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind ui-designer claude m1 - claude-cli' \
-    'bind codex-reviewer codex provider-configured - codex-cli' \
+    'bind code-reviewer codex provider-configured - codex-cli' \
     > "$1"
 }
 
@@ -119,7 +119,7 @@ mkdir -p "$TMP/hostconf/.ops"
 printf '%s\n' 'schema 1' \
   'bind tech-lead claude m1 - claude-cli' 'bind pm-spec claude m1 - claude-cli' \
   'bind engineer claude m1 - claude-cli' 'bind qa-verifier claude m1 - claude-cli' \
-  'bind ui-designer claude m1 - claude-cli' 'bind codex-reviewer claude m1 - claude-cli' \
+  'bind ui-designer claude m1 - claude-cli' 'bind code-reviewer claude m1 - claude-cli' \
   > "$TMP/hostconf/.ops/binding.conf"
 bash "$REPO_ROOT/bin/check-binding.sh" --config "$TMP/hostconf/.ops/binding.conf" >/dev/null 2>&1 \
   || fail "host-config-wins: fixture control failed — the host config is not valid"
@@ -228,7 +228,7 @@ effort_binding() {  # $1 = tech-lead's effort value
     "bind tech-lead claude m1 $1 claude-cli" \
     'bind pm-spec claude m1 - claude-cli' 'bind engineer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' 'bind ui-designer claude m1 - claude-cli' \
-    'bind codex-reviewer codex provider-configured - codex-cli' \
+    'bind code-reviewer codex provider-configured - codex-cli' \
     > "$EFF/r/.ops/binding.conf"
 }
 run_effort() { ( cd "$EFF/r" && TEAM_RUN_BASE=.ops bash "$EFF/bin/resolve-executor.sh" --print-resolved >"$TMP/eff.out" 2>"$TMP/eff.err" ); }
@@ -263,27 +263,27 @@ cp "$TMP/claude-cli.orig" "$EFF/templates/adapters/claude-cli.txt"
 AUTH="$TMP/authority-tree"
 build_installed_tree "$AUTH"
 mkdir -p "$AUTH/r/.ops"
-# Every role bound to claude-cli (including codex-reviewer) — the mutation
+# Every role bound to claude-cli (including code-reviewer) — the mutation
 # below targets claude-cli's own definition, so every role's adapter must
 # actually BE claude-cli for the mutation to reach it.
 printf '%s\n' 'schema 1' \
   'bind tech-lead claude m1 - claude-cli' 'bind pm-spec claude m1 - claude-cli' \
   'bind engineer claude m1 - claude-cli' 'bind qa-verifier claude m1 - claude-cli' \
-  'bind ui-designer claude m1 - claude-cli' 'bind codex-reviewer claude m1 - claude-cli' \
+  'bind ui-designer claude m1 - claude-cli' 'bind code-reviewer claude m1 - claude-cli' \
   > "$AUTH/r/.ops/binding.conf"
 run_auth_role() { ( cd "$AUTH/r" && TEAM_RUN_BASE=.ops bash "$AUTH/bin/resolve-executor.sh" --role "$1" >"$TMP/auth.out" 2>"$TMP/auth.err" ); }
 
-for r in tech-lead engineer codex-reviewer; do
+for r in tech-lead engineer code-reviewer; do
   run_auth_role "$r" && rc=0 || rc=$?
   [ "$rc" -eq 0 ] || fail "authority-rule-baseline-$r: expected exit 0, got $rc"
 done
-pass "authority-rule-baseline — engineer/codex-reviewer/tech-lead all resolve against the shipped (carrying) definitions"
+pass "authority-rule-baseline — engineer/code-reviewer/tech-lead all resolve against the shipped (carrying) definitions"
 
 cp "$AUTH/templates/adapters/claude-cli.txt" "$TMP/claude-cli.auth.orig"
 sed 's/^carries board-transition .*$/carries board-transition not-carried/' "$TMP/claude-cli.auth.orig" > "$AUTH/templates/adapters/claude-cli.txt"
 cmp -s "$TMP/claude-cli.auth.orig" "$AUTH/templates/adapters/claude-cli.txt" && fail "authority-rule: fixture control failed — mutation had no effect"
 
-for r in engineer codex-reviewer; do
+for r in engineer code-reviewer; do
   run_auth_role "$r" && rc=0 || rc=$?
   [ "$rc" -eq 1 ] || { fail "authority-rule-not-carried-$r: expected exit 1, got $rc"; continue; }
   [ ! -s "$TMP/auth.out" ] || fail "authority-rule-not-carried-$r: expected zero stdout bytes"
@@ -332,7 +332,7 @@ mkdir -p "$FC/r/.ops"
 printf '%s\n' 'schema 1' \
   'bind tech-lead claude m1 - claude-cli' 'bind pm-spec claude m1 - claude-cli' \
   'bind engineer claude m1 high claude-cli' 'bind qa-verifier claude m1 - claude-cli' \
-  'bind ui-designer claude m1 - claude-cli' 'bind codex-reviewer claude m1 - claude-cli' \
+  'bind ui-designer claude m1 - claude-cli' 'bind code-reviewer claude m1 - claude-cli' \
   > "$FC/r/.ops/binding.conf"
 run_fc_role() { ( cd "$FC/r" && TEAM_RUN_BASE=.ops bash "$FC/bin/resolve-executor.sh" --role "$1" >"$TMP/fc.out" 2>"$TMP/fc.err" ); }
 
@@ -378,7 +378,7 @@ printf '%s\n' \
   'effort-mechanism none' 'effort-mechanism cli-flag' \
   'role-board-authority tech-lead none' 'role-board-authority pm-spec writes' \
   'role-board-authority engineer writes extra-field-here' \
-  'role-board-authority qa-verifier writes' 'role-board-authority codex-reviewer proposes' 'role-board-authority ui-designer none' \
+  'role-board-authority qa-verifier writes' 'role-board-authority code-reviewer proposes' 'role-board-authority ui-designer none' \
   > "$STUB_CONTRACT_FC"
 printf '#!/usr/bin/env bash\ncat %s\nexit 0\n' "$STUB_CONTRACT_FC" > "$FC/bin/check-adapter.sh"
 chmod +x "$FC/bin/check-adapter.sh"
@@ -401,7 +401,7 @@ chmod +x "$STUB/bin/check-binding.sh"
 
 good_canon() {
   printf '%s\n' 'schema 1' \
-    'bound codex-reviewer codex stubmodel - codex-cli' \
+    'bound code-reviewer codex stubmodel - codex-cli' \
     'bound engineer claude stubmodel - claude-cli' \
     'bound pm-spec claude stubmodel - claude-cli' \
     'bound qa-verifier claude stubmodel - claude-cli' \
@@ -464,7 +464,7 @@ run_probe_role engineer && rc=0 || rc=$?
 grep -qF -- 'in-process' "$TMP/probe.out" || fail "probe-in-process-available: expected the in-process probe kind in stdout"
 pass "probe-in-process-available — an in-process provider resolves regardless of PATH and names the probe kind it performed"
 
-run_probe_role codex-reviewer && rc=0 || rc=$?
+run_probe_role code-reviewer && rc=0 || rc=$?
 [ "$rc" -eq 1 ] || fail "probe-out-of-process-unavailable: expected exit 1 with an empty PATH, got $rc"
 [ ! -s "$TMP/probe.out" ] || fail "probe-out-of-process-unavailable: expected zero stdout bytes"
 grep -qF -- 'executor-unavailable' "$TMP/probe.err" || fail "probe-out-of-process-unavailable: expected executor-unavailable"
@@ -516,6 +516,29 @@ hashes > "$TMP/h1"
 cmp -s "$TMP/inv0" "$TMP/inv1" || fail "writes-nothing-behavioral: the scratch tree's file inventory changed across two invocations"
 cmp -s "$TMP/h0" "$TMP/h1" || fail "writes-nothing-behavioral: an observed input's content changed across two invocations"
 pass "writes-nothing-behavioral — the scratch tree's file inventory and every observed input's hash are identical before and after both modes run"
+
+# =============================================================================
+# alias (T-1144, issue #524): `--role codex-reviewer` (the superseded
+# spelling) is accepted and reports the current name, byte-identical to
+# `--role code-reviewer` on stdout, with neither exit status ever the
+# usage refusal (2) that means "the alias was never applied".
+# =============================================================================
+aliasold_out="$TMP/alias-old.out"; aliasold_err="$TMP/alias-old.err"
+aliasnew_out="$TMP/alias-new.out"; aliasnew_err="$TMP/alias-new.err"
+set +e
+bash "$RESOLVER" --role codex-reviewer > "$aliasold_out" 2> "$aliasold_err"; alias_old_rc=$?
+bash "$RESOLVER" --role code-reviewer > "$aliasnew_out" 2> "$aliasnew_err"; alias_new_rc=$?
+set -e
+[ "$alias_old_rc" -eq "$alias_new_rc" ] \
+  || fail "resolve-alias-equivalence: exit status differs between spellings ($alias_old_rc vs $alias_new_rc)"
+[ "$alias_old_rc" -ne 2 ] \
+  || fail "resolve-alias-equivalence: --role codex-reviewer hit the usage refusal — the alias was never applied"
+cmp -s "$aliasold_out" "$aliasnew_out" \
+  || fail "resolve-alias-equivalence: stdout differs between --role codex-reviewer and --role code-reviewer"
+if grep -qF -- 'codex-reviewer' "$aliasold_out"; then
+  fail "resolve-alias-equivalence: the superseded spelling leaked onto stdout"
+fi
+pass "alias: resolve-executor --role accepts the superseded spelling and reports the current name"
 
 # =============================================================================
 # CI wiring this suite asserts (AC15 shape)

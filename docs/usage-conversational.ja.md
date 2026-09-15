@@ -7,7 +7,7 @@ shell-team は、毎回 `/shell-team:run …` と打ち込んで操作する必�
 ありません。日常的に想定している使い方は、すでに Codex でのクロスプロバイダ
 レビューでやっているのと同じモデルです。**やりたいことを普通の言葉で伝えれば、
 メインの Claude セッションがチーム** — `pm-spec`・`engineer`・`qa-verifier`・
-`codex-reviewer` — **に委譲してループを回します**。
+`code-reviewer` — **に委譲してループを回します**。
 
 このガイドでは、その会話駆動モデルと委譲の仕組み、そして信頼性を高めるための
 オプトイン手順 1 つを説明します。
@@ -18,7 +18,7 @@ shell-team は、毎回 `/shell-team:run …` と打ち込んで操作する必�
   フラグを追加して」→ Claude が非自明な変更だと認識し、shell-team ループ（Plan →
   Specify → Implement → Validate → Review）を回し、マージ前にあなたへ一時停止します。
 - これは Codex レビュアーと同じ仕組みです。クロスプロバイダレビューを得るのに
-  スラッシュコマンドを打つ必要はなく、レビューを依頼すれば `codex-reviewer`
+  スラッシュコマンドを打つ必要はなく、レビューを依頼すれば `code-reviewer`
   エージェントに委譲されます。dev-team の各エージェントも同様に動きます（各
   エージェントの `description` フィールドが、メインセッションにいつそこへ
   ルーティングすべきかを伝えます）。
@@ -46,16 +46,16 @@ shell-team は、毎回 `/shell-team:run …` と打ち込んで操作する必�
 > サイズ 50、安定した並び順、OpenAPI ドキュメントも更新。
 >
 > **Claude:** これは仕様と複数ファイルが必要なので、チームを回します。tech-lead →
-> pm-spec（受入条件）→ engineer → qa-verifier → codex-reviewer の順でルーティング
+> pm-spec（受入条件）→ engineer → qa-verifier → code-reviewer の順でルーティング
 > します。マージ前には必ず一時停止します。
 > *(ループを実行し、各ゲートでボードの status flag を進め、READY_FOR_MERGE を
 > 報告してあなたの GO を待つ。)*
 
-**2. 「これだけレビューして」 → codex-reviewer のみ**
+**2. 「これだけレビューして」 → code-reviewer のみ**
 
 > **あなた:** いまプッシュした差分にセカンドオピニオンをもらえる？
 >
-> **Claude:** クロスプロバイダレビュアー（Codex）に委譲します。*(`codex-reviewer`
+> **Claude:** クロスプロバイダレビュアー（Codex）に委譲します。*(`code-reviewer`
 > を起動し、所見つきで APPROVE / REQUEST_CHANGES を返す。)*
 
 **3. 仕様だけ → pm-spec**
@@ -77,7 +77,7 @@ shell-team は、毎回 `/shell-team:run …` と打ち込んで操作する必�
 ## 委譲の仕組み
 
 - **各エージェント**（全 8 体: `tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
-  `codex-reviewer`・`scrum-master`、加えて条件付き参加の `ui-designer`〔UI 作業時〕と
+  `code-reviewer`・`scrum-master`、加えて条件付き参加の `ui-designer`〔UI 作業時〕と
   `triage-orchestrator`〔外側ループ triage〕）は、`description` フロントマターに基づいて
   メインセッションから起動されます — Codex のレビュアーが使うのと同じ能動的
   メカニズムです。

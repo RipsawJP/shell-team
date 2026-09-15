@@ -4,13 +4,13 @@
 # session can dispatch the same role prose Claude Code dispatches, with
 # zero duplicated bytes of role prose anywhere (T-1134; GitHub issue #484;
 # .shell-team/specs/T-1134-codex-host-slice1.md). T-1135 (GitHub issue #493;
-# .shell-team/specs/T-1135-codex-host-slice2.md) adds codex-reviewer as a
+# .shell-team/specs/T-1135-codex-host-slice2.md) adds code-reviewer as a
 # fifth default role — generated exactly like the other four, from its own
-# unmodified agents/codex-reviewer.md, with no special-casing anywhere in
+# unmodified agents/code-reviewer.md, with no special-casing anywhere in
 # this script.
 #
 # For each role in ROLES (default: tech-lead pm-spec engineer qa-verifier
-# codex-reviewer — the Specify-to-Validate-to-Review chain, per D2 in
+# code-reviewer — the Specify-to-Validate-to-Review chain, per D2 in
 # T-1134's spec and AC1 in T-1135's):
 #   1. Read agents/<role>.md from --root, unmodified. Validate its
 #      frontmatter has both a `---` opener and closer, that its
@@ -93,7 +93,7 @@
 #               for the writable-roots form when Codex must run it in-session.
 #   --roles     space-separated role-list override (default: the five
 #               roles this task's Goal names: "tech-lead pm-spec engineer
-#               qa-verifier codex-reviewer"). Each token must match
+#               qa-verifier code-reviewer"). Each token must match
 #               ^[a-z][a-z0-9-]*$ (the same shape agents/<role>.md's own
 #               `name:` frontmatter values already use) — a token outside
 #               that shape refuses the WHOLE run (--roles item 2 of T-1135
@@ -129,7 +129,7 @@ SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
 ROOT=""
 OUT_DIR=""
-ROLES="tech-lead pm-spec engineer qa-verifier codex-reviewer"
+ROLES="tech-lead pm-spec engineer qa-verifier code-reviewer"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in

@@ -180,7 +180,7 @@ fetch) as the command itself rather than as a summary of it.
 adopted **whole**: there is no per-role merge, layering or fallback
 against the shipped default, so it must carry exactly one `bind` row for
 each of the six inner-loop roles (`tech-lead`, `pm-spec`, `engineer`,
-`qa-verifier`, `codex-reviewer`, `ui-designer`) — no more, no fewer. A
+`qa-verifier`, `code-reviewer`, `ui-designer`) — no more, no fewer. A
 partial file is refused, not completed from the default. Author one when
 you want to assign specific executors to all six:
 
@@ -190,7 +190,7 @@ you want to assign specific executors to all six:
    installed directory, not a path under your own repository) to
    `<base>/binding.conf` by hand. **Its six rows carry placeholder model
    tokens** — `model-1` on the five `claude` rows, `model-2` on
-   `codex-reviewer` — that name no real model: replace **every** row
+   `code-reviewer` — that name no real model: replace **every** row
    before relying on it, or transcribe the actual rows from
    `templates/binding-default.conf` (**not** the grammar example below,
    which is a custom-binding illustration with different values) for any
@@ -214,7 +214,7 @@ you want to assign specific executors to all six:
    performs **no availability check at all**, printing the probe kind
    and leaving grounding the harness's own sub-agent invocation failure
    to the caller. Under the shipped default, five of the six roles bind
-   `claude`, so `resolve-executor.sh --role codex-reviewer` is the only
+   `claude`, so `resolve-executor.sh --role code-reviewer` is the only
    one of the six invocations that actually probes anything (see
    `executor-unavailable` below).
 
@@ -229,13 +229,13 @@ bind pm-spec        claude opus   high claude-cli
 bind engineer       claude sonnet -    claude-cli
 bind qa-verifier    claude sonnet -    claude-cli
 bind ui-designer    claude sonnet -    claude-cli
-bind codex-reviewer codex  gpt-5  -    codex-cli
+bind code-reviewer  codex  gpt-5  -    codex-cli
 ```
 
 With no host `<base>/binding.conf` at all — the ordinary, unconfigured
 case — `resolve-executor.sh` falls back to the plugin-shipped default,
 `templates/binding-default.conf`; its `model` column carries
-`provider-configured` only for `codex-reviewer`, naming the boundary that
+`provider-configured` only for `code-reviewer`, naming the boundary that
 the shipped Codex invocation passes no model flag at all, while every
 other role's column carries that role's own `agents/<role>.md` pin, from
 the plugin's own agent definitions.
@@ -289,7 +289,7 @@ blocker that stops the phase rather than falling back to anything: an
 ordinary edit can reach `binding-unresolved`, `capability-unsupported`
 and `executor-unavailable`, each described above. The two standalone
 review commands consult the binding too, in their own review step.
-`/shell-team:review` resolves `codex-reviewer`'s executor immediately
+`/shell-team:review` resolves `code-reviewer`'s executor immediately
 before it invokes the reviewer, and `/shell-team:review-response` does
 the same before its own cross-evaluation step; in both, a refusal is a
 blocker that stops the command rather than falling back, so a rebind
@@ -316,7 +316,7 @@ reporting-only axis, for every role other than `tech-lead` and
 illustrative rather than exhaustive: the **model** a role runs at still
 comes from that role's own `agents/<role>.md` pin, not from the resolved
 row — issue **#236** tracks retiring those pins, for the five
-`claude-cli`-bound roles only, and deliberately excludes `codex-reviewer`,
+`claude-cli`-bound roles only, and deliberately excludes `code-reviewer`,
 whose pin configures the Claude wrapper that shells out to the Codex CLI
 rather than the model that reviews; a declared **effort** no longer tells
 one story shared by every adapter, and which story applies depends on
@@ -325,8 +325,8 @@ alternate path — dispatched `sandbox-read-only` through the `codex-cli`
 recipe — the resolved value is **applied** to the invocation itself, as
 `-c model_reasoning_effort=<value>` gated on that adapter's own
 `cli-config-override` declaration; every other `codex-cli` row, including
-`codex-reviewer`'s own shipped default, which is dispatched
-`wrapper-hosted` through its own `agents/codex-reviewer.md` and never
+`code-reviewer`'s own shipped default, which is dispatched
+`wrapper-hosted` through its own `agents/code-reviewer.md` and never
 receives that recipe's line at all, and every `claude-cli` row, stays
 **recorded** on the span and applied to nothing, its only other effect
 being the `capability-unsupported` refusal above (#420); and which **executor**
@@ -365,21 +365,21 @@ unauthorized read appears in the trail, and never that none occurred.
 A Codex CLI session can now drive this loop's whole Specify → Implement →
 Validate → Review chain to `READY_FOR_MERGE`, both gates green, with no
 Claude Code **host session** and no Claude Code Agent-tool orchestration
-anywhere in the dispatch — every role, `codex-reviewer` included, is
+anywhere in the dispatch — every role, `code-reviewer` included, is
 spawned by Codex's own `spawn_agent` tool, never by the Claude Code Agent
 tool, which this host does not have. A `claude -p` **child process** does
 run, for the review pass alone (steps 8 and 10 below); its own
 prerequisite — a Claude Code CLI already installed and authenticated on
 this host — is step 7. Slice 1 (T-1134) wired the
 `pm-spec` → `engineer` → `qa-verifier` chain (plus `tech-lead`) to
-`READY_FOR_REVIEW`; slice 2 (T-1135) adds `codex-reviewer` as a fifth
+`READY_FOR_REVIEW`; slice 2 (T-1135) adds `code-reviewer` as a fifth
 generated role and closes the remaining gap by running its review on
 Claude instead of Codex — the provider the Codex CLI host is not — so the
 cross-provider property this loop was built around survives the host
 switch. `agents/**` is never duplicated or forked for this: a generator
 derives one Codex custom-agent TOML per role from the unmodified
 `agents/<role>.md`, so both hosts read the same role prose rather than a
-second, Codex-shaped copy of it. The role name `codex-reviewer` stays as
+second, Codex-shaped copy of it. The role name `code-reviewer` stays as
 it is on both hosts — it is historical rather than descriptive here: on
 this host it is Claude, not Codex, that actually reviews (see step 10).
 
@@ -424,8 +424,8 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
 
    **If the located root has no `bin/gen-codex-agents.sh`, or that
    script's own default role list does not yet include
-   `codex-reviewer` (step 3 then never produces
-   `shell-team-codex-reviewer.toml`), the install is stale** — installed
+   `code-reviewer` (step 3 then never produces
+   `shell-team-code-reviewer.toml`), the install is stale** — installed
    before this Codex-host feature shipped, or before the fifth role was
    added to it. Neither feature has a version number of its own to check
    against (both ship as part of an ordinary plugin release, not a
@@ -453,7 +453,7 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    — so naming `--out-dir` explicitly above is only clarity, not a
    requirement). It reads `agents/tech-lead.md`, `agents/pm-spec.md`,
    `agents/engineer.md`, `agents/qa-verifier.md` and
-   `agents/codex-reviewer.md`, and writes one `shell-team-<role>.toml` per
+   `agents/code-reviewer.md`, and writes one `shell-team-<role>.toml` per
    role — five roles in total — into `.codex/agents/` (`--out-dir` names a
    different location if you want one; `--root` names the directory
    holding `agents/`, not the shell-team operating base dir, and only
@@ -558,11 +558,11 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    scripts they name.
 10. Start a Codex CLI session in the repository and dispatch a role by
     spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
-    `shell-team-engineer`, `shell-team-qa-verifier`, `shell-team-codex-reviewer`)
+    `shell-team-engineer`, `shell-team-qa-verifier`, `shell-team-code-reviewer`)
     with Codex's own `spawn_agent` tool — see
     `templates/prompt-blocks/host-dispatch.md` (spliced into
     `skills/run/SKILL.md`) for the per-host dispatch text this loop's own
-    phase list reads, including the `claude -p` recipe `codex-reviewer`
+    phase list reads, including the `claude -p` recipe `code-reviewer`
     runs instead of a second Codex pass. Its `APPROVE` reaches
     `READY_FOR_MERGE` — both gates green — without either host ever
     leaving the Codex CLI session. When `pm-spec` writes the spec file, it
@@ -601,7 +601,7 @@ generated agent's `sandbox_mode` is declarative documentation of that role's
 own intended write scope, derived from its `agents/<role>.md` frontmatter
 `tools:` list — it is **not an enforcement boundary**: the parent Codex
 session's own sandbox governs at runtime, whatever a generated agent's
-`sandbox_mode` value says — `codex-reviewer`'s own generated
+`sandbox_mode` value says — `code-reviewer`'s own generated
 `workspace-write` value included; its actual read-only confinement on this
 host comes from the `claude -p` invocation's own `--permission-mode
 dontAsk` plus its `--allowedTools` git-only allowlist in step 10, never
@@ -647,7 +647,7 @@ does not confirm the branch's own `<plugin root>/bin` was actually
 reached.
 
 **The self-detected-host observable (T-1138, issue #508).** After step 10,
-read what `codex-reviewer`'s own review record actually says, rather than
+read what `code-reviewer`'s own review record actually says, rather than
 assuming the host switch above worked: on a genuine Codex CLI host the
 review pass runs as a single `claude -p` invocation, its telemetry span is
 logged with `--provider claude` (a `claude`-provider span, never a
@@ -658,7 +658,7 @@ whole mechanism exists for was silently lost, even when the printed verdict
 is `APPROVE`: reviewing Codex's own output through Codex again is exactly the
 same-family blind spot this role exists to avoid. One shape is disclosed
 rather than checked: whether a spawned Codex custom agent
-(`shell-team-codex-reviewer`, the agent step 10 dispatches via
+(`shell-team-code-reviewer`, the agent step 10 dispatches via
 `spawn_agent`) sets `CODEX_THREAD_ID` — the one observation the role's own
 ladder reads — is **unmeasured** from this repository's own checkout, since
 that shape cannot be reproduced from a Claude Code session; read the spawned
@@ -1048,7 +1048,7 @@ or an agent performs; the checker never claims to close it.
 ## Electing a spec review at the Specify seam (T-1092)
 
 Alongside `specify`, a fourth dispatch axis elects whether an extra
-cross-provider `codex-reviewer` pass reads a spec's **domain** premises
+cross-provider `code-reviewer` pass reads a spec's **domain** premises
 before implementation begins: `spec-review`, closed over `none` and
 `cross-provider`, defined and priced in
 `docs/loop-engineering/specify-seam-review.md`.
@@ -1071,7 +1071,7 @@ mode); the freeze sweep does not proceed until it is answered.
 
 **What it does and does not guarantee.** An elected spec review is never
 one of the loop's **both gates** — `qa-verifier`'s PASS and
-`codex-reviewer`'s APPROVE on the delivered change both remain required
+`code-reviewer`'s APPROVE on the delivered change both remain required
 regardless of this axis's value, and a spec-review APPROVE never
 substitutes for either. It also does not authenticate its own inputs (both
 condition texts it is cross-checked against are agent-produced), does not
@@ -1130,7 +1130,7 @@ because the profile it protects is a repository-wide property rather than
 a per-task one.
 
 **An approval never substitutes for either of the loop's both gates.**
-`qa-verifier`'s PASS and `codex-reviewer`'s APPROVE on the delivered change
+`qa-verifier`'s PASS and `code-reviewer`'s APPROVE on the delivered change
 remain required in **both** profiles; an oversight-profile approval record
 is never one of the two gates, in either direction.
 
@@ -1168,7 +1168,7 @@ the very mechanism auditing that separation.
 
 `bin/close-out.sh` reads the task's Active flag before it ever writes to the
 board (T-1107, issue #53). Unless that flag already reads `READY_FOR_MERGE`
-— the one state `codex-reviewer` writes on APPROVE — the close-out refuses
+— the one state `code-reviewer` writes on APPROVE — the close-out refuses
 at exit 1, naming the board path, the source line and the flag it found,
 and the board file is left byte-untouched. A task still at
 `READY_FOR_ARCH`, `READY_FOR_ENG`, `READY_FOR_QA`, `READY_FOR_REVIEW`,
@@ -1221,7 +1221,7 @@ A pass may additionally carry
 required, and a conformant four-field pass with no such line stays
 conformant forever. Its first token is closed to the pair `claude-code` /
 `codex-cli` (the review role's own decision about which host it believed
-it was running on — see `agents/codex-reviewer.md`'s ladder); its ground,
+it was running on — see `agents/code-reviewer.md`'s ladder); its ground,
 after the literal ` — ` separator, names the observation that decision
 turned on (a variable's name and whether it was set), never that
 variable's value. Three refusals, each naming a pass id and never echoing
@@ -1320,3 +1320,46 @@ session performs this derivation as a read, and no mechanical checker ships for 
 - Files are the only shared state between agents (they do not share memory): the
   board (`<base>/todo.md`), the specs (`<base>/specs/`), and the loop contract are
   the single source of truth.
+
+## The superseded role name
+
+The cross-provider review role was renamed from `codex-reviewer` to
+`code-reviewer` (T-1144, issue #524): the role's own name should not assert
+a binding the project only ever shipped as a default, and the shipped
+default is documented as one in `CLAUDE.md`'s "Working rules" section — a
+host is free to rebind `code-reviewer` to a same-family executor in its own
+`binding.conf`, and a role still called `codex-reviewer` after doing so
+would contradict its own configuration.
+
+**What the alias covers, for one release.** A `<base>/binding.conf`
+written before this rename still resolves without an edit: `bind
+codex-reviewer <provider> <model> <effort|-> <adapter>` is accepted and
+normalized to `code-reviewer` before validation, and `bash
+"<plugin root>/bin/resolve-executor.sh" --role codex-reviewer` (and the
+identical `--role` argument to `bin/check-invocation-path.sh`) is accepted
+and reports `code-reviewer`. Rewriting `codex-reviewer` to `code-reviewer`
+in either surface — the config's role token or a `--role` argument — costs
+nothing; the alias exists so it does not have to happen the same day as
+the upgrade. A config that carries a `bind` row for **both** spellings is
+refused outright, naming the collision, rather than silently picking one.
+
+**What the alias does not cover.** It is a configuration/role-token-layer
+shim, not a rename of the harness's own sub-agent: `agents/code-reviewer.md`
+is the file and `code-reviewer` is the only name Claude Code's Agent tool
+(or a spawned Codex custom agent, `shell-team-code-reviewer`) dispatches by
+— there is no `agents/codex-reviewer.md` compatibility stub, and inventing
+one would register a second agent answering to two names for one role. Nor
+does it reach a copy of `templates/CLAUDE-routing-snippet.md` you have
+already pasted into your own `CLAUDE.md`: that copy is yours, in your own
+repository, and nothing this project ships can edit it for you — read the
+routing snippet in the current release and update your own copy by hand if
+it still names the superseded role.
+
+**Removal.** This alias is scoped to one release cycle: it ships in the
+release that carries this rename and is removed in the next release after
+that one. Rewrite any `codex-reviewer` role token in your own
+`binding.conf` or scripted `--role` argument before then. Dated analysis
+notes under this project's `docs/loop-engineering/` and already-committed
+review records keep the name they were written under — those are historical
+records, not configuration, and are not part of what this alias covers or
+what its removal touches.

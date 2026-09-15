@@ -242,7 +242,7 @@ bind pm-spec        claude opus   - claude-cli
 bind engineer       claude sonnet - claude-cli
 bind qa-verifier    codex  gpt-5-codex low codex-cli
 bind ui-designer    claude sonnet - claude-cli
-bind codex-reviewer codex  provider-configured - codex-cli
+bind code-reviewer codex  provider-configured - codex-cli
 CONF
 OUT4="$T/out4"
 if (cd "$WD4" && TEAM_RUN_BASE="$BASE4" bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT4" >/dev/null 2>"$T/gen4.err"); then
@@ -282,33 +282,33 @@ fi
 
 # =============================================================================
 # fixture 6 (T-1135 AC7 fixed string 1): the generated developer_instructions
-# body for the fifth role, codex-reviewer, is byte-identical to
-# agents/codex-reviewer.md's own content, and neither model nor
+# body for the fifth role, code-reviewer, is byte-identical to
+# agents/code-reviewer.md's own content, and neither model nor
 # model_reasoning_effort is emitted under the shipped default binding.
 # =============================================================================
-printf '\n--- fixture 6 (T-1135): codex-reviewer developer_instructions body ---\n'
+printf '\n--- fixture 6 (T-1135): code-reviewer developer_instructions body ---\n'
 OUT6="$T/out6"
 if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT6" >"$T/gen6.out" 2>"$T/gen6.err"; then
-  F6="$OUT6/shell-team-codex-reviewer.toml"
+  F6="$OUT6/shell-team-code-reviewer.toml"
   ok=1
   if [ -s "$F6" ]; then
     awk -v k="developer_instructions = '''" 'f{print} $0==k{f=1}' "$F6" > "$T/raw6"
     sed '$d' "$T/raw6" > "$T/body6"
-    awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n==2{print}' "$REPO_ROOT/agents/codex-reviewer.md" > "$T/src6"
+    awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n==2{print}' "$REPO_ROOT/agents/code-reviewer.md" > "$T/src6"
     cmp -s "$T/body6" "$T/src6" || ok=0
     tail -n 1 "$F6" | grep -Fxq -- "'''" || ok=0
-    grep -Fxq -- 'name = "shell-team-codex-reviewer"' "$F6" || ok=0
+    grep -Fxq -- 'name = "shell-team-code-reviewer"' "$F6" || ok=0
     { grep -q '^model = ' "$F6" || grep -q '^model_reasoning_effort = ' "$F6"; } && ok=0
   else
     ok=0
   fi
   if [ "$ok" -eq 1 ]; then
-    pass "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md"
+    pass "T-1135: the generated developer_instructions body is byte-identical to agents/code-reviewer.md"
   else
-    fail "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md"
+    fail "T-1135: the generated developer_instructions body is byte-identical to agents/code-reviewer.md"
   fi
 else
-  fail "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md (generator refused: $(cat "$T/gen6.err"))"
+  fail "T-1135: the generated developer_instructions body is byte-identical to agents/code-reviewer.md (generator refused: $(cat "$T/gen6.err"))"
 fi
 
 # =============================================================================
@@ -381,7 +381,7 @@ CR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"cache_read_input_tokens":\([0
 TOK8=$((IN8 + OUT8 + CC8 + CR8))
 DUR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"duration_ms":\([0-9]*\).*/\1/p')"
 USD8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"total_cost_usd":\([0-9.]*\).*/\1/p')"
-if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span codex-reviewer --phase review \
+if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span code-reviewer --phase review \
     --iteration 0 --attempt 0 --status success --tokens "$TOK8" --duration-ms "$DUR8" --usd "$USD8" \
     --provider claude --adapter claude-cli >/dev/null 2>"$T/lr8.err"; then
   ROWFILE8="$RUNSDIR8/t1135loop.jsonl"

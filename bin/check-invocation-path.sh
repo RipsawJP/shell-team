@@ -177,6 +177,14 @@ done
 [ "$#" -eq 0 ] || refuse2 "unexpected extra argument: $1"
 [ "$MODE" = "role" ] || refuse2 "specify --role <role> (see --help)"
 [ -n "$ROLE_ARG" ] || refuse2 "--role requires a non-empty value"
+# T-1144 (issue #524) — normalize the superseded `--role` spelling before
+# any lookup below, so `--role codex-reviewer` resolves identically to
+# `--role code-reviewer` (bin/resolve-executor.sh's own alias, mirrored
+# here since this checker's role lookup is keyed off its delegated
+# `--print-resolved` output, not off SIX_ROLES directly).
+if [ "$ROLE_ARG" = "codex-reviewer" ]; then
+  ROLE_ARG="code-reviewer"
+fi
 
 # --- resolve the recipe, from THIS script's own installed directory --------
 TEMPLATES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)" \

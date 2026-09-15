@@ -162,7 +162,7 @@ mk_valid() {  # $1 = outfile
     'bind engineer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind ui-designer claude m1 - claude-cli' \
-    'bind codex-reviewer codex m2 - codex-cli' \
+    'bind code-reviewer codex m2 - codex-cli' \
     > "$1"
 }
 
@@ -292,7 +292,7 @@ printf '%s\n' \
   'bind engineer claude m1 - my-cli' \
   'bind qa-verifier claude m1 - my-cli' \
   'bind ui-designer claude m1 - my-cli' \
-  'bind codex-reviewer claude m2 - my-cli' \
+  'bind code-reviewer claude m2 - my-cli' \
   > "$alldecoy"
 set +e
 out="$(cd "$TMP/decoyroot" && bash "$CHECKER" --config alldecoy.conf 2>&1)"
@@ -330,7 +330,7 @@ printf '%s\n' \
   'bind engineer claude m1 - my-cli' \
   'bind qa-verifier claude m1 - my-cli' \
   'bind ui-designer claude m1 - my-cli' \
-  'bind codex-reviewer claude m2 - my-cli' \
+  'bind code-reviewer claude m2 - my-cli' \
   > "$TMP/symroot/adopter/.shell-team/binding.conf"
 set +e
 out="$(cd "$TMP/symroot/adopter" && TEAM_RUN_BASE=.shell-team bash bin/check-binding.sh 2>&1)"
@@ -396,7 +396,7 @@ pass "cb-comma-provider"
 alt="$TMP/alt.conf"
 {
   printf '%s\n' '# a comment' '' 'schema 1' '' \
-    'bind codex-reviewer   codex  m2 -   codex-cli' '# another' \
+    'bind code-reviewer   codex  m2 -   codex-cli' '# another' \
     'bind ui-designer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind engineer claude m1 - claude-cli' \
@@ -511,7 +511,7 @@ tabcfg="$TMP/tab.conf"
   printf 'bind\tengineer\tclaude\tm1\t-\tclaude-cli\n'
   printf 'bind\tqa-verifier\tclaude\tm1\t-\tclaude-cli\n'
   printf 'bind\tui-designer\tclaude\tm1\t-\tclaude-cli\n'
-  printf 'bind\tcodex-reviewer\tcodex\tm2\t-\tcodex-cli\n'
+  printf 'bind\tcode-reviewer\tcodex\tm2\t-\tcodex-cli\n'
 } > "$tabcfg"
 assert_case cb-tab-separated 0 'valid' --config "$tabcfg"
 
@@ -523,7 +523,7 @@ notrail="$TMP/notrail.conf"
     'bind engineer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind ui-designer claude m1 - claude-cli'
-  printf 'bind codex-reviewer codex m2 - codex-cli'
+  printf 'bind code-reviewer codex m2 - codex-cli'
 } > "$notrail"
 assert_case cb-no-trailing-newline 0 'valid' --config "$notrail"
 
@@ -688,5 +688,48 @@ n_self="$(grep -cF -- '--adapters' "$CHECKER" || true)"
 [ "$n_self" -ge 1 ] \
   || fail "cb-adapters-not-forwarded-population: the search form finds zero occurrences of --adapters in bin/check-binding.sh itself — self-exclusion would be decorative, not load-bearing"
 pass "cb-adapters-not-forwarded-population"
+
+# =============================================================================
+# alias (T-1144, issue #524): the superseded role spelling `codex-reviewer`
+# is accepted as a `binding.conf` alias for one release, normalized to
+# `code-reviewer` before the six-row/duplicate re-assertions, with exactly
+# one deprecation line on stderr; a config carrying BOTH spellings is
+# refused with a message naming the collision.
+# =============================================================================
+aliasold="$TMP/alias-old.conf"
+mk_valid "$aliasold"
+sed -i.bak 's/^bind code-reviewer /bind codex-reviewer /' "$aliasold" && rm -f "$aliasold.bak"
+grep -qF -- 'bind codex-reviewer ' "$aliasold" \
+  || fail "cb-alias-superseded-deprecated: fixture control failed — expected the superseded spelling in the fixture"
+aliasold_out="$TMP/alias-old.out"; aliasold_err="$TMP/alias-old.err"
+bash "$CHECKER" --config "$aliasold" --print-binding > "$aliasold_out" 2> "$aliasold_err"
+aliasold_rc=$?
+[ "$aliasold_rc" -eq 0 ] || fail "cb-alias-superseded-deprecated: expected exit 0, got $aliasold_rc"
+[ "$(grep -cE '^bound code-reviewer ' "$aliasold_out" || true)" = "1" ] \
+  || fail "cb-alias-superseded-deprecated: expected exactly one 'bound code-reviewer' row on stdout"
+if grep -qF -- 'codex-reviewer' "$aliasold_out"; then
+  fail "cb-alias-superseded-deprecated: the superseded spelling leaked onto stdout"
+fi
+[ "$(grep -cF -- 'deprecated' "$aliasold_err" || true)" = "1" ] \
+  || fail "cb-alias-superseded-deprecated: expected exactly one 'deprecated' line on stderr"
+pass "alias: a binding.conf carrying the superseded role spelling resolves and prints exactly one deprecation line"
+
+aliasboth="$TMP/alias-both.conf"
+mk_valid "$aliasboth"
+printf '%s\n' 'bind codex-reviewer codex m2 - codex-cli' >> "$aliasboth"
+aliasboth_out="$TMP/alias-both.out"; aliasboth_err="$TMP/alias-both.err"
+set +e
+bash "$CHECKER" --config "$aliasboth" --print-binding > "$aliasboth_out" 2> "$aliasboth_err"
+aliasboth_rc=$?
+set -e
+[ "$aliasboth_rc" -ne 0 ] || fail "cb-alias-both-collision: expected a non-zero exit for a both-spellings config"
+[ ! -s "$aliasboth_out" ] || fail "cb-alias-both-collision: expected zero stdout bytes"
+grep -qF -- 'collision' "$aliasboth_err" \
+  || fail "cb-alias-both-collision: expected the 'collision' token on stderr"
+grep -qF -- 'code-reviewer' "$aliasboth_err" \
+  || fail "cb-alias-both-collision: expected the current spelling named on stderr"
+grep -qF -- 'codex-reviewer' "$aliasboth_err" \
+  || fail "cb-alias-both-collision: expected the superseded spelling named on stderr"
+pass "alias: a binding.conf carrying both spellings is refused with a message naming the collision"
 
 printf 'check-binding suite: all cases passed\n'

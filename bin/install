@@ -46,7 +46,7 @@ AGENTS_SRC_DIR="$REPO_ROOT/agents"
 
 # Common agents installed regardless of which team(s) are requested.
 COMMON_AGENTS=(
-  codex-reviewer.md
+  code-reviewer.md
   tech-lead.md
   scrum-master.md
 )
@@ -69,7 +69,7 @@ Options:
   --force         Overwrite existing files. Default: skip with warning.
   --help, -h      Show this help and exit.
 
-Common agents (codex-reviewer, tech-lead, scrum-master) are always installed.
+Common agents (code-reviewer, tech-lead, scrum-master) are always installed.
 A manifest .claude/team-meta.yaml is written to the target.
 EOF
 }

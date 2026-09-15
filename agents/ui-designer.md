@@ -47,7 +47,7 @@ silent fallback). Use the banner that matches the cause:
 > **errored / returned unusable output**, so this note falls back to condensed
 > in-house guidance (design quality reduced). Retry or check the Skill.
 
-This differs from `codex-reviewer`, which hard-`BLOCK`s when Codex CLI is missing
+This differs from `code-reviewer`, which hard-`BLOCK`s when Codex CLI is missing
 — there, a fallback would void the role's whole purpose (cross-provider
 independence). Here a degraded design is still a *real* design that serves the
 role, so the loop continues; the rule is the same principle applied to a

@@ -6,7 +6,7 @@
 ## フェーズ境界（status flag）
 
 ```
-   pm-spec                engineer              qa-verifier            codex-reviewer
+   pm-spec                engineer              qa-verifier            code-reviewer
       │                      │                      │                       │
       ▼                      ▼                      ▼                       ▼
   READY_FOR_ARCH ──► READY_FOR_ENG ──► READY_FOR_QA ──► READY_FOR_REVIEW ──► READY_FOR_MERGE
@@ -35,12 +35,12 @@
 |-----------|------------------|
 | 1 行のタイポ修正やコメント修正 | `tech-lead` は直接 `engineer` へスキップしてよい |
 | 非 UI タスク（CI/bash/バックエンド/docs/config、または非視覚的なフロントエンド編集） | `ui-designer` は参加しない — `[Design]` フェーズ無し |
-| テストのみの変更（不足テストの追加） | `pm-spec` をスキップ。`engineer` + `qa-verifier` + `codex-reviewer` |
-| 他人の PR をレビューする | `/review` を使う — `codex-reviewer` のみが走る |
+| テストのみの変更（不足テストの追加） | `pm-spec` をスキップ。`engineer` + `qa-verifier` + `code-reviewer` |
+| 他人の PR をレビューする | `/review` を使う — `code-reviewer` のみが走る |
 | 自分の PR に返ってきたレビュー指摘に対応する | `/review-response` を使う — 受領した指摘を Codex で評価し、リスクゲート（決定論フロアがリスクの高い指摘を人間確認へ強制）を通してから、採用分を `shell-team` に渡す |
 | 仕様のみ（コードはまだ無し） | `pm-spec` の後で停止。タスクは `READY_FOR_ARCH`（仕様記述済）で一時停止 |
 | すでに spec が書かれている（`specify — operator-authored`。出荷時デフォルトの `pm-authored` ではない） | `pm-spec` はスキップしない——author ではなく conformance formatter として走る。[spec を誰が書くかを選ぶ](adopting.ja.md#spec-を誰が書くかを選ぶt-1091)を参照 |
-| spec review が elect されている（`spec-review — cross-provider`。出荷時デフォルトの `none` ではない） | フェーズは何もスキップされない——Specify seam で、freeze sweep の後・intent hash を記録する前に、追加の `codex-reviewer` パスが spec document の domain 前提を読む。`REQUEST_CHANGES` は Implement が始まる前に spec 自身の author へ差し戻される。[Specify seam で spec review を elect する](adopting.ja.md#specify-seam-で-spec-review-を-elect-するt-1092)、`docs/loop-engineering/specify-seam-review.md` を参照 |
+| spec review が elect されている（`spec-review — cross-provider`。出荷時デフォルトの `none` ではない） | フェーズは何もスキップされない——Specify seam で、freeze sweep の後・intent hash を記録する前に、追加の `code-reviewer` パスが spec document の domain 前提を読む。`REQUEST_CHANGES` は Implement が始まる前に spec 自身の author へ差し戻される。[Specify seam で spec review を elect する](adopting.ja.md#specify-seam-で-spec-review-を-elect-するt-1092)、`docs/loop-engineering/specify-seam-review.md` を参照 |
 
 `/review` と `/review-response` の違い: `review` は現ブランチ diff の *新規* Codex レビューを生成する。`review-response` は PR に**すでに返ってきた**レビュー指摘をトリアージする — 指摘を評価しリスクゲートに通し、（リスクの高い指摘への GO を得たら）採用分を `shell-team` で実装させる。互いを置き換えるものではない。
 
@@ -122,13 +122,13 @@ status flag（`READY_FOR_ARCH` … `READY_FOR_MERGE`、`BLOCKED`、`REWORK`）�
 だけで、そこではオーケストレータがディレクティブを注入します。エージェントを
 **直接 / スタンドアロン**で起動する（`@engineer` 等）と、ミラーは**保証されません** —
 Bash を持たない `pm-spec` / `tech-lead` は会話言語を自己解決できません（設計上、
-env も config ファイルも無い）。`codex-reviewer` はスタンドアロンの `/review` で
+env も config ファイルも無い）。`code-reviewer` はスタンドアロンの `/review` で
 タスクプロンプトの言語に従うことで、これを部分的に緩和します。
 
 ## Codex CLI クイックリファレンス
 
 ```bash
-# バージョン確認 — codex-reviewer と drift-evaluator が毎ラウンド実行し、
+# バージョン確認 — code-reviewer と drift-evaluator が毎ラウンド実行し、
 # その出力を verdict の `- Codex CLI:` 行に転記する
 codex --version
 
