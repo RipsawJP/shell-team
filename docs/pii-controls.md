@@ -117,6 +117,11 @@ mechanical catch for the opt-in shapes; the change-scoped scan on every pull
 request is the separate, unconditional check for everything else this gate
 covers.
 
+A hit the checker's own documents declare as **accepted noise** — this
+project's design-point label vocabulary and same-outline standards
+identifiers, under the opt-in — is classified as such in the summary line
+rather than edited away.
+
 ## What this gate does not cover
 
 - Named entities — customer names, internal hostnames, project codes — cannot be matched by shape and are not covered by this gate.

@@ -135,7 +135,8 @@ Always end with:
 - **Before you write your hand-off, scan the record files you wrote or edited this round with the shipped shape checker, opt-in shapes enabled.** The scan reads the working tree, which is why it is the `--all` mode and not the change-scoped default: the default reads each changed path's committed blob, so a record you have not committed yet is invisible to it.
 
   ```bash
-  PII_CHECK_TRACKER_KEY=1 bash "<plugin root>/bin/check-pii-shapes.sh" --all > "$out" 2>&1; rc=$?
+  out="$(mktemp)"
+  if PII_CHECK_TRACKER_KEY=1 bash "<plugin root>/bin/check-pii-shapes.sh" --all > "$out" 2>&1; then rc=0; else rc=$?; fi
   ```
 
 - **Judge the filtered lines, never the bare exit status.** `--all` reports every path in the tree, so a `1` says something somewhere matched and says nothing about your own files. Read the `FINDING pattern=<id> path=<path> line=<n>` lines whose `path=` is one of the files you wrote this round. A `0` or a `1` is a scan that completed; a `2` is a scan that **did not complete**, and a scan that did not complete is never an absence of findings — fix the invocation and run it again.
