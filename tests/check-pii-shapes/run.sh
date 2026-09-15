@@ -1746,6 +1746,16 @@ HOS_WORDS_LINE="reference filed under its own tracking system, described in word
 HOS_RECORD_RELPATH="uncommitted-record.md"
 
 HOS_REPO="$(new_repo)"
+# Round 4 (T-1143 review, round-3 Major 1, extended by live testing beyond
+# the reported case): `add_fixture_line` below runs `git add`, which is
+# itself an ignore-consulting call — under a hostile ambient
+# core.excludesFile matching this record's own literal filename, `git add`
+# refuses the path outright and aborts this script under `set -e`, well
+# before assertions (a)-(c) below (whose own READ mechanism, once the path
+# is tracked, does not consult excludes) ever run. Pin this repo's own
+# excludesFile to neutral too, for the same reason and by the same
+# mechanism as HOS_UT_REPO below.
+git -C "$HOS_REPO" config core.excludesFile /dev/null
 HOS_BASE="$(git -C "$HOS_REPO" rev-parse HEAD)"
 
 # Commit an innocuous version of the record path strictly after HOS_BASE,
@@ -1812,7 +1822,26 @@ fi
 # ever mentions its path. Kept as its own labeled assertion so this
 # weaker mechanism is never confused with the committed-blob read (b)
 # demonstrates.
+#
+# Round 4 (T-1143 review, round-3 Major 1): unlike (a)-(c), which read
+# already-TRACKED paths — (a)/(c) through --all's `ls-files -s --cached`
+# branch, (b) through `git cat-file -p "HEAD:$path"` — neither of which
+# ever consults excludes, this assertion's record is wholly UNTRACKED, so
+# --all enumerates it through `git ls-files -z --others --exclude-standard`
+# (bin/check-pii-shapes.sh:744), which DOES honor whatever core.excludesFile
+# is active in the ambient git environment. Unpinned, a contributor whose
+# own global excludes happen to match "*.md" or this record's own literal
+# filename would see this one assertion fail locally while CI (no global
+# excludes) stayed green — the class .shell-team/test-recipe.md's
+# "Environment quirks" section already names and requires pinning against.
+# Pin this scratch repo's OWN core.excludesFile to neutral (following the
+# `/dev/null` half of tests/rollup-track/run.sh's and
+# tests/gitignore-raw-dumps/run.sh's precedent) rather than a `-c` flag on
+# the outer `bash "$BIN"` invocation: that flag would apply to the outer
+# `bash` process, not to check-pii-shapes.sh's own internal `git` calls,
+# which read config from the repo `bash "$BIN"` is run inside of.
 HOS_UT_REPO="$(new_repo)"
+git -C "$HOS_UT_REPO" config core.excludesFile /dev/null
 HOS_UT_BASE="$(git -C "$HOS_UT_REPO" rev-parse HEAD)"
 printf '%s\n' "$HOS_LINE" > "$HOS_UT_REPO/$HOS_RECORD_RELPATH"
 export PII_CHECK_TRACKER_KEY=1
@@ -1828,6 +1857,32 @@ if [ "$HOS_UT_ALL_RC" -eq 1 ] && printf '%s\n' "$HOS_UT_ALL_OUT" | grep -qF -- "
   pass "hand-off shape scan: a wholly untracked record is also reported by --all, and is invisible to the change-scoped default because it never entered any diff"
 else
   fail "hand-off shape scan: a wholly untracked record is also reported by --all, and is invisible to the change-scoped default because it never entered any diff (all_rc=$HOS_UT_ALL_RC all_out=$HOS_UT_ALL_OUT diff_rc=$HOS_UT_DIFF_RC diff_out=$HOS_UT_DIFF_OUT)"
+fi
+
+# Control for the pin above (same two-arm shape as tests/rollup-track/run.sh
+# and tests/gitignore-raw-dumps/run.sh): a HOSTILE excludesFile matching this
+# record's own literal filename, pinned into a separate scratch repo, DOES
+# make the same untracked record invisible to --all's own enumeration —
+# proving the neutral pin above is not silently ineffective (it has
+# something to defeat), and at the same time honestly documenting the
+# checker's own real, disclosed blind spot for ignored paths (round 1's
+# fast-follow finding 5 / Non-goal #1 / out-of-scope item 2) as a fixture
+# result, never as evidence of a defect in bin/check-pii-shapes.sh's own
+# enumeration logic, which this task does not touch.
+HOS_UT_HOSTILE_REPO="$(new_repo)"
+printf '%s\n' "$HOS_RECORD_RELPATH" > "$WORK/hos-hostile-excludes"
+git -C "$HOS_UT_HOSTILE_REPO" config core.excludesFile "$WORK/hos-hostile-excludes"
+printf '%s\n' "$HOS_LINE" > "$HOS_UT_HOSTILE_REPO/$HOS_RECORD_RELPATH"
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_UT_HOSTILE_OUT="$(cd "$HOS_UT_HOSTILE_REPO" && bash "$BIN" --all 2>&1)"
+HOS_UT_HOSTILE_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_UT_HOSTILE_RC" -eq 0 ] && ! printf '%s\n' "$HOS_UT_HOSTILE_OUT" | grep -qF -- "path=${HOS_RECORD_RELPATH}"; then
+  pass "hand-off shape scan: control — a hostile excludesFile matching this record's own name makes it invisible to --all's untracked enumeration, proving the neutral pin above has teeth"
+else
+  fail "hand-off shape scan: control — a hostile excludesFile matching this record's own name makes it invisible to --all's untracked enumeration, proving the neutral pin above has teeth (rc=$HOS_UT_HOSTILE_RC out=$HOS_UT_HOSTILE_OUT)"
 fi
 
 # =============================================================================
