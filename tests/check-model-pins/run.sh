@@ -216,7 +216,7 @@ printf '%s\n' \
   'bind engineer codex provider-configured - codex-cli' \
   'bind qa-verifier codex provider-configured - codex-cli' \
   'bind ui-designer codex provider-configured - codex-cli' \
-  'bind codex-reviewer codex provider-configured - codex-cli' \
+  'bind code-reviewer codex provider-configured - codex-cli' \
   > "$POP/c.conf"
 bash "$REPO_ROOT/bin/check-binding.sh" --config "$POP/c.conf" >/dev/null 2>&1 \
   || fail "cmp-population-empty: fixture control failed — the all-codex conf does not validate under the shipped grammar"

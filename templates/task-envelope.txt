@@ -101,7 +101,7 @@
 #
 #   role-board-authority <role> <writes|proposes|none>
 #     One row per inner-loop role (tech-lead, pm-spec, engineer,
-#     qa-verifier, codex-reviewer, ui-designer — no more, no fewer; the
+#     qa-verifier, code-reviewer, ui-designer — no more, no fewer; the
 #     three advisory roles scrum-master, triage-orchestrator and
 #     drift-evaluator never appear here). `writes` means the role edits
 #     the board itself and the envelope's `board-transition` field records
@@ -165,5 +165,5 @@ role-board-authority tech-lead      none
 role-board-authority pm-spec       writes
 role-board-authority engineer      writes
 role-board-authority qa-verifier   writes
-role-board-authority codex-reviewer proposes
+role-board-authority code-reviewer proposes
 role-board-authority ui-designer   none

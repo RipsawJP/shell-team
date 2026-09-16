@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # bin/review-gate.sh — the DETERMINISTIC FLOOR of the review-response risk gate
-# (T-037). Given one review finding's attributes (as evaluated by codex-reviewer),
+# (T-037). Given one review finding's attributes (as evaluated by code-reviewer),
 # decide whether that finding MUST be escalated to a human, or is clear of the
 # floor (in which case the SKILL's LLM judgment decides auto vs reject in the
 # grey zone).

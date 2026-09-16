@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.6.4-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.7.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
@@ -121,7 +121,7 @@ It also works standalone, one agent or skill at a time, when you want to be expl
 │   ├── ui-designer.md               # Design for UI work only (frontend-design Skill; optional dep)
 │   ├── engineer.md                  # Implementer (non-worktree by default; opt-in isolation)
 │   ├── qa-verifier.md               # Test runner / acceptance checker
-│   ├── codex-reviewer.md            # Codex CLI cross-provider reviewer
+│   ├── code-reviewer.md            # Codex CLI cross-provider reviewer
 │   ├── scrum-master.md              # Retro / lessons generator
 │   └── triage-orchestrator.md       # Outer-loop triage consolidator (propose-only)
 ├── skills/
@@ -157,7 +157,7 @@ It also works standalone, one agent or skill at a time, when you want to be expl
 [Design]    ui-designer     → (UI only) design note   no new flag
 [Implement] engineer        → code + tests           READY_FOR_QA
 [Validate]  qa-verifier     → run + check criteria   READY_FOR_REVIEW
-[Review]    codex-reviewer  → Codex CLI verdict       READY_FOR_MERGE
+[Review]    code-reviewer  → Codex CLI verdict       READY_FOR_MERGE
 ```
 
 `[Design]` is **conditional** (only when the task involves UI work). It carries no new status flag — the design note's existence gates the engineer. The `frontend-design` Skill is an optional dependency (degrades to in-house guidance, announced not silent, when absent).
@@ -175,7 +175,7 @@ The agent pipeline above is the **inner loop**. An **outer loop** of operating d
 - **Situational dispatch record** — `tech-lead`'s Routing Map decides, per axis, which mechanism runs a task's implement phase and which runs its verify phase, and the orchestrator transcribes each decision onto the task's board entry under the closed-vocabulary grammar `- dispatch: <axis> — <value> — <unconditional|conditional> — <ground>`. `bin/close-out.sh` validates every such sub-bullet when present and refuses a malformed one (a value from another axis's set, a duplicated axis, an axis outside the closed set, a bad modality, or a ground with no priced-line prefix) — an entry carrying none of them still closes out. When a task's verification duty bundles a fixture-suite half with a mechanism-class full-population diff, the `verify-fixture` and `verify-mechanism` refinement keys price each half independently in place of the single `verify` row — an entry records the parent `verify` key or one or more of its refinements, never both. `bin/close-out.sh` also refuses (exit 1, board byte-untouched) to promote an entry whose Active flag is not already `READY_FOR_MERGE` — the one state the cross-provider review writes on APPROVE — and, when `--issue` is omitted, prints a one-line note that a `develop` merge does not auto-close the issue, instead of silently skipping the manual close procedure.
 - **Cross-task dispatch reflection** — before transcribing the dispatch record above, the orchestrator skims the immediately preceding task's own board entry and records, per axis, whether this task repeats or diverges from what that predecessor elected: `- dispatch-reflection: <axis> — <predecessor> — <repeat|differs|no-predecessor-row> — <ground>`, or the single `- dispatch-reflection: all — no-predecessor — no-predecessor-row — <ground>` line where the task has no predecessor at all. `bin/check-entry-mode.sh` validates this family when it is present — every axis the entry's own dispatch rows record must carry a matching reflection row, no axis may appear twice, and a stated verdict must agree with the predecessor entry's own recorded value for that axis, the predecessor resolved to exactly one top-level board entry in either the active or the done section of the board — while an entry carrying no reflection line at all still passes.
 - **Spec authorship as a dispatch axis** — `specify`, closed over `pm-authored` (the shipped default: `pm-spec` writes the spec) and `operator-authored` (the coordinating session has already written it, typically because a judgment-density bottleneck made delegating authorship worthless — see [Choosing who authors the spec](docs/adopting.md#choosing-who-authors-the-spec-t-1091)). Either way the loop's machinery — the freeze sweep, both review gates, the interventions ledger — runs unchanged; `pm-spec` participates as a conformance formatter rather than an author in the `operator-authored` branch.
-- **Spec review at the Specify seam as a dispatch axis** — `spec-review`, defined and priced in `docs/loop-engineering/specify-seam-review.md`, closed over `none` (the shipped default) and `cross-provider` (an extra `codex-reviewer` pass reads the spec's domain premises after the freeze sweep and before the intent hash is recorded, elected when the spec's correctness rests on a domain premise this repository cannot itself measure — see [Electing a spec review at the Specify seam](docs/adopting.md#electing-a-spec-review-at-the-specify-seam-t-1092)). An elected spec review is never one of the loop's two gates and never substitutes for either.
+- **Spec review at the Specify seam as a dispatch axis** — `spec-review`, defined and priced in `docs/loop-engineering/specify-seam-review.md`, closed over `none` (the shipped default) and `cross-provider` (an extra `code-reviewer` pass reads the spec's domain premises after the freeze sweep and before the intent hash is recorded, elected when the spec's correctness rests on a domain premise this repository cannot itself measure — see [Electing a spec review at the Specify seam](docs/adopting.md#electing-a-spec-review-at-the-specify-seam-t-1092)). An elected spec review is never one of the loop's two gates and never substitutes for either.
 - **Declared verification ceiling** — every spec declares, on one `- verification-ceiling: unit-and-static | real-environment` line, the level QA can actually reach for it, with any criterion above that level named on its own `- above-ceiling:` sub-bullet; QA's PASS block and the board's `READY_FOR_REVIEW` line both carry the declared value verbatim, so a green flag reads "green up to" rather than bare green — see [Declaring the verification ceiling](docs/adopting.md#declaring-the-verification-ceiling).
 - **Concurrent-worktree reconcile** — when 2+ engineer instances have each committed disjoint work in their own linked worktree, `bin/land-worktree.sh` lands each worker onto one coordinator branch in turn, behind a never-stealing lock (default 10s bounded wait, overridable via `TEAM_LAND_LOCK_TIMEOUT`), refusing rather than landing on any path-level collision. Opt-in only — the run skill's own `reconcile-step` section documents when to use it. The guarantee is path-level and textual only: it does not guarantee semantic or interface independence between workers.
 - **Opt-in triage** — `/shell-team:loop-triage` (`bin/discover-work.sh`) is read-only: it finds failing CI / open PRs / labelled issues and *proposes* todo candidates, never editing the board.
@@ -186,7 +186,7 @@ See [docs/history.md](docs/history.md) for how this operating discipline evolved
 ## Binding roles to executors
 
 Each of the six inner-loop roles — `tech-lead`, `pm-spec`, `engineer`,
-`qa-verifier`, `codex-reviewer`, `ui-designer` — is host-assignable to a
+`qa-verifier`, `code-reviewer`, `ui-designer` — is host-assignable to a
 specific executor (provider + model + effort + adapter) through a
 `<base>/binding.conf`; with no host config, the plugin-shipped
 `templates/binding-default.conf` is the **shipped default**. The how-to, the
@@ -210,7 +210,7 @@ adapter or sandbox mode has one (see [docs/adopting.md](docs/adopting.md) for
 the recipe and its refusal tokens). Illustratively, on the reporting-only axis,
 for every role other than `tech-lead`: the model still comes from the role's
 own `agents/<role>.md` pin (issue **#236** tracks retiring those pins for the
-five `claude-cli`-bound roles only, `codex-reviewer` excluded), and
+five `claude-cli`-bound roles only, `code-reviewer` excluded), and
 executor-level routing is not resolved at all. A declared effort is no
 longer a single story shared by every adapter this project ships, and
 which story applies depends on **dispatch shape**, not on the adapter
@@ -219,8 +219,8 @@ token alone: on `tech-lead`'s alternate path — dispatched
 **applied** to the invocation, as `-c model_reasoning_effort=<value>`
 gated on that adapter's own `cli-config-override` declaration; every
 other `codex-cli` row, including the shipped default's own
-`codex-reviewer`, which is dispatched `wrapper-hosted` through its own
-`agents/codex-reviewer.md` and never receives that recipe's line at all,
+`code-reviewer`, which is dispatched `wrapper-hosted` through its own
+`agents/code-reviewer.md` and never receives that recipe's line at all,
 and every `claude-cli` row, stays **recorded** and applied to nothing. Every
 bound value is declared, never an observation of what executed — except
 `tech-lead`'s alternate path, where the resolved row's model column is what
@@ -259,7 +259,7 @@ verbatim, preceded by a `- reproduce: <command>` line carrying the exact
 command that regenerates it.
 
 ```bash
-bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l codex-reviewer agents/*.md"
+bash derive-populations.sh --label agents --set "registered=git ls-files -- agents/*.md" --set "reviewers=grep -l code-reviewer agents/*.md"
 ```
 
 (invoke it as `bash "<plugin root>/bin/derive-populations.sh"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, the same convention `## Replaying a run` documents for `gen-loop-replay.sh`.) Each `--set name=command` line is captured, deduplicated and partitioned into a gap-free, overlap-free membership signature; `--accept-status name=csv` declares additional exit statuses accepted for one named set beyond the default of `0` (the "`git grep` exits `1` for no match" case). `bash derive-populations.sh --help` documents the full grammar.
@@ -303,7 +303,7 @@ grammar and exit-code contract.
 - **Files are the only shared state**: the board (`todo.md`) + status flags are the single source of truth between agents.
 - **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo runs on that same default layout, so its own board, specs, and retros live under `.shell-team/` too. The resolver still detects and supports the earlier `tasks/` + `docs/specs/` layout for repos that adopted the team before the base dir was consolidated — where these docs write `tasks/…` or `docs/specs/…`, they name the same artifacts in that legacy layout. See [docs/adopting.md](docs/adopting.md).
 - **Engineer is non-worktree by default**: its edits land directly on the current feature branch; the orchestrator opts into `isolation: worktree` at invocation only for parallel implementations.
-- **The reviewer's cross-provider binding is the shipped default**: `codex-reviewer` ships bound to Codex CLI because a model reviewing output from its own family shares its blind spots. A host-authored `binding.conf` may rebind `codex-reviewer` to a same-family executor; doing so changes which executor gets resolved and which value telemetry records, but does not wire up an alternate-executor invocation path and does not guarantee cross-provider review once such a rebind exists. If Codex CLI is unavailable, the review returns `BLOCKED` rather than falling back to Claude.
+- **The reviewer's cross-provider binding is the shipped default**: `code-reviewer` ships bound to Codex CLI because a model reviewing output from its own family shares its blind spots. A host-authored `binding.conf` may rebind `code-reviewer` to a same-family executor; doing so changes which executor gets resolved and which value telemetry records, but does not wire up an alternate-executor invocation path and does not guarantee cross-provider review once such a rebind exists. If Codex CLI is unavailable, the review returns `BLOCKED` rather than falling back to Claude.
 
 ## Versioning
 

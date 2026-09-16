@@ -29,7 +29,7 @@ action:
 budget:
   max_iterations: 3        # QA allows 2 retries, so up to 3 implement->verify passes
   max_wallclock_min: 0     # untracked (host-dependent)
-  max_subagents: 5         # tech-lead, pm-spec, engineer, qa-verifier, codex-reviewer
+  max_subagents: 5         # tech-lead, pm-spec, engineer, qa-verifier, code-reviewer
   max_usd: 0               # untracked (host-dependent)
   extension_ratifier: operator   # default; or: authoring-session
 

@@ -13,8 +13,15 @@
 # Grammar: a required `schema <version>` line, followed by exactly one
 # `bind <role> <provider> <model> <effort|-> <adapter>` row for each of
 # the six inner-loop roles (tech-lead, pm-spec, engineer, qa-verifier,
-# codex-reviewer, ui-designer) — no more, no fewer. `#` comment lines and
+# code-reviewer, ui-designer) — no more, no fewer. `#` comment lines and
 # blank lines are skipped; row order and extra whitespace do not matter.
+#
+# Alias (T-1144, issue #524): a `bind` row's role field carrying the
+# superseded spelling `codex-reviewer` is accepted and normalized to
+# `code-reviewer` before the six-row / duplicate-role re-assertions below,
+# with exactly one deprecation line on stderr; a config carrying `bind`
+# rows for BOTH spellings is refused with a `collision` token naming both.
+# The alias is one release's compatibility shim, not a second role.
 #
 # Usage:
 #   check-binding.sh [--config PATH] [--adapters PATH]
@@ -179,7 +186,11 @@ print_help() {
 ROLE_RE='^[a-z][a-z0-9-]*$'
 MODEL_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 MAXLEN=64
-SIX_ROLES=(tech-lead pm-spec engineer qa-verifier codex-reviewer ui-designer)
+SIX_ROLES=(tech-lead pm-spec engineer qa-verifier code-reviewer ui-designer)
+# T-1144 (issue #524): the superseded role spelling, accepted as a
+# config-layer alias for one release and normalized to SIX_ROLES's own
+# `code-reviewer` entry before any duplicate/six-row re-assertion runs.
+SUPERSEDED_REVIEWER_ROLE="codex-reviewer"
 SUPPORTED_SCHEMA_VERSIONS=(1)
 SUPPORTED_LOCK_VERSIONS=(1)
 
@@ -352,8 +363,26 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
 
   # Pass 2: every remaining substantive line, in file order.
   BIND_ROLE=() BIND_PROVIDER=() BIND_MODEL=() BIND_EFFORT=() BIND_ADAPTER=()
+  BIND_ROLE_ORIG=()
   BOUND_LINES=()
-  local role provider model effort adapter seen reg_provider
+  # T-1144 round 3 (Codex round-2 Major 2), corrected round 4 (Codex round-3
+  # Major 1): the alias deprecation line is BUFFERED here, never printed
+  # inline. It is left in DEPRECATION_NOTICES (a global array, not `local` —
+  # deliberately survives this function's own return) for the CALLER to
+  # flush, never printed by this function itself. Round 3's fix flushed it
+  # here, at the end of validate_config, which correctly covers every
+  # refusal INSIDE this function (the six-role completeness loop included)
+  # but not a refusal a caller of validate_config can still raise AFTER it
+  # returns — `--verify` mode's later binding-changed comparison and
+  # print-lock mode's canonical_hash call both refuse after this function
+  # has already returned successfully. See flush_deprecation_notices() below
+  # for where the flush now actually happens: only at the mode dispatch's
+  # own success exit, past that mode's own last refusal-capable step. This
+  # is the general invariant the finding names — a diagnostic is emitted
+  # only once the whole PROGRAM has validated for the mode it is running,
+  # and never on a refusal path — not a fix scoped to validate_config alone.
+  DEPRECATION_NOTICES=()
+  local role provider model effort adapter seen reg_provider role_orig di
   lineno=0
   while IFS= read -r raw || [ -n "$raw" ]; do
     lineno=$((lineno + 1))
@@ -374,6 +403,24 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     if ! [[ "$role" =~ $ROLE_RE ]] || [ "${#role}" -gt "$MAXLEN" ]; then
       refuse bad-token 1 "malformed role token: $role"
     fi
+    # T-1144 (issue #524) — normalize the superseded role spelling to the
+    # current one BEFORE role_in_six / duplicate / six-row re-assertions,
+    # so a v2.6.x-shaped row resolves and a both-spellings row collides
+    # rather than being reported as an ordinary duplicate. role_orig is
+    # the pre-normalization token, kept only to tell a genuine collision
+    # (two different original spellings landing on one role) apart from
+    # an ordinary same-spelling duplicate below.
+    role_orig="$role"
+    if [ "$role" = "$SUPERSEDED_REVIEWER_ROLE" ]; then
+      role="code-reviewer"
+      # Buffered, not printed here (see DEPRECATION_NOTICES above): this row
+      # may still collide with an already-bound 'code-reviewer' row further
+      # down in the same file, or the six-role completeness check below may
+      # still fail for an unrelated reason — either refuses the whole run,
+      # and neither may coexist with this line on stderr.
+      DEPRECATION_NOTICES+=("$(printf 'check-binding: deprecated: role token '\''%s'\'' in %s is accepted as an alias for '\''%s'\'' — rewrite this binding.conf before the alias is removed in the next release' \
+        "$SUPERSEDED_REVIEWER_ROLE" "$cfg" "code-reviewer")")
+    fi
     if ! [[ "$provider" =~ $ROLE_RE ]] || [ "${#provider}" -gt "$MAXLEN" ]; then
       refuse bad-token 1 "malformed provider token: $provider"
     fi
@@ -392,10 +439,15 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     role_in_six "$role" || refuse unknown-role 1 "role is not one of the six inner-loop roles: $role"
 
     if [ "${#BIND_ROLE[@]}" -gt 0 ]; then
+      di=0
       for seen in "${BIND_ROLE[@]}"; do
         if [ "$seen" = "$role" ]; then
+          if [ "${BIND_ROLE_ORIG[$di]}" != "$role_orig" ]; then
+            refuse collision 1 "role token collision in $cfg: rows for 'code-reviewer' and 'codex-reviewer' both resolve to the same role — remove the superseded spelling"
+          fi
           refuse duplicate-role 1 "role bound more than once: $role"
         fi
+        di=$((di + 1))
       done
     fi
 
@@ -408,6 +460,7 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     fi
 
     BIND_ROLE+=("$role")
+    BIND_ROLE_ORIG+=("$role_orig")
     BIND_PROVIDER+=("$provider")
     BIND_MODEL+=("$model")
     BIND_EFFORT+=("$effort")
@@ -433,6 +486,22 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
     while IFS= read -r sorted || [ -n "$sorted" ]; do
       [ -n "$sorted" ] && CANON_LINES+=("$sorted")
     done <<< "$sorted_text"
+  fi
+}
+
+# T-1144 round 4 (Codex round-3 Major 1): the ONE place this file writes a
+# buffered, non-refusal diagnostic line to stderr. Called only from the mode
+# dispatch below, at each of this file's four success (`exit 0`) sites, and
+# in every case strictly AFTER that mode's own last refuse()-capable step has
+# already returned without exiting — never from inside validate_config
+# itself, because validate_config's own callers can still refuse after it
+# returns (`--verify` mode's binding-changed comparison; print-lock mode's
+# canonical_hash call). This keeps the invariant true for the whole program,
+# not only for the one function that happens to originate the notice: a
+# diagnostic never coexists with a refusal on stderr, for any mode.
+flush_deprecation_notices() {
+  if [ "${#DEPRECATION_NOTICES[@]}" -gt 0 ]; then
+    printf '%s\n' "${DEPRECATION_NOTICES[@]}" >&2 || true
   fi
 }
 
@@ -546,6 +615,11 @@ if [ "$MODE" = "verify" ]; then
   if [ "$computed_hash" != "$LOCK_HASH" ]; then
     refuse binding-changed 1 "the binding has changed since the lock was taken (config: $CONFIG_DISPLAY)"
   fi
+  # T-1144 round 4: this is `--verify` mode's own last refuse()-capable step
+  # (the binding-changed comparison just above) — nothing between here and
+  # this mode's exit 0 can still refuse, so the buffered alias notice is
+  # safe to flush here.
+  flush_deprecation_notices
   printf 'check-binding: verified: binding matches the lock (config: %s)\n' "$CONFIG_DISPLAY"
   exit 0
 fi
@@ -565,16 +639,29 @@ validate_config "$CONFIG"
 
 case "$MODE" in
   validate)
+    # T-1144 round 4: `validate` mode's own last refuse()-capable step is
+    # the shared `validate_config "$CONFIG"` call in the prelude just above
+    # — nothing in this branch can still refuse, so flush is safe here.
+    flush_deprecation_notices
     printf 'check-binding: valid: schema %s, %d role(s) bound (config: %s)\n' \
       "${CANON_LINES[0]#schema }" "${#BIND_ROLE[@]}" "$CONFIG_DISPLAY"
     exit 0
     ;;
   print-binding)
+    # T-1144 round 4: same last-refusal point as `validate` above
+    # (validate_config); print_canonical() itself never refuses.
+    flush_deprecation_notices
     print_canonical
     exit 0
     ;;
   print-lock)
     computed_hash="$(canonical_hash)" || fail_usage "git hash-object failed while hashing the canonical binding for: $CONFIG"
+    # T-1144 round 4: unlike `validate`/`print-binding`, this mode's own
+    # last refuse()-capable step is the canonical_hash call directly above
+    # (its fail_usage guard), not validate_config — flush must follow THAT,
+    # not the earlier validate_config call, or a hash-object failure could
+    # still coexist with an already-flushed notice on stderr.
+    flush_deprecation_notices
     {
       printf 'binding-lock 1\n'
       printf 'config-path %s\n' "$CONFIG_DISPLAY"

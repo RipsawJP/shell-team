@@ -162,7 +162,7 @@ mk_valid() {  # $1 = outfile
     'bind engineer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind ui-designer claude m1 - claude-cli' \
-    'bind codex-reviewer codex m2 - codex-cli' \
+    'bind code-reviewer codex m2 - codex-cli' \
     > "$1"
 }
 
@@ -292,7 +292,7 @@ printf '%s\n' \
   'bind engineer claude m1 - my-cli' \
   'bind qa-verifier claude m1 - my-cli' \
   'bind ui-designer claude m1 - my-cli' \
-  'bind codex-reviewer claude m2 - my-cli' \
+  'bind code-reviewer claude m2 - my-cli' \
   > "$alldecoy"
 set +e
 out="$(cd "$TMP/decoyroot" && bash "$CHECKER" --config alldecoy.conf 2>&1)"
@@ -330,7 +330,7 @@ printf '%s\n' \
   'bind engineer claude m1 - my-cli' \
   'bind qa-verifier claude m1 - my-cli' \
   'bind ui-designer claude m1 - my-cli' \
-  'bind codex-reviewer claude m2 - my-cli' \
+  'bind code-reviewer claude m2 - my-cli' \
   > "$TMP/symroot/adopter/.shell-team/binding.conf"
 set +e
 out="$(cd "$TMP/symroot/adopter" && TEAM_RUN_BASE=.shell-team bash bin/check-binding.sh 2>&1)"
@@ -396,7 +396,7 @@ pass "cb-comma-provider"
 alt="$TMP/alt.conf"
 {
   printf '%s\n' '# a comment' '' 'schema 1' '' \
-    'bind codex-reviewer   codex  m2 -   codex-cli' '# another' \
+    'bind code-reviewer   codex  m2 -   codex-cli' '# another' \
     'bind ui-designer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind engineer claude m1 - claude-cli' \
@@ -511,7 +511,7 @@ tabcfg="$TMP/tab.conf"
   printf 'bind\tengineer\tclaude\tm1\t-\tclaude-cli\n'
   printf 'bind\tqa-verifier\tclaude\tm1\t-\tclaude-cli\n'
   printf 'bind\tui-designer\tclaude\tm1\t-\tclaude-cli\n'
-  printf 'bind\tcodex-reviewer\tcodex\tm2\t-\tcodex-cli\n'
+  printf 'bind\tcode-reviewer\tcodex\tm2\t-\tcodex-cli\n'
 } > "$tabcfg"
 assert_case cb-tab-separated 0 'valid' --config "$tabcfg"
 
@@ -523,7 +523,7 @@ notrail="$TMP/notrail.conf"
     'bind engineer claude m1 - claude-cli' \
     'bind qa-verifier claude m1 - claude-cli' \
     'bind ui-designer claude m1 - claude-cli'
-  printf 'bind codex-reviewer codex m2 - codex-cli'
+  printf 'bind code-reviewer codex m2 - codex-cli'
 } > "$notrail"
 assert_case cb-no-trailing-newline 0 'valid' --config "$notrail"
 
@@ -688,5 +688,148 @@ n_self="$(grep -cF -- '--adapters' "$CHECKER" || true)"
 [ "$n_self" -ge 1 ] \
   || fail "cb-adapters-not-forwarded-population: the search form finds zero occurrences of --adapters in bin/check-binding.sh itself — self-exclusion would be decorative, not load-bearing"
 pass "cb-adapters-not-forwarded-population"
+
+# =============================================================================
+# alias (T-1144, issue #524): the superseded role spelling `codex-reviewer`
+# is accepted as a `binding.conf` alias for one release, normalized to
+# `code-reviewer` before the six-row/duplicate re-assertions, with exactly
+# one deprecation line on stderr; a config carrying BOTH spellings is
+# refused with a message naming the collision.
+# =============================================================================
+aliasold="$TMP/alias-old.conf"
+mk_valid "$aliasold"
+sed -i.bak 's/^bind code-reviewer /bind codex-reviewer /' "$aliasold" && rm -f "$aliasold.bak"
+grep -qF -- 'bind codex-reviewer ' "$aliasold" \
+  || fail "cb-alias-superseded-deprecated: fixture control failed — expected the superseded spelling in the fixture"
+aliasold_out="$TMP/alias-old.out"; aliasold_err="$TMP/alias-old.err"
+bash "$CHECKER" --config "$aliasold" --print-binding > "$aliasold_out" 2> "$aliasold_err"
+aliasold_rc=$?
+[ "$aliasold_rc" -eq 0 ] || fail "cb-alias-superseded-deprecated: expected exit 0, got $aliasold_rc"
+[ "$(grep -cE '^bound code-reviewer ' "$aliasold_out" || true)" = "1" ] \
+  || fail "cb-alias-superseded-deprecated: expected exactly one 'bound code-reviewer' row on stdout"
+if grep -qF -- 'codex-reviewer' "$aliasold_out"; then
+  fail "cb-alias-superseded-deprecated: the superseded spelling leaked onto stdout"
+fi
+[ "$(grep -cF -- 'deprecated' "$aliasold_err" || true)" = "1" ] \
+  || fail "cb-alias-superseded-deprecated: expected exactly one 'deprecated' line on stderr"
+pass "alias: a binding.conf carrying the superseded role spelling resolves and prints exactly one deprecation line"
+
+aliasboth="$TMP/alias-both.conf"
+mk_valid "$aliasboth"
+printf '%s\n' 'bind codex-reviewer codex m2 - codex-cli' >> "$aliasboth"
+aliasboth_out="$TMP/alias-both.out"; aliasboth_err="$TMP/alias-both.err"
+set +e
+bash "$CHECKER" --config "$aliasboth" --print-binding > "$aliasboth_out" 2> "$aliasboth_err"
+aliasboth_rc=$?
+set -e
+[ "$aliasboth_rc" -ne 0 ] || fail "cb-alias-both-collision: expected a non-zero exit for a both-spellings config"
+[ ! -s "$aliasboth_out" ] || fail "cb-alias-both-collision: expected zero stdout bytes"
+grep -qF -- 'collision' "$aliasboth_err" \
+  || fail "cb-alias-both-collision: expected the 'collision' token on stderr"
+grep -qF -- 'code-reviewer' "$aliasboth_err" \
+  || fail "cb-alias-both-collision: expected the current spelling named on stderr"
+grep -qF -- 'codex-reviewer' "$aliasboth_err" \
+  || fail "cb-alias-both-collision: expected the superseded spelling named on stderr"
+pass "alias: a binding.conf carrying both spellings is refused with a message naming the collision"
+
+# =============================================================================
+# alias diagnostic-ordering regression (T-1144 Codex round-2 Major 2): a
+# direct invocation's stderr is EXACTLY one line in both the aliased-success
+# and the both-spellings-refusal cases — a whole-file `wc -l`, never a
+# presence grep, because presence alone cannot tell "one line" apart from
+# "the deprecation notice plus a later refusal", which is exactly the shape
+# round 2 found: the deprecation printf fired unconditionally at
+# normalization time, before the later duplicate/collision walk could
+# discover the two rows collide, so a both-spellings config emitted two
+# lines against this script's own one-token-per-refusal contract.
+# =============================================================================
+n_aliasold_lines="$(wc -l < "$aliasold_err" | tr -d ' ')"
+[ "$n_aliasold_lines" = "1" ] \
+  || fail "cb-alias-superseded-deprecated-linecount: expected exactly 1 stderr line total, got $n_aliasold_lines: $(cat "$aliasold_err")"
+pass "cb-alias-superseded-deprecated-linecount: an aliased-success direct invocation emits exactly 1 stderr line"
+
+n_aliasboth_lines="$(wc -l < "$aliasboth_err" | tr -d ' ')"
+[ "$n_aliasboth_lines" = "1" ] \
+  || fail "cb-alias-both-collision-linecount: expected exactly 1 stderr line total, got $n_aliasboth_lines: $(cat "$aliasboth_err")"
+pass "cb-alias-both-collision-linecount: a both-spellings direct invocation emits exactly 1 stderr line"
+
+# Control: an ordinary, alias-unrelated refusal is ALSO exactly one stderr
+# line — proves the invariant this fix restores ("a diagnostic is emitted
+# only once the whole input has validated, and never on a refusal path") is
+# general, not a special case wired only for the alias.
+badschema="$TMP/badschema.conf"
+sed 's/^schema 1$/schema 99/' "$base" > "$badschema"
+badschema_out="$TMP/badschema.out"; badschema_err="$TMP/badschema.err"
+set +e
+bash "$CHECKER" --config "$badschema" --print-binding > "$badschema_out" 2> "$badschema_err"
+badschema_rc=$?
+set -e
+[ "$badschema_rc" -ne 0 ] || fail "cb-bad-schema-linecount: expected a non-zero exit"
+[ ! -s "$badschema_out" ] || fail "cb-bad-schema-linecount: expected zero stdout bytes"
+n_badschema_lines="$(wc -l < "$badschema_err" | tr -d ' ')"
+[ "$n_badschema_lines" = "1" ] \
+  || fail "cb-bad-schema-linecount: expected exactly 1 stderr line total, got $n_badschema_lines: $(cat "$badschema_err")"
+pass "cb-bad-schema-linecount: an ordinary (non-alias) refusal is also exactly 1 stderr line"
+
+# =============================================================================
+# alias diagnostic-ordering regression, --verify mode (T-1144 Codex round-3
+# Major 1): round 3's fix buffered the deprecation notice inside
+# validate_config and flushed it there, unconditionally, before that
+# function returned — correctly covering every refusal validate_config
+# itself can raise (the six-role completeness loop included), but NOT
+# --verify mode's own LATER binding-changed comparison, which runs after
+# validate_config has already returned successfully. A stale lock against an
+# aliased config therefore emitted the deprecation notice AND the
+# binding-changed refusal on the same stderr stream. Round 4 moves the flush
+# to the mode dispatch's own success exit, strictly past each mode's own
+# last refusal-capable step.
+# =============================================================================
+aliaslock="$TMP/alias-old.lock"
+bash "$CHECKER" --config "$aliasold" --print-lock > "$aliaslock" 2>/dev/null \
+  || fail "cb-verify-alias-fresh: --print-lock failed on the aliased config"
+
+aliasfresh_out="$TMP/alias-fresh.out"; aliasfresh_err="$TMP/alias-fresh.err"
+bash "$CHECKER" --verify --lock "$aliaslock" --config "$aliasold" > "$aliasfresh_out" 2> "$aliasfresh_err"
+aliasfresh_rc=$?
+[ "$aliasfresh_rc" -eq 0 ] || fail "cb-verify-alias-fresh: expected exit 0, got $aliasfresh_rc"
+grep -qF -- 'verified' "$aliasfresh_out" || fail "cb-verify-alias-fresh: expected 'verified' on stdout"
+n_aliasfresh_lines="$(wc -l < "$aliasfresh_err" | tr -d ' ')"
+[ "$n_aliasfresh_lines" = "1" ] \
+  || fail "cb-verify-alias-fresh-linecount: expected exactly 1 stderr line total, got $n_aliasfresh_lines: $(cat "$aliasfresh_err")"
+grep -qF -- 'deprecated' "$aliasfresh_err" \
+  || fail "cb-verify-alias-fresh-linecount: expected the 'deprecated' line on stderr"
+pass "cb-verify-alias-fresh-linecount: --verify on an unchanged aliased config emits exactly 1 stderr line (deprecated), rc 0"
+
+# binding-changed must be proved at the SAME path the lock recorded (a
+# different path reports path-mismatch instead, since that check runs
+# first — the same constraint the pre-existing cb-verify-binding-changed
+# case above already documents) — edit $aliasold's bound value in place,
+# verify, then restore byte-for-byte before anything later depends on it.
+aliasold_original="$TMP/alias-old-original.bak"
+cp "$aliasold" "$aliasold_original"
+sed 's/^bind codex-reviewer codex m2 - codex-cli$/bind codex-reviewer codex m2 high codex-cli/' "$aliasold_original" > "$TMP/alias-old-stale.tmp"
+cmp -s "$aliasold_original" "$TMP/alias-old-stale.tmp" && fail "cb-verify-alias-stale: mutated fixture is byte-identical to the aliased base"
+grep -qxF -- 'bind codex-reviewer codex m2 high codex-cli' "$TMP/alias-old-stale.tmp" \
+  || fail "cb-verify-alias-stale: fixture control failed — the effort-field edit did not land"
+mv "$TMP/alias-old-stale.tmp" "$aliasold"
+
+aliasstale_out="$TMP/alias-stale.out"; aliasstale_err="$TMP/alias-stale.err"
+set +e
+bash "$CHECKER" --verify --lock "$aliaslock" --config "$aliasold" > "$aliasstale_out" 2> "$aliasstale_err"
+aliasstale_rc=$?
+set -e
+cp "$aliasold_original" "$aliasold"
+cmp -s "$aliasold" "$aliasold_original" || fail "cb-verify-alias-stale: failed to restore \$aliasold to its original content"
+[ "$aliasstale_rc" -eq 1 ] || fail "cb-verify-alias-stale: expected exit 1 (binding-changed), got $aliasstale_rc"
+[ ! -s "$aliasstale_out" ] || fail "cb-verify-alias-stale: expected zero stdout bytes"
+n_aliasstale_lines="$(wc -l < "$aliasstale_err" | tr -d ' ')"
+[ "$n_aliasstale_lines" = "1" ] \
+  || fail "cb-verify-alias-stale-linecount: expected exactly 1 stderr line total, got $n_aliasstale_lines: $(cat "$aliasstale_err")"
+grep -qF -- 'binding-changed' "$aliasstale_err" \
+  || fail "cb-verify-alias-stale-linecount: expected the 'binding-changed' token on stderr"
+if grep -qF -- 'deprecated' "$aliasstale_err"; then
+  fail "cb-verify-alias-stale-linecount: a diagnostic must never coexist with a refusal — 'deprecated' leaked alongside 'binding-changed'"
+fi
+pass "cb-verify-alias-stale-linecount: --verify on a stale aliased config emits exactly 1 stderr line (binding-changed only, no deprecated)"
 
 printf 'check-binding suite: all cases passed\n'

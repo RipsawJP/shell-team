@@ -12,7 +12,7 @@
 #      goes into a new sub-bullet instead of the title line. T-1107's
 #      pre-flip gate (#53) refuses this whole step, before any board write,
 #      unless the entry's OWN current flag already reads `READY_FOR_MERGE`
-#      (the state `agents/codex-reviewer.md` writes on APPROVE) — a task
+#      (the state `agents/code-reviewer.md` writes on APPROVE) — a task
 #      still at `READY_FOR_QA`, `REWORK`, `BLOCKED`, `READY_FOR_ARCH`,
 #      `READY_FOR_ENG` or `READY_FOR_REVIEW` is refused, never silently
 #      promoted.
@@ -720,7 +720,7 @@ esac
 # the wrong message) and BEFORE any board write. $FOUND_FLAG was extracted
 # above (:463-ish, the Done-entry build) by the same rightmost-slot rule the
 # rewrite already uses, so a decoy backticked token earlier in the title
-# cannot be mistaken for it. `agents/codex-reviewer.md`'s own APPROVE step
+# cannot be mistaken for it. `agents/code-reviewer.md`'s own APPROVE step
 # and `docs/adopting.md`'s own done-rule both name READY_FOR_MERGE as the
 # one legitimate pre-close-out state; every other allowed flag
 # (READY_FOR_ARCH, READY_FOR_ENG, READY_FOR_QA, READY_FOR_REVIEW, BLOCKED,

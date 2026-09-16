@@ -20,7 +20,7 @@
 #
 # Registered variants: a consumer listed against a `language-<role>.md` block is
 # an EXPLICITLY allowed variant of the shared `language.md` core (e.g.
-# codex-reviewer's gate-specific Language rules).
+# code-reviewer's gate-specific Language rules).
 #
 # Scope limits (by design): the checker only governs consumers LISTED here — a
 # new agent/skill that copies a block without being registered is invisible to
@@ -31,11 +31,11 @@
 marker  language.md                       agents/engineer.md agents/pm-spec.md agents/qa-verifier.md agents/tech-lead.md
 contain language.md                       agents/scrum-master.md agents/ui-designer.md
 contain language-triage-orchestrator.md   agents/triage-orchestrator.md
-contain language-codex-reviewer.md        agents/codex-reviewer.md
+contain language-code-reviewer.md         agents/code-reviewer.md
 contain flag-enum.md                      agents/engineer.md agents/pm-spec.md agents/qa-verifier.md agents/tech-lead.md agents/scrum-master.md agents/ui-designer.md agents/triage-orchestrator.md skills/run/SKILL.md templates/todo-template.md bin/check-handoff.sh docs/interventions-reminder-hook.sample.sh
 contain verdict-labels.md                 agents/qa-verifier.md skills/run/SKILL.md skills/goal/SKILL.md bin/log-run.sh bin/goal-state.sh
 contain board-line-format.md              agents/pm-spec.md templates/todo-template.md bin/check-handoff.sh
-contain operating-paths-core.md           agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/ui-designer.md agents/triage-orchestrator.md agents/codex-reviewer.md skills/run/SKILL.md skills/goal/SKILL.md
+contain operating-paths-core.md           agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/ui-designer.md agents/triage-orchestrator.md agents/code-reviewer.md skills/run/SKILL.md skills/goal/SKILL.md
 contain retro-inputs.md                   bin/retro-inputs.sh bin/check-retro.sh agents/scrum-master.md docs/templates/retro-template.md
 contain retro-sections.md                 bin/check-retro.sh agents/scrum-master.md docs/templates/retro-template.md
 contain interventions-classes.md          bin/check-interventions.sh skills/run/SKILL.md
@@ -43,7 +43,7 @@ contain liveness-declaration.md           skills/run/SKILL.md skills/goal/SKILL.
 contain executor-resolution.md            skills/run/SKILL.md skills/goal/SKILL.md skills/review/SKILL.md skills/review-response/SKILL.md
 contain telemetry-binding.md              skills/run/SKILL.md skills/goal/SKILL.md skills/review-response/SKILL.md
 contain adopter-docs-declaration.md       agents/pm-spec.md skills/run/SKILL.md
-contain derived-populations.md            agents/pm-spec.md agents/tech-lead.md agents/engineer.md agents/qa-verifier.md agents/codex-reviewer.md
+contain derived-populations.md            agents/pm-spec.md agents/tech-lead.md agents/engineer.md agents/qa-verifier.md agents/code-reviewer.md
 marker  careful-execution.md              agents/engineer.md agents/qa-verifier.md agents/tech-lead.md
 marker  playbook-engineer.md               agents/engineer.md
 marker  playbook-qa-verifier.md            agents/qa-verifier.md
@@ -52,6 +52,8 @@ marker  playbook-pm-spec.md                agents/pm-spec.md
 contain fanout-orchestration.md            skills/run/SKILL.md
 contain dispatch-record.md                 agents/tech-lead.md skills/run/SKILL.md
 contain means-ends-reflection.md           skills/run/SKILL.md skills/goal/SKILL.md
+contain convergence-escalation.md          skills/run/SKILL.md skills/goal/SKILL.md
 contain alternate-executor-invocation.md   skills/run/SKILL.md
 contain host-dispatch.md                   skills/run/SKILL.md
-marker  record-portability.md              agents/scrum-master.md agents/pm-spec.md agents/engineer.md agents/qa-verifier.md agents/codex-reviewer.md agents/tech-lead.md
+marker  record-portability.md              agents/scrum-master.md agents/pm-spec.md agents/engineer.md agents/qa-verifier.md agents/code-reviewer.md agents/tech-lead.md
+marker  record-shape-scan.md               agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/code-reviewer.md

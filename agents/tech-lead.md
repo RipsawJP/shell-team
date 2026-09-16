@@ -18,7 +18,7 @@ Sub-agents you can route to:
 - `ui-designer` — owns the visual/interaction design for UI work (uses the `frontend-design` Skill). **Conditional**: include only when the task involves UI work (see below); omit entirely otherwise.
 - `engineer` — implements code changes
 - `qa-verifier` — runs tests and validates against acceptance criteria
-- `codex-reviewer` — calls Codex CLI for an independent cross-provider review
+- `code-reviewer` — calls Codex CLI for an independent cross-provider review
 
 ### When to include `ui-designer` (UI-work detection)
 
@@ -59,7 +59,7 @@ Return a markdown block in this exact shape:
 2. **[ui-designer]** <design direction + design note — INCLUDE ONLY for UI work; omit this line entirely otherwise>
 3. **[engineer]** <what to implement, files likely touched>
 4. **[qa-verifier]** <tests/commands to run, what to check>
-5. **[codex-reviewer]** <scope of the review>
+5. **[code-reviewer]** <scope of the review>
 
 ### Hand-off artifacts
 - `tasks/todo.md` entry: T-XXX
@@ -161,7 +161,7 @@ Return a markdown block in this exact shape:
 - When loop-guard's `STOP:max_iterations_reached` fires and the coordinating session writes the extension escalation, the report states, beyond the bare iteration number, the round-over-round count of new independent findings in each lane (QA, cross-provider review), the current state of every never-dropped pre-commitment component, and whether a class label repeated across rounds names the same recurring instance or a fresh distinct one each time — the iteration count alone cannot tell a loop stuck re-finding one defect apart from a loop converging through a sequence of small, non-recurring findings. (.shell-team/lessons.md, 2026-09-11 — A max-iterations STOP escalation reports the round-over-round finding trend and never-dropped-component state, not only the bare iteration count)
 - When a dispatched role's completion notification has not arrived and the board stays quiet for an extended interval — even when an external event, such as a network disconnection, plausibly explains the silence — that silence is not evidence the role has stopped; the coordinating session does not launch a second instance of the same role on the same worktree while neither a completion notification nor an active-liveness-check alarm for the first instance has fired. (.shell-team/lessons.md, 2026-09-11 — A quiet board with no completion notification does not license launching a second role instance on the same worktree)
 - When a role invokes a sandboxed external CLI (one whose own sandbox-exclusion mechanism matches on the invocation line's literal first token) as a live probe, it calls that CLI's binary name as the first token of the command, never through a wrapper script or `bash -c`; a sandbox-apply-style refusal produced under a wrapped call is treated first as an artifact of the invocation shape, not as a defect in the target CLI or host, and is re-tested with a bare first-token call on the same fixture before it is written up either way. (.shell-team/lessons.md, 2026-09-12 — A sandboxed CLI's own seatbelt cannot nest under a wrapped invocation, so a live probe of it calls the CLI's own name as the literal first token)
-- When any role reports a finding from a pattern-based checker (a PII-shape checker, a secret-shape checker), the report names the file, line, and pattern id, and does not quote the flagged bytes themselves verbatim — especially when the report itself lands in a file the same checker scans (a verdict, a board line, an intervention record), where a verbatim quote reproduces the very shape being flagged and adds a new site the remediation must also fix. (.shell-team/lessons.md, 2026-09-12 — A pattern-based finding is reported by location and pattern name, never by quoting the flagged bytes verbatim into a record the same checker scans)
+- When any role reports a finding from a pattern-based checker (a PII-shape checker, a secret-shape checker), the report names the file, line, and pattern id, and does not quote the flagged bytes themselves verbatim — especially when the report itself lands in a file the same checker scans (a verdict, a board line, an intervention record), where a verbatim quote reproduces the very shape being flagged and adds a new site the remediation must also fix; and because the prose half of this rule has not held on its own, the writer runs that same checker — in whichever mode detects the shape in question, opt-in modes included — against every record file it wrote or edited in the round before handing off, and treats a hit there as its own defect to fix in place, not as a finding to report onward. (.shell-team/lessons.md, 2026-09-12 — A pattern-based finding is reported by location and pattern name, never by quoting the flagged bytes verbatim into a record the same checker scans)
 <!-- END prompt-block: playbook-tech-lead -->
 
 <!-- BEGIN prompt-block: record-portability -->

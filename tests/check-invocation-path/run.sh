@@ -146,16 +146,16 @@ bash "$PF_TREE/bin/check-invocation-path.sh" --role tech-lead >/dev/null 2>&1 \
 RB_TREE="$TMP/rebound"
 build_installed_tree "$RB_TREE"
 RB_CONF="$RB_TREE/templates/binding-default.conf"
-sed -E 's/^bind([[:space:]]+)codex-reviewer([[:space:]]+)codex([[:space:]]+)[^[:space:]]+([[:space:]]+)-([[:space:]]+)codex-cli/bind\1codex-reviewer\2claude\3sonnet\4-\5claude-cli/' \
+sed -E 's/^bind([[:space:]]+)code-reviewer([[:space:]]+)codex([[:space:]]+)[^[:space:]]+([[:space:]]+)-([[:space:]]+)codex-cli/bind\1code-reviewer\2claude\3sonnet\4-\5claude-cli/' \
   "$DEFAULT_CONF" > "$RB_CONF"
-grep -qE '^bind[[:space:]]+codex-reviewer[[:space:]]+claude[[:space:]]' "$RB_CONF" \
+grep -qE '^bind[[:space:]]+code-reviewer[[:space:]]+claude[[:space:]]' "$RB_CONF" \
   || fail "cip-reviewer-rebound-admitted: rebind did not apply"
 bash "$RB_TREE/bin/check-binding.sh" --config "$RB_CONF" >/dev/null 2>&1 \
   || fail "cip-reviewer-rebound-admitted: rebound conf failed to validate"
-if bash "$RB_TREE/bin/check-invocation-path.sh" --role codex-reviewer >/dev/null 2>&1; then
-  pass "cip-reviewer-rebound-admitted — codex-reviewer rebound to claude-cli is admitted, a documented shipped capability"
+if bash "$RB_TREE/bin/check-invocation-path.sh" --role code-reviewer >/dev/null 2>&1; then
+  pass "cip-reviewer-rebound-admitted — code-reviewer rebound to claude-cli is admitted, a documented shipped capability"
 else
-  fail "cip-reviewer-rebound-admitted: expected codex-reviewer rebound to claude-cli to be admitted"
+  fail "cip-reviewer-rebound-admitted: expected code-reviewer rebound to claude-cli to be admitted"
 fi
 
 # =============================================================================
@@ -163,16 +163,16 @@ fi
 # =============================================================================
 WH_TREE="$TMP/wrapperhosted"
 build_installed_tree "$WH_TREE"
-grep -qE '^[[:space:]]*codex exec ' "$WH_TREE/agents/codex-reviewer.md" \
-  || fail "cip-wrapper-hosted-admitted: agents/codex-reviewer.md carries no anchored bare 'codex exec ' line"
+grep -qE '^[[:space:]]*codex exec ' "$WH_TREE/agents/code-reviewer.md" \
+  || fail "cip-wrapper-hosted-admitted: agents/code-reviewer.md carries no anchored bare 'codex exec ' line"
 o="$TMP/wh.out"; e="$TMP/wh.err"
 rc=0
-bash "$WH_TREE/bin/check-invocation-path.sh" --role codex-reviewer > "$o" 2> "$e" || rc=$?
+bash "$WH_TREE/bin/check-invocation-path.sh" --role code-reviewer > "$o" 2> "$e" || rc=$?
 [ "$rc" -eq 0 ] || fail "cip-wrapper-hosted-admitted: expected exit 0, got $rc"
 [ -s "$o" ] || fail "cip-wrapper-hosted-admitted: expected non-empty stdout"
 grep -qF -- 'wrapper-hosted' "$o" || fail "cip-wrapper-hosted-admitted: expected the wrapper-hosted token on stdout"
-grep -qF -- 'agents/codex-reviewer.md' "$o" || fail "cip-wrapper-hosted-admitted: expected the agent file named on stdout"
-pass "cip-wrapper-hosted-admitted — codex-reviewer, unwired and unadmitted by the recipe, is admitted wrapper-hosted by its own agent definition"
+grep -qF -- 'agents/code-reviewer.md' "$o" || fail "cip-wrapper-hosted-admitted: expected the agent file named on stdout"
+pass "cip-wrapper-hosted-admitted — code-reviewer, unwired and unadmitted by the recipe, is admitted wrapper-hosted by its own agent definition"
 
 # =============================================================================
 # cip-wrapper-line-removed-refused (AC13(vi) — the derivation is derived,
@@ -180,18 +180,18 @@ pass "cip-wrapper-hosted-admitted — codex-reviewer, unwired and unadmitted by 
 # =============================================================================
 WL_TREE="$TMP/wrapperline"
 build_installed_tree "$WL_TREE"
-bash "$WL_TREE/bin/check-invocation-path.sh" --role codex-reviewer >/dev/null 2>&1 \
-  || fail "cip-wrapper-line-removed-refused: expected the pristine tree to admit codex-reviewer first"
-grep -vE '^[[:space:]]*codex exec ' "$REPO_ROOT/agents/codex-reviewer.md" > "$WL_TREE/agents/codex-reviewer.md"
-n="$(grep -cE '^[[:space:]]*codex exec ' "$WL_TREE/agents/codex-reviewer.md" || true)"
+bash "$WL_TREE/bin/check-invocation-path.sh" --role code-reviewer >/dev/null 2>&1 \
+  || fail "cip-wrapper-line-removed-refused: expected the pristine tree to admit code-reviewer first"
+grep -vE '^[[:space:]]*codex exec ' "$REPO_ROOT/agents/code-reviewer.md" > "$WL_TREE/agents/code-reviewer.md"
+n="$(grep -cE '^[[:space:]]*codex exec ' "$WL_TREE/agents/code-reviewer.md" || true)"
 [ "$n" = "0" ] || fail "cip-wrapper-line-removed-refused: mutation did not remove the anchored line"
 o="$TMP/wl.out"; e="$TMP/wl.err"
 rc=0
-bash "$WL_TREE/bin/check-invocation-path.sh" --role codex-reviewer > "$o" 2> "$e" || rc=$?
+bash "$WL_TREE/bin/check-invocation-path.sh" --role code-reviewer > "$o" 2> "$e" || rc=$?
 [ "$rc" -eq 1 ] || fail "cip-wrapper-line-removed-refused: expected exit 1, got $rc"
 [ ! -s "$o" ] || fail "cip-wrapper-line-removed-refused: expected zero bytes on stdout"
 grep -qF -- 'role-not-wired' "$e" || fail "cip-wrapper-line-removed-refused: expected the role-not-wired token on stderr"
-pass "cip-wrapper-line-removed-refused — removing codex-reviewer's own anchored codex exec line flips its admission to role-not-wired"
+pass "cip-wrapper-line-removed-refused — removing code-reviewer's own anchored codex exec line flips its admission to role-not-wired"
 
 # =============================================================================
 # cip-nonwrapper-authority-incompatible (AC13(v) — the derivation's

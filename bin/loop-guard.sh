@@ -54,7 +54,7 @@
 #
 # Concurrent-review-window counting carve-out (T-1080, S5, comment/header
 # text only — the decision logic below is unmodified). Inside a declared
-# concurrent-review-window, a codex-reviewer verdict computed concurrently
+# concurrent-review-window, a code-reviewer verdict computed concurrently
 # against a commit qa-verifier's own subsequent FAIL rejects is discarded.
 # This extends the same carve-out skills/run/SKILL.md's own T-1002
 # interventions-gate bullet already draws for a pre-Validate gate failure,

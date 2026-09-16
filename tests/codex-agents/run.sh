@@ -242,7 +242,7 @@ bind pm-spec        claude opus   - claude-cli
 bind engineer       claude sonnet - claude-cli
 bind qa-verifier    codex  gpt-5-codex low codex-cli
 bind ui-designer    claude sonnet - claude-cli
-bind codex-reviewer codex  provider-configured - codex-cli
+bind code-reviewer codex  provider-configured - codex-cli
 CONF
 OUT4="$T/out4"
 if (cd "$WD4" && TEAM_RUN_BASE="$BASE4" bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT4" >/dev/null 2>"$T/gen4.err"); then
@@ -282,33 +282,33 @@ fi
 
 # =============================================================================
 # fixture 6 (T-1135 AC7 fixed string 1): the generated developer_instructions
-# body for the fifth role, codex-reviewer, is byte-identical to
-# agents/codex-reviewer.md's own content, and neither model nor
+# body for the fifth role, code-reviewer, is byte-identical to
+# agents/code-reviewer.md's own content, and neither model nor
 # model_reasoning_effort is emitted under the shipped default binding.
 # =============================================================================
-printf '\n--- fixture 6 (T-1135): codex-reviewer developer_instructions body ---\n'
+printf '\n--- fixture 6 (T-1135): code-reviewer developer_instructions body ---\n'
 OUT6="$T/out6"
 if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT6" >"$T/gen6.out" 2>"$T/gen6.err"; then
-  F6="$OUT6/shell-team-codex-reviewer.toml"
+  F6="$OUT6/shell-team-code-reviewer.toml"
   ok=1
   if [ -s "$F6" ]; then
     awk -v k="developer_instructions = '''" 'f{print} $0==k{f=1}' "$F6" > "$T/raw6"
     sed '$d' "$T/raw6" > "$T/body6"
-    awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n==2{print}' "$REPO_ROOT/agents/codex-reviewer.md" > "$T/src6"
+    awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n==2{print}' "$REPO_ROOT/agents/code-reviewer.md" > "$T/src6"
     cmp -s "$T/body6" "$T/src6" || ok=0
     tail -n 1 "$F6" | grep -Fxq -- "'''" || ok=0
-    grep -Fxq -- 'name = "shell-team-codex-reviewer"' "$F6" || ok=0
+    grep -Fxq -- 'name = "shell-team-code-reviewer"' "$F6" || ok=0
     { grep -q '^model = ' "$F6" || grep -q '^model_reasoning_effort = ' "$F6"; } && ok=0
   else
     ok=0
   fi
   if [ "$ok" -eq 1 ]; then
-    pass "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md"
+    pass "T-1135: the generated developer_instructions body is byte-identical to agents/code-reviewer.md"
   else
-    fail "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md"
+    fail "T-1135: the generated developer_instructions body is byte-identical to agents/code-reviewer.md"
   fi
 else
-  fail "T-1135: the generated developer_instructions body is byte-identical to agents/codex-reviewer.md (generator refused: $(cat "$T/gen6.err"))"
+  fail "T-1135: the generated developer_instructions body is byte-identical to agents/code-reviewer.md (generator refused: $(cat "$T/gen6.err"))"
 fi
 
 # =============================================================================
@@ -381,7 +381,7 @@ CR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"cache_read_input_tokens":\([0
 TOK8=$((IN8 + OUT8 + CC8 + CR8))
 DUR8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"duration_ms":\([0-9]*\).*/\1/p')"
 USD8="$(printf '%s' "$CLAUDE_RESULT" | sed -n 's/.*"total_cost_usd":\([0-9.]*\).*/\1/p')"
-if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span codex-reviewer --phase review \
+if TEAM_RUNS_DIR="$RUNSDIR8" bash "$LOGRUN" t1135loop --run-id r1 --seq 0 --span code-reviewer --phase review \
     --iteration 0 --attempt 0 --status success --tokens "$TOK8" --duration-ms "$DUR8" --usd "$USD8" \
     --provider claude --adapter claude-cli >/dev/null 2>"$T/lr8.err"; then
   ROWFILE8="$RUNSDIR8/t1135loop.jsonl"
@@ -688,6 +688,125 @@ if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT17" >/dev/null 2>&1 \
   pass "T-1136 extra: the same invocation without the mv shim still succeeds cleanly"
 else
   fail "T-1136 extra: the same invocation without the mv shim still succeeds cleanly"
+fi
+
+# =============================================================================
+# extra (T-1144, issue #524): the review role's rename leaves an
+# adopter-generated shell-team-codex-reviewer.toml behind under the
+# superseded basename; the generator removes it by name on regeneration,
+# and the checker names it with a specific hint when it survives
+# un-regenerated (Codex review round-2 Major 1).
+# =============================================================================
+printf '\n--- extra (T-1144): legacy shell-team-codex-reviewer.toml migration ---\n'
+LEGACY_BASENAME="shell-team-codex-reviewer.toml"
+
+# Fixture A: a fresh generator run, seeded afterward with the legacy file
+# (simulating a released pre-rename generation), then regenerated. The
+# legacy file must be gone and the out-dir back in sync.
+OUT18="$T/out18"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT18" >/dev/null 2>&1
+cp "$OUT18/shell-team-engineer.toml" "$OUT18/$LEGACY_BASENAME"
+[ -f "$OUT18/$LEGACY_BASENAME" ] \
+  || fail "T-1144 extra: fixture control failed — could not seed the legacy basename"
+if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT18" >"$T/gen18.out" 2>"$T/gen18.err"; then
+  if [ -e "$OUT18/$LEGACY_BASENAME" ]; then
+    fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (file still present)"
+  elif ! grep -qF -- "$LEGACY_BASENAME" "$T/gen18.err"; then
+    fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (no stderr notice naming it: $(cat "$T/gen18.err"))"
+  elif ! bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT18" >"$T/chk18.out" 2>"$T/chk18.err"; then
+    fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (out-dir not back in sync: $(cat "$T/chk18.err"))"
+  else
+    pass "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration, and the out-dir is back in sync"
+  fi
+else
+  fail "T-1144 extra: the generator removes the legacy shell-team-codex-reviewer.toml on regeneration (regeneration itself failed: $(cat "$T/gen18.err"))"
+fi
+# Idempotency: a second regeneration with the legacy file already gone is a
+# clean no-op re-run of the removal step (not a refusal, not a re-hit).
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT18" >/dev/null 2>"$T/gen18b.err"; then
+  fail "T-1144 extra: a second regeneration after the legacy file is already gone still succeeds ($(cat "$T/gen18b.err"))"
+else
+  pass "T-1144 extra: a second regeneration after the legacy file is already gone is idempotent"
+fi
+
+# Fixture B: the checker's own specific hint when the legacy file survives
+# un-regenerated (an out-dir the generator has not touched since the
+# rename) — distinct from the generic "extra" message an unrelated stray
+# *.toml still gets.
+OUT19="$T/out19"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT19" >/dev/null 2>&1
+cp "$OUT19/shell-team-engineer.toml" "$OUT19/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT19" >"$T/chk19.out" 2>"$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (checker did not refuse)"
+elif ! grep -qF -- "$LEGACY_BASENAME" "$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (basename not named: $(cat "$T/chk19.err"))"
+elif ! grep -qF -- 'codex-reviewer' "$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (superseded role name not mentioned: $(cat "$T/chk19.err"))"
+elif grep -qF -- 'this generator does not own for the requested role list' "$T/chk19.err"; then
+  fail "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint (fell through to the generic 'extra' message instead: $(cat "$T/chk19.err"))"
+else
+  pass "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint, distinct from the generic 'extra' message"
+fi
+# Round-4 (Codex round-3 Minor): the hint must carry THIS checker's own
+# resolved --out-dir (a non-default path here, $OUT19) so the literal
+# remedy it prints targets the directory actually flagged, not the
+# generator's own default ($PWD/.codex/agents) on a non-default install.
+grep -qF -- "$OUT19" "$T/chk19.err" \
+  || fail "T-1144 extra: the migration hint does not carry this checker's own resolved --out-dir ($OUT19): $(cat "$T/chk19.err")"
+pass "T-1144 extra: the migration hint carries this checker's own resolved --out-dir"
+# Regression control: an unrelated stray *.toml still gets the generic
+# message, proving the specific hint is scoped to the one named basename.
+OUT20="$T/out20"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT20" >/dev/null 2>&1
+cp "$OUT20/shell-team-engineer.toml" "$OUT20/shell-team-some-other-role.toml"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT20" >"$T/chk20.out" 2>"$T/chk20.err"; then
+  fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (checker did not refuse)"
+elif grep -qF -- 'codex-reviewer' "$T/chk20.err"; then
+  fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (got the legacy-specific hint instead: $(cat "$T/chk20.err"))"
+elif ! grep -qF -- 'this generator does not own for the requested role list' "$T/chk20.err"; then
+  fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (generic message missing: $(cat "$T/chk20.err"))"
+else
+  pass "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message, unaffected by the legacy-basename hint"
+fi
+
+# =============================================================================
+# extra (T-1144 round 4, Codex round-3 Major 2): the legacy-basename removal
+# is gated on `code-reviewer` actually being one of THIS run's own
+# requested roles. A partial --roles regeneration that excludes
+# code-reviewer must never delete the legacy file — deleting it here would
+# leave an adopter with neither the legacy basename nor its replacement,
+# since a role-scoped regeneration that excludes code-reviewer never
+# (re)generates shell-team-code-reviewer.toml either.
+# =============================================================================
+printf '\n--- extra (T-1144 round 4): legacy-basename removal scoped to --roles ---\n'
+OUT21="$T/out21"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT21" >/dev/null 2>&1
+cp "$OUT21/shell-team-engineer.toml" "$OUT21/$LEGACY_BASENAME"
+[ -f "$OUT21/$LEGACY_BASENAME" ] \
+  || fail "T-1144 round 4: fixture control failed — could not seed the legacy basename"
+
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT21" --roles 'pm-spec engineer' >"$T/gen21.out" 2>"$T/gen21.err"; then
+  fail "T-1144 round 4: a code-reviewer-excluding --roles regeneration still succeeds ($(cat "$T/gen21.err"))"
+elif [ ! -f "$OUT21/$LEGACY_BASENAME" ]; then
+  fail "T-1144 round 4: a code-reviewer-excluding --roles regeneration must not delete the legacy file (it is gone)"
+elif grep -qF -- 'removed superseded legacy agent file' "$T/gen21.err"; then
+  fail "T-1144 round 4: a code-reviewer-excluding --roles regeneration must not emit the removal notice ($(cat "$T/gen21.err"))"
+else
+  pass "T-1144 round 4: a code-reviewer-excluding --roles regeneration leaves the legacy file untouched, with no removal notice"
+fi
+
+# The same out-dir, regenerated with the default (full) role list, DOES
+# remove the legacy file, with its one removal notice — proving the gate is
+# scoped to whether code-reviewer was requested THIS run, not a permanent
+# disablement of the removal step.
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT21" >"$T/gen21b.out" 2>"$T/gen21b.err"; then
+  fail "T-1144 round 4: a default (full) --roles regeneration still succeeds ($(cat "$T/gen21b.err"))"
+elif [ -f "$OUT21/$LEGACY_BASENAME" ]; then
+  fail "T-1144 round 4: a default (full) --roles regeneration removes the legacy file (it is still present)"
+elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/gen21b.err" || true)" != "1" ]; then
+  fail "T-1144 round 4: a default (full) --roles regeneration emits exactly one removal notice ($(cat "$T/gen21b.err"))"
+else
+  pass "T-1144 round 4: a default (full) --roles regeneration (code-reviewer requested) removes the legacy file with its one notice"
 fi
 
 printf '\n'

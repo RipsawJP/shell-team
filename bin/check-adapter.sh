@@ -237,7 +237,7 @@ print_help() {
 TOKEN_RE='^[a-z][a-z0-9-]*$'
 VERSION_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 MAXLEN=64
-SIX_ROLES=(tech-lead pm-spec engineer qa-verifier codex-reviewer ui-designer)
+SIX_ROLES=(tech-lead pm-spec engineer qa-verifier code-reviewer ui-designer)
 BOARD_AUTHORITY_VALUES=(writes proposes none)
 STATUS_KIND_VALUES=(success failure)
 SUPPORTED_SCHEMA_VERSIONS=(1)

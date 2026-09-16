@@ -50,7 +50,7 @@
 # continuation test) and would silently resurrect a stale verdict.
 #
 # The producer contract this reads against is pinned in
-# agents/codex-reviewer.md's "Verdict and record shape" paragraph.
+# agents/code-reviewer.md's "Verdict and record shape" paragraph.
 #
 # Election (validate-if-present): this gate fires only when the task's
 # Active board entry carries `- dispatch: spec-review — cross-provider —
