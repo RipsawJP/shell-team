@@ -101,7 +101,7 @@ class-M の境界は `bin/check-refreeze-class.sh` が機械判定します: 2 �
 grant の置き場所は 2 つあり、どちらか一方だけでも両方でも構いません——片方に記録しても、もう片方に記録された grant を取り消すことにはなりません:
 
 - **Claude Code host では**、あなた自身の checkout の `CLAUDE.local.md` に記録してください（出荷ファイルには絶対に置きません——このプロジェクトはあなたの grant の転記を出荷しませんし、あなたに代わって捏造することもありません）。これまでどおりです。
-- **どちらの host でも**——`CLAUDE.local.md` のような Claude Code 用の instruction ファイルを一切読み込まない Codex CLI host を含めて——`<base>/refreeze-grant.conf` にホスト中立な record として記録できます。`bin/check-refreeze-grant.sh` がこれを解決・検証します。これはループ自身の class-M branch が実際にコマンドを実行して読む surface です: `bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant` を実行してその stdout を読むので、ここに置いた record はどちらの host の orchestrating session からも同じように届きます。次のように書いてください:
+- **どちらの host でも**——Codex CLI host はこのプロジェクトが Codex 用の instruction surface を一切出荷していない host であり、そこでは `CLAUDE.local.md` はこのプロジェクトが頼れる instruction surface ではありません——`<base>/refreeze-grant.conf` にホスト中立な record として記録できます。`bin/check-refreeze-grant.sh` がこれを解決・検証します。これはループ自身の class-M branch が実際にコマンドを実行して読む surface です: `bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant` を実行してその stdout を読むので、ここに置いた record はどちらの host の orchestrating session からも同じように届きます。次のように書いてください:
 
 ```markdown
 schema 1

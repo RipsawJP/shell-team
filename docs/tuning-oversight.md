@@ -115,7 +115,7 @@ The class-M boundary is machine-checked by `bin/check-refreeze-class.sh`: it rep
 The grant has two homes, and a host may use either or both — recording it in one never revokes a grant recorded in the other:
 
 - **On a Claude Code host**, grant it in your own checkout's `CLAUDE.local.md` (never in a shipped file — this project does not ship a transcription of your grant, and never invents one on your behalf), exactly as before.
-- **On either host** — including a Codex CLI host, which never loads a Claude Code instruction file such as `CLAUDE.local.md` — grant it in a host-neutral record at `<base>/refreeze-grant.conf`, resolved and validated by `bin/check-refreeze-grant.sh`. This is the surface the loop's own class-M branch actually runs a command against: it executes `bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant` and reads its stdout, so a record placed here is reachable from either host's orchestrating session the same way. Author it as:
+- **On either host** — on a Codex CLI host, this project ships no Codex instruction surface, so `CLAUDE.local.md` is not an instruction surface this project can rely on there — grant it in a host-neutral record at `<base>/refreeze-grant.conf`, resolved and validated by `bin/check-refreeze-grant.sh`. This is the surface the loop's own class-M branch actually runs a command against: it executes `bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant` and reads its stdout, so a record placed here is reachable from either host's orchestrating session the same way. Author it as:
 
 ```markdown
 schema 1

@@ -673,8 +673,9 @@ depends on it.)
 human GO.** See `docs/tuning-oversight.md`'s `## Who may re-freeze a
 frozen intent block` for what a `class-M` repair covers and how
 `bin/check-refreeze-class.sh` draws the mechanical boundary. On a Codex
-CLI host — which never loads a Claude Code instruction file such as
-`CLAUDE.local.md` — record it instead (or as well) in the host-neutral
+CLI host — this project ships no Codex instruction surface, so
+`CLAUDE.local.md` is not an instruction surface this project can rely
+on there — record it instead (or as well) in the host-neutral
 `<base>/refreeze-grant.conf`, resolved and validated by
 `bin/check-refreeze-grant.sh` (T-1147, issue #515): this is the surface
 the loop's own class-M branch actually reads on either host, by running
