@@ -1712,6 +1712,180 @@ assert_finding "positive control: the same retro fixture carrying a named refere
 unset PII_CHECK_TRACKER_KEY
 
 # =============================================================================
+# hand-off shape scan (T-1143): proves the prescribed --all invocation for
+# the record-shape-scan prompt block does what the block claims, including
+# that the mode choice (decision point twelve) is load-bearing. As with the
+# tracker-key fixtures above, the namespace and issue number are assembled
+# from fragments at runtime; no line here spells the finished shape as a
+# committed literal.
+#
+# Round 2 (T-1143 review, Major 3): the load-bearing negative control (b)
+# below is a TRACKED file, committed with innocuous content strictly after
+# HOS_BASE (so its path IS present in the HOS_BASE..HEAD diff), then
+# modified on disk and left UNCOMMITTED — the tracked-and-locally-modified
+# input class this spec's own Input space class 2 names alongside the
+# untracked case. This is what actually exercises change-scoped mode's
+# committed-blob read (git cat-file -p "HEAD:$path"): the path is in the
+# diff, but its HEAD blob is still the innocuous content, so no FINDING
+# fires for it even though the working tree carries the shape. The
+# round-1 design instead left HOS_BASE == HEAD (nothing ever committed
+# after the repo's own base commit), so `git diff --raw` was empty
+# regardless of any file's content — the assertion passed for a cause
+# unrelated to the "reads committed blobs" claim its own label makes.
+# Assertion (d) below keeps a wholly untracked variant too, honestly
+# labeled as demonstrating the different, weaker never-entered-any-diff
+# mechanism rather than the committed-blob read (b) demonstrates.
+# =============================================================================
+printf '\n--- hand-off shape scan ---\n'
+
+HOS_NS1="Q"; HOS_NS2="Z"
+HOS_NS="${HOS_NS1}${HOS_NS2}"
+HOS_NUM="42"
+HOS_LINE="reference ${HOS_NS}-${HOS_NUM} filed"
+HOS_WORDS_LINE="reference filed under its own tracking system, described in words"
+HOS_RECORD_RELPATH="uncommitted-record.md"
+
+HOS_REPO="$(new_repo)"
+# Round 4 (T-1143 review, round-3 Major 1, extended by live testing beyond
+# the reported case): `add_fixture_line` below runs `git add`, which is
+# itself an ignore-consulting call — under a hostile ambient
+# core.excludesFile matching this record's own literal filename, `git add`
+# refuses the path outright and aborts this script under `set -e`, well
+# before assertions (a)-(c) below (whose own READ mechanism, once the path
+# is tracked, does not consult excludes) ever run. Pin this repo's own
+# excludesFile to neutral too, for the same reason and by the same
+# mechanism as HOS_UT_REPO below.
+git -C "$HOS_REPO" config core.excludesFile /dev/null
+HOS_BASE="$(git -C "$HOS_REPO" rev-parse HEAD)"
+
+# Commit an innocuous version of the record path strictly after HOS_BASE,
+# so the path is present in the HOS_BASE..HEAD diff — but the HEAD blob
+# this commits carries no shape.
+add_fixture_line "$HOS_REPO" "$HOS_RECORD_RELPATH" "$HOS_WORDS_LINE"
+
+# Now modify the tracked file on disk to carry the opt-in-only shape,
+# leaving the edit UNCOMMITTED. HEAD's own blob for this path is still the
+# innocuous line committed above.
+printf '%s\n' "$HOS_LINE" > "$HOS_REPO/$HOS_RECORD_RELPATH"
+
+# (a) --all reads the working tree, so the tracked-but-locally-modified,
+# uncommitted record is visible to the documented invocation.
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_ALL_OUT="$(cd "$HOS_REPO" && bash "$BIN" --all 2>&1)"
+HOS_ALL_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_ALL_RC" -eq 1 ] && printf '%s\n' "$HOS_ALL_OUT" | grep -qF -- "pattern=tracker-key path=${HOS_RECORD_RELPATH}"; then
+  pass "hand-off shape scan: an uncommitted record carrying the opt-in-only shape is reported by the documented --all invocation"
+else
+  fail "hand-off shape scan: an uncommitted record carrying the opt-in-only shape is reported by the documented --all invocation (rc=$HOS_ALL_RC out=$HOS_ALL_OUT)"
+fi
+
+# (b) load-bearing negative control: the change-scoped default reads each
+# changed path's COMMITTED BLOB (git cat-file -p "HEAD:$path"), never the
+# working tree. The path is present in the HOS_BASE..HEAD diff (added by
+# the commit above), but its HEAD blob is still the innocuous content —
+# the shape-bearing edit above was never committed — so the change-scoped
+# scan reports nothing at all for this repository.
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_DIFF_OUT="$(cd "$HOS_REPO" && bash "$BIN" --base "$HOS_BASE" 2>&1)"
+HOS_DIFF_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_DIFF_RC" -eq 0 ] && ! printf '%s\n' "$HOS_DIFF_OUT" | grep -q '^FINDING'; then
+  pass "hand-off shape scan: the same uncommitted record is invisible to the change-scoped default, which reads committed blobs"
+else
+  fail "hand-off shape scan: the same uncommitted record is invisible to the change-scoped default, which reads committed blobs (rc=$HOS_DIFF_RC out=$HOS_DIFF_OUT)"
+fi
+
+# (c) fixed in place: describe the shape in words instead of quoting it
+# (still uncommitted), and the same --all invocation reports nothing for
+# that path.
+printf '%s\n' "$HOS_WORDS_LINE" > "$HOS_REPO/$HOS_RECORD_RELPATH"
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_FIXED_OUT="$(cd "$HOS_REPO" && bash "$BIN" --all 2>&1)"
+HOS_FIXED_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_FIXED_RC" -eq 0 ] && ! printf '%s\n' "$HOS_FIXED_OUT" | grep -qF -- "path=${HOS_RECORD_RELPATH}"; then
+  pass "hand-off shape scan: the same record passes once the shape is described in words instead"
+else
+  fail "hand-off shape scan: the same record passes once the shape is described in words instead (rc=$HOS_FIXED_RC out=$HOS_FIXED_OUT)"
+fi
+
+# (d) a wholly untracked record: --all still reports it, and it is
+# invisible to the change-scoped default for a DIFFERENT, weaker reason
+# than (b) — it never entered any commit's diff at all, since no commit
+# ever mentions its path. Kept as its own labeled assertion so this
+# weaker mechanism is never confused with the committed-blob read (b)
+# demonstrates.
+#
+# Round 4 (T-1143 review, round-3 Major 1): unlike (a)-(c), which read
+# already-TRACKED paths — (a)/(c) through --all's `ls-files -s --cached`
+# branch, (b) through `git cat-file -p "HEAD:$path"` — neither of which
+# ever consults excludes, this assertion's record is wholly UNTRACKED, so
+# --all enumerates it through `git ls-files -z --others --exclude-standard`
+# (bin/check-pii-shapes.sh:744), which DOES honor whatever core.excludesFile
+# is active in the ambient git environment. Unpinned, a contributor whose
+# own global excludes happen to match "*.md" or this record's own literal
+# filename would see this one assertion fail locally while CI (no global
+# excludes) stayed green — the class .shell-team/test-recipe.md's
+# "Environment quirks" section already names and requires pinning against.
+# Pin this scratch repo's OWN core.excludesFile to neutral (following the
+# `/dev/null` half of tests/rollup-track/run.sh's and
+# tests/gitignore-raw-dumps/run.sh's precedent) rather than a `-c` flag on
+# the outer `bash "$BIN"` invocation: that flag would apply to the outer
+# `bash` process, not to check-pii-shapes.sh's own internal `git` calls,
+# which read config from the repo `bash "$BIN"` is run inside of.
+HOS_UT_REPO="$(new_repo)"
+git -C "$HOS_UT_REPO" config core.excludesFile /dev/null
+HOS_UT_BASE="$(git -C "$HOS_UT_REPO" rev-parse HEAD)"
+printf '%s\n' "$HOS_LINE" > "$HOS_UT_REPO/$HOS_RECORD_RELPATH"
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_UT_ALL_OUT="$(cd "$HOS_UT_REPO" && bash "$BIN" --all 2>&1)"
+HOS_UT_ALL_RC=$?
+HOS_UT_DIFF_OUT="$(cd "$HOS_UT_REPO" && bash "$BIN" --base "$HOS_UT_BASE" 2>&1)"
+HOS_UT_DIFF_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_UT_ALL_RC" -eq 1 ] && printf '%s\n' "$HOS_UT_ALL_OUT" | grep -qF -- "pattern=tracker-key path=${HOS_RECORD_RELPATH}" \
+  && [ "$HOS_UT_DIFF_RC" -eq 0 ] && ! printf '%s\n' "$HOS_UT_DIFF_OUT" | grep -q '^FINDING'; then
+  pass "hand-off shape scan: a wholly untracked record is also reported by --all, and is invisible to the change-scoped default because it never entered any diff"
+else
+  fail "hand-off shape scan: a wholly untracked record is also reported by --all, and is invisible to the change-scoped default because it never entered any diff (all_rc=$HOS_UT_ALL_RC all_out=$HOS_UT_ALL_OUT diff_rc=$HOS_UT_DIFF_RC diff_out=$HOS_UT_DIFF_OUT)"
+fi
+
+# Control for the pin above (same two-arm shape as tests/rollup-track/run.sh
+# and tests/gitignore-raw-dumps/run.sh): a HOSTILE excludesFile matching this
+# record's own literal filename, pinned into a separate scratch repo, DOES
+# make the same untracked record invisible to --all's own enumeration —
+# proving the neutral pin above is not silently ineffective (it has
+# something to defeat), and at the same time honestly documenting the
+# checker's own real, disclosed blind spot for ignored paths (round 1's
+# fast-follow finding 5 / Non-goal #1 / out-of-scope item 2) as a fixture
+# result, never as evidence of a defect in bin/check-pii-shapes.sh's own
+# enumeration logic, which this task does not touch.
+HOS_UT_HOSTILE_REPO="$(new_repo)"
+printf '%s\n' "$HOS_RECORD_RELPATH" > "$WORK/hos-hostile-excludes"
+git -C "$HOS_UT_HOSTILE_REPO" config core.excludesFile "$WORK/hos-hostile-excludes"
+printf '%s\n' "$HOS_LINE" > "$HOS_UT_HOSTILE_REPO/$HOS_RECORD_RELPATH"
+export PII_CHECK_TRACKER_KEY=1
+set +e
+HOS_UT_HOSTILE_OUT="$(cd "$HOS_UT_HOSTILE_REPO" && bash "$BIN" --all 2>&1)"
+HOS_UT_HOSTILE_RC=$?
+set -e
+unset PII_CHECK_TRACKER_KEY
+if [ "$HOS_UT_HOSTILE_RC" -eq 0 ] && ! printf '%s\n' "$HOS_UT_HOSTILE_OUT" | grep -qF -- "path=${HOS_RECORD_RELPATH}"; then
+  pass "hand-off shape scan: control — a hostile excludesFile matching this record's own name makes it invisible to --all's untracked enumeration, proving the neutral pin above has teeth"
+else
+  fail "hand-off shape scan: control — a hostile excludesFile matching this record's own name makes it invisible to --all's untracked enumeration, proving the neutral pin above has teeth (rc=$HOS_UT_HOSTILE_RC out=$HOS_UT_HOSTILE_OUT)"
+fi
+
+# =============================================================================
 # temp hygiene: every throwaway repo is created inside the trap-cleaned
 # work dir (AC12)
 # =============================================================================
