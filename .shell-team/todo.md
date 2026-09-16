@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1145** the STOP escalation states whether the loop is converging — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1145-stop-digest-convergence.md
+- [ ] **T-1145** the STOP escalation states whether the loop is converging — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1145-stop-digest-convergence.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked-on: feature/524-code-reviewer-rename (T-1144, PR #548 open and unmerged at authoring time); this branch is feature/491-stop-digest-convergence and its PR base stays develop, joining the stacked train for the sprint batch GO
