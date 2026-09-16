@@ -20,7 +20,11 @@
 #   - a missing expected file                               -> violation
 #   - an extra shell-team-*.toml --out-dir does not own      -> violation
 #     (i.e. its basename is not one of this run's own
-#     shell-team-<role>.toml names)
+#     shell-team-<role>.toml names) — this includes a SYMLINK occupant of
+#     an unowned shell-team-*.toml name, dangling or not: the audit loop
+#     below reaches it too (a symlink satisfies -L even when it fails -e),
+#     so it is reported rather than silently skipped as though the glob
+#     itself had not matched (T-1146, issue #546).
 #   - any OTHER *.toml file in --out-dir (an adopter's own
 #     Codex agent, whose name does not begin shell-team-)     -> ignored,
 #     not a violation and never inspected further — this checker's
@@ -73,7 +77,7 @@ while [ "$#" -gt 0 ]; do
     --root)     [ "$#" -ge 2 ] || die "--root requires a value"; shift; ROOT="$1"; shift ;;
     --out-dir)  [ "$#" -ge 2 ] || die "--out-dir requires a value"; shift; OUT_DIR="$1"; shift ;;
     --roles)    [ "$#" -ge 2 ] || die "--roles requires a value"; shift; ROLES="$1"; shift ;;
-    --help|-h)  sed -n '2,48p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --help|-h)  sed -n '2,52p' "$script_path" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
 done
@@ -138,7 +142,7 @@ done
 LEGACY_CODEX_REVIEWER_BASENAME="shell-team-codex-reviewer.toml"
 if [ -d "$OUT_DIR" ]; then
   for f in "$OUT_DIR"/shell-team-*.toml; do
-    [ -e "$f" ] || continue   # unmatched glob (no shell-team-*.toml files at all)
+    [ -e "$f" ] || [ -L "$f" ] || continue   # unmatched glob (no shell-team-*.toml files at all); a dangling symlink satisfies -L, not -e, and must still reach the loop body below
     base="$(basename "$f")"
     owned=0
     for role in "${ROLES_ARR[@]}"; do
@@ -155,7 +159,12 @@ if [ -d "$OUT_DIR" ]; then
         # a hint naming no flags at all regenerates the plugin's default
         # root and $PWD/.codex/agents instead of the directory this checker
         # actually flagged.
-        emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: bash \"$GENERATOR\" --root \"$ROOT\" --out-dir \"$OUT_DIR\" (removes this file by name), or remove it by hand"
+        # T-1146 (issue #546): the remedy also carries THIS invocation's own
+        # resolved --roles unconditionally, default list included — one code
+        # path, one printed shape, so the printed command is literally what
+        # this checker itself resolved in every case rather than only when
+        # the list happens to differ from the default.
+        emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: bash \"$GENERATOR\" --root \"$ROOT\" --out-dir \"$OUT_DIR\" --roles \"$ROLES\" (removes this file by name), or remove it by hand"
       else
         emit "$f: an extra shell-team-*.toml this generator does not own for the requested role list ($ROLES)"
       fi

@@ -809,6 +809,63 @@ else
   pass "T-1144 round 4: a default (full) --roles regeneration (code-reviewer requested) removes the legacy file with its one notice"
 fi
 
+# =============================================================================
+# T-1146 fixture 1 (GitHub issue #546): a DANGLING symlink at the legacy
+# basename is removed by a default generator run (with the existing removal
+# notice) and reported by the checker with the legacy-specific hint when it
+# survives un-regenerated, rather than being silently skipped as unreadable.
+# =============================================================================
+printf '\n--- T-1146 fixture 1: a dangling symlink at the legacy basename ---\n'
+OUT22="$T/out22"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT22" >/dev/null 2>&1
+ln -s "$T/no-such-target-t1146" "$OUT22/$LEGACY_BASENAME"
+if [ ! -L "$OUT22/$LEGACY_BASENAME" ] || [ -e "$OUT22/$LEGACY_BASENAME" ]; then
+  fail "T-1146: fixture control failed — could not seed a dangling symlink at the legacy basename"
+elif bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT22" >"$T/chk22a.out" 2>"$T/chk22a.err"; then
+  fail "T-1146: checker did not flag a dangling symlink at the legacy basename (exited 0: $(cat "$T/chk22a.out")))"
+elif ! grep -qF -- "$LEGACY_BASENAME" "$T/chk22a.err"; then
+  fail "T-1146: checker's dangling-symlink report does not name the legacy basename: $(cat "$T/chk22a.err")"
+elif ! grep -qF -- 'superseded legacy agent file' "$T/chk22a.err"; then
+  fail "T-1146: checker's dangling-symlink report does not carry the legacy-specific hint: $(cat "$T/chk22a.err")"
+else
+  pass "T-1146: a dangling symlink at the legacy basename is reported with the legacy-specific hint, not silently passed over"
+fi
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT22" >"$T/gen22.out" 2>"$T/gen22.err"; then
+  fail "T-1146: a default regeneration still succeeds over a dangling symlink at the legacy basename ($(cat "$T/gen22.err"))"
+elif [ -e "$OUT22/$LEGACY_BASENAME" ] || [ -L "$OUT22/$LEGACY_BASENAME" ]; then
+  fail "T-1146: a default regeneration removes a dangling symlink at the legacy basename (it is still present)"
+elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/gen22.err" || true)" != "1" ]; then
+  fail "T-1146: a default regeneration removes the dangling symlink with exactly one removal notice ($(cat "$T/gen22.err"))"
+elif ! bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT22" >"$T/chk22b.out" 2>"$T/chk22b.err"; then
+  fail "T-1146: out-dir is not in sync after the dangling symlink was removed ($(cat "$T/chk22b.err"))"
+elif ! grep -qF -- 'in sync' "$T/chk22b.out"; then
+  fail "T-1146: out-dir is not reported in sync after the dangling symlink was removed: $(cat "$T/chk22b.out")"
+else
+  pass "T-1146: a default generator run removes a dangling symlink at the legacy basename, with the existing removal notice, leaving the out-dir in sync"
+fi
+
+# =============================================================================
+# T-1146 fixture 2 (GitHub issue #546): a --roles-scoped checker invocation's
+# printed remedy carries THIS invocation's own resolved --roles value, not
+# the default list, so following the remedy verbatim does not silently
+# widen the regeneration beyond the scope the invocation asked for.
+# =============================================================================
+printf '\n--- T-1146 fixture 2: the legacy hint carries the invocation'"'"'s own --roles ---\n'
+SCOPED_ROLES='pm-spec engineer code-reviewer'
+DEFAULT_ROLES='tech-lead pm-spec engineer qa-verifier code-reviewer'
+OUT23="$T/out23"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT23" --roles "$SCOPED_ROLES" >/dev/null 2>&1
+ln -s "$T/no-such-target-t1146b" "$OUT23/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT23" --roles "$SCOPED_ROLES" >"$T/chk23.out" 2>"$T/chk23.err"; then
+  fail "T-1146: checker did not flag the seeded legacy symlink under a --roles-scoped invocation (exited 0)"
+elif ! grep -qF -- "--roles \"$SCOPED_ROLES\"" "$T/chk23.err"; then
+  fail "T-1146: --roles-scoped hint does not carry this invocation's own resolved role list: $(cat "$T/chk23.err")"
+elif grep -qF -- "--roles \"$DEFAULT_ROLES\"" "$T/chk23.err"; then
+  fail "T-1146: --roles-scoped hint carries the default role list instead of the invocation's own: $(cat "$T/chk23.err")"
+else
+  pass "T-1146: a --roles-scoped checker invocation's legacy hint carries that invocation's own resolved role list, not the default"
+fi
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'codex-agents suite: all assertions passed\n'
