@@ -86,6 +86,21 @@ at those three firing points. See
 [`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)
 for the one worked example this reflection currently rests on.
 
+When a `STOP:` escalation reaches you, `rework-digest.sh` (T-1145, issue
+#491) states — it never decides — whether the rework history looks like a
+converging loop or not: supply `--rounds-total`, one `--never-dropped
+<name>=<state>` per never-dropped component and one `--instance
+<class>=<same|distinct>` for every class repeating in the records, and its
+stdout carries a closed `convergence: converging | not-converging` line
+with its `trend:`, `never-dropped:` and `instances:` grounds and a
+`convergence-action:` line naming which action leads. Open the escalation
+message with that verdict and its grounds in your own language, then paste
+the digest's raw stdout below them verbatim — the script's output stays the
+single source of truth for the choice text, never hand-copied. Omitting all
+three inputs leaves the digest exactly as it was before this field existed;
+supplying some but not all of them is refused rather than printed with a
+partial verdict.
+
 ## Language — mirror the conversation
 
 Team output **mirrors the user's conversation language**: when `/shell-team:run` or

@@ -68,6 +68,35 @@
 #                    --stop-reason or --trigger, and omitting it leaves the
 #                    digest's printed shape byte-identical to before this
 #                    flag existed.
+#   --rounds-total   OPTIONAL (T-1145, #491). Requests the convergence block
+#                    (see below). Positive integer, 1-999. Mandatory together
+#                    with at least one --never-dropped when the block is
+#                    requested; must be >= the highest --round in the
+#                    records (a round with zero findings is real and
+#                    represented by this count, never by a sentinel record).
+#   --never-dropped  OPTIONAL (T-1145). Repeatable. `<name>=<state>`, name a
+#                    lowercase slug (^[a-z0-9][a-z0-9-]*$), state one of
+#                    green | hit-this-round | hit-earlier. At least one is
+#                    required together with --rounds-total when the block is
+#                    requested.
+#   --instance       OPTIONAL (T-1145). Repeatable. `<class>=<value>`, value
+#                    one of same | distinct. Exactly one is required per
+#                    class slug repeating (>=2 occurrences) in the records
+#                    when the block is requested; naming a class that does
+#                    not repeat, or that is absent, is refused.
+#
+#                    CONVERGENCE BLOCK (T-1145, issue #491): supplying at
+#                    least one of --rounds-total / --never-dropped /
+#                    --instance requests a `convergence: converging |
+#                    not-converging` line immediately after `stop-reason:`,
+#                    with `trend:`, `never-dropped:`, `instances:` and
+#                    `convergence-action:` ground lines. STOP mode only —
+#                    any of these three paired with --trigger is refused.
+#                    Supplying none of them leaves stdout byte-identical to
+#                    before this feature existed; supplying some but not all
+#                    of the mandatory-together set, or a class-vs-instance
+#                    mismatch, exits 2 with nothing on stdout — never a
+#                    partial verdict. The verdict states; it never decides.
 #
 # Judgment: any class slug appearing >= 2 times across the records =>
 # `judgment: same-class-repetition` plus a `repeated-classes:` line; all
@@ -111,6 +140,21 @@ usage: rework-digest.sh --round N --phase validate|review --class <slug> \
   caller decides and supplies the single earliest value; this script never
   computes it): escalated-primary-not-green, escalated-never-dropped,
   escalated-irreversible, escalated-no-disposition.
+
+  Convergence block (T-1145, #491) — STOP mode only, requested by supplying
+  at least one of:
+    --rounds-total N        total rounds run, 1-999, >= the highest --round
+                            in the records. Mandatory together with
+                            --never-dropped once the block is requested.
+    --never-dropped <name>=<green|hit-this-round|hit-earlier>
+                            repeatable; at least one required once the
+                            block is requested.
+    --instance <class>=<same|distinct>
+                            repeatable; exactly one required per class
+                            repeating (>=2 occurrences) in the records.
+  Supplying some but not all of the mandatory-together set, or an --instance
+  whose class does not repeat (or is absent), or any of these three paired
+  with --trigger, is refused: exit 2, nothing on stdout.
 EOF
   exit 2
 }
@@ -126,6 +170,11 @@ CLASSES=()
 STOP_REASON=""
 TRIGGER=""
 REFLECTION=""
+ROUNDS_TOTAL=""
+ND_NAMES=()
+ND_STATES=()
+INST_CLASSES=()
+INST_VALUES=()
 cur_round=""
 cur_phase=""
 cur_class=""
@@ -211,6 +260,57 @@ while [[ $# -gt 0 ]]; do
       esac
       shift 2
       ;;
+    --rounds-total)
+      if [[ $# -lt 2 ]]; then fail "missing value for --rounds-total"; fi
+      if [[ -n "$ROUNDS_TOTAL" ]]; then fail "duplicate --rounds-total"; fi
+      if [[ ! "$2" =~ ^[0-9]{1,3}$ ]] || (( 10#$2 < 1 )); then
+        fail "--rounds-total must be a positive integer (<= 3 digits): '$2'"
+      fi
+      ROUNDS_TOTAL="$2"
+      shift 2
+      ;;
+    --never-dropped)
+      if [[ $# -lt 2 ]]; then fail "missing value for --never-dropped"; fi
+      if [[ "$2" != *=* ]]; then
+        fail "--never-dropped must be name=state: '$2'"
+      fi
+      nd_name="${2%%=*}"
+      nd_state="${2#*=}"
+      if [[ -z "$nd_name" || ! "$nd_name" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        fail "--never-dropped name must be a lowercase slug (^[a-z0-9][a-z0-9-]*\$): '$nd_name'"
+      fi
+      case "$nd_state" in
+        green|hit-this-round|hit-earlier) : ;;
+        *) fail "--never-dropped state must be green|hit-this-round|hit-earlier: '$nd_state'" ;;
+      esac
+      for nd_i in "${!ND_NAMES[@]}"; do
+        if [[ "${ND_NAMES[$nd_i]}" == "$nd_name" ]]; then fail "duplicate --never-dropped for '$nd_name'"; fi
+      done
+      ND_NAMES+=("$nd_name")
+      ND_STATES+=("$nd_state")
+      shift 2
+      ;;
+    --instance)
+      if [[ $# -lt 2 ]]; then fail "missing value for --instance"; fi
+      if [[ "$2" != *=* ]]; then
+        fail "--instance must be class=value: '$2'"
+      fi
+      inst_class="${2%%=*}"
+      inst_value="${2#*=}"
+      if [[ -z "$inst_class" || ! "$inst_class" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        fail "--instance class must be a lowercase slug (^[a-z0-9][a-z0-9-]*\$): '$inst_class'"
+      fi
+      case "$inst_value" in
+        same|distinct) : ;;
+        *) fail "--instance value must be same|distinct: '$inst_value'" ;;
+      esac
+      for inst_i in "${!INST_CLASSES[@]}"; do
+        if [[ "${INST_CLASSES[$inst_i]}" == "$inst_class" ]]; then fail "duplicate --instance for '$inst_class'"; fi
+      done
+      INST_CLASSES+=("$inst_class")
+      INST_VALUES+=("$inst_value")
+      shift 2
+      ;;
     *)
       fail "unknown argument: $1"
       ;;
@@ -256,12 +356,170 @@ if [[ -n "$TRIGGER" && -z "$repeated" ]]; then
   fail "--trigger same-class-2 requires a repeated class (>=2 occurrences); records show none"
 fi
 
+# --- convergence block validation and derivation (T-1145, #491) -------------
+# Opt-in seam: the block is REQUESTED only when at least one of the three
+# flags below was supplied. Requested-but-partial is a hard refusal (a
+# convergence verdict with an incomplete ground is worse than none), and the
+# block is STOP-mode only (any of the three with --trigger is refused).
+CONV_REQUESTED=0
+if [[ -n "$ROUNDS_TOTAL" || ${#ND_NAMES[@]} -gt 0 || ${#INST_CLASSES[@]} -gt 0 ]]; then
+  CONV_REQUESTED=1
+fi
+
+if [[ "$CONV_REQUESTED" -eq 1 ]]; then
+  if [[ -n "$TRIGGER" ]]; then
+    fail "convergence inputs (--rounds-total/--never-dropped/--instance) are refused with --trigger same-class-2"
+  fi
+  if [[ -z "$ROUNDS_TOTAL" ]]; then
+    fail "--rounds-total is required when --never-dropped or --instance is supplied"
+  fi
+  if [[ ${#ND_NAMES[@]} -eq 0 ]]; then
+    fail "at least one --never-dropped is required when the convergence block is requested"
+  fi
+
+  # --rounds-total must be at least the highest --round in the records.
+  max_round=0
+  for r in "${ROUNDS[@]}"; do
+    if (( 10#$r > max_round )); then max_round=$((10#$r)); fi
+  done
+  if (( 10#$ROUNDS_TOTAL < max_round )); then
+    fail "--rounds-total (${ROUNDS_TOTAL}) must be >= the highest --round in the records (${max_round})"
+  fi
+
+  # Every class repeating (>=2 occurrences) must have exactly one --instance;
+  # every supplied --instance must name a class that actually repeats.
+  for i in "${!uniq_classes[@]}"; do
+    if (( uniq_counts[i] >= 2 )); then
+      inst_found=0
+      for j in "${!INST_CLASSES[@]}"; do
+        if [[ "${INST_CLASSES[$j]}" == "${uniq_classes[$i]}" ]]; then inst_found=1; fi
+      done
+      if [[ "$inst_found" -eq 0 ]]; then
+        fail "--instance is required for the repeated class '${uniq_classes[$i]}'"
+      fi
+    fi
+  done
+  for j in "${!INST_CLASSES[@]}"; do
+    inst_matched=0
+    for i in "${!uniq_classes[@]}"; do
+      if [[ "${uniq_classes[$i]}" == "${INST_CLASSES[$j]}" && "${uniq_counts[$i]}" -ge 2 ]]; then
+        inst_matched=1
+      fi
+    done
+    if [[ "$inst_matched" -eq 0 ]]; then
+      fail "--instance names class '${INST_CLASSES[$j]}' which does not repeat in the records"
+    fi
+  done
+
+  # --- series s[1..N] and trend (DP5) ---
+  conv_n="$((10#$ROUNDS_TOTAL))"
+  series=()
+  for (( conv_r=1; conv_r<=conv_n; conv_r++ )); do
+    conv_cnt=0
+    for r in "${ROUNDS[@]}"; do
+      if (( 10#$r == conv_r )); then conv_cnt=$((conv_cnt + 1)); fi
+    done
+    series+=("$conv_cnt")
+  done
+  s_first="${series[0]}"
+  s_last="${series[$((conv_n - 1))]}"
+  if [[ "$conv_n" -ge 2 ]]; then
+    s_prev="${series[$((conv_n - 2))]}"
+  else
+    s_prev="$s_first"
+  fi
+  falling_flag=0
+  if [[ "$conv_n" -ge 2 ]] && (( s_last < s_first )) && (( s_last <= s_prev )); then
+    falling_flag=1
+  fi
+  rising_flag=0
+  if [[ "$conv_n" -ge 2 ]]; then
+    if (( s_last > s_first )) || (( s_last > s_prev )); then
+      rising_flag=1
+    fi
+  fi
+  trend="flat"
+  if [[ "$falling_flag" -eq 1 ]]; then
+    trend="falling"
+  elif [[ "$rising_flag" -eq 1 ]]; then
+    trend="rising"
+  fi
+  series_str="${series[*]}"
+
+  # --- never-dropped aggregate (DP6/DP8) ---
+  has_hit_this=0
+  has_hit_earlier=0
+  for st in "${ND_STATES[@]}"; do
+    case "$st" in
+      hit-this-round) has_hit_this=1 ;;
+      hit-earlier) has_hit_earlier=1 ;;
+    esac
+  done
+  nd_agg="all-green"
+  if [[ "$has_hit_this" -eq 1 ]]; then
+    nd_agg="hit-this-round"
+  elif [[ "$has_hit_earlier" -eq 1 ]]; then
+    nd_agg="cleared-earlier"
+  fi
+  nd_tail=""
+  for j in "${!ND_NAMES[@]}"; do
+    nd_tail+=" ${ND_NAMES[$j]}=${ND_STATES[$j]}"
+  done
+
+  # --- instances aggregate (DP7), first-seen order matching repeated-classes ---
+  repeated_classes_ordered=()
+  for i in "${!uniq_classes[@]}"; do
+    if (( uniq_counts[i] >= 2 )); then
+      repeated_classes_ordered+=("${uniq_classes[$i]}")
+    fi
+  done
+  has_same=0
+  inst_agg="none-repeated"
+  inst_tail=""
+  if [[ ${#repeated_classes_ordered[@]} -gt 0 ]]; then
+    inst_agg="all-distinct"
+    for cls in "${repeated_classes_ordered[@]}"; do
+      for j in "${!INST_CLASSES[@]}"; do
+        if [[ "${INST_CLASSES[$j]}" == "$cls" ]]; then
+          inst_tail+=" ${cls}=${INST_VALUES[$j]}"
+          if [[ "${INST_VALUES[$j]}" == "same" ]]; then has_same=1; fi
+        fi
+      done
+    done
+    if [[ "$has_same" -eq 1 ]]; then
+      inst_agg="repeated-same"
+    fi
+  fi
+
+  # --- derivation rule (DP6/DP7) ---
+  convergence="not-converging"
+  if [[ "$trend" == "falling" && "$has_hit_this" -eq 0 && "$has_same" -eq 0 ]]; then
+    convergence="converging"
+  fi
+  if [[ "$convergence" == "converging" ]]; then
+    conv_action="extend — first choice while the trend is falling and every ground is green"
+  else
+    conv_action="reconsider-design-premise — first choice while the loop is not converging"
+  fi
+fi
+
 # --- assemble the full digest, then print once (no partial output) ----------
 out="=== REWORK-HISTORY DIGEST ==="
 if [[ -n "$TRIGGER" ]]; then
   out+=$'\n'"trigger: same-class-2"
 else
   out+=$'\n'"stop-reason: ${STOP_REASON}"
+  if [[ "$CONV_REQUESTED" -eq 1 ]]; then
+    out+=$'\n'"convergence: ${convergence}"
+    out+=$'\n'"  trend: ${trend} — findings per round: ${series_str}"
+    out+=$'\n'"  never-dropped: ${nd_agg} —${nd_tail}"
+    if [[ "$inst_agg" == "none-repeated" ]]; then
+      out+=$'\n'"  instances: ${inst_agg}"
+    else
+      out+=$'\n'"  instances: ${inst_agg} —${inst_tail}"
+    fi
+    out+=$'\n'"  convergence-action: ${conv_action}"
+  fi
 fi
 out+=$'\n'"rounds:"
 for i in "${!ROUNDS[@]}"; do
@@ -311,7 +569,7 @@ if [[ ! -f "$GS" || ! -r "$GS" ]]; then
 fi
 sig="$(printf '%s\n' "$out" | bash "$GS" signature)"
 if [[ "$sig" != "NO_VERDICT" ]]; then
-  fail "digest would leak goal-state signature token(s) '${sig}' — rename the offending class slug"
+  fail "digest would leak goal-state signature token(s) '${sig}' — rename the offending class slug or never-dropped component name"
 fi
 
 printf '%s\n' "$out"
