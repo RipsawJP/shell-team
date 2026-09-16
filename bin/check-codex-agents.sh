@@ -170,12 +170,20 @@ if [ -d "$OUT_DIR" ]; then
         # --roles, or $f is an occupant type (a directory, FIFO, socket or
         # other non-symlink special file) the generator's `[ -f ] || [ -L ]`
         # gate never matches — and in either case the "(removes this file
-        # by name)" claim would be false. The three branches below mirror
-        # that same gate exactly rather than restating it: only when
-        # code-reviewer is requested AND $f is a regular file or a symlink
-        # does the hint claim removal; otherwise it names the reason the
-        # printed command will not remove the file and the actual remedy
-        # (widen --roles to include code-reviewer, or remove it by hand).
+        # by name)" claim would be false.
+        # T-1146 round 3 (QA round 2 FAIL, cell 4 of the 2x2): round 2's
+        # branch order checked "code-reviewer requested" first and, once
+        # false, offered "add code-reviewer to --roles and re-run" as THE
+        # remedy without ever re-checking occupant type — so a non-regular
+        # occupant (a directory, in QA's live reproduction) excluded from
+        # --roles got a remedy claim that is false for TWO independent
+        # reasons at once, and only one of them was named. The branch below
+        # is a true 2x2 on (code-reviewer requested) x ($f is -f or -L):
+        # each of the four cells below fires on both conditions together
+        # and gets its own message; "add code-reviewer to --roles and
+        # re-run" is offered as a working remedy in exactly the one cell
+        # where re-running with that widened list would actually remove
+        # the file, and nowhere else.
         code_reviewer_requested=0
         for __legacy_hint_role in "${ROLES_ARR[@]}"; do
           if [ "$__legacy_hint_role" = "code-reviewer" ]; then
@@ -185,11 +193,22 @@ if [ -d "$OUT_DIR" ]; then
         done
         LEGACY_REMEDY_CMD="bash \"$GENERATOR\" --root \"$ROOT\" --out-dir \"$OUT_DIR\" --roles \"$ROLES\""
         if [ "$code_reviewer_requested" -eq 1 ] && { [ -f "$f" ] || [ -L "$f" ]; }; then
+          # cell 1: requested AND removable — the printed command, run
+          # verbatim, really does remove this file (AC6's anchors).
           emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD (removes this file by name), or remove it by hand"
-        elif [ "$code_reviewer_requested" -eq 0 ]; then
+        elif [ "$code_reviewer_requested" -eq 1 ]; then
+          # cell 2: requested but NOT removable — the occupant type alone
+          # defeats the gate; no re-run of any --roles suggestion helps.
+          emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD, but this occupant is not a regular file or a symlink, so gen-codex-agents.sh will NOT remove it; remove it by hand"
+        elif [ -f "$f" ] || [ -L "$f" ]; then
+          # cell 3: excluded but removable — widening --roles to include
+          # code-reviewer and re-running really would remove this file.
           emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD, but this invocation's --roles \"$ROLES\" excludes code-reviewer, so that command will NOT remove this file; add code-reviewer to --roles and re-run, or remove it by hand"
         else
-          emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD, but this occupant is not a regular file or a symlink, so gen-codex-agents.sh will NOT remove it; remove it by hand"
+          # cell 4: excluded AND not removable — both facts hold at once,
+          # so neither the printed command nor a --roles widening removes
+          # this file; "remove it by hand" is the only working remedy.
+          emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — this invocation's --roles \"$ROLES\" excludes code-reviewer and this occupant is not a regular file or a symlink, so no re-run of $LEGACY_REMEDY_CMD — with or without code-reviewer added to --roles — will remove it; remove it by hand"
         fi
       else
         emit "$f: an extra shell-team-*.toml this generator does not own for the requested role list ($ROLES)"
