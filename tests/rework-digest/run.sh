@@ -319,4 +319,128 @@ reject "--reflection duplicate" \
   --round 1 --phase validate --class a-class --stop-reason no_progress --reflection disposition-executed --reflection escalated-irreversible
 pass "--reflection: fail-closed on out-of-enum, missing and duplicate values"
 
+# --- T-1145 (#491): convergence block ---------------------------------------
+# --- opt-in byte-identity: no new flags leaves stdout exactly as before ----
+out_no_conv="$(bash "$RD" --round 1 --phase validate --class only-once --stop-reason guard_error)"
+printf '%s\n' "$out_no_conv" | grep -q 'convergence:' && fail "no new flags: convergence: line must not appear"
+pass "convergence: opt-in — omitting all three flags prints no convergence: line"
+
+# --- AC2-style happy path: closed two-value verdict, position and grounds --
+conv_common=(--round 1 --phase validate --class alpha-one --round 1 --phase review --class beta-two --round 2 --phase review --class alpha-one --rounds-total 3 --never-dropped parser-core=green --stop-reason max_iterations_reached)
+out_conv_converging="$(bash "$RD" "${conv_common[@]}" --instance alpha-one=distinct)"
+printf '%s\n' "$out_conv_converging" | sed -n 3p | grep -Fxq 'convergence: converging' \
+  || fail "convergence: converging expected on line 3"
+printf '%s\n' "$out_conv_converging" | grep -Fxq '  trend: falling — findings per round: 2 1 0' \
+  || fail "convergence: trend line malformed"
+printf '%s\n' "$out_conv_converging" | grep -Fxq '  never-dropped: all-green — parser-core=green' \
+  || fail "convergence: never-dropped line malformed"
+printf '%s\n' "$out_conv_converging" | grep -Fxq '  instances: all-distinct — alpha-one=distinct' \
+  || fail "convergence: instances line malformed"
+printf '%s\n' "$out_conv_converging" | grep -Fxq '  convergence-action: extend — first choice while the trend is falling and every ground is green' \
+  || fail "convergence: convergence-action line malformed"
+pass "convergence: converging happy path — verdict, trend, never-dropped, instances, convergence-action"
+
+out_conv_not="$(bash "$RD" "${conv_common[@]}" --instance alpha-one=same)"
+printf '%s\n' "$out_conv_not" | sed -n 3p | grep -Fxq 'convergence: not-converging' \
+  || fail "convergence: not-converging expected on line 3 (same-instance case)"
+printf '%s\n' "$out_conv_not" | grep -Fxq '  instances: repeated-same — alpha-one=same' \
+  || fail "convergence: repeated-same instances line malformed"
+printf '%s\n' "$out_conv_not" | grep -Fxq '  convergence-action: reconsider-design-premise — first choice while the loop is not converging' \
+  || fail "convergence: not-converging convergence-action line malformed"
+pass "convergence: not-converging — a same instance under a repeated label defeats the verdict"
+
+# --- derivation matrix (AC5 shapes) -----------------------------------------
+out_hit="$(bash "$RD" "${conv_common[@]}" --never-dropped gate-core=hit-this-round --instance alpha-one=distinct)"
+printf '%s\n' "$out_hit" | grep -Fxq 'convergence: not-converging' || fail "convergence: hit-this-round must defeat convergence"
+pass "convergence: a hit-this-round never-dropped component defeats convergence"
+
+out_hit_earlier="$(bash "$RD" "${conv_common[@]}" --never-dropped gate-core=hit-earlier --instance alpha-one=distinct)"
+printf '%s\n' "$out_hit_earlier" | grep -Fxq 'convergence: converging' || fail "convergence: hit-earlier alone must not defeat convergence"
+printf '%s\n' "$out_hit_earlier" | grep -Fq '  never-dropped: cleared-earlier —' || fail "convergence: cleared-earlier aggregate expected"
+pass "convergence: a hit-earlier (closed) never-dropped component does not defeat convergence"
+
+out_flat="$(bash "$RD" --round 1 --phase validate --class alpha-one --round 2 --phase review --class beta-two --rounds-total 2 --never-dropped parser-core=green --stop-reason no_progress)"
+printf '%s\n' "$out_flat" | grep -Fxq 'convergence: not-converging' || fail "convergence: tied series must not converge"
+printf '%s\n' "$out_flat" | grep -Fq '  trend: flat —' || fail "convergence: tied series must read flat"
+pass "convergence: a tied two-round series reads flat and not-converging"
+
+out_single="$(bash "$RD" --round 1 --phase validate --class only-once --rounds-total 1 --never-dropped parser-core=green --stop-reason guard_error)"
+printf '%s\n' "$out_single" | grep -Fxq 'convergence: not-converging' || fail "convergence: single-round series must not converge"
+printf '%s\n' "$out_single" | grep -Fq '  trend: flat —' || fail "convergence: single-round series must read flat"
+printf '%s\n' "$out_single" | grep -Fxq '  instances: none-repeated' || fail "convergence: no repeated class must read instances: none-repeated (no tail)"
+pass "convergence: a single-round series reads flat, not-converging, and instances: none-repeated"
+
+out_rebound="$(bash "$RD" \
+  --round 1 --phase validate --class alpha-one \
+  --round 1 --phase review --class beta-two \
+  --round 1 --phase review --class gamma-three \
+  --round 3 --phase review --class delta-four \
+  --round 3 --phase review --class epsilon-five \
+  --rounds-total 3 --never-dropped parser-core=green --stop-reason no_progress)"
+printf '%s\n' "$out_rebound" | grep -Fxq 'convergence: not-converging' || fail "convergence: collapse-then-rebound series must not converge"
+printf '%s\n' "$out_rebound" | grep -Fq '  trend: rising —' || fail "convergence: collapse-then-rebound series must read rising"
+pass "convergence: a series that collapses then rebounds on the final round reads rising"
+
+# --- T-1134's real, re-derived data (AC7) -----------------------------------
+t1134_nd=(--never-dropped generator-core=hit-earlier --never-dropped checker-core=green --never-dropped host-indirection=green --never-dropped live-run=green)
+t1134_review=(--round 1 --phase review --class generator-control-byte-gap --round 1 --phase review --class docs-missing-adopter-procedure --round 1 --phase review --class docs-assume-dogfood-layout --round 2 --phase review --class docs-missing-adopter-procedure --round 2 --phase review --class docs-cache-path-wrong --round 2 --phase review --class docs-gitignore-commit-gap --round 3 --phase review --class docs-missing-adopter-procedure --round 4 --phase review --class docs-missing-adopter-procedure --rounds-total 5 --instance docs-missing-adopter-procedure=distinct --stop-reason max_iterations_reached)
+out_t1134_review="$(bash "$RD" "${t1134_review[@]}" "${t1134_nd[@]}")"
+printf '%s\n' "$out_t1134_review" | grep -Fxq 'convergence: converging' || fail "T-1134 review series (3 3 1 1 0) must converge"
+printf '%s\n' "$out_t1134_review" | grep -Fq '  trend: falling — findings per round: 3 3 1 1 0' || fail "T-1134 review series trend line wrong"
+pass "convergence: T-1134's real 5-round review series (3 3 1 1 0) converges"
+
+t1134_qa=(--round 1 --phase validate --class docs-assume-dogfood-layout --round 2 --phase validate --class codex-sandbox-protected-dir --round 3 --phase validate --class docs-overclaim-sandbox-requirement --round 8 --phase validate --class docs-overclaim-live-run --rounds-total 9 --stop-reason max_iterations_reached)
+out_t1134_qa="$(bash "$RD" "${t1134_qa[@]}" "${t1134_nd[@]}")"
+printf '%s\n' "$out_t1134_qa" | grep -Fxq 'convergence: converging' || fail "T-1134 QA series (1 1 1 0 0 0 0 1 0), non-monotone, must still converge"
+printf '%s\n' "$out_t1134_qa" | grep -Fq '  trend: falling — findings per round: 1 1 1 0 0 0 0 1 0' || fail "T-1134 QA series trend line wrong"
+pass "convergence: T-1134's real, non-monotone 9-round QA series (1 1 1 0 0 0 0 1 0) still converges"
+
+# --- signature-leak component names (AC6) -----------------------------------
+conv_leak_base=(--round 1 --phase validate --class only-once --rounds-total 1 --stop-reason no_progress)
+bash "$RD" "${conv_leak_base[@]}" --never-dropped live-run=green > "$TMP/conv-ok" 2>/dev/null || fail "convergence: signature-clean never-dropped name should succeed"
+[ -s "$TMP/conv-ok" ] || fail "convergence: signature-clean positive control produced no stdout"
+pass "convergence: signature-clean never-dropped component name succeeds"
+
+reject_conv_leak() {
+  local label="$1" name="$2"
+  local out_f="$TMP/conv-leak-out" err_f="$TMP/conv-leak-err" rc
+  set +e
+  bash "$RD" "${conv_leak_base[@]}" --never-dropped "$name=green" > "$out_f" 2> "$err_f"; rc=$?
+  set -e
+  [ "$rc" -eq 2 ] || fail "$label: expected exit 2, got $rc"
+  [ ! -s "$out_f" ] || fail "$label: stdout must be empty"
+  grep -Fq 'signature token' "$err_f" || fail "$label: message must name signature token"
+  grep -Fq 'component name' "$err_f" || fail "$label: message must name component name field"
+  pass "reject (convergence signature-leak): $label"
+}
+reject_conv_leak "never-dropped name leaking whole-word PASS" "live-pass-gate"
+reject_conv_leak "never-dropped name leaking whole-word FAIL" "qa-fail-mode"
+reject_conv_leak "never-dropped name leaking AC<digits>" "ac10-parser"
+
+# --- AC4: convergence-block refusals ----------------------------------------
+R2c=(--round 1 --phase validate --class alpha-one --round 2 --phase review --class alpha-one --stop-reason no_progress)
+R1c=(--round 1 --phase validate --class only-once --stop-reason no_progress)
+bash "$RD" "${R2c[@]}" --rounds-total 2 --never-dropped parser-core=green --instance alpha-one=distinct > "$TMP/conv-pos-ok" 2>/dev/null || fail "convergence: full well-formed positive control must succeed"
+[ -s "$TMP/conv-pos-ok" ] || fail "convergence: full well-formed positive control produced no stdout"
+pass "convergence: full well-formed input set succeeds (positive control)"
+
+reject "convergence: --never-dropped without --rounds-total" "${R1c[@]}" --never-dropped parser-core=green
+reject "convergence: --rounds-total without any --never-dropped" "${R1c[@]}" --rounds-total 1
+reject "convergence: repeated class with no --instance" "${R2c[@]}" --rounds-total 2 --never-dropped parser-core=green
+reject "convergence: --instance names a once-only class" "${R1c[@]}" --rounds-total 1 --never-dropped parser-core=green --instance only-once=distinct
+reject "convergence: --instance names an absent class" "${R2c[@]}" --rounds-total 2 --never-dropped parser-core=green --instance alpha-one=distinct --instance no-such-class=distinct
+reject "convergence: out-of-enum --never-dropped state" "${R1c[@]}" --rounds-total 1 --never-dropped parser-core=amber
+reject "convergence: out-of-enum --instance value" "${R2c[@]}" --rounds-total 2 --never-dropped parser-core=green --instance alpha-one=maybe
+reject "convergence: duplicate --never-dropped for one name" "${R1c[@]}" --rounds-total 1 --never-dropped parser-core=green --never-dropped parser-core=green
+reject "convergence: duplicate --instance for one class" "${R2c[@]}" --rounds-total 2 --never-dropped parser-core=green --instance alpha-one=distinct --instance alpha-one=distinct
+reject "convergence: duplicate --rounds-total" "${R1c[@]}" --rounds-total 1 --rounds-total 2 --never-dropped parser-core=green
+reject "convergence: non-integer --rounds-total" "${R1c[@]}" --rounds-total one --never-dropped parser-core=green
+reject "convergence: zero --rounds-total" "${R1c[@]}" --rounds-total 0 --never-dropped parser-core=green
+reject "convergence: --rounds-total smaller than the highest --round" --round 5 --phase validate --class only-once --stop-reason no_progress --rounds-total 3 --never-dropped parser-core=green
+reject "convergence: --rounds-total above the three-digit bound" "${R1c[@]}" --rounds-total 1000 --never-dropped parser-core=green
+reject "convergence: --never-dropped with no = separator" "${R1c[@]}" --rounds-total 1 --never-dropped parser-core
+reject "convergence: --never-dropped name violates slug charset" "${R1c[@]}" --rounds-total 1 --never-dropped ParserCore=green
+reject "convergence: trailing --never-dropped with no value" "${R1c[@]}" --rounds-total 1 --never-dropped
+reject "convergence: any convergence input with --trigger same-class-2" --round 1 --phase validate --class alpha-one --round 2 --phase review --class alpha-one --trigger same-class-2 --rounds-total 2 --never-dropped parser-core=green --instance alpha-one=distinct
+
 printf '\nAll rework-digest assertions passed.\n'

@@ -89,6 +89,20 @@ merge は人間の行為である。破壊的・不可逆な操作の前の停�
 [`docs/loop-engineering/means-ends-reflection.md`](loop-engineering/means-ends-reflection.md)
 を参照。
 
+`STOP:` escalation に至った時、`rework-digest.sh`（T-1145、issue #491）は
+——決めるのではなく——rework 履歴が収束しつつあるループに見えるかどうかを
+状態表示する。`--rounds-total`、never-dropped component ごとの
+`--never-dropped <name>=<state>`、records 中で 2 回以上繰り返す class
+ごとの `--instance <class>=<same|distinct>` を渡すと、その stdout には
+閉じた `convergence: converging | not-converging` 行が、`trend:` /
+`never-dropped:` / `instances:` の根拠と、どちらの action が先に来るかを
+示す `convergence-action:` 行とともに乗る。escalation メッセージの冒頭は
+この verdict とその根拠をあなた自身の言語で書き、その下に digest の生の
+stdout を verbatim で貼り付ける——script の出力が choice text の唯一の
+正典であり続け、手で書き写さない。3 つの入力をすべて省略すれば、この
+field が存在する前とまったく同じ digest のままであり、一部だけを渡した
+場合は部分的な verdict を出す代わりに refuse される。
+
 ## 言語 — 会話をミラーする
 
 チームの出力は**ユーザーの会話言語をミラーします**: `/shell-team:run` や `/goal` が

@@ -50,5 +50,38 @@ PASS: reject: --reflection out-of-enum value
 PASS: reject: --reflection missing value (trailing)
 PASS: reject: --reflection duplicate
 PASS: --reflection: fail-closed on out-of-enum, missing and duplicate values
+PASS: convergence: opt-in — omitting all three flags prints no convergence: line
+PASS: convergence: converging happy path — verdict, trend, never-dropped, instances, convergence-action
+PASS: convergence: not-converging — a same instance under a repeated label defeats the verdict
+PASS: convergence: a hit-this-round never-dropped component defeats convergence
+PASS: convergence: a hit-earlier (closed) never-dropped component does not defeat convergence
+PASS: convergence: a tied two-round series reads flat and not-converging
+PASS: convergence: a single-round series reads flat, not-converging, and instances: none-repeated
+PASS: convergence: a series that collapses then rebounds on the final round reads rising
+PASS: convergence: T-1134's real 5-round review series (3 3 1 1 0) converges
+PASS: convergence: T-1134's real, non-monotone 9-round QA series (1 1 1 0 0 0 0 1 0) still converges
+PASS: convergence: signature-clean never-dropped component name succeeds
+PASS: reject (convergence signature-leak): never-dropped name leaking whole-word PASS
+PASS: reject (convergence signature-leak): never-dropped name leaking whole-word FAIL
+PASS: reject (convergence signature-leak): never-dropped name leaking AC<digits>
+PASS: convergence: full well-formed input set succeeds (positive control)
+PASS: reject: convergence: --never-dropped without --rounds-total
+PASS: reject: convergence: --rounds-total without any --never-dropped
+PASS: reject: convergence: repeated class with no --instance
+PASS: reject: convergence: --instance names a once-only class
+PASS: reject: convergence: --instance names an absent class
+PASS: reject: convergence: out-of-enum --never-dropped state
+PASS: reject: convergence: out-of-enum --instance value
+PASS: reject: convergence: duplicate --never-dropped for one name
+PASS: reject: convergence: duplicate --instance for one class
+PASS: reject: convergence: duplicate --rounds-total
+PASS: reject: convergence: non-integer --rounds-total
+PASS: reject: convergence: zero --rounds-total
+PASS: reject: convergence: --rounds-total smaller than the highest --round
+PASS: reject: convergence: --rounds-total above the three-digit bound
+PASS: reject: convergence: --never-dropped with no = separator
+PASS: reject: convergence: --never-dropped name violates slug charset
+PASS: reject: convergence: trailing --never-dropped with no value
+PASS: reject: convergence: any convergence input with --trigger same-class-2
 
 All rework-digest assertions passed.
