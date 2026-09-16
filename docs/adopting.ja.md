@@ -679,9 +679,16 @@ adopter の実行では、まさにこの継ぎ目でおよそ 45 分間のネ�
 人間 GO を省略できる。** どの `class-M` 修正が対象で
 `bin/check-refreeze-class.sh` がその境界をどう機械的に引くかは
 `docs/tuning-oversight.ja.md` の「凍結された intent block を誰が
-再凍結してよいか」節を参照——grant を持ちたい場合は自分自身の
-checkout の `CLAUDE.local.md` に記録すること。このプロジェクトは
-その grant の文面を出荷物には転記せず、代わりに発明することもしない。
+再凍結してよいか」節を参照。Codex CLI host——`CLAUDE.local.md` のような
+Claude Code の instruction ファイルを一切読み込まない host——では、
+代わりに（あるいは併せて）ホスト中立な `<base>/refreeze-grant.conf` に
+記録すること。`bin/check-refreeze-grant.sh`（T-1147, issue #515）が
+これを解決・検証する: これはループ自身の class-M branch がどちらの
+host でも実際に読む surface で、`bash "<plugin root>/bin/check-refreeze-grant.sh"
+--print-grant` を実行して読む。Claude Code host では、これまでどおり
+自分自身の checkout の `CLAUDE.local.md` に記録することもできる。
+このプロジェクトはどちらの surface の grant の文面も出荷物には転記せず、
+代わりに発明することもしない。
 
 ## 会話駆動での使い方（スラッシュコマンド無し）
 

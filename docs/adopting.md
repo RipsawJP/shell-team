@@ -672,10 +672,16 @@ depends on it.)
 **A standing grant lets a mechanics-only re-freeze skip the per-instance
 human GO.** See `docs/tuning-oversight.md`'s `## Who may re-freeze a
 frozen intent block` for what a `class-M` repair covers and how
-`bin/check-refreeze-class.sh` draws the mechanical boundary; if you want
-one, record your own grant in your own checkout's `CLAUDE.local.md` —
-this project ships no transcription of it and invents none on your
-behalf.
+`bin/check-refreeze-class.sh` draws the mechanical boundary. On a Codex
+CLI host — which never loads a Claude Code instruction file such as
+`CLAUDE.local.md` — record it instead (or as well) in the host-neutral
+`<base>/refreeze-grant.conf`, resolved and validated by
+`bin/check-refreeze-grant.sh` (T-1147, issue #515): this is the surface
+the loop's own class-M branch actually reads on either host, by running
+`bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant`. On a
+Claude Code host you may still record your own grant in your own
+checkout's `CLAUDE.local.md` exactly as before — this project ships no
+transcription of either surface's grant and invents none on your behalf.
 
 ## Conversational usage (no slash commands)
 
