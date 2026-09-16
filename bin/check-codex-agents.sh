@@ -164,7 +164,33 @@ if [ -d "$OUT_DIR" ]; then
         # path, one printed shape, so the printed command is literally what
         # this checker itself resolved in every case rather than only when
         # the list happens to differ from the default.
-        emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: bash \"$GENERATOR\" --root \"$ROOT\" --out-dir \"$OUT_DIR\" --roles \"$ROLES\" (removes this file by name), or remove it by hand"
+        # T-1146 round 2 (cross-provider Major + Minor 1): the printed
+        # command's own inputs can fail gen-codex-agents.sh's own removal
+        # gate — either code-reviewer is excluded from THIS invocation's
+        # --roles, or $f is an occupant type (a directory, FIFO, socket or
+        # other non-symlink special file) the generator's `[ -f ] || [ -L ]`
+        # gate never matches — and in either case the "(removes this file
+        # by name)" claim would be false. The three branches below mirror
+        # that same gate exactly rather than restating it: only when
+        # code-reviewer is requested AND $f is a regular file or a symlink
+        # does the hint claim removal; otherwise it names the reason the
+        # printed command will not remove the file and the actual remedy
+        # (widen --roles to include code-reviewer, or remove it by hand).
+        code_reviewer_requested=0
+        for __legacy_hint_role in "${ROLES_ARR[@]}"; do
+          if [ "$__legacy_hint_role" = "code-reviewer" ]; then
+            code_reviewer_requested=1
+            break
+          fi
+        done
+        LEGACY_REMEDY_CMD="bash \"$GENERATOR\" --root \"$ROOT\" --out-dir \"$OUT_DIR\" --roles \"$ROLES\""
+        if [ "$code_reviewer_requested" -eq 1 ] && { [ -f "$f" ] || [ -L "$f" ]; }; then
+          emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD (removes this file by name), or remove it by hand"
+        elif [ "$code_reviewer_requested" -eq 0 ]; then
+          emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD, but this invocation's --roles \"$ROLES\" excludes code-reviewer, so that command will NOT remove this file; add code-reviewer to --roles and re-run, or remove it by hand"
+        else
+          emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: $LEGACY_REMEDY_CMD, but this occupant is not a regular file or a symlink, so gen-codex-agents.sh will NOT remove it; remove it by hand"
+        fi
       else
         emit "$f: an extra shell-team-*.toml this generator does not own for the requested role list ($ROLES)"
       fi
