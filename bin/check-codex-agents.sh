@@ -149,7 +149,13 @@ if [ -d "$OUT_DIR" ]; then
     done
     if [ "$owned" -eq 0 ]; then
       if [ "$base" = "$LEGACY_CODEX_REVIEWER_BASENAME" ]; then
-        emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run bin/gen-codex-agents.sh, which removes this file by name, or remove it by hand"
+        # T-1144 round 4 (Codex round-3 Minor): the remedy must carry THIS
+        # checker's own resolved --root/--out-dir, not a bare relative
+        # command name — on a non-default install (either flag overridden),
+        # a hint naming no flags at all regenerates the plugin's default
+        # root and $PWD/.codex/agents instead of the directory this checker
+        # actually flagged.
+        emit "$f: superseded legacy agent file from the review role's pre-rename name 'codex-reviewer' (T-1144, issue #524) — re-run: bash \"$GENERATOR\" --root \"$ROOT\" --out-dir \"$OUT_DIR\" (removes this file by name), or remove it by hand"
       else
         emit "$f: an extra shell-team-*.toml this generator does not own for the requested role list ($ROLES)"
       fi

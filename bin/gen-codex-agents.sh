@@ -47,13 +47,17 @@
 #   5. Write shell-team-<role>.toml into --out-dir, overwriting only its
 #      own files — an adopter's own Codex agent TOMLs already there, or a
 #      *.toml not named shell-team-<role>.toml, are never touched. ONE
-#      NAMED EXCEPTION (T-1144, issue #524): shell-team-codex-reviewer.toml
-#      — the file this same generator wrote under the review role's
-#      superseded name, before the rename — is removed if present, once
-#      every requested role above has generated successfully. This is a
-#      single hardcoded basename, not a pattern or a general cleanup: no
-#      other stale or unrecognized file in --out-dir is ever touched by
-#      this step, named or not.
+#      NAMED EXCEPTION (T-1144, issue #524, gated round 4 per Codex round-3
+#      Major 2): shell-team-codex-reviewer.toml — the file this same
+#      generator wrote under the review role's superseded name, before the
+#      rename — is removed if present, once every requested role above has
+#      generated successfully, but ONLY when `code-reviewer` is among THIS
+#      run's own requested roles — a partial --roles regeneration that
+#      excludes code-reviewer never touches the legacy file, so it is never
+#      deleted without its replacement also having just been (re)generated
+#      in the same run. This is a single hardcoded basename, not a pattern
+#      or a general cleanup: no other stale or unrecognized file in
+#      --out-dir is ever touched by this step, named or not.
 #
 # bin/check-codex-agents.sh (its check-only sibling) then verifies an
 # out-dir stays in sync with a fresh run of THIS script — running this
@@ -423,7 +427,8 @@ for role in "${CONTENT_ROLE[@]}"; do
   idx=$((idx + 1))
 done
 
-# --- one named legacy-basename removal (T-1144, issue #524) ----------------
+# --- one named legacy-basename removal (T-1144, issue #524), corrected
+# round 4 (Codex round-3 Major 2) -------------------------------------------
 # Every requested role above has now generated successfully. An adopter who
 # ran this generator under a released version before the review role's
 # rename holds shell-team-codex-reviewer.toml in --out-dir; this generator
@@ -438,8 +443,25 @@ done
 # occupant of that name is left alone, exactly like pass 2's own
 # already-exists check above, and surfaces at bin/check-codex-agents.sh
 # instead.
+#
+# GATED on `code-reviewer` actually being one of THIS run's own requested
+# roles (round-3 Codex Major 2): a partial `--roles` regeneration that
+# excludes code-reviewer never (re)generates shell-team-code-reviewer.toml,
+# so unconditionally deleting the legacy file on such a run would leave an
+# adopter with neither the legacy basename nor its replacement — exactly
+# the reachable scenario (## Input space class 9: an adopter's own,
+# unedited routing configuration may still target the superseded agent
+# name) this gate closes. The default (full) role list always includes
+# code-reviewer, so an ordinary full regeneration is unaffected.
+legacy_role_requested=0
+for __legacy_role_tok in "${ROLES_ARR[@]}"; do
+  if [ "$__legacy_role_tok" = "code-reviewer" ]; then
+    legacy_role_requested=1
+    break
+  fi
+done
 LEGACY_CODEX_REVIEWER_TOML="$OUT_DIR/shell-team-codex-reviewer.toml"
-if [ -f "$LEGACY_CODEX_REVIEWER_TOML" ]; then
+if [ "$legacy_role_requested" -eq 1 ] && [ -f "$LEGACY_CODEX_REVIEWER_TOML" ]; then
   rm -f "$LEGACY_CODEX_REVIEWER_TOML" \
     || die "cannot remove the superseded legacy agent file: $LEGACY_CODEX_REVIEWER_TOML"
   printf 'gen-codex-agents: removed superseded legacy agent file %s (the review role was renamed to code-reviewer; see docs/adopting.md)\n' \

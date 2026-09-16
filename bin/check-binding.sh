@@ -365,18 +365,22 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
   BIND_ROLE=() BIND_PROVIDER=() BIND_MODEL=() BIND_EFFORT=() BIND_ADAPTER=()
   BIND_ROLE_ORIG=()
   BOUND_LINES=()
-  # T-1144 round 3 (Codex round-2 Major 2): the alias deprecation line is
-  # BUFFERED here, never printed inline, and flushed only at the very end of
-  # this function (after every refuse()-capable check below — the six-role
-  # completeness loop included — has already returned without exiting).
-  # Every refusal in this file exits the process outright via refuse(), so
-  # any refusal reached after a row is buffered simply discards this array
-  # along with the rest of the process's state: a refused both-spellings
-  # config (the `collision` case) never reaches the flush below, and a
-  # refused config never carries a stray `deprecated` line alongside its one
-  # refusal token. This is the general invariant the finding names — a
-  # diagnostic is emitted only once the whole input has validated, and never
-  # on a refusal path — not a fix scoped to this one alias.
+  # T-1144 round 3 (Codex round-2 Major 2), corrected round 4 (Codex round-3
+  # Major 1): the alias deprecation line is BUFFERED here, never printed
+  # inline. It is left in DEPRECATION_NOTICES (a global array, not `local` —
+  # deliberately survives this function's own return) for the CALLER to
+  # flush, never printed by this function itself. Round 3's fix flushed it
+  # here, at the end of validate_config, which correctly covers every
+  # refusal INSIDE this function (the six-role completeness loop included)
+  # but not a refusal a caller of validate_config can still raise AFTER it
+  # returns — `--verify` mode's later binding-changed comparison and
+  # print-lock mode's canonical_hash call both refuse after this function
+  # has already returned successfully. See flush_deprecation_notices() below
+  # for where the flush now actually happens: only at the mode dispatch's
+  # own success exit, past that mode's own last refusal-capable step. This
+  # is the general invariant the finding names — a diagnostic is emitted
+  # only once the whole PROGRAM has validated for the mode it is running,
+  # and never on a refusal path — not a fix scoped to validate_config alone.
   DEPRECATION_NOTICES=()
   local role provider model effort adapter seen reg_provider role_orig di
   lineno=0
@@ -483,13 +487,19 @@ validate_config() {  # $1 = config path (already confirmed readable by the calle
       [ -n "$sorted" ] && CANON_LINES+=("$sorted")
     done <<< "$sorted_text"
   fi
+}
 
-  # --- flush the buffered deprecation notice(s), only now that every
-  #     refuse()-capable check above (including the six-role completeness
-  #     loop just above) has returned without exiting the process. This is
-  #     the ONLY place this function writes to stderr on a path that is not
-  #     a refusal, and it is unconditionally the last thing this function
-  #     does — nothing after this point can still refuse.
+# T-1144 round 4 (Codex round-3 Major 1): the ONE place this file writes a
+# buffered, non-refusal diagnostic line to stderr. Called only from the mode
+# dispatch below, at each of this file's four success (`exit 0`) sites, and
+# in every case strictly AFTER that mode's own last refuse()-capable step has
+# already returned without exiting — never from inside validate_config
+# itself, because validate_config's own callers can still refuse after it
+# returns (`--verify` mode's binding-changed comparison; print-lock mode's
+# canonical_hash call). This keeps the invariant true for the whole program,
+# not only for the one function that happens to originate the notice: a
+# diagnostic never coexists with a refusal on stderr, for any mode.
+flush_deprecation_notices() {
   if [ "${#DEPRECATION_NOTICES[@]}" -gt 0 ]; then
     printf '%s\n' "${DEPRECATION_NOTICES[@]}" >&2 || true
   fi
@@ -605,6 +615,11 @@ if [ "$MODE" = "verify" ]; then
   if [ "$computed_hash" != "$LOCK_HASH" ]; then
     refuse binding-changed 1 "the binding has changed since the lock was taken (config: $CONFIG_DISPLAY)"
   fi
+  # T-1144 round 4: this is `--verify` mode's own last refuse()-capable step
+  # (the binding-changed comparison just above) — nothing between here and
+  # this mode's exit 0 can still refuse, so the buffered alias notice is
+  # safe to flush here.
+  flush_deprecation_notices
   printf 'check-binding: verified: binding matches the lock (config: %s)\n' "$CONFIG_DISPLAY"
   exit 0
 fi
@@ -624,16 +639,29 @@ validate_config "$CONFIG"
 
 case "$MODE" in
   validate)
+    # T-1144 round 4: `validate` mode's own last refuse()-capable step is
+    # the shared `validate_config "$CONFIG"` call in the prelude just above
+    # — nothing in this branch can still refuse, so flush is safe here.
+    flush_deprecation_notices
     printf 'check-binding: valid: schema %s, %d role(s) bound (config: %s)\n' \
       "${CANON_LINES[0]#schema }" "${#BIND_ROLE[@]}" "$CONFIG_DISPLAY"
     exit 0
     ;;
   print-binding)
+    # T-1144 round 4: same last-refusal point as `validate` above
+    # (validate_config); print_canonical() itself never refuses.
+    flush_deprecation_notices
     print_canonical
     exit 0
     ;;
   print-lock)
     computed_hash="$(canonical_hash)" || fail_usage "git hash-object failed while hashing the canonical binding for: $CONFIG"
+    # T-1144 round 4: unlike `validate`/`print-binding`, this mode's own
+    # last refuse()-capable step is the canonical_hash call directly above
+    # (its fail_usage guard), not validate_config — flush must follow THAT,
+    # not the earlier validate_config call, or a hash-object failure could
+    # still coexist with an already-flushed notice on stderr.
+    flush_deprecation_notices
     {
       printf 'binding-lock 1\n'
       printf 'config-path %s\n' "$CONFIG_DISPLAY"

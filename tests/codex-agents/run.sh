@@ -747,6 +747,13 @@ elif grep -qF -- 'this generator does not own for the requested role list' "$T/c
 else
   pass "T-1144 extra: the checker names the un-regenerated legacy file with a specific hint, distinct from the generic 'extra' message"
 fi
+# Round-4 (Codex round-3 Minor): the hint must carry THIS checker's own
+# resolved --out-dir (a non-default path here, $OUT19) so the literal
+# remedy it prints targets the directory actually flagged, not the
+# generator's own default ($PWD/.codex/agents) on a non-default install.
+grep -qF -- "$OUT19" "$T/chk19.err" \
+  || fail "T-1144 extra: the migration hint does not carry this checker's own resolved --out-dir ($OUT19): $(cat "$T/chk19.err")"
+pass "T-1144 extra: the migration hint carries this checker's own resolved --out-dir"
 # Regression control: an unrelated stray *.toml still gets the generic
 # message, proving the specific hint is scoped to the one named basename.
 OUT20="$T/out20"
@@ -760,6 +767,46 @@ elif ! grep -qF -- 'this generator does not own for the requested role list' "$T
   fail "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message (generic message missing: $(cat "$T/chk20.err"))"
 else
   pass "T-1144 extra: an unrelated extra shell-team-*.toml still gets the generic message, unaffected by the legacy-basename hint"
+fi
+
+# =============================================================================
+# extra (T-1144 round 4, Codex round-3 Major 2): the legacy-basename removal
+# is gated on `code-reviewer` actually being one of THIS run's own
+# requested roles. A partial --roles regeneration that excludes
+# code-reviewer must never delete the legacy file — deleting it here would
+# leave an adopter with neither the legacy basename nor its replacement,
+# since a role-scoped regeneration that excludes code-reviewer never
+# (re)generates shell-team-code-reviewer.toml either.
+# =============================================================================
+printf '\n--- extra (T-1144 round 4): legacy-basename removal scoped to --roles ---\n'
+OUT21="$T/out21"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT21" >/dev/null 2>&1
+cp "$OUT21/shell-team-engineer.toml" "$OUT21/$LEGACY_BASENAME"
+[ -f "$OUT21/$LEGACY_BASENAME" ] \
+  || fail "T-1144 round 4: fixture control failed — could not seed the legacy basename"
+
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT21" --roles 'pm-spec engineer' >"$T/gen21.out" 2>"$T/gen21.err"; then
+  fail "T-1144 round 4: a code-reviewer-excluding --roles regeneration still succeeds ($(cat "$T/gen21.err"))"
+elif [ ! -f "$OUT21/$LEGACY_BASENAME" ]; then
+  fail "T-1144 round 4: a code-reviewer-excluding --roles regeneration must not delete the legacy file (it is gone)"
+elif grep -qF -- 'removed superseded legacy agent file' "$T/gen21.err"; then
+  fail "T-1144 round 4: a code-reviewer-excluding --roles regeneration must not emit the removal notice ($(cat "$T/gen21.err"))"
+else
+  pass "T-1144 round 4: a code-reviewer-excluding --roles regeneration leaves the legacy file untouched, with no removal notice"
+fi
+
+# The same out-dir, regenerated with the default (full) role list, DOES
+# remove the legacy file, with its one removal notice — proving the gate is
+# scoped to whether code-reviewer was requested THIS run, not a permanent
+# disablement of the removal step.
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT21" >"$T/gen21b.out" 2>"$T/gen21b.err"; then
+  fail "T-1144 round 4: a default (full) --roles regeneration still succeeds ($(cat "$T/gen21b.err"))"
+elif [ -f "$OUT21/$LEGACY_BASENAME" ]; then
+  fail "T-1144 round 4: a default (full) --roles regeneration removes the legacy file (it is still present)"
+elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/gen21b.err" || true)" != "1" ]; then
+  fail "T-1144 round 4: a default (full) --roles regeneration emits exactly one removal notice ($(cat "$T/gen21b.err"))"
+else
+  pass "T-1144 round 4: a default (full) --roles regeneration (code-reviewer requested) removes the legacy file with its one notice"
 fi
 
 printf '\n'
