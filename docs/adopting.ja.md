@@ -181,7 +181,7 @@ push、fetch）は要約ではなくコマンドそのものとして中継し�
 `<base>/binding.conf` は**丸ごと**採用されます。出荷時の既定に対する
 per-role の merge・layering・fallback は存在しないので、6 つの
 inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
-`codex-reviewer`・`ui-designer`）それぞれに `bind` 行を 1 本ずつ、多くも
+`code-reviewer`・`ui-designer`）それぞれに `bind` 行を 1 本ずつ、多くも
 少なくもなく持たせる必要があります。部分的なファイルは既定から補完され
 ず、refuse されます。6 役割すべてに executor を割り当てたいときに、次の
 手順で作成します:
@@ -192,7 +192,7 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    コピーする（このパスはプラグインのインストール先ディレクトリから
    解決される。自リポジトリ配下のパスではない）。**この 6 行が持つのは
    プレースホルダーのモデルトークン**です。`claude` 系の 5 行に
-   `model-1`、`codex-reviewer` に `model-2` と書かれていますが、いずれも
+   `model-1`、`code-reviewer` に `model-2` と書かれていますが、いずれも
    実在するモデルを指しません。これに依拠する前に**全ての行**を置き換えて
    ください。変更しない役割の行には `templates/binding-default.conf` の
    実際の行を転記します（**下記の grammar example からは転記しないで
@@ -218,7 +218,7 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    probe kind を表示するだけで、根拠を持てる判定（harness 自身の
    サブエージェント呼び出し失敗）を下すのは呼び出し側に委ねる。出荷時の
    既定では 6 役割のうち 5 つが `claude` に紐付いているため、実際に何かを
-   probe する呼び出しは `resolve-executor.sh --role codex-reviewer`
+   probe する呼び出しは `resolve-executor.sh --role code-reviewer`
    だけになる（下記の `executor-unavailable` 参照）。
 
 実際の validator が受理する設定例を示します。採用される config が持つべき
@@ -232,13 +232,13 @@ bind pm-spec        claude opus   high claude-cli
 bind engineer       claude sonnet -    claude-cli
 bind qa-verifier    claude sonnet -    claude-cli
 bind ui-designer    claude sonnet -    claude-cli
-bind codex-reviewer codex  gpt-5  -    codex-cli
+bind code-reviewer  codex  gpt-5  -    codex-cli
 ```
 
 host の `<base>/binding.conf` が全く無い場合（設定していない通常の
 ケース）、`resolve-executor.sh` はプラグイン出荷時の既定
 `templates/binding-default.conf` にフォールバックする。その `model` 列
-のうち `codex-reviewer` の行だけは `provider-configured` を持つ。これは
+のうち `code-reviewer` の行だけは `provider-configured` を持つ。これは
 出荷時の Codex 呼び出しが model フラグを一切渡さないという境界を表す。
 それ以外の各役割の列は、その役割自身の `agents/<role>.md`（プラグイン
 自身の agent 定義）の pin をそのまま持つ。
@@ -295,7 +295,7 @@ config-condition refusal で、3 つまでは通常の config 編集で到達し
 `executor-unavailable` に到達しうる（いずれも上記参照）。単体で使う
 2 つの review 系コマンドも、自身の review ステップで binding を
 参照する。`/shell-team:review` は reviewer を呼び出す直前に
-`codex-reviewer` の executor を解決し、`/shell-team:review-response`
+`code-reviewer` の executor を解決し、`/shell-team:review-response`
 も自身のクロス評価ステップの前に同じことを行う。どちらでも refusal は
 フォールバックせずコマンドを停止させる blocker であり、rebind は
 run に届くのとまったく同じようにこれらにも届く。
@@ -324,7 +324,7 @@ write 権限または propose 権限を持つ役割が同じ形で紐付けら�
 役割について）。まず、役割が走る **model** は今なおその役割自身の
 `agents/<role>.md` の pin から来る（resolved row からではない）。issue
 **#236** がその pin の退役を追跡するが、対象は `claude-cli` に紐付く
-5 役割のみで、`codex-reviewer` は意図的に除外される（その pin は Codex
+5 役割のみで、`code-reviewer` は意図的に除外される（その pin は Codex
 CLI を呼び出す Claude 側の wrapper を設定するもので、レビューを行う
 モデルではない）。次に、宣言された **effort** はもはや adapter を問わず
 一様な話ではない——どちらの話になるかは **dispatch の形**にも左右
@@ -332,8 +332,8 @@ CLI を呼び出す Claude 側の wrapper を設定するもので、レビュ�
 `sandbox-read-only` で dispatch される——では値がその呼び出し自体に
 **適用**される（`-c model_reasoning_effort=<value>` として、その adapter
 自身の `cli-config-override` 宣言に紐付く）#420。それ以外の `codex-cli` の
-行——出荷時既定の `codex-reviewer` 自身の行を含め、これは自身の
-`agents/codex-reviewer.md` を通じて `wrapper-hosted` で dispatch され、
+行——出荷時既定の `code-reviewer` 自身の行を含め、これは自身の
+`agents/code-reviewer.md` を通じて `wrapper-hosted` で dispatch され、
 その recipe の行を一切受け取らない——と、すべての `claude-cli` の行は、
 span に**記録**されるだけで何にも適用されず、他に及ぶ影響は上記の
 `capability-unsupported` refusal だけである。最後に、どの **executor**（provider と
@@ -374,21 +374,21 @@ executor は fallback ではなく `BLOCKED` になるため、未測定の認�
 Codex CLI セッションから、このループの Specify → Implement → Validate →
 Review のチェーン全体を `READY_FOR_MERGE`、両ゲート green まで駆動できる
 ようになった——dispatch のどこにも Claude Code の **host セッション**も
-Claude Code Agent tool によるオーケストレーションも登場しない: `codex-reviewer`
+Claude Code Agent tool によるオーケストレーションも登場しない: `code-reviewer`
 を含む全ての役割は Codex 自身の `spawn_agent` ツールで spawn され、この
 host には存在しない Claude Code Agent tool では一切ない。`claude -p` の
 **子プロセス**は実際に走る——レビュー pass（下の手順 8 と 10）のみ——
 その前提条件（この host に Claude Code CLI が既にインストール・認証済み
 であること）が手順 7 である。slice 1（T-1134）は `pm-spec` → `engineer` →
 `qa-verifier` チェーン（`tech-lead` も含む）を `READY_FOR_REVIEW` まで配線し、
-slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追加し、その
+slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追加し、その
 レビューを Codex ではなく Claude 上で走らせることで残りのギャップを閉じる
 ——Codex CLI host が「そうではない」provider が Claude だから。このループが
 前提とする cross-provider の性質は host を切り替えても保たれる。`agents/**` は
 このために複製・分岐されることは一切ない: generator が未改変の
 `agents/<role>.md` から役割ごとに 1 つの Codex custom-agent TOML を導出する
 ので、両 host は同じ役割プロースを読む——2 つ目の Codex 専用コピーではない。
-役割名 `codex-reviewer` は両 host で変わらない——ここでは歴史的な名前に
+役割名 `code-reviewer` は両 host で変わらない——ここでは歴史的な名前に
 過ぎず、実際にレビューするのは Codex ではなく Claude である（手順 10 参照）。
 
 1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
@@ -430,8 +430,8 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
    だった。checkout でも、どちらの host でも構わない。
 
    **特定した root に `bin/gen-codex-agents.sh` が無い、あるいはその
-   スクリプト自身の既定役割リストにまだ `codex-reviewer` が含まれていない
-   （そのため手順 3 が `shell-team-codex-reviewer.toml` を生成しない）
+   スクリプト自身の既定役割リストにまだ `code-reviewer` が含まれていない
+   （そのため手順 3 が `shell-team-code-reviewer.toml` を生成しない）
    場合、そのインストールは古い**——この Codex host 機能自体が出荷される
    前、あるいはこの 5 つ目の役割が追加される前にインストールされた
    ということ。どちらの機能にも比較対象にできる独立したバージョン番号が
@@ -461,7 +461,7 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
    `$PWD/.codex/agents` なので、上で `--out-dir` を明示しているのは
    分かりやすさのためであって必須ではない）。`agents/tech-lead.md`・
    `agents/pm-spec.md`・`agents/engineer.md`・`agents/qa-verifier.md`・
-   `agents/codex-reviewer.md` を読み、役割ごとの `shell-team-<role>.toml`
+   `agents/code-reviewer.md` を読み、役割ごとの `shell-team-<role>.toml`
    ——合計 5 つ——を `.codex/agents/` に書き出す（別の場所に出したい場合は
    `--out-dir` を渡す。`--root` は `agents/` を持つディレクトリを指す
    ——shell-team の稼働ベースディレクトリではない。上記のとおり plugin
@@ -566,9 +566,9 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
 10. その repository で Codex CLI セッションを開始し、Codex 自身の
     `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
     `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`・
-    `shell-team-codex-reviewer`）を spawn して役割を dispatch する——host
+    `shell-team-code-reviewer`）を spawn して役割を dispatch する——host
     ごとの dispatch 文言（`skills/run/SKILL.md` に splice 済み）は
-    `templates/prompt-blocks/host-dispatch.md` を参照——`codex-reviewer` が
+    `templates/prompt-blocks/host-dispatch.md` を参照——`code-reviewer` が
     2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
     `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
     host も Codex CLI セッションを一度も離れない。`pm-spec` がスペック
@@ -607,7 +607,7 @@ slice 2（T-1135）が `codex-reviewer` を 5 つ目の生成役割として追�
 導出した「意図された write scope」の宣言的な記述に過ぎない——**enforcement
 boundary ではない**: 実行時は親の Codex セッション自身の sandbox が支配し、
 生成された agent の `sandbox_mode` の値が何であれそれは変わらない——
-`codex-reviewer` 自身の生成された `workspace-write` の値も例外ではない。
+`code-reviewer` 自身の生成された `workspace-write` の値も例外ではない。
 この host 上でのその実際の read-only 性は、手順 10 の `claude -p` invocation
 自身の `--permission-mode dontAsk` と、その `--allowedTools` の git 限定
 allowlist から来るのであって、`sandbox_mode` からでも `--tools` /
@@ -652,7 +652,7 @@ bootstrap はそれ自体を提供しない。手順 9 を省略すると、役�
 
 **self-detected-host という観測可能な事実（T-1138、issue #508）。** 手順 10
 の後、上の host 切り替えが実際に機能したと仮定するのではなく、
-`codex-reviewer` 自身のレビュー記録が実際に何と書いているかを読むこと:
+`code-reviewer` 自身のレビュー記録が実際に何と書いているかを読むこと:
 本物の Codex CLI host では、レビュー pass は単一の `claude -p` invocation
 として走り、その telemetry span は `--provider claude`（`claude` provider
 の span であり `codex` provider の span では決してない）で記録され、記録
@@ -664,7 +664,7 @@ cross-provider の性質が、たとえ表示された verdict が `APPROVE` で
 することは、この役割がまさに避けるために存在する同一系統の盲点そのもの
 である。1 つの形だけは、チェックされるのではなく開示されている: spawn
 された Codex custom agent（手順 10 が `spawn_agent` で dispatch する
-`shell-team-codex-reviewer` の形）が `CODEX_THREAD_ID` を設定するか——
+`shell-team-code-reviewer` の形）が `CODEX_THREAD_ID` を設定するか——
 この役割自身の ladder が読む唯一の観測——は、この repository 自身の
 checkout からは**未計測**である。その形は Claude Code セッションから
 再現できないため——このギャップを自分で閉じるには、自分自身の実行で
@@ -1019,7 +1019,7 @@ freeze sweep 以降は full loop がそのまま走る。`operator-authored` が
 ## Specify seam で spec review を elect する（T-1092）
 
 `specify` と並んで第四の軸がある。実装着手前に spec の **domain**
-（ドメイン）前提を cross-provider の `codex-reviewer` に追加で 1 回
+（ドメイン）前提を cross-provider の `code-reviewer` に追加で 1 回
 読ませるかどうかを決める `spec-review` で、`none` と `cross-provider` の
 2 値に閉じ、`docs/loop-engineering/specify-seam-review.md` で定義・
 値付けされている。
@@ -1041,7 +1041,7 @@ branch diff は決して読まない。freeze sweep の後・`- intent-hash (v1)
 
 **保証すること・しないこと。** elect された spec review は loop の
 **both gates**（`qa-verifier` の PASS と、実際に届いた変更に対する
-`codex-reviewer` の APPROVE）のどちらでもない。この軸の値に関わらず
+`code-reviewer` の APPROVE）のどちらでもない。この軸の値に関わらず
 両 gate は引き続き必須であり、spec-review の APPROVE がどちらの代わりに
 なることもない。またこの読みは自身の入力を認証しない（cross-check する
 2 つの条件テキストはどちらも agent が生成したものである)。読みが実際に
@@ -1117,7 +1117,7 @@ segregation-of-duties 統制を満たすかどうかは `undetermined`（未測�
 でのみ検証済み）として出荷され、この repository では意図的に live run で
 行使しない。ここで enroll すれば、coordinating session がその分離を
 監査する機構自身の producer と approver を兼ねることになってしまうから
-である。`qa-verifier` の PASS と `codex-reviewer` の APPROVE という
+である。`qa-verifier` の PASS と `code-reviewer` の APPROVE という
 **both gates** はどちらの profile でも変わらず必須であり、
 oversight-profile approval record がその代わりになることはどちらの向き
 にも無い。
@@ -1126,7 +1126,7 @@ oversight-profile approval record がその代わりになることはどちら�
 
 `bin/close-out.sh` はボードへ書き込む前に、タスクの Active flag を読む
 （T-1107、issue #53）。その flag が既に `READY_FOR_MERGE`——
-`codex-reviewer` が APPROVE 時に書く唯一の状態——でない限り、close-out は
+`code-reviewer` が APPROVE 時に書く唯一の状態——でない限り、close-out は
 exit 1 で refuse し、ボードのパス・ソース行・見つかった flag を名指しし、
 ボードファイルは byte 単位で無変更のまま残る。`READY_FOR_ARCH` /
 `READY_FOR_ENG` / `READY_FOR_QA` / `READY_FOR_REVIEW` / `BLOCKED` /
@@ -1180,7 +1180,7 @@ record——今日すでに commit されている全 record がこれに当た�
 持つことができる——決して必須ではなく、この行を持たない conformant な
 4 field の pass は今後も永久に conformant である。先頭 token は closed
 pair `claude-code` / `codex-cli` に限られる（review 役割自身がどちらの
-host で走っていると判断したかという決定そのもの——`agents/codex-reviewer.md`
+host で走っていると判断したかという決定そのもの——`agents/code-reviewer.md`
 自身の ladder を参照）。その ground は、リテラルな ` — ` 区切り記号の後に、
 その決定が何の observation に基づいたか——どの変数か、そしてそれが
 set されていたかどうか——を記す。その変数の値そのものは決して記さない。
@@ -1279,3 +1279,47 @@ derived tier が承認済み premise と一致しないということは、そ�
 - レビュアーは意図的に別のモデルプロバイダ（Codex）で走ります。ループの中に必ず入れておくこと。
 - エージェント間の共有状態はファイルだけです（メモリは共有されない）。ボード
   （`<base>/todo.md`）・各仕様（`<base>/specs/`）・ループ契約が唯一の真実源です。
+
+## 旧ロール名の扱い
+
+クロスプロバイダレビューロールは `codex-reviewer` から `code-reviewer` へ改名された
+（T-1144, issue #524）。ロール自身の名前が、この project が出荷時デフォルトとしてしか
+約束していない紐付けを主張すべきではないからだ——出荷時デフォルトであることは
+`CLAUDE.md` の "Working rules" 節に明記されており、host は自分の `binding.conf` で
+`code-reviewer` を同一ファミリーの executor に自由に rebind できる。rebind した後も
+`codex-reviewer` と名乗り続けるロールは、自分自身の設定と矛盾することになる。
+
+**alias が一リリースの間カバーするもの。** 改名前に書かれた `<base>/binding.conf`
+は編集なしでそのまま解決される: `bind codex-reviewer <provider> <model> <effort|-> <adapter>`
+は受理され、validation の前に `code-reviewer` へ正規化される。`bash
+"<plugin root>/bin/resolve-executor.sh" --role codex-reviewer`（および
+`bin/check-invocation-path.sh` への同じ `--role` 引数）も受理され、
+`code-reviewer` として報告される。`codex-reviewer` を `code-reviewer` に
+書き換えるコスト（binding.conf の role token でも `--role` 引数でも）はゼロだが、
+alias があることでアップグレードと同じ日に書き換える必要はなくなる。**両方の
+綴りの** `bind` 行を同時に持つ config は、どちらかを黙って選ぶのではなく、
+衝突を名指しして拒否される。
+
+**alias がカバーしないもの。** これは configuration / role-token 層のシムであって、
+harness 自身の sub-agent の改名ではない: `agents/code-reviewer.md` がそのファイルで
+あり、Claude Code の Agent tool（または spawn された Codex custom agent、
+`shell-team-code-reviewer`）が dispatch する名前は `code-reviewer` の一つだけ——
+`agents/codex-reviewer.md` という互換スタブは存在せず、それを作ることは 1 つの
+ロールに 2 つの名前で答える 2 つ目の agent を登録することになる。また、すでに
+自分の `CLAUDE.md` に貼り付け済みの `templates/CLAUDE-routing-snippet.md` の
+コピーにも alias は届かない——そのコピーはあなた自身のリポジトリにある
+あなた自身のものであり、この project が出荷するものでは編集できない。現行
+リリースの routing snippet を読み、旧ロール名のままなら自分のコピーを手で
+更新してほしい。以前のリリースがすでに生成した
+`.codex/agents/shell-team-codex-reviewer.toml` の後片付けも alias は行わない——
+`bin/gen-codex-agents.sh` は次回実行時にこの旧 basename を名指しで削除し、
+再生成されないまま残っている場合は `bin/check-codex-agents.sh` が同じ対処法とともに
+それを明示的に名指しする。
+
+**削除。** この alias は一リリース周期に限定されている: この改名を含むリリースで
+出荷され、次のリリースで削除される。あなた自身の `binding.conf` や scripted な
+`--role` 引数に残る `codex-reviewer` を、それまでに書き換えてほしい。この project
+の `docs/loop-engineering/` 配下の日付付き分析ノートと、すでに commit 済みの
+review record は、書かれた当時の名前のまま残る——それらは configuration ではなく
+historical record であり、この alias がカバーする対象にも、その削除が触れる対象
+にも含まれない。

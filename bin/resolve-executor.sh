@@ -52,7 +52,7 @@
 # Usage:
 #   resolve-executor.sh --role <role>
 #     Resolve ONE named inner-loop role (tech-lead | pm-spec | engineer |
-#     qa-verifier | codex-reviewer | ui-designer): the effective binding,
+#     qa-verifier | code-reviewer | ui-designer): the effective binding,
 #     the two normative rules, and — for this mode only — the compiled-in
 #     availability probe. On success, stdout is exactly one line:
 #       resolved <role> <provider> <model> <effort|-> <adapter> <probe-kind>
@@ -193,7 +193,12 @@ print_help() {
 }
 
 # --- fixed vocabulary --------------------------------------------------------
-SIX_ROLES=(tech-lead pm-spec engineer qa-verifier codex-reviewer ui-designer)
+SIX_ROLES=(tech-lead pm-spec engineer qa-verifier code-reviewer ui-designer)
+# T-1144 (issue #524): a `--role` argument carrying the superseded
+# spelling is accepted as an alias and normalized before the unknown-role
+# refusal below, so the resolved row reports `code-reviewer`, never the
+# typed token.
+SUPERSEDED_REVIEWER_ROLE="codex-reviewer"
 SUPPORTED_SCHEMA_VERSIONS=(1)
 
 role_in_six() {  # $1 = candidate role token
@@ -271,6 +276,13 @@ while [ "$#" -gt 0 ]; do
 done
 [ "$#" -eq 0 ] || fail_usage "unexpected extra argument: $1"
 [ -n "$MODE" ] || fail_usage "specify exactly one of --role <role> or --print-resolved (see --help)"
+# T-1144 (issue #524) — normalize the superseded `--role` spelling before
+# the unknown-role refusal below, so `--role codex-reviewer` is accepted
+# and every downstream lookup (and the printed `resolved` row) uses
+# `code-reviewer`.
+if [ "$MODE" = "role" ] && [ "$ROLE_ARG" = "$SUPERSEDED_REVIEWER_ROLE" ]; then
+  ROLE_ARG="code-reviewer"
+fi
 if [ "$MODE" = "role" ]; then
   role_in_six "$ROLE_ARG" \
     || fail_usage "unknown role: $ROLE_ARG (expected one of: ${SIX_ROLES[*]})"
@@ -326,7 +338,58 @@ else
 fi
 
 # --- delegate binding parsing to the sibling validator (DP2) -----------------
-if ! BINDING_OUT="$(bash "$SCRIPT_DIR/check-binding.sh" --config "$CONFIG_PATH" --print-binding 2>/dev/null)"; then
+# T-1144 round 2 (issue #524, DP6; codex-reviewer round-1 Major 1): the
+# delegated validator's stderr is separated from its stdout by a
+# content-based split of ONE combined `2>&1` capture, never by a scratch
+# file or FIFO — this script's own header contract ("no write path of any
+# kind") is enforced by tests/resolve-executor/run.sh's
+# writes-nothing-static assertion (a static grep for mktemp/rm/touch/etc.
+# and for any `>`/`>>` redirection into a path), so a temp file here would
+# be a regression against a DIFFERENT, pre-existing acceptance criterion
+# than the one this fix answers. Two prior shapes were both wrong: round 0
+# swallowed the delegated stderr outright (an alias-normalized role
+# token's deprecation line never reached the operator); round 1 inherited
+# it unconditionally (this script's own header contract, "every refusal is
+# one token on stderr", broke for EVERY OTHER delegated failure too, not
+# only the alias case: a malformed binding.conf produced TWO stderr lines,
+# the validator's own plus this script's).
+#
+# The split is grounded in check-binding.sh's OWN fixed grammar, never
+# guessed: `--print-binding`'s stdout (print_canonical()) is always
+# exactly a `schema <version>` line followed by `bound ...` rows and
+# nothing else (bin/check-binding.sh's print_canonical()), while every
+# line it writes to its own stderr — its `refuse()` helper and its
+# `deprecated` printf alike — opens with the fixed literal prefix
+# `check-binding: ` (bin/check-binding.sh's refuse() and its
+# SUPERSEDED_REVIEWER_ROLE deprecation printf). A line matching neither
+# shape is treated as a stdout line (conservative: it lands in
+# parse_canonical_binding's re-assertion below, which refuses on anything
+# it does not recognize, rather than being silently dropped).
+#
+# The two outcomes are handled asymmetrically on purpose:
+#   - on SUCCESS, the only thing the delegated validator can have written
+#     to its own stderr is its `deprecated` line (at most one — only one
+#     row can ever carry the superseded role token), because every OTHER
+#     stderr write it makes goes through its own `refuse()`, which always
+#     exits non-zero first. That line is forwarded verbatim: it is the
+#     operator-facing signal this task exists to surface.
+#   - on FAILURE, the delegated validator's own stderr line is DROPPED
+#     entirely. This script emits its own single `binding-unresolved`
+#     refusal token instead, preserving the one-line-per-refusal contract
+#     for every failure mode the delegated validator can produce, not only
+#     the ones this task happens to be about.
+if BINDING_COMBINED="$(bash "$SCRIPT_DIR/check-binding.sh" --config "$CONFIG_PATH" --print-binding 2>&1)"; then
+  BINDING_OUT="" BINDING_DIAG=""
+  while IFS= read -r combined_line || [ -n "$combined_line" ]; do
+    case "$combined_line" in
+      "check-binding: "*) BINDING_DIAG="${BINDING_DIAG}${combined_line}"$'\n' ;;
+      *) BINDING_OUT="${BINDING_OUT}${combined_line}"$'\n' ;;
+    esac
+  done <<< "$BINDING_COMBINED"
+  if [ -n "$BINDING_DIAG" ]; then
+    printf '%s' "$BINDING_DIAG" >&2 || true
+  fi
+else
   refuse binding-unresolved 2 "the effective binding at $CONFIG_PATH did not resolve"
 fi
 [ -n "$BINDING_OUT" ] \

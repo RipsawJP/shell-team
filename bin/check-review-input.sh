@@ -61,7 +61,7 @@
 #     NOT close: whether the declared classification is actually true — a
 #     role that forges claude-code while running as a spawned Codex agent
 #     is undetectable from committed bytes, because no record artifact
-#     carries host ground truth (see agents/codex-reviewer.md's own
+#     carries host ground truth (see agents/code-reviewer.md's own
 #     disclosure of this limit).
 #
 # It never judges the content of the verbatim executor-invocation field
@@ -223,7 +223,7 @@ trap 'rm -rf "$WORK"' EXIT
 # above it (the Gotcha this task's Notes for engineer records — `## `
 # headings vary across the corpus; `### Codex Review verdict:` and
 # `### Codex Spec-Review verdict:` are the two fixed stems
-# agents/codex-reviewer.md pins). A real scan failure (grep exit > 1 —
+# agents/code-reviewer.md pins). A real scan failure (grep exit > 1 —
 # e.g. a read error mid-file) is distinguished from a clean "no heading
 # found" (exit 1) rather than masked by a blanket `|| true`: an input
 # this checker cannot actually evaluate must never read as a silent,

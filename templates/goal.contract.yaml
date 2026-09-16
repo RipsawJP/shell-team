@@ -2,7 +2,7 @@
 # The /goal skill drives a self-paced loop (one implement/verify attempt per
 # tick) until a layered completion gate (check-acs -> check-intent, only when
 # the spec carries a frozen intent block -> check-provenance -> qa-verifier ->
-# codex-reviewer) is fully green, or loop-guard.sh returns a STOP. This
+# code-reviewer) is fully green, or loop-guard.sh returns a STOP. This
 # contract makes that loop explicit in the 8-element vocabulary and is what
 # loop-guard.sh reads each tick. Spec: docs/specs/T-034-goal-skill.md.
 #
@@ -27,12 +27,12 @@ scope:
   - must not merge or push without a human gate (see human_gate below)
 
 action:
-  description: a self-paced loop of one engineer implement/verify attempt per tick, gated each tick by a layered completion check (check-acs -> check-intent, only when the spec carries a frozen intent block -> check-provenance -> qa-verifier -> codex-reviewer) and bounded by loop-guard.sh; it ends green when all four pass (five when the spec carries a frozen intent block), or stops on a loop-guard STOP
+  description: a self-paced loop of one engineer implement/verify attempt per tick, gated each tick by a layered completion check (check-acs -> check-intent, only when the spec carries a frozen intent block -> check-provenance -> qa-verifier -> code-reviewer) and bounded by loop-guard.sh; it ends green when all four pass (five when the spec carries a frozen intent block), or stops on a loop-guard STOP
 
 budget:
   max_iterations: 5         # at most 5 implement->verify ticks before escalating
   max_wallclock_min: 60     # PRIMARY lever — driver passes --elapsed-min each tick
-  max_subagents: 3          # engineer, qa-verifier, codex-reviewer per tick
+  max_subagents: 3          # engineer, qa-verifier, code-reviewer per tick
   max_usd: 0                # untracked — token/usd is never a hard STOP lever here
   extension_ratifier: operator   # default; or: authoring-session
 

@@ -287,6 +287,44 @@ try {
   }
 })();
 
+// ---- 1d. legacy-reviewer-span canonicalization (T-1144 round 2,
+//          codex-reviewer round-1 Major #2) — the superseded review-role
+//          token ("codex-reviewer") must never survive adaptation, in ANY
+//          of the fields it can appear in: a work-row `agent` (from
+//          `span`), a handoff/rework `from`/`to`, or a gate `agent` (from
+//          `from`). Checked on EVERY fixture (a leak on any of them is a
+//          finding), with a positive control on `mixed` and `flag-rail` —
+//          the two fixtures whose own committed
+//          tests/gen-loop-replay/fixtures/*/shell-team.jsonl source
+//          literally carries the raw "codex-reviewer" token (confirmed by
+//          `grep -n codex-reviewer` against those two files) in more than
+//          just a span row: flag-rail's own source carries it in a handoff
+//          `to`, a gate `from`, and a rework `from` too — so this cannot
+//          pass vacuously for lack of input on those two labels. ----
+(function legacyReviewerCanonicalization() {
+  var SUPERSEDED = 'codex-reviewer';
+  var rosterLeak = scene.RING_AGENTS.indexOf(SUPERSEDED) !== -1;
+  var eventLeak = scene.events.some(function (e) {
+    return e.agent === SUPERSEDED || e.from === SUPERSEDED || e.to === SUPERSEDED;
+  });
+  if (rosterLeak || eventLeak) {
+    fail('the superseded review-role span "' + SUPERSEDED + '" survived adaptation (roster leak=' + rosterLeak +
+      ', event-field leak=' + eventLeak + ') — legacy telemetry was not canonicalized to "code-reviewer"');
+  } else if (label === 'mixed' || label === 'flag-rail') {
+    if (scene.RING_AGENTS.indexOf('code-reviewer') === -1) {
+      fail('positive-control failure: "code-reviewer" is absent from the roster on the ' + label +
+        ' fixture, which is expected to carry the canonicalized reviewer role — the absence of the ' +
+        'superseded token above may be vacuous rather than a real canonicalization');
+    } else {
+      ok('the "' + SUPERSEDED + '" token this fixture\'s own committed source carries (in a span, and — on ' +
+        'flag-rail — a handoff/gate/rework from/to too) is canonicalized to "code-reviewer" everywhere ' +
+        'before roster/event construction (roster size ' + scene.RING_AGENTS.length + ')');
+    }
+  } else {
+    ok('no superseded review-role token present in this fixture\'s adapted events or roster (vacuous — not a positive control)');
+  }
+})();
+
 // ---- 2. injection-escaping proof (adopter's XSS-shaped span id, hostile's
 //         XSS-shaped event `to` value) — only meaningful when present ----
 (function injectionProof() {

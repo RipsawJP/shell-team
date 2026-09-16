@@ -6,7 +6,7 @@
 ## Phase boundaries (status flags)
 
 ```
-   pm-spec                engineer              qa-verifier            codex-reviewer
+   pm-spec                engineer              qa-verifier            code-reviewer
       │                      │                      │                       │
       ▼                      ▼                      ▼                       ▼
   READY_FOR_ARCH ──► READY_FOR_ENG ──► READY_FOR_QA ──► READY_FOR_REVIEW ──► READY_FOR_MERGE
@@ -35,12 +35,12 @@
 |-----------|------------------|
 | Single-line typo or comment fix | `tech-lead` may skip directly to `engineer` |
 | Non-UI task (CI/bash/backend/docs/config, or non-visual frontend edits) | `ui-designer` does not participate — no `[Design]` phase |
-| Test-only change (adding a missing test) | Skip `pm-spec`; `engineer` + `qa-verifier` + `codex-reviewer` |
-| Reviewing someone else's PR | Use `/review` — only `codex-reviewer` runs |
+| Test-only change (adding a missing test) | Skip `pm-spec`; `engineer` + `qa-verifier` + `code-reviewer` |
+| Reviewing someone else's PR | Use `/review` — only `code-reviewer` runs |
 | Responding to review feedback already on your PR | Use `/review-response` — Codex-evaluates the received findings, risk-gates them (a deterministic floor forces risky ones to a human), then hands the adopted set to `shell-team` |
 | Spec only (no code yet) | Stop after `pm-spec`; task is at `READY_FOR_ARCH` (spec written) and pauses |
 | Spec already authored (`specify — operator-authored`, not the shipped `pm-authored` default) | `pm-spec` does not skip — it runs as a conformance formatter instead of an author; see [Choosing who authors the spec](adopting.md#choosing-who-authors-the-spec-t-1091) |
-| Spec review elected (`spec-review — cross-provider`, not the shipped `none` default) | No phase is skipped — an extra `codex-reviewer` pass reads the spec document's domain premises at the Specify seam, after the freeze sweep and before the intent hash; a `REQUEST_CHANGES` routes back to the spec's own author before Implement starts. See [Electing a spec review at the Specify seam](adopting.md#electing-a-spec-review-at-the-specify-seam-t-1092), `docs/loop-engineering/specify-seam-review.md` |
+| Spec review elected (`spec-review — cross-provider`, not the shipped `none` default) | No phase is skipped — an extra `code-reviewer` pass reads the spec document's domain premises at the Specify seam, after the freeze sweep and before the intent hash; a `REQUEST_CHANGES` routes back to the spec's own author before Implement starts. See [Electing a spec review at the Specify seam](adopting.md#electing-a-spec-review-at-the-specify-seam-t-1092), `docs/loop-engineering/specify-seam-review.md` |
 
 `/review` vs `/review-response`: `review` generates a *fresh* Codex review of the current branch diff; `review-response` triages review findings that **already came back** on a PR — it evaluates and risk-gates them, then (on your GO for any risky ones) drives `shell-team` to implement the adopted set. Neither replaces the other.
 
@@ -123,14 +123,14 @@ shipped surface, written in English like every other shipped file.
 (`/shell-team:run`, `/goal`), where the orchestrator injects the directive. Invoking an
 agent **directly / standalone** (`@engineer`, etc.) is **not guaranteed** to
 mirror — the Bash-less `pm-spec` / `tech-lead` cannot self-resolve the
-conversation language (no env, no config file by design). `codex-reviewer`
+conversation language (no env, no config file by design). `code-reviewer`
 partially mitigates this by following its task-prompt language on a standalone
 `/review`.
 
 ## Codex CLI quick-reference
 
 ```bash
-# Version check — codex-reviewer and drift-evaluator each run this every round
+# Version check — code-reviewer and drift-evaluator each run this every round
 # and transcribe its output into the verdict's `- Codex CLI:` line
 codex --version
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # bin/codex-capture.sh — shared temp-capture hygiene helper for the `codex
-# exec` invocations used by agents/codex-reviewer.md (primary + adversarial
+# exec` invocations used by agents/code-reviewer.md (primary + adversarial
 # passes), agents/drift-evaluator.md (semantic pass), and the alternate-
 # executor invocation path recipe at
 # templates/prompt-blocks/alternate-executor-invocation.md (T-1118; #419)
@@ -78,7 +78,7 @@
 #
 # `--alloc` and `--publish` are mutually exclusive; exactly one is required.
 # The caller runs its own `codex exec …` between the two calls (a bare,
-# first-token-`codex` invocation — see agents/codex-reviewer.md /
+# first-token-`codex` invocation — see agents/code-reviewer.md /
 # agents/drift-evaluator.md for the full skeleton), redirecting `-o` to
 # `--alloc`'s first stdout line and its own stdout+stderr to the second.
 #

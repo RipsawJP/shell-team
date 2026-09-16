@@ -7,7 +7,7 @@ You don't have to drive shell-team by typing `/shell-team:run …`
 every time. The intended day-to-day model is the same one you already use for
 cross-provider review with Codex: **you describe what you want in plain language,
 and the main Claude session delegates to the team** — `pm-spec`, `engineer`,
-`qa-verifier`, and the `codex-reviewer` — invoking the loop for you.
+`qa-verifier`, and the `code-reviewer` — invoking the loop for you.
 
 This guide shows that conversational model, how the delegation works, and the
 one opt-in step that makes it reliable.
@@ -19,7 +19,7 @@ one opt-in step that makes it reliable.
   Specify → Implement → Validate → Review), pausing for you before merge.
 - This mirrors the Codex reviewer: you don't type a slash command to get a
   cross-provider review — you ask for a review and it's delegated to the
-  `codex-reviewer` agent. The dev-team agents work the same way (their
+  `code-reviewer` agent. The dev-team agents work the same way (their
   `description` fields tell the main session when to route to them).
 - Slash commands still work and are great when you want to be explicit
   (`/shell-team:run …`, `/shell-team:review`) — conversational
@@ -47,16 +47,16 @@ running the *whole* gated loop is more reliable when CLAUDE.md says to.
 >
 > **Claude:** This needs a spec and several files, so I'll run the team. Routing
 > through tech-lead → pm-spec (acceptance criteria) → engineer → qa-verifier →
-> codex-reviewer. I'll pause before any merge.
+> code-reviewer. I'll pause before any merge.
 > *(runs the loop; advances the board's status flag at each gate; reports
 > READY_FOR_MERGE and waits for your go.)*
 
-**2. "Just review this" → codex-reviewer only**
+**2. "Just review this" → code-reviewer only**
 
 > **You:** Can you get a second opinion on the diff I just pushed?
 >
 > **Claude:** Delegating to the cross-provider reviewer (Codex). *(invokes
-> `codex-reviewer`; returns APPROVE / REQUEST_CHANGES with findings.)*
+> `code-reviewer`; returns APPROVE / REQUEST_CHANGES with findings.)*
 
 **3. Spec only → pm-spec**
 
@@ -78,7 +78,7 @@ running the *whole* gated loop is more reliable when CLAUDE.md says to.
 ## How the delegation works
 
 - **Agents** (all eight: `tech-lead`, `pm-spec`, `engineer`, `qa-verifier`,
-  `codex-reviewer`, `scrum-master`, plus the conditional `ui-designer` for UI work
+  `code-reviewer`, `scrum-master`, plus the conditional `ui-designer` for UI work
   and `triage-orchestrator` for outer-loop triage) are invoked by the main session based on their
   `description` frontmatter — the same proactive mechanism Codex's reviewer uses.
 - **The full loop lives in the `run` skill**, not in any single agent. The

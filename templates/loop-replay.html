@@ -17,7 +17,7 @@
     --agent-human:hsl(30 78% 42%); --agent-orchestrator:hsl(270 55% 48%);
     --agent-tech-lead:hsl(235 60% 50%); --agent-pm-spec:hsl(305 55% 42%);
     --agent-engineer:hsl(65 75% 32%); --agent-qa-verifier:hsl(200 65% 42%);
-    --agent-codex-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
+    --agent-code-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
     /* T-1012: a roster id outside the six known agents (an adopter's own
        agent names) gets this neutral, reused text token — deliberately not a
        new hue, so it sits outside every identity color band. */
@@ -36,7 +36,7 @@
       --agent-human:hsl(30 85% 62%); --agent-orchestrator:hsl(270 70% 72%);
       --agent-tech-lead:hsl(235 78% 74%); --agent-pm-spec:hsl(305 70% 70%);
       --agent-engineer:hsl(65 78% 60%); --agent-qa-verifier:hsl(200 78% 66%);
-      --agent-codex-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
+      --agent-code-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
       --agent-unknown: var(--text-faint);
     }
   }
@@ -52,7 +52,7 @@
     --agent-human:hsl(30 85% 62%); --agent-orchestrator:hsl(270 70% 72%);
     --agent-tech-lead:hsl(235 78% 74%); --agent-pm-spec:hsl(305 70% 70%);
     --agent-engineer:hsl(65 78% 60%); --agent-qa-verifier:hsl(200 78% 66%);
-    --agent-codex-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
+    --agent-code-reviewer:hsl(330 78% 70%); --agent-ui-designer:hsl(100 24% 46%);
     --agent-unknown: var(--text-faint);
   }
   :root[data-theme="light"]{
@@ -67,7 +67,7 @@
     --agent-human:hsl(30 78% 42%); --agent-orchestrator:hsl(270 55% 48%);
     --agent-tech-lead:hsl(235 60% 50%); --agent-pm-spec:hsl(305 55% 42%);
     --agent-engineer:hsl(65 75% 32%); --agent-qa-verifier:hsl(200 65% 42%);
-    --agent-codex-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
+    --agent-code-reviewer:hsl(330 62% 46%); --agent-ui-designer:hsl(100 28% 34%);
     --agent-unknown: var(--text-faint);
   }
 
@@ -373,6 +373,33 @@
     if (typeof label !== "string") return null;
     return FLAG_STOPS.indexOf(label) !== -1 ? label : null;
   }
+  // T-1144 round 2 (issue #524; codex-reviewer round-1 Major 2): historical
+  // telemetry recorded under the superseded review-role name is accepted
+  // HERE, at row adaptation — the single choke point every role-token-shaped
+  // field (a `span`, and a handoff/rework `from`/`to`, and a gate/release
+  // `agent`) passes through before anything downstream (RING_AGENTS,
+  // agentById, KNOWN_COLOR_IDS lookups, RING_POS/worldPos, agentSpans,
+  // labels) ever reads it — mirroring bin/rollup-runs.sh's own
+  // REVIEWER_ROLES=(code-reviewer codex-reviewer) two-token acceptance for
+  // the identical historical-telemetry reason (T-1144, issue #524). Applied
+  // unconditionally to every one of those fields, not only `span`: this
+  // suite's OWN committed flag-rail fixture
+  // (tests/gen-loop-replay/fixtures/flag-rail/shell-team.jsonl) already
+  // carries the superseded token in a handoff `to`, a gate `from`, and a
+  // rework `from` — not only in a span row — so a fix scoped to `span`
+  // alone would leave those fields pointing `worldPos()`/`RING_POS` lookups
+  // at a ring position that was never built, silently falling back to the
+  // orchestrator's position (worldPos()'s own documented fallback) rather
+  // than genuinely crashing, which is the same silent-misrender defect
+  // class the reviewer's finding is about, one field over. A value that is
+  // null or is not the superseded token (a phase name, another role, an
+  // adopter's own agent id) passes through completely unchanged — this is
+  // a targeted rewrite of the ONE closed literal the alias covers, never a
+  // general transform.
+  var SUPERSEDED_REVIEWER_SPAN = "codex-reviewer";
+  function canonicalAgentId(id){
+    return id === SUPERSEDED_REVIEWER_SPAN ? "code-reviewer" : id;
+  }
   function adaptRow(row){
     if (row && row.kind === "event") {
       // D1: every kind:"event" row derives `flag` uniformly, off the row's
@@ -381,17 +408,17 @@
       // operator settling the flag directly ("the maintainer set the flag at
       // the gate") reaches the rail.
       switch (row.event) {
-        case "handoff": return { seq:row.seq, type:"handoff", from:row.from, to:row.to, label:row.label, flag:flagFromLabel(row.label) };
-        case "rework":  return { seq:row.seq, type:"rework",  from:row.from, to:row.to, label:row.label, flag:flagFromLabel(row.label) };
-        case "gate":    return { seq:row.seq, type:"gate",    agent:row.from, label:row.label, flag:flagFromLabel(row.label) };
+        case "handoff": return { seq:row.seq, type:"handoff", from:canonicalAgentId(row.from), to:canonicalAgentId(row.to), label:row.label, flag:flagFromLabel(row.label) };
+        case "rework":  return { seq:row.seq, type:"rework",  from:canonicalAgentId(row.from), to:canonicalAgentId(row.to), label:row.label, flag:flagFromLabel(row.label) };
+        case "gate":    return { seq:row.seq, type:"gate",    agent:canonicalAgentId(row.from), label:row.label, flag:flagFromLabel(row.label) };
         case "human":   return { seq:row.seq, type:"human",   label:row.label, flag:flagFromLabel(row.label) };
-        case "release": return { seq:row.seq, type:"release", agent:(row.from != null ? row.from : "orchestrator"), label:row.label, flag:flagFromLabel(row.label) };
+        case "release": return { seq:row.seq, type:"release", agent:canonicalAgentId(row.from != null ? row.from : "orchestrator"), label:row.label, flag:flagFromLabel(row.label) };
         default: return null; // unreachable: bin/check-run.sh already rejects any other event id
       }
     }
     // span row (kind absent or "span") — never dropped, even when status !== "success".
     return {
-      seq:row.seq, type:"work", agent:row.span, phase:row.phase, status:row.status,
+      seq:row.seq, type:"work", agent:canonicalAgentId(row.span), phase:row.phase, status:row.status,
       model:row.model, tokens:row.tokens, tool_uses:row.tool_uses,
       duration_ms:row.duration_ms, verdict:row.verdict, error:row.error
     };
@@ -413,15 +440,15 @@
   /* ---------------- roster: the six known ids UNION every distinct `span`
      value present (D3) — orchestrator/human stay structural, never derived,
      since they are this loop's topology and emit no spans themselves. ---------------- */
-  var KNOWN_RING_AGENTS = ["tech-lead","pm-spec","engineer","qa-verifier","codex-reviewer","ui-designer"];
-  var KNOWN_COLOR_IDS = { "human":1, "orchestrator":1, "tech-lead":1, "pm-spec":1, "engineer":1, "qa-verifier":1, "codex-reviewer":1, "ui-designer":1 };
+  var KNOWN_RING_AGENTS = ["tech-lead","pm-spec","engineer","qa-verifier","code-reviewer","ui-designer"];
+  var KNOWN_COLOR_IDS = { "human":1, "orchestrator":1, "tech-lead":1, "pm-spec":1, "engineer":1, "qa-verifier":1, "code-reviewer":1, "ui-designer":1 };
   var STATIC_AGENTS = [
     {"id":"orchestrator","label":"Orchestrator","note_ja":"メインセッション。指示の発行・ゲート判定・board 更新・PR/マージ","note_en":"Main session. Issues instructions, judges gates, updates the board, merges PRs."},
     {"id":"tech-lead","label":"Tech Lead","note_ja":"Routing Map（計画）","note_en":"Routing Map (planning)"},
     {"id":"pm-spec","label":"PM / Spec","note_ja":"spec 起草・AC 定義","note_en":"Drafts the spec, defines acceptance criteria"},
     {"id":"engineer","label":"Engineer","note_ja":"実装・rework","note_en":"Implementation, rework"},
     {"id":"qa-verifier","label":"QA","note_ja":"経験的検証（実行レンズ）","note_en":"Empirical verification (the execution lens)"},
-    {"id":"codex-reviewer","label":"Codex Reviewer","note_ja":"cross-provider レビュー（静的レンズ・別モデル系列）","note_en":"Cross-provider review (the static-analysis lens, a different model family)"},
+    {"id":"code-reviewer","label":"Codex Reviewer","note_ja":"cross-provider レビュー（静的レンズ・別モデル系列）","note_en":"Cross-provider review (the static-analysis lens, a different model family)"},
     {"id":"human","label":"Human","note_ja":"merge GO（Phase A では全マージに人間の GO）","note_en":"Merge GO (in Phase A, every merge needs a human's GO)"}
   ];
   var agentById = {};
@@ -857,7 +884,7 @@
     document.getElementById("agentLegendHeading").textContent = T().legendAgentsTitle;
     var el = document.getElementById("agentLegendGrid");
     el.innerHTML = "";
-    var ids = ["human","orchestrator","tech-lead","pm-spec","engineer","qa-verifier","codex-reviewer"];
+    var ids = ["human","orchestrator","tech-lead","pm-spec","engineer","qa-verifier","code-reviewer"];
     ids.forEach(function(id){
       var row = document.createElement("div");
       row.className = "legend-row";

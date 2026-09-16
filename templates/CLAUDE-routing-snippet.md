@@ -10,7 +10,7 @@ should be able to ask in plain language without typing slash commands.
   skill (equivalent to `/shell-team:run <the request>`). Do **not**
   implement it directly in the main session.
 - **"Review this" / a second opinion on a diff / PR** → delegate to the
-  `codex-reviewer` agent (cross-provider review on a different model family).
+  `code-reviewer` agent (cross-provider review on a different model family).
 - **"Write the spec" / "clarify the requirements" only** → delegate to `pm-spec`.
 - **"What should we pick up next?" / triage failing CI, open PRs, labelled issues**
   → run the `loop-triage` skill (read-only — it *proposes* candidates, never edits

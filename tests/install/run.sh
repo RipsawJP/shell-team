@@ -93,7 +93,7 @@ pass "AC8 --help / -h exit 0 with stdout-only output"
 T1="$(new_target ac1)"
 "$INSTALL" --team new-dev "$T1" >/dev/null
 
-for f in pm-spec.md engineer.md qa-verifier.md codex-reviewer.md tech-lead.md scrum-master.md; do
+for f in pm-spec.md engineer.md qa-verifier.md code-reviewer.md tech-lead.md scrum-master.md; do
   [ -f "$T1/.claude/agents/$f" ] || fail "AC1 missing $T1/.claude/agents/$f"
 done
 [ -f "$T1/.claude/team-meta.yaml" ] || fail "AC1 missing $T1/.claude/team-meta.yaml"

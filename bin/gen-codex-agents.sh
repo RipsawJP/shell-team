@@ -4,13 +4,13 @@
 # session can dispatch the same role prose Claude Code dispatches, with
 # zero duplicated bytes of role prose anywhere (T-1134; GitHub issue #484;
 # .shell-team/specs/T-1134-codex-host-slice1.md). T-1135 (GitHub issue #493;
-# .shell-team/specs/T-1135-codex-host-slice2.md) adds codex-reviewer as a
+# .shell-team/specs/T-1135-codex-host-slice2.md) adds code-reviewer as a
 # fifth default role — generated exactly like the other four, from its own
-# unmodified agents/codex-reviewer.md, with no special-casing anywhere in
+# unmodified agents/code-reviewer.md, with no special-casing anywhere in
 # this script.
 #
 # For each role in ROLES (default: tech-lead pm-spec engineer qa-verifier
-# codex-reviewer — the Specify-to-Validate-to-Review chain, per D2 in
+# code-reviewer — the Specify-to-Validate-to-Review chain, per D2 in
 # T-1134's spec and AC1 in T-1135's):
 #   1. Read agents/<role>.md from --root, unmodified. Validate its
 #      frontmatter has both a `---` opener and closer, that its
@@ -46,12 +46,24 @@
 #      extractable without a TOML parser.
 #   5. Write shell-team-<role>.toml into --out-dir, overwriting only its
 #      own files — an adopter's own Codex agent TOMLs already there, or a
-#      *.toml not named shell-team-<role>.toml, are never touched.
+#      *.toml not named shell-team-<role>.toml, are never touched. ONE
+#      NAMED EXCEPTION (T-1144, issue #524, gated round 4 per Codex round-3
+#      Major 2): shell-team-codex-reviewer.toml — the file this same
+#      generator wrote under the review role's superseded name, before the
+#      rename — is removed if present, once every requested role above has
+#      generated successfully, but ONLY when `code-reviewer` is among THIS
+#      run's own requested roles — a partial --roles regeneration that
+#      excludes code-reviewer never touches the legacy file, so it is never
+#      deleted without its replacement also having just been (re)generated
+#      in the same run. This is a single hardcoded basename, not a pattern
+#      or a general cleanup: no other stale or unrecognized file in
+#      --out-dir is ever touched by this step, named or not.
 #
 # bin/check-codex-agents.sh (its check-only sibling) then verifies an
 # out-dir stays in sync with a fresh run of THIS script — running this
 # script again after editing a role file or after a plugin upgrade is how
-# you refresh that sync.
+# you refresh that sync. It also names the same legacy basename explicitly
+# if it ever finds it un-regenerated (see its own header).
 #
 # Fail-closed, whole-run validation (no partial output): every requested
 # role's source is validated and its TOML content built into a scratch
@@ -93,7 +105,7 @@
 #               for the writable-roots form when Codex must run it in-session.
 #   --roles     space-separated role-list override (default: the five
 #               roles this task's Goal names: "tech-lead pm-spec engineer
-#               qa-verifier codex-reviewer"). Each token must match
+#               qa-verifier code-reviewer"). Each token must match
 #               ^[a-z][a-z0-9-]*$ (the same shape agents/<role>.md's own
 #               `name:` frontmatter values already use) — a token outside
 #               that shape refuses the WHOLE run (--roles item 2 of T-1135
@@ -129,7 +141,7 @@ SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd -P)"
 
 ROOT=""
 OUT_DIR=""
-ROLES="tech-lead pm-spec engineer qa-verifier codex-reviewer"
+ROLES="tech-lead pm-spec engineer qa-verifier code-reviewer"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -414,5 +426,46 @@ for role in "${CONTENT_ROLE[@]}"; do
   printf 'gen-codex-agents: generated %s/shell-team-%s.toml\n' "$OUT_DIR" "$role"
   idx=$((idx + 1))
 done
+
+# --- one named legacy-basename removal (T-1144, issue #524), corrected
+# round 4 (Codex round-3 Major 2) -------------------------------------------
+# Every requested role above has now generated successfully. An adopter who
+# ran this generator under a released version before the review role's
+# rename holds shell-team-codex-reviewer.toml in --out-dir; this generator
+# never deleted files it did not write, so that file survives every
+# ordinary regeneration untouched and bin/check-codex-agents.sh then reports
+# it as an unowned "extra" file — the exact upgrade-staleness flow
+# docs/adopting.md tells an adopter to run. This is a single, hardcoded
+# basename removed by name, not a glob or a pattern match against
+# shell-team-*.toml: no other file in --out-dir, owned or not, is ever
+# touched by this step. Idempotent (a no-op once the file is gone) and
+# bounded to a regular file only — a directory or other non-regular
+# occupant of that name is left alone, exactly like pass 2's own
+# already-exists check above, and surfaces at bin/check-codex-agents.sh
+# instead.
+#
+# GATED on `code-reviewer` actually being one of THIS run's own requested
+# roles (round-3 Codex Major 2): a partial `--roles` regeneration that
+# excludes code-reviewer never (re)generates shell-team-code-reviewer.toml,
+# so unconditionally deleting the legacy file on such a run would leave an
+# adopter with neither the legacy basename nor its replacement — exactly
+# the reachable scenario (## Input space class 9: an adopter's own,
+# unedited routing configuration may still target the superseded agent
+# name) this gate closes. The default (full) role list always includes
+# code-reviewer, so an ordinary full regeneration is unaffected.
+legacy_role_requested=0
+for __legacy_role_tok in "${ROLES_ARR[@]}"; do
+  if [ "$__legacy_role_tok" = "code-reviewer" ]; then
+    legacy_role_requested=1
+    break
+  fi
+done
+LEGACY_CODEX_REVIEWER_TOML="$OUT_DIR/shell-team-codex-reviewer.toml"
+if [ "$legacy_role_requested" -eq 1 ] && [ -f "$LEGACY_CODEX_REVIEWER_TOML" ]; then
+  rm -f "$LEGACY_CODEX_REVIEWER_TOML" \
+    || die "cannot remove the superseded legacy agent file: $LEGACY_CODEX_REVIEWER_TOML"
+  printf 'gen-codex-agents: removed superseded legacy agent file %s (the review role was renamed to code-reviewer; see docs/adopting.md)\n' \
+    "$LEGACY_CODEX_REVIEWER_TOML" >&2 || true
+fi
 
 exit 0

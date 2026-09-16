@@ -18,7 +18,7 @@ Sub-agents you can route to:
 - `ui-designer` — owns the visual/interaction design for UI work (uses the `frontend-design` Skill). **Conditional**: include only when the task involves UI work (see below); omit entirely otherwise.
 - `engineer` — implements code changes
 - `qa-verifier` — runs tests and validates against acceptance criteria
-- `codex-reviewer` — calls Codex CLI for an independent cross-provider review
+- `code-reviewer` — calls Codex CLI for an independent cross-provider review
 
 ### When to include `ui-designer` (UI-work detection)
 
@@ -59,7 +59,7 @@ Return a markdown block in this exact shape:
 2. **[ui-designer]** <design direction + design note — INCLUDE ONLY for UI work; omit this line entirely otherwise>
 3. **[engineer]** <what to implement, files likely touched>
 4. **[qa-verifier]** <tests/commands to run, what to check>
-5. **[codex-reviewer]** <scope of the review>
+5. **[code-reviewer]** <scope of the review>
 
 ### Hand-off artifacts
 - `tasks/todo.md` entry: T-XXX

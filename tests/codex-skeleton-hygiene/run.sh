@@ -141,7 +141,7 @@
 #                          end never creates the sentinel — proving neither
 #                          mode ever executes anything named `codex`.
 #   agentmd-bare-codex-present (T-107, DP-g①) the live
-#                          agents/codex-reviewer.md / agents/drift-evaluator.md
+#                          agents/code-reviewer.md / agents/drift-evaluator.md
 #                          carry exactly 2 / 1 bare `^codex exec ` lines and
 #                          each of AC10's confirmed `--alloc`/`--publish`
 #                          full-sentence forms. Grep rc discipline: rc=0
@@ -154,7 +154,7 @@
 #                          is the only PASS; rc=0 means the old form
 #                          resurfaced, rc>=2 fails closed.
 #   agentmd-mutation-present (T-107, DP-g③, non-vacuous counterfactual) a
-#                          mutated $TMP copy of agents/codex-reviewer.md with
+#                          mutated $TMP copy of agents/code-reviewer.md with
 #                          one bare `codex exec ` line rewritten to a
 #                          `cd <repo> && codex exec ...` wrapped form shows a
 #                          REDUCED bare-line count — proving the present-lock
@@ -168,7 +168,7 @@
 #   agentmd-fence-structure (T-107, DP-l, round4; count updated by T-1092's
 #                          third caller site) both live agent files' 5
 #                          T-107-step blocks per site (alloc/codex/diagnose/
-#                          cleanup/publish; codex-reviewer.md carries 3 sites)
+#                          cleanup/publish; code-reviewer.md carries 3 sites)
 #                          each contain EXACTLY one logical command (comments/
 #                          blanks excluded, backslash continuations folded),
 #                          whose first token matches the kind
@@ -177,8 +177,8 @@
 #                          assignment and no `$( )` anywhere in that command.
 #   agentmd-fence-mutation (T-107, DP-l, round4/round5, non-vacuous — PER
 #                          SITE; count updated by T-1092) for EACH of the 4
-#                          sites (codex-reviewer.md primary, codex-reviewer.md
-#                          adversarial, codex-reviewer.md spec-review
+#                          sites (code-reviewer.md primary, code-reviewer.md
+#                          adversarial, code-reviewer.md spec-review
 #                          [T-1092], drift-evaluator.md) INDEPENDENTLY: (i)
 #                          injecting an extra assignment line into that site's
 #                          `codex` block, (ii) merging that site's `cleanup`
@@ -655,7 +655,7 @@ pass "wrapper-never-execs-codex — with a sentinel-writing 'codex' shim first o
 # agentmd-bare-codex-present (T-107, DP-g①)
 # =============================================================================
 printf -- '\n--- agentmd-bare-codex-present ---\n'
-CODEX_REVIEWER_MD="$REPO_ROOT/agents/codex-reviewer.md"
+CODEX_REVIEWER_MD="$REPO_ROOT/agents/code-reviewer.md"
 DRIFT_EVALUATOR_MD="$REPO_ROOT/agents/drift-evaluator.md"
 BARE_CODEX_RE='^[[:space:]]*codex exec '
 
@@ -664,9 +664,9 @@ reviewer_bare_count="$(grep -cE "$BARE_CODEX_RE" "$CODEX_REVIEWER_MD")"
 reviewer_bare_rc=$?
 set -e
 [[ "$reviewer_bare_rc" -eq 0 ]] \
-  || fail "agentmd-bare-codex-present: expected grep rc=0 (match found) for bare 'codex exec ' lines in agents/codex-reviewer.md, got rc=$reviewer_bare_rc (>=2 = grep execution error, e.g. the file went missing — must fail closed)"
+  || fail "agentmd-bare-codex-present: expected grep rc=0 (match found) for bare 'codex exec ' lines in agents/code-reviewer.md, got rc=$reviewer_bare_rc (>=2 = grep execution error, e.g. the file went missing — must fail closed)"
 [[ "$reviewer_bare_count" -eq 3 ]] \
-  || fail "agentmd-bare-codex-present: expected exactly 3 bare 'codex exec ' lines in agents/codex-reviewer.md (T-1092: the spec-review mode's caller site joins the primary and adversarial ones), got $reviewer_bare_count"
+  || fail "agentmd-bare-codex-present: expected exactly 3 bare 'codex exec ' lines in agents/code-reviewer.md (T-1092: the spec-review mode's caller site joins the primary and adversarial ones), got $reviewer_bare_count"
 
 set +e
 drift_bare_count="$(grep -cE "$BARE_CODEX_RE" "$DRIFT_EVALUATOR_MD")"
@@ -679,26 +679,26 @@ set -e
 
 # AC10's confirmed full-sentence alloc/publish forms, same 2 files.
 grep -Fq -- '--alloc --stem T-XXX-codex-primary' "$CODEX_REVIEWER_MD" \
-  || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-codex-primary' in agents/codex-reviewer.md"
+  || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-codex-primary' in agents/code-reviewer.md"
 grep -Fq -- '--alloc --stem T-XXX-codex-adversarial' "$CODEX_REVIEWER_MD" \
-  || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-codex-adversarial' in agents/codex-reviewer.md"
+  || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-codex-adversarial' in agents/code-reviewer.md"
 grep -Fq -- '--alloc --stem T-XXX-codex-specreview' "$CODEX_REVIEWER_MD" \
-  || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-codex-specreview' in agents/codex-reviewer.md (T-1092)"
+  || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-codex-specreview' in agents/code-reviewer.md (T-1092)"
 grep -Fq -- '--alloc --stem T-XXX-drift-codex' "$DRIFT_EVALUATOR_MD" \
   || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-drift-codex' in agents/drift-evaluator.md"
 # shellcheck disable=SC2016  # deliberately literal -F pattern, not a shell expansion.
 grep -Fq -- '--publish --stem T-XXX-codex-primary --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$CODEX_REVIEWER_MD" \
-  || fail "agentmd-bare-codex-present: missing the primary --publish full-sentence form in agents/codex-reviewer.md"
+  || fail "agentmd-bare-codex-present: missing the primary --publish full-sentence form in agents/code-reviewer.md"
 # shellcheck disable=SC2016
 grep -Fq -- '--publish --stem T-XXX-codex-adversarial --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$CODEX_REVIEWER_MD" \
-  || fail "agentmd-bare-codex-present: missing the adversarial --publish full-sentence form in agents/codex-reviewer.md"
+  || fail "agentmd-bare-codex-present: missing the adversarial --publish full-sentence form in agents/code-reviewer.md"
 # shellcheck disable=SC2016
 grep -Fq -- '--publish --stem T-XXX-codex-specreview --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$CODEX_REVIEWER_MD" \
-  || fail "agentmd-bare-codex-present: missing the spec-review --publish full-sentence form in agents/codex-reviewer.md (T-1092)"
+  || fail "agentmd-bare-codex-present: missing the spec-review --publish full-sentence form in agents/code-reviewer.md (T-1092)"
 # shellcheck disable=SC2016
 grep -Fq -- '--publish --stem T-XXX-drift-codex --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$DRIFT_EVALUATOR_MD" \
   || fail "agentmd-bare-codex-present: missing the drift --publish full-sentence form in agents/drift-evaluator.md"
-pass "agentmd-bare-codex-present — agents/codex-reviewer.md / agents/drift-evaluator.md carry exactly 3 / 1 bare 'codex exec ' lines and every AC10/T-1092 confirmed --alloc/--publish full-sentence form (grep rc=0 required)"
+pass "agentmd-bare-codex-present — agents/code-reviewer.md / agents/drift-evaluator.md carry exactly 3 / 1 bare 'codex exec ' lines and every AC10/T-1092 confirmed --alloc/--publish full-sentence form (grep rc=0 required)"
 
 # =============================================================================
 # agentmd-wrapped-form-absent (T-107, DP-g②; round4 extends with AC27's
@@ -715,15 +715,15 @@ for pat in "${OLD_FORM_PATTERNS[@]}" "${RC_THREADING_PATTERNS[@]}"; do
   wfa_rc=$?
   set -e
   [[ "$wfa_rc" -eq 1 ]] \
-    || fail "agentmd-wrapped-form-absent: expected grep rc=1 (clean, zero matches) for retired literal '$pat' across agents/codex-reviewer.md + agents/drift-evaluator.md, got rc=$wfa_rc (0=old form resurfaced; >=2=grep execution error — must fail closed): $(cat "$TMP/agentmd-wrapped-form-absent.out" 2>/dev/null)"
+    || fail "agentmd-wrapped-form-absent: expected grep rc=1 (clean, zero matches) for retired literal '$pat' across agents/code-reviewer.md + agents/drift-evaluator.md, got rc=$wfa_rc (0=old form resurfaced; >=2=grep execution error — must fail closed): $(cat "$TMP/agentmd-wrapped-form-absent.out" 2>/dev/null)"
 done
-pass "agentmd-wrapped-form-absent — none of the retired inline-hygiene literals (@CODEX_OUT@ / tmp_out=\$(mktemp) / cp \"\$tmp_out\") NOR the round4-retired rc-threading vocabulary (codex_status / publish_status / raw= capture / \${raw%%} / \"\$raw_out\" / \"\$raw_jsonl\" / the old same-invocation-\$? sentence / the shell-state-preserving fallback sentence) appear in agents/codex-reviewer.md or agents/drift-evaluator.md (grep rc=1 required for each)"
+pass "agentmd-wrapped-form-absent — none of the retired inline-hygiene literals (@CODEX_OUT@ / tmp_out=\$(mktemp) / cp \"\$tmp_out\") NOR the round4-retired rc-threading vocabulary (codex_status / publish_status / raw= capture / \${raw%%} / \"\$raw_out\" / \"\$raw_jsonl\" / the old same-invocation-\$? sentence / the shell-state-preserving fallback sentence) appear in agents/code-reviewer.md or agents/drift-evaluator.md (grep rc=1 required for each)"
 
 # =============================================================================
 # agentmd-mutation-present (T-107, DP-g③, non-vacuous counterfactual)
 # =============================================================================
 printf -- '\n--- agentmd-mutation-present ---\n'
-MUT_BARE_FILE="$TMP/mutated-bare-codex-reviewer.md"
+MUT_BARE_FILE="$TMP/mutated-bare-code-reviewer.md"
 awk '
   /^[[:space:]]*codex exec / && !done {
     match($0, /^[[:space:]]*/)
@@ -745,7 +745,7 @@ pass "agentmd-mutation-present — rewriting one bare 'codex exec ' line to a 'c
 # extends the injected probes with the retired rc-threading vocabulary)
 # =============================================================================
 printf -- '\n--- agentmd-mutation-absent ---\n'
-MUT_OLDFORM_FILE="$TMP/mutated-oldform-codex-reviewer.md"
+MUT_OLDFORM_FILE="$TMP/mutated-oldform-code-reviewer.md"
 cp "$CODEX_REVIEWER_MD" "$MUT_OLDFORM_FILE"
 # shellcheck disable=SC2016  # deliberately literal probe lines, not shell expansions.
 cat >> "$MUT_OLDFORM_FILE" <<'PROBES'
@@ -936,7 +936,7 @@ reviewer_struct_out="$(check_fence_structure "$CODEX_REVIEWER_MD")"
 reviewer_struct_rc=$?
 set -e
 [[ "$reviewer_struct_rc" -eq 0 ]] \
-  || fail "agentmd-fence-structure: agents/codex-reviewer.md has structural violations: $reviewer_struct_out"
+  || fail "agentmd-fence-structure: agents/code-reviewer.md has structural violations: $reviewer_struct_out"
 set +e
 drift_struct_out="$(check_fence_structure "$DRIFT_EVALUATOR_MD")"
 drift_struct_rc=$?
@@ -946,18 +946,18 @@ set -e
 for kind in alloc codex diagnose cleanup publish; do
   kc_reviewer="$(grep -cE "^[[:space:]]*# T-107-step: ${kind}\$" "$CODEX_REVIEWER_MD")"
   [[ "$kc_reviewer" -eq 3 ]] \
-    || fail "agentmd-fence-structure: expected exactly 3 '# T-107-step: $kind' markers in agents/codex-reviewer.md (one per site — T-1092 adds the spec-review site), got $kc_reviewer"
+    || fail "agentmd-fence-structure: expected exactly 3 '# T-107-step: $kind' markers in agents/code-reviewer.md (one per site — T-1092 adds the spec-review site), got $kc_reviewer"
   kc_drift="$(grep -cE "^[[:space:]]*# T-107-step: ${kind}\$" "$DRIFT_EVALUATOR_MD")"
   [[ "$kc_drift" -eq 1 ]] \
     || fail "agentmd-fence-structure: expected exactly 1 '# T-107-step: $kind' marker in agents/drift-evaluator.md, got $kc_drift"
 done
-pass "agentmd-fence-structure — every T-107-step block in both live agent files folds to exactly one logical command with the kind-matching first token and no variable assignment / \$( ), and each of the 5 kinds appears exactly once per site (3 sites in codex-reviewer.md, 1 in drift-evaluator.md)"
+pass "agentmd-fence-structure — every T-107-step block in both live agent files folds to exactly one logical command with the kind-matching first token and no variable assignment / \$( ), and each of the 5 kinds appears exactly once per site (3 sites in code-reviewer.md, 1 in drift-evaluator.md)"
 
 printf -- '\n--- agentmd-fence-mutation ---\n'
 # mutate_fence_site FILE SITE_N MODE OUTFILE — SITE_N is the 1-based
 # occurrence index of the marker of the given kind within FILE (site 1 =
-# first site in file order, i.e. primary for codex-reviewer.md / the only
-# site for drift-evaluator.md; site 2 = adversarial, codex-reviewer.md only).
+# first site in file order, i.e. primary for code-reviewer.md / the only
+# site for drift-evaluator.md; site 2 = adversarial, code-reviewer.md only).
 # MODE is one of: assign | merge | delmarker | preline | connector (preline
 # and connector are the round5 additions closing Major #1/#2 -- see the
 # docstring above check_fence_structure()). Never touches the real repo
@@ -1062,7 +1062,7 @@ with open(dst, "w", encoding="utf-8") as f:
 PYEOF
 }
 
-# --- site 1 = codex-reviewer.md primary --------------------------------------
+# --- site 1 = code-reviewer.md primary --------------------------------------
 for mode in assign merge delmarker preline connector; do
   MUT="$TMP/fence-mutation-reviewer-site1-$mode.md"
   mutate_fence_site "$CODEX_REVIEWER_MD" 1 "$mode" "$MUT"
@@ -1079,9 +1079,9 @@ for mode in assign merge delmarker preline connector; do
       || fail "agentmd-fence-mutation: site1(primary)/$mode mutation was NOT caught by agentmd-fence-structure (rc=0) — the per-site lock would be vacuous"
   fi
 done
-pass "agentmd-fence-mutation — site1 (codex-reviewer.md primary): each of the 5 mutations (assign/merge/delmarker/preline/connector), applied ALONE, is independently caught"
+pass "agentmd-fence-mutation — site1 (code-reviewer.md primary): each of the 5 mutations (assign/merge/delmarker/preline/connector), applied ALONE, is independently caught"
 
-# --- site 2 = codex-reviewer.md adversarial ----------------------------------
+# --- site 2 = code-reviewer.md adversarial ----------------------------------
 for mode in assign merge delmarker preline connector; do
   MUT="$TMP/fence-mutation-reviewer-site2-$mode.md"
   mutate_fence_site "$CODEX_REVIEWER_MD" 2 "$mode" "$MUT"
@@ -1098,9 +1098,9 @@ for mode in assign merge delmarker preline connector; do
       || fail "agentmd-fence-mutation: site2(adversarial)/$mode mutation was NOT caught by agentmd-fence-structure (rc=0) — the per-site lock would be vacuous"
   fi
 done
-pass "agentmd-fence-mutation — site2 (codex-reviewer.md adversarial): each of the 5 mutations (assign/merge/delmarker/preline/connector), applied ALONE, is independently caught"
+pass "agentmd-fence-mutation — site2 (code-reviewer.md adversarial): each of the 5 mutations (assign/merge/delmarker/preline/connector), applied ALONE, is independently caught"
 
-# --- site 3 = codex-reviewer.md spec-review (T-1092, after the adversarial --
+# --- site 3 = code-reviewer.md spec-review (T-1092, after the adversarial --
 # --- site in file order — see the ordering constraint in the docstring at --
 # --- the top of this file's own routing map) --------------------------------
 for mode in assign merge delmarker preline connector; do
@@ -1119,7 +1119,7 @@ for mode in assign merge delmarker preline connector; do
       || fail "agentmd-fence-mutation: site3(spec-review)/$mode mutation was NOT caught by agentmd-fence-structure (rc=0) — the per-site lock would be vacuous"
   fi
 done
-pass "agentmd-fence-mutation — site3 (codex-reviewer.md spec-review, T-1092): each of the 5 mutations (assign/merge/delmarker/preline/connector), applied ALONE, is independently caught"
+pass "agentmd-fence-mutation — site3 (code-reviewer.md spec-review, T-1092): each of the 5 mutations (assign/merge/delmarker/preline/connector), applied ALONE, is independently caught"
 
 # --- site 4 = drift-evaluator.md (only site in that file) -------------------
 for mode in assign merge delmarker preline connector; do
@@ -1151,7 +1151,7 @@ ctrl_reviewer_rc=$?
 check_fence_structure "$CTRL_DRIFT" >/dev/null
 ctrl_drift_rc=$?
 set -e
-[[ "$ctrl_reviewer_rc" -eq 0 ]] || fail "agentmd-fence-mutation: control copy of agents/codex-reviewer.md unexpectedly FAILs agentmd-fence-structure"
+[[ "$ctrl_reviewer_rc" -eq 0 ]] || fail "agentmd-fence-mutation: control copy of agents/code-reviewer.md unexpectedly FAILs agentmd-fence-structure"
 [[ "$ctrl_drift_rc" -eq 0 ]] || fail "agentmd-fence-mutation: control copy of agents/drift-evaluator.md unexpectedly FAILs agentmd-fence-structure"
 pass "agentmd-fence-mutation — unmodified control copies of both agent files still PASS agentmd-fence-structure (4 sites x 5 mutations = 20 independent non-vacuity proofs, plus 2 controls)"
 
@@ -1181,8 +1181,8 @@ pass "agentmd-fence-mutation — unmodified control copies of both agent files s
 # Measured on the live files: of the 20 marked blocks, 17 are single command
 # lines already pinned byte-for-byte by AC10/AC11/AC12's `^...$` anchors — all
 # three injection forms are already impossible there. The entire remaining
-# surface is exactly THREE multi-line free-text blocks (codex-reviewer.md's
-# adversarial `codex` block, codex-reviewer.md's spec-review `codex` block
+# surface is exactly THREE multi-line free-text blocks (code-reviewer.md's
+# adversarial `codex` block, code-reviewer.md's spec-review `codex` block
 # [T-1092], and drift-evaluator.md's `codex` block). So the proportionate
 # move is not to introduce a new mechanism class (a shell quoting lexer, with
 # its own open-ended blind-spot surface) for three blocks; it is to extend
@@ -1285,13 +1285,13 @@ expect_block_mismatch() {
 }
 
 printf -- '\n--- agentmd-block-verbatim ---\n'
-FIX_BLOCK_REVIEWER="$FIX/agentmd-block-codex-reviewer-adversarial.txt"
+FIX_BLOCK_REVIEWER="$FIX/agentmd-block-code-reviewer-adversarial.txt"
 FIX_BLOCK_DRIFT="$FIX/agentmd-block-drift-evaluator.txt"
-FIX_BLOCK_SPECREVIEW="$FIX/agentmd-block-codex-reviewer-specreview.txt"
+FIX_BLOCK_SPECREVIEW="$FIX/agentmd-block-code-reviewer-specreview.txt"
 verify_block_verbatim "reviewer-adversarial" "$CODEX_REVIEWER_MD" codex 2 "$FIX_BLOCK_REVIEWER"
 verify_block_verbatim "reviewer-specreview" "$CODEX_REVIEWER_MD" codex 3 "$FIX_BLOCK_SPECREVIEW"
 verify_block_verbatim "drift" "$DRIFT_EVALUATOR_MD" codex 1 "$FIX_BLOCK_DRIFT"
-pass "agentmd-block-verbatim — all three multi-line free-text codex blocks (codex-reviewer.md adversarial site, codex-reviewer.md spec-review site [T-1092], drift-evaluator.md) are byte-identical to their frozen copies, and an un-extractable block is a failure rather than a silent pass"
+pass "agentmd-block-verbatim — all three multi-line free-text codex blocks (code-reviewer.md adversarial site, code-reviewer.md spec-review site [T-1092], drift-evaluator.md) are byte-identical to their frozen copies, and an un-extractable block is a failure rather than a silent pass"
 
 printf -- '\n--- agentmd-block-verbatim-mutation ---\n'
 for mode in connector tailconnector midbacktick; do

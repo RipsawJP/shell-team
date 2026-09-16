@@ -59,7 +59,7 @@
 #
 # This checker never judges whether a replacement `- check:` line still means
 # what its criterion's prose says (T-1028 D6/Non-goals) — that reading
-# judgment is `codex-reviewer`'s mandatory item and, at the loop level, S4's
+# judgment is `code-reviewer`'s mandatory item and, at the loop level, S4's
 # territory. It proves a delta is CONFINED to check lines; it never proves
 # the replacement is semantically correct, and it never proves the loop
 # actually consulted it before taking the class-M path (D6's honesty claim).
