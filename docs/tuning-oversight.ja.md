@@ -92,9 +92,27 @@ Do not add conversational gates on top of it:
 
 凍結された intent block はループが判定される正典なので、既定では**何が変わったかに関わらず**、都度の人間 GO なしには動きません。この既定は箱出しのまま無条件で、下の例外を自分から選び取らない限り今日のままです。
 
-再凍結には 2 つのクラスがあり、委譲できるのは片方だけです。**class-B** の再凍結（Goal 文・Non-goals・criterion の prose・Input space のいずれかに触れるデルタ）には、常にあなた自身の GO が要ります。凍結 intent はあなた自身の決定の記録であり、それが望むことを書き換えられるのはあなただけだからです。**class-M**（mechanics repair）の再凍結——`- check:` 行だけに閉じたデルタで、コマンドとして壊れている・空虚・別の凍結済み criterion や自分自身の prose と測定済みで矛盾している行の修復——だけは、代わりにあなた自身の `CLAUDE.local.md` に記録された standing grant を根拠にできます。そこに grant の記録が無ければ出荷時の既定は変わらず、どちらのクラスの再凍結も都度の人間 GO のままです。
+再凍結には 2 つのクラスがあり、委譲できるのは片方だけです。**class-B** の再凍結（Goal 文・Non-goals・criterion の prose・Input space のいずれかに触れるデルタ）には、常にあなた自身の GO が要ります。凍結 intent はあなた自身の決定の記録であり、それが望むことを書き換えられるのはあなただけだからです。**class-M**（mechanics repair）の再凍結——`- check:` 行だけに閉じたデルタで、コマンドとして壊れている・空虚・別の凍結済み criterion や自分自身の prose と測定済みで矛盾している行の修復——だけは、代わりに standing grant を根拠にできます。どこにも grant の記録が無ければ出荷時の既定は変わらず、どちらのクラスの再凍結も都度の人間 GO のままです。
 
-class-M の境界は `bin/check-refreeze-class.sh` が機械判定します: 2 つの intent block の行数が同じで、少なくとも 1 行が異なり、異なる行すべてが両側とも `- check:` 行である場合にのみ `mechanics` を報告します——それ以外は `class-b`（または structural エラー）で、通常の都度手続きに戻ります。grant は以下を、あなた自身の checkout の `CLAUDE.local.md` に置いてください（出荷ファイルには絶対に置きません——このプロジェクトはあなたの grant の転記を出荷しませんし、あなたに代わって捏造することもありません）:
+class-M の境界は `bin/check-refreeze-class.sh` が機械判定します: 2 つの intent block の行数が同じで、少なくとも 1 行が異なり、異なる行すべてが両側とも `- check:` 行である場合にのみ `mechanics` を報告します——それ以外は `class-b`（または structural エラー）で、通常の都度手続きに戻ります。
+
+### grant はホストごとにどこへ記録するか（T-1147, issue #515）
+
+grant の置き場所は 2 つあり、どちらか一方だけでも両方でも構いません——片方に記録しても、もう片方に記録された grant を取り消すことにはなりません:
+
+- **Claude Code host では**、あなた自身の checkout の `CLAUDE.local.md` に記録してください（出荷ファイルには絶対に置きません——このプロジェクトはあなたの grant の転記を出荷しませんし、あなたに代わって捏造することもありません）。これまでどおりです。
+- **どちらの host でも**——Codex CLI host はこのプロジェクトが Codex 用の instruction surface を一切出荷していない host であり、そこでは `CLAUDE.local.md` はこのプロジェクトが頼れる instruction surface ではありません——`<base>/refreeze-grant.conf` にホスト中立な record として記録できます。`bin/check-refreeze-grant.sh` がこれを解決・検証します。これはループ自身の class-M branch が実際にコマンドを実行して読む surface です: `bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant` を実行してその stdout を読むので、ここに置いた record はどちらの host の orchestrating session からも同じように届きます。次のように書いてください:
+
+```markdown
+schema 1
+grant class-m
+```
+
+absent・malformed・unreadable・non-regular な record はすべて no grant（`grant none`）に解決されます——これまでと同じフォールバックです——そして都度の人間 GO が立ちます。branch condition 自体は freeze を一切失敗させません。失敗するのは grant の判定だけです。
+
+ここで閉じていないもの: orchestrating session がこの class-M branch を取る前に実際にこのコマンドを実行したかどうか——そもそも Codex CLI orchestrator が instruction として何を自動で読み込むか——は、この repository からは測定不能です: このプロジェクトは Codex 用の instruction surface を一切出荷していません。`<base>/AGENTS.md` は host root より下に置かれているため root 規約による自動ピックアップの対象にならないからです。そして record が本当に参照されたかを機械的に確認するものは何もありません。この文書自身の[限界](#限界)節がすでに `CLAUDE.md` に適用している「確率を変えるだけで機構を変えない」という限界と同じです。
+
+以下の `CLAUDE.local.md` の経路は変わらず、これまでどおり動きます。この surface に手で著すべき形として残っています:
 
 ```markdown
 # Local overrides

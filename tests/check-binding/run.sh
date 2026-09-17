@@ -118,6 +118,14 @@
 #                                check-binding.sh, self excluded) is
 #                                enumerated LIVE and every member spells
 #                                --adapters zero times (T-1106 #221)
+#   cb-refusal-matrix-complete — header-completeness (T-1146, issue #545):
+#                                the set of refusal tokens enumerated in the
+#                                header "Refusal matrix" comment and the set
+#                                of tokens reachable at a `refuse` call site
+#                                in this same script are identical — not a
+#                                second behavioural case, since
+#                                cb-alias-both-collision above already
+#                                covers the `collision` refusal itself
 
 set -euo pipefail
 
@@ -831,5 +839,31 @@ if grep -qF -- 'deprecated' "$aliasstale_err"; then
   fail "cb-verify-alias-stale-linecount: a diagnostic must never coexist with a refusal — 'deprecated' leaked alongside 'binding-changed'"
 fi
 pass "cb-verify-alias-stale-linecount: --verify on a stale aliased config emits exactly 1 stderr line (binding-changed only, no deprecated)"
+
+# =============================================================================
+# cb-refusal-matrix-complete (T-1146, issue #545): the header "Refusal
+# matrix" comment must enumerate every token this script can actually emit
+# at a `refuse` call site — not a second behavioural case (the `collision`
+# refusal itself is already covered by cb-alias-both-collision above), but a
+# header-completeness case: the two sets are extracted by command and their
+# symmetric difference must be empty.
+# =============================================================================
+rmc_calls="$TMP/rmc-calls.txt"
+rmc_hdr="$TMP/rmc-hdr.txt"
+LC_ALL=C grep -oE 'refuse [a-z][a-z-]+ [12]' "$CHECKER" | awk '{print $2}' | sort -u > "$rmc_calls"
+LC_ALL=C sed -n '/^# Refusal matrix/,/^# Validation order/p' "$CHECKER" | grep -oE '[a-z][a-z-]+ \([12]\)' | sed 's/ .*//' | sort -u > "$rmc_hdr"
+[ "$(grep -c . "$rmc_calls" || true)" -ge 10 ] \
+  || fail "cb-refusal-matrix-complete: call-site token set has fewer than 10 members: $(cat "$rmc_calls")"
+[ "$(grep -c . "$rmc_hdr" || true)" -ge 10 ] \
+  || fail "cb-refusal-matrix-complete: header token set has fewer than 10 members: $(cat "$rmc_hdr")"
+for rmc_tok in usage collision; do
+  grep -qxF -- "$rmc_tok" "$rmc_calls" || fail "cb-refusal-matrix-complete: call-site set is missing '$rmc_tok'"
+  grep -qxF -- "$rmc_tok" "$rmc_hdr" || fail "cb-refusal-matrix-complete: header set is missing '$rmc_tok'"
+done
+rmc_diff="$TMP/rmc-diff.txt"
+cat "$rmc_calls" "$rmc_hdr" | sort | uniq -u > "$rmc_diff"
+[ "$(grep -c . "$rmc_diff" || true)" = "0" ] \
+  || fail "cb-refusal-matrix-complete: call-site and header token sets disagree: $(cat "$rmc_diff")"
+pass "cb-refusal-matrix-complete"
 
 printf 'check-binding suite: all cases passed\n'

@@ -78,7 +78,8 @@ set -euo pipefail
 #   bad-token (1), unknown-role (1), duplicate-role (1), missing-role (1),
 #   unknown-provider (1), unknown-adapter (1), provider-adapter-mismatch (1),
 #   registry-unreadable (2), registry-malformed (2), lock-missing (2),
-#   lock-structural (2), path-mismatch (1), binding-changed (1), usage (2).
+#   lock-structural (2), path-mismatch (1), binding-changed (1),
+#   collision (1), usage (2).
 #
 # Validation order (DP-level, per-line refusals win over set completeness):
 # a two-pass read of the config. Pass 1 establishes schema-level facts only

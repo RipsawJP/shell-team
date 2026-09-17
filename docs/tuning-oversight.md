@@ -106,9 +106,27 @@ Naming it is a discipline the operator imposes on themselves, not a rule the loo
 
 A frozen intent block is the record the loop is judged against, so by default it never moves without a per-instance human GO — whatever changed. That default is unconditional out of the box and stays exactly what it is today unless you opt into the exception below.
 
-Two classes of re-freeze exist, and only one of them is delegable. A **class-B** re-freeze — any delta touching the Goal sentence, Non-goals, a criterion's prose, or Input space — always needs your GO, because the frozen intent is a record of your own decisions, and only you can amend what it says you want. A **class-M** (mechanics repair) re-freeze — a delta confined to `- check:` lines, repairing a line that is broken as a command, vacuous, or measured-contradictory with another frozen criterion or with its own prose — may instead cite a standing grant recorded in your own `CLAUDE.local.md`. With no grant recorded there, the shipped default is unchanged: every re-freeze, of either class, is a per-instance human GO.
+Two classes of re-freeze exist, and only one of them is delegable. A **class-B** re-freeze — any delta touching the Goal sentence, Non-goals, a criterion's prose, or Input space — always needs your GO, because the frozen intent is a record of your own decisions, and only you can amend what it says you want. A **class-M** (mechanics repair) re-freeze — a delta confined to `- check:` lines, repairing a line that is broken as a command, vacuous, or measured-contradictory with another frozen criterion or with its own prose — may instead cite a standing grant. With no grant recorded anywhere, the shipped default is unchanged: every re-freeze, of either class, is a per-instance human GO.
 
-The class-M boundary is machine-checked by `bin/check-refreeze-class.sh`: it reports `mechanics` only when the two intent blocks have the same line count, at least one line differs, and every differing line is a `- check:` line on both sides — anything else is `class-b` (or a structural error), and routes to the ordinary per-instance procedure. Grant it below, in your own checkout's `CLAUDE.local.md` (never in a shipped file — this project does not ship a transcription of your grant, and never invents one on your behalf):
+The class-M boundary is machine-checked by `bin/check-refreeze-class.sh`: it reports `mechanics` only when the two intent blocks have the same line count, at least one line differs, and every differing line is a `- check:` line on both sides — anything else is `class-b` (or a structural error), and routes to the ordinary per-instance procedure.
+
+### Where the grant is recorded, per host (T-1147, issue #515)
+
+The grant has two homes, and a host may use either or both — recording it in one never revokes a grant recorded in the other:
+
+- **On a Claude Code host**, grant it in your own checkout's `CLAUDE.local.md` (never in a shipped file — this project does not ship a transcription of your grant, and never invents one on your behalf), exactly as before.
+- **On either host** — on a Codex CLI host, this project ships no Codex instruction surface, so `CLAUDE.local.md` is not an instruction surface this project can rely on there — grant it in a host-neutral record at `<base>/refreeze-grant.conf`, resolved and validated by `bin/check-refreeze-grant.sh`. This is the surface the loop's own class-M branch actually runs a command against: it executes `bash "<plugin root>/bin/check-refreeze-grant.sh" --print-grant` and reads its stdout, so a record placed here is reachable from either host's orchestrating session the same way. Author it as:
+
+```markdown
+schema 1
+grant class-m
+```
+
+An absent, malformed, unreadable or non-regular record resolves to no grant (`grant none`) — the same fallback as today — and the per-instance human GO stands; the branch condition never fails a freeze on its own account, only the grant.
+
+What this does not close: whether an orchestrating session actually ran that command before taking the class-M branch — what a Codex CLI orchestrator loads automatically as instruction in the first place — is unmeasured from this repository: this project ships no Codex instruction surface, since `<base>/AGENTS.md` sits below the host root and is therefore not root-convention auto-picked-up, and nothing mechanically confirms the record was consulted at all, the same odds-not-mechanism limit this document's own [Limits](#limits) section already applies to a `CLAUDE.md`.
+
+The `CLAUDE.local.md` route below is unchanged and keeps working exactly as it does today; it remains the shape to hand-author for that surface:
 
 ```markdown
 # Local overrides

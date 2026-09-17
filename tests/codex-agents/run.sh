@@ -809,6 +809,167 @@ else
   pass "T-1144 round 4: a default (full) --roles regeneration (code-reviewer requested) removes the legacy file with its one notice"
 fi
 
+# =============================================================================
+# T-1146 fixture 1 (GitHub issue #546): a DANGLING symlink at the legacy
+# basename is removed by a default generator run (with the existing removal
+# notice) and reported by the checker with the legacy-specific hint when it
+# survives un-regenerated, rather than being silently skipped as unreadable.
+# =============================================================================
+printf '\n--- T-1146 fixture 1: a dangling symlink at the legacy basename ---\n'
+OUT22="$T/out22"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT22" >/dev/null 2>&1
+ln -s "$T/no-such-target-t1146" "$OUT22/$LEGACY_BASENAME"
+if [ ! -L "$OUT22/$LEGACY_BASENAME" ] || [ -e "$OUT22/$LEGACY_BASENAME" ]; then
+  fail "T-1146: fixture control failed — could not seed a dangling symlink at the legacy basename"
+elif bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT22" >"$T/chk22a.out" 2>"$T/chk22a.err"; then
+  fail "T-1146: checker did not flag a dangling symlink at the legacy basename (exited 0: $(cat "$T/chk22a.out")))"
+elif ! grep -qF -- "$LEGACY_BASENAME" "$T/chk22a.err"; then
+  fail "T-1146: checker's dangling-symlink report does not name the legacy basename: $(cat "$T/chk22a.err")"
+elif ! grep -qF -- 'superseded legacy agent file' "$T/chk22a.err"; then
+  fail "T-1146: checker's dangling-symlink report does not carry the legacy-specific hint: $(cat "$T/chk22a.err")"
+else
+  pass "T-1146: a dangling symlink at the legacy basename is reported with the legacy-specific hint, not silently passed over"
+fi
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT22" >"$T/gen22.out" 2>"$T/gen22.err"; then
+  fail "T-1146: a default regeneration still succeeds over a dangling symlink at the legacy basename ($(cat "$T/gen22.err"))"
+elif [ -e "$OUT22/$LEGACY_BASENAME" ] || [ -L "$OUT22/$LEGACY_BASENAME" ]; then
+  fail "T-1146: a default regeneration removes a dangling symlink at the legacy basename (it is still present)"
+elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/gen22.err" || true)" != "1" ]; then
+  fail "T-1146: a default regeneration removes the dangling symlink with exactly one removal notice ($(cat "$T/gen22.err"))"
+elif ! bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT22" >"$T/chk22b.out" 2>"$T/chk22b.err"; then
+  fail "T-1146: out-dir is not in sync after the dangling symlink was removed ($(cat "$T/chk22b.err"))"
+elif ! grep -qF -- 'in sync' "$T/chk22b.out"; then
+  fail "T-1146: out-dir is not reported in sync after the dangling symlink was removed: $(cat "$T/chk22b.out")"
+else
+  pass "T-1146: a default generator run removes a dangling symlink at the legacy basename, with the existing removal notice, leaving the out-dir in sync"
+fi
+
+# =============================================================================
+# T-1146 fixture 2 (GitHub issue #546): a --roles-scoped checker invocation's
+# printed remedy carries THIS invocation's own resolved --roles value, not
+# the default list, so following the remedy verbatim does not silently
+# widen the regeneration beyond the scope the invocation asked for.
+# =============================================================================
+printf '\n--- T-1146 fixture 2: the legacy hint carries the invocation'"'"'s own --roles ---\n'
+SCOPED_ROLES='pm-spec engineer code-reviewer'
+DEFAULT_ROLES='tech-lead pm-spec engineer qa-verifier code-reviewer'
+OUT23="$T/out23"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT23" --roles "$SCOPED_ROLES" >/dev/null 2>&1
+ln -s "$T/no-such-target-t1146b" "$OUT23/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT23" --roles "$SCOPED_ROLES" >"$T/chk23.out" 2>"$T/chk23.err"; then
+  fail "T-1146: checker did not flag the seeded legacy symlink under a --roles-scoped invocation (exited 0)"
+elif ! grep -qF -- "--roles \"$SCOPED_ROLES\"" "$T/chk23.err"; then
+  fail "T-1146: --roles-scoped hint does not carry this invocation's own resolved role list: $(cat "$T/chk23.err")"
+elif grep -qF -- "--roles \"$DEFAULT_ROLES\"" "$T/chk23.err"; then
+  fail "T-1146: --roles-scoped hint carries the default role list instead of the invocation's own: $(cat "$T/chk23.err")"
+else
+  pass "T-1146: a --roles-scoped checker invocation's legacy hint carries that invocation's own resolved role list, not the default"
+fi
+
+# =============================================================================
+# T-1146 round 2 fixture 3 (cross-provider review round-1 Major, pinned as a
+# regression): a --roles value EXCLUDING code-reviewer means
+# gen-codex-agents.sh's own removal gate ([ "$legacy_role_requested" -eq 1 ])
+# never fires, so the printed remedy must say so rather than claim
+# "(removes this file by name)" — the reviewer's own live reproduction
+# (seed a dangling symlink under --roles 'pm-spec engineer', run the
+# checker with the same --roles, extract and run the printed command,
+# confirm the symlink survives with zero removal-notice bytes), pinned here
+# so a future edit cannot silently reintroduce the false claim.
+# =============================================================================
+printf '\n--- T-1146 round 2 fixture 3: --roles excluding code-reviewer does not claim removal ---\n'
+EXCL_ROLES='pm-spec engineer'
+OUT24="$T/out24"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT24" --roles "$EXCL_ROLES" >/dev/null 2>&1
+ln -s "$T/no-such-target-t1146c" "$OUT24/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT24" --roles "$EXCL_ROLES" >"$T/chk24.out" 2>"$T/chk24.err"; then
+  fail "T-1146: checker did not flag the seeded legacy symlink under a code-reviewer-excluding --roles invocation (exited 0)"
+elif grep -qF -- '(removes this file by name)' "$T/chk24.err"; then
+  fail "T-1146: --roles excluding code-reviewer still claims '(removes this file by name)': $(cat "$T/chk24.err")"
+elif ! grep -qF -- 'excludes code-reviewer' "$T/chk24.err"; then
+  fail "T-1146: hint does not state that this invocation's --roles excludes code-reviewer: $(cat "$T/chk24.err")"
+else
+  pass "T-1146: a --roles value excluding code-reviewer does not claim the printed remedy will remove the legacy file"
+fi
+sed -n 's/^.*re-run: \(bash "[^"]*" --root "[^"]*" --out-dir "[^"]*" --roles "[^"]*"\).*/\1/p' "$T/chk24.err" > "$T/cmd24"
+if [ ! -s "$T/cmd24" ] || [ "$(grep -c . "$T/cmd24")" != "1" ]; then
+  fail "T-1146: could not extract exactly one printed remedy command from the excluding-roles hint: $(cat "$T/chk24.err")"
+else
+  eval "$(cat "$T/cmd24")" >/dev/null 2>"$T/rerun24.err"
+  if [ ! -L "$OUT24/$LEGACY_BASENAME" ]; then
+    fail "T-1146: running the printed remedy command under a code-reviewer-excluding --roles removed the legacy symlink, contradicting the hint's own exclusion claim"
+  elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/rerun24.err" || true)" != "0" ]; then
+    fail "T-1146: running the printed remedy command emitted removal-notice bytes despite excluding code-reviewer: $(cat "$T/rerun24.err")"
+  else
+    pass "T-1146: executing the printed remedy command verbatim under a code-reviewer-excluding --roles leaves the legacy symlink in place with zero removal-notice bytes"
+  fi
+fi
+
+# =============================================================================
+# T-1146 round 2 fixture 4 (cross-provider review round-1 Minor 1, pinned as
+# a regression): a non-symlink special occupant (a directory) at the legacy
+# basename is reported, but the printed remedy must not claim "(removes
+# this file by name)" either, since gen-codex-agents.sh's own removal gate
+# is [ -f ] || [ -L ] and a directory never matches it.
+# =============================================================================
+printf '\n--- T-1146 round 2 fixture 4: a directory occupant does not claim removal ---\n'
+OUT25="$T/out25"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT25" >/dev/null 2>&1
+mkdir "$OUT25/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT25" >"$T/chk25.out" 2>"$T/chk25.err"; then
+  fail "T-1146: checker did not flag a directory occupant of the legacy basename (exited 0)"
+elif grep -qF -- '(removes this file by name)' "$T/chk25.err"; then
+  fail "T-1146: a directory occupant's hint still claims '(removes this file by name)': $(cat "$T/chk25.err")"
+elif ! grep -qF -- 'not a regular file or a symlink' "$T/chk25.err"; then
+  fail "T-1146: hint does not state that this occupant is not a regular file or a symlink: $(cat "$T/chk25.err")"
+else
+  pass "T-1146: a directory occupant of the legacy basename does not claim the printed remedy will remove it"
+fi
+
+# =============================================================================
+# T-1146 round 3 fixture 5 (QA round-2 FAIL, cell 4 of the 2x2): a
+# non-symlink special occupant (a directory) at the legacy basename, under
+# a --roles value that ALSO excludes code-reviewer — both facts hold at
+# once, so neither re-running the printed command as-is NOR widening
+# --roles to include code-reviewer removes it. Round 2's branch order
+# checked role-exclusion before occupant type and offered "add
+# code-reviewer to --roles and re-run" unconditionally in the excluded
+# branch; QA's own live reproduction showed that suggestion does not work
+# for a directory. This fixture pins the fourth cell directly: neither
+# claim may appear, and executing QA's own suggested remedy (widen --roles
+# to include code-reviewer, re-run the generator) must leave the directory
+# in place with zero removal-notice bytes.
+# =============================================================================
+printf '\n--- T-1146 round 3 fixture 5: --roles excluding code-reviewer AND a directory occupant does not claim either remedy works ---\n'
+EXCL_ROLES5='pm-spec engineer'
+OUT26="$T/out26"
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT26" --roles "$EXCL_ROLES5" >/dev/null 2>&1
+mkdir "$OUT26/$LEGACY_BASENAME"
+if bash "$CHK" --root "$REPO_ROOT" --out-dir "$OUT26" --roles "$EXCL_ROLES5" >"$T/chk26.out" 2>"$T/chk26.err"; then
+  fail "T-1146: checker did not flag a directory occupant under a code-reviewer-excluding --roles invocation (exited 0)"
+elif grep -qF -- '(removes this file by name)' "$T/chk26.err"; then
+  fail "T-1146: cell 4 (excluded x directory) hint still claims '(removes this file by name)': $(cat "$T/chk26.err")"
+elif grep -qF -- 'add code-reviewer to --roles and re-run' "$T/chk26.err"; then
+  fail "T-1146: cell 4 (excluded x directory) hint still offers 'add code-reviewer to --roles and re-run' as a working remedy: $(cat "$T/chk26.err")"
+elif ! grep -qF -- 'excludes code-reviewer' "$T/chk26.err"; then
+  fail "T-1146: cell 4 hint does not state that this invocation's --roles excludes code-reviewer: $(cat "$T/chk26.err")"
+elif ! grep -qF -- 'not a regular file or a symlink' "$T/chk26.err"; then
+  fail "T-1146: cell 4 hint does not state that this occupant is not a regular file or a symlink: $(cat "$T/chk26.err")"
+else
+  pass "T-1146: cell 4 (--roles excluding code-reviewer AND a non-symlink occupant) claims neither remedy removes the directory"
+fi
+# Execute QA's own suggested remedy (widen --roles to include code-reviewer,
+# re-run the generator) and confirm it does NOT remove the directory.
+if ! bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT26" --roles 'pm-spec engineer code-reviewer' >"$T/gen26.out" 2>"$T/gen26.err"; then
+  fail "T-1146: widening --roles to include code-reviewer and regenerating over a directory occupant still fails ($(cat "$T/gen26.err"))"
+elif [ ! -d "$OUT26/$LEGACY_BASENAME" ]; then
+  fail "T-1146: widening --roles to include code-reviewer removed the directory occupant, contradicting cell 4's own claim"
+elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/gen26.err" || true)" != "0" ]; then
+  fail "T-1146: widening --roles to include code-reviewer emitted removal-notice bytes over a directory occupant: $(cat "$T/gen26.err")"
+else
+  pass "T-1146: widening --roles to include code-reviewer and re-running leaves the directory occupant in place with zero removal-notice bytes, confirming cell 4's claim"
+fi
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'codex-agents suite: all assertions passed\n'
