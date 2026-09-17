@@ -428,7 +428,8 @@ for role in "${CONTENT_ROLE[@]}"; do
 done
 
 # --- one named legacy-basename removal (T-1144, issue #524), corrected
-# round 4 (Codex round-3 Major 2) -------------------------------------------
+# round 4 (Codex round-3 Major 2), widened round 5 (T-1146, issue #546) to
+# also unlink a SYMLINK occupant of the same name --------------------------
 # Every requested role above has now generated successfully. An adopter who
 # ran this generator under a released version before the review role's
 # rename holds shell-team-codex-reviewer.toml in --out-dir; this generator
@@ -438,11 +439,19 @@ done
 # docs/adopting.md tells an adopter to run. This is a single, hardcoded
 # basename removed by name, not a glob or a pattern match against
 # shell-team-*.toml: no other file in --out-dir, owned or not, is ever
-# touched by this step. Idempotent (a no-op once the file is gone) and
-# bounded to a regular file only — a directory or other non-regular
-# occupant of that name is left alone, exactly like pass 2's own
-# already-exists check above, and surfaces at bin/check-codex-agents.sh
-# instead.
+# touched by this step. Idempotent (a no-op once the file is gone).
+#
+# T-1146 widening: a SYMLINK occupant of this one name is now also removed,
+# whether or not its target resolves — `rm -f` unlinks the link itself and
+# never follows it, so a dangling symlink, a symlink resolving to a regular
+# file, a symlink resolving to a directory, and a symlink participating in
+# a resolution loop are all unlinked here without anything at the other end
+# of the link being read, written or removed. A directory or any other
+# non-symlink special occupant of this name (a FIFO, a socket, a device
+# node) is still deliberately left alone, exactly like pass 2's own
+# already-exists check above: `rm -f` would fail on a directory anyway, and
+# a non-symlink special file at this name is not something this generator
+# ever wrote. Those occupants surface at bin/check-codex-agents.sh instead.
 #
 # GATED on `code-reviewer` actually being one of THIS run's own requested
 # roles (round-3 Codex Major 2): a partial `--roles` regeneration that
@@ -461,7 +470,7 @@ for __legacy_role_tok in "${ROLES_ARR[@]}"; do
   fi
 done
 LEGACY_CODEX_REVIEWER_TOML="$OUT_DIR/shell-team-codex-reviewer.toml"
-if [ "$legacy_role_requested" -eq 1 ] && [ -f "$LEGACY_CODEX_REVIEWER_TOML" ]; then
+if [ "$legacy_role_requested" -eq 1 ] && { [ -f "$LEGACY_CODEX_REVIEWER_TOML" ] || [ -L "$LEGACY_CODEX_REVIEWER_TOML" ]; }; then
   rm -f "$LEGACY_CODEX_REVIEWER_TOML" \
     || die "cannot remove the superseded legacy agent file: $LEGACY_CODEX_REVIEWER_TOML"
   printf 'gen-codex-agents: removed superseded legacy agent file %s (the review role was renamed to code-reviewer; see docs/adopting.md)\n' \
