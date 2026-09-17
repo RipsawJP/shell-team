@@ -204,6 +204,19 @@ bash "$SCRIPT" --help > "$T/help" 2>&1
 [ -s "$T/help" ] || fail "--help must write a non-empty stream"
 pass "--help exits 0 and writes a non-empty stream"
 
+# crg-help-no-host-loading-claim: --help never asserts what a Codex CLI host
+# loads or does not load as instruction (class `unmeasured-host-claim`,
+# review round 3 Blocker: bin/check-refreeze-grant.sh's own header comment
+# carried this claim verbatim, surfaced through --help). Positive control
+# proves the stream really was read: it must still name the record file.
+[ "$(grep -cF -- 'never loads' "$T/help" || true)" = "0" ] \
+  || fail "crg-help-no-host-loading-claim: --help must never carry the fixed string 'never loads'"
+[ "$(grep -cF -- 'host never' "$T/help" || true)" = "0" ] \
+  || fail "crg-help-no-host-loading-claim: --help must never carry the fixed string 'host never'"
+[ "$(grep -cF -- 'refreeze-grant.conf' "$T/help" || true)" -ge 1 ] \
+  || fail "crg-help-no-host-loading-claim: --help must carry 'refreeze-grant.conf' at least once (positive control)"
+pass "crg-help-no-host-loading-claim"
+
 # =============================================================================
 # 7. Usage errors refuse at exit 2 (both --base and --config, an unknown
 #    flag, and no mode at all).

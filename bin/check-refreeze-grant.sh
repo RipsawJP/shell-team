@@ -4,10 +4,11 @@
 # .shell-team/specs/T-1147-class-m-grant-host-neutral-record.md).
 #
 # Problem this closes: docs/tuning-oversight.md records a standing class-M
-# grant only in an adopter's own CLAUDE.local.md — a Claude Code instruction
-# surface a Codex CLI host never loads. This script reads a sibling record,
-# <base>/refreeze-grant.conf, that either host's orchestrator can run the
-# same command against.
+# grant only in an adopter's own CLAUDE.local.md. On a Codex CLI host, this
+# project ships no Codex instruction surface, so CLAUDE.local.md is not an
+# instruction surface this project can rely on there. This script reads a
+# sibling record, <base>/refreeze-grant.conf, that either host's orchestrator
+# can run the same command against.
 #
 # The three-way behaviour, which is the whole safety property (spec D-3):
 #   - absent                                     -> `grant none`
