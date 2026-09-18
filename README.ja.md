@@ -24,7 +24,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 
 ## shell-team とは
 
-**Claude Code** でも **Codex CLI** でも動く spec 駆動の開発チームです — 役割も status flag のゲートも別プロバイダレビューも同じで、使っている host にプラグインとして一度入れるだけです。**PM・Tech Lead・Engineer・QA・独立した別プロバイダ Reviewer**（＋ UI 作業時のみ参加する UI Designer・＋ Scrum-Master）が、Spec 駆動ワークフローと明示的なハンドオフゲートに従います。
+**Claude Code** でも **Codex CLI** でも動く spec 駆動の開発チームです — 使っている host にプラグインとして一度入れるだけです。中核の 5 役割は **PM・Tech Lead・Engineer・QA・独立した別プロバイダ Reviewer** で、どちらの host でも同じ status flag ゲートを経て `READY_FOR_MERGE` まで進みます。UI 作業時のみ参加する UI Designer と、retro・lessons を書く Scrum-Master は、今のところ Claude Code 側の役割です。Codex CLI host では、上の 5 役割を [runbook](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) が直接駆動します。
 
 - **plan → specify →（必要時のみ design）→ implement → validate → cross-provider review** を強制し、各境界に status flag を置く。
 - 最終レビューは、ループを駆動している host とは別のプロバイダで走る — Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass — 実装チームと同じモデルファミリーには決してならない。
@@ -118,7 +118,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 
 メインの Claude セッションが非自明な依頼を認識し、チームのループ（Plan → Specify → Implement → Validate → Review）を回して、マージ前には必ず一時停止してあなたを待ちます。スラッシュコマンドを打たずに Codex による別プロバイダレビューが得られるのと同じ経路です。会話モデルの詳細・追加の会話例・チャットから**フルループ**を確実に発火させるための唯一の opt-in ステップは [docs/usage-conversational.md](docs/usage-conversational.md) を参照。
 
-明示的に使いたいときは、エージェントやスキルを単体でも起動できます:
+Claude Code host では、明示的に使いたいときにエージェントやスキルを単体でも起動できます — 以下はいずれも Claude Code のスラッシュコマンドとエージェント指名です。Codex CLI host に同じ形のスラッシュコマンドはなく、[runbook](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 自身の dispatch が上の 5 役割を直接駆動します:
 
 ```text
 # フルパイプライン（明示スラッシュコマンド）

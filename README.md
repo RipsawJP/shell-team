@@ -24,7 +24,7 @@ The longer, personal version is in [“Honestly, I Just Want Less Work — Loop 
 
 ## What shell-team is
 
-A spec-driven dev team you can run from **either Claude Code or Codex CLI** — the same roles, the same status-flag gates, the same cross-provider review — installed once as a plugin on whichever host you already use. **PM, Tech Lead, Engineer, QA, and an independent cross-provider Reviewer** (plus a UI Designer that joins only for UI work, and a Scrum-Master) follow a Spec-Driven workflow with explicit hand-off gates.
+A spec-driven dev team you can run from **either Claude Code or Codex CLI** — installed once as a plugin on whichever host you already use. **PM, Tech Lead, Engineer, QA, and an independent cross-provider Reviewer** are the same five roles, carrying every task through the same status-flag gates to `READY_FOR_MERGE` on either host. A UI Designer that joins only for UI work, and a Scrum-Master that writes retros and lessons, ship as Claude Code roles today; a Codex CLI host drives the five roles above directly through [the runbook](docs/adopting.md#using-shell-team-from-codex-cli) instead.
 
 - Enforces **plan → specify → conditional design → implement → validate → cross-provider review**, with a status flag at every boundary.
 - Runs the final review through the *other* provider from whichever host is driving the loop — Codex CLI on a Claude Code host, a `claude -p` pass on a Codex CLI host — so it never comes from the same model family as the implementation team.
@@ -118,7 +118,7 @@ shell-team a /healthz endpoint that returns build sha + uptime
 
 The main Claude session recognizes a non-trivial request and routes it through the team (Plan → Specify → Implement → Validate → Review), pausing for you before any merge — the same way you already get a cross-provider code review without typing a slash command. See [docs/usage-conversational.md](docs/usage-conversational.md) for the full model, more example conversations, and the one opt-in step that makes the *full* loop fire reliably from chat.
 
-It also works standalone, one agent or skill at a time, when you want to be explicit:
+On a Claude Code host, it also works standalone, one agent or skill at a time, when you want to be explicit — these are Claude Code slash commands and agent mentions; a Codex CLI host drives the same five roles directly through [the runbook](docs/adopting.md#using-shell-team-from-codex-cli)'s own dispatch, with no equivalent slash-command surface of its own:
 
 ```text
 # Full pipeline, explicit slash command
