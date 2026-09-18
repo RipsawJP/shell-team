@@ -6,6 +6,7 @@
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
 [![version](https://img.shields.io/badge/version-2.7.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
+[![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.ja.md#codex-cli-から-shell-team-を使う)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
 
@@ -23,10 +24,10 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 
 ## shell-team とは
 
-任意のリポジトリに開発チームを投入する Claude Code **プラグイン**です。**PM・Tech Lead・Engineer・QA・Codex による別プロバイダ Reviewer**（＋ UI 作業時のみ参加する UI Designer・＋ Scrum-Master）が、Spec 駆動ワークフローと明示的なハンドオフゲートに従います。
+**Claude Code** でも **Codex CLI** でも動く spec 駆動の開発チームです — 役割も status flag のゲートも別プロバイダレビューも同じで、使っている host にプラグインとして一度入れるだけです。**PM・Tech Lead・Engineer・QA・独立した別プロバイダ Reviewer**（＋ UI 作業時のみ参加する UI Designer・＋ Scrum-Master）が、Spec 駆動ワークフローと明示的なハンドオフゲートに従います。
 
 - **plan → specify →（必要時のみ design）→ implement → validate → cross-provider review** を強制し、各境界に status flag を置く。
-- Reviewer は **Codex CLI（OpenAI）** 経由で動き、実装チームとは別のモデルファミリーから最終チェックを行う。
+- 最終レビューは、ループを駆動している host とは別のプロバイダで走る — Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass — 実装チームと同じモデルファミリーには決してならない。
 - 各実行を明示的な Loop 契約（BUDGET/STOP）で bound し、`/goal` が同じガードレールの下で 1 タスクを完了まで駆動する。
 - 各フェーズのテレメトリと retro / lessons を、次の実行へ還流させる。
 - プラグインとして一度導入すれば全リポで使え、リポごとのコピーやバージョンドリフトを避けられる。
@@ -35,13 +36,23 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 
 ## 前提
 
+**Claude Code host の場合:**
+
 - Claude Code（プラグイン対応バージョン、v2.1.x 以降）。
-- Codex CLI のインストールと認証。Codex プラグインがあれば `/codex:setup` を 1 回、なければ https://developers.openai.com/codex/cli を参照。
-- **サンドボックス有効なセッションでは追加設定が必要**。Codex レビュー経路の sandbox 除外（`sandbox.excludedCommands`）と permission の設定は [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照。
+- Codex CLI のインストールと認証（レビュー pass 用）。Codex プラグインがあれば `/codex:setup` を 1 回、なければ https://developers.openai.com/codex/cli を参照。
+
+**Codex CLI host の場合:**
+
+- Codex CLI。
+- Claude Code CLI のインストールと認証（レビュー pass 用）— 詳細は [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 7 を参照。
+
+**サンドボックス有効なセッションでは、どちらの host でも追加設定が必要**。Codex レビュー経路の sandbox 除外（`sandbox.excludedCommands`）と permission の設定は [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照。
 
 ## インストール
 
-このリポは「プラグイン本体」と「自前マーケットプレイス（`ripsawjp`）」を兼ねる。マシンごとに 1 回だけ：
+このリポは「プラグイン本体」と「自前マーケットプレイス（`ripsawjp`）」を兼ねる。マシンごとに、使っている host で 1 回だけ — 両方を下に示す：
+
+**Claude Code:**
 
 ```text
 /plugin marketplace add RipsawJP/shell-team
@@ -54,12 +65,48 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 /shell-team:team-init
 ```
 
+**Codex CLI:**
+
+```text
+codex plugin marketplace add RipsawJP/shell-team
+codex plugin add shell-team@ripsawjp
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+```
+
+その後、適用先リポの per-repo データを 1 回初期化する（上の Claude Code ブロックがスラッシュコマンド経由で叩いているのと同じ host-neutral な scaffolder）：
+
+```text
+bash "<plugin root>/bin/team-init.sh" .
+```
+
+この 3 行だけが手順の全てではない: リポジトリの trust・sandbox の writable roots・Claude Code CLI という前提・ネットワークアクセス・`PATH` の export は、それぞれ [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
+
+Codex CLI の orchestrator がどの instruction 面を自動で読み込むかは、**このリポジトリからは測定**できていません。拠り所にするのは上でリンクした runbook の手順です。ループ自身の停止点はどちらの host でも同じで、**マージ**と **push** はあなたの判断のまま、独立レビュアーに到達できない場合は同一ファミリーへ黙って切り替えず `BLOCKED` を返します。
+
 **`.shell-team/` を git に載せるかを最初に決めてください。** プラグインはルートの `.gitignore` を編集しないため、base dir は repo 内で *untracked* として現れます（無視されるのは中の run テレメトリのみ。自己完結した `<base>/.gitignore` による）。どちらの選択も想定されており、プラグインが代わりに決めることはありません：
 
 - **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）
 - **git に載せない** — 自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。どちらを選んでも base dir は untracked のままで、このループの耐久性ゲートが反応するのは untracked という状態そのものであって、どちらの ignore ルールがそれを作ったかではない — base dir が untracked なら耐久性ゲートは恒久的に `not-durable` を返し、hand-off はそのマシン上にしか残らなくなる。この代償は repo 側の `.gitignore` を選んでも同じく発生する。repo 側の行が実際に避けるのは適用範囲の広さだけで、global 側はマシン上の他の全 repo でも base dir を隠してしまい、後から「この repo ではボードを追跡したい」と決めても、その repo 自身の root `.gitignore` に `!.shell-team/` を明示的に書いて戻さない限り隠れたままになる（repo 側のパターンが global ファイルより優先される）— だからこそ repo 側の行のほうが適用範囲が狭く取り消しやすい選択なのであって、耐久性の代償そのものを避ける手段ではない。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
 
-詳細・更新・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
+詳細とエアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
+
+## 更新
+
+**Claude Code host の場合:**
+
+```text
+/plugin marketplace update ripsawjp
+```
+
+**Codex CLI host の場合:**
+
+```text
+codex plugin marketplace upgrade ripsawjp
+```
+
+Codex 側にはもう 1 つ follow-up がある: upgrade すると `.codex/agents` 配下の生成済みカスタムエージェントが陳腐化するため、generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認する — 何も書き込まず、現在の役割ファイルとの drift を報告するだけ。
+
+更新の全体像・バージョン方針・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
 ## 使い方
 

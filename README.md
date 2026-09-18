@@ -6,6 +6,7 @@
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
 [![version](https://img.shields.io/badge/version-2.7.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
+[![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.md#using-shell-team-from-codex-cli)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
 ![bin: zero-dep bash](https://img.shields.io/badge/bin-zero--dep_bash-2ea043?style=flat-square)
 
@@ -23,10 +24,10 @@ The longer, personal version is in [“Honestly, I Just Want Less Work — Loop 
 
 ## What shell-team is
 
-A Claude Code **plugin** that drops a dev team into any repo. **PM, Tech Lead, Engineer, QA, and a Codex-powered cross-provider Reviewer** (plus a UI Designer that joins only for UI work, and a Scrum-Master) follow a Spec-Driven workflow with explicit hand-off gates.
+A spec-driven dev team you can run from **either Claude Code or Codex CLI** — the same roles, the same status-flag gates, the same cross-provider review — installed once as a plugin on whichever host you already use. **PM, Tech Lead, Engineer, QA, and an independent cross-provider Reviewer** (plus a UI Designer that joins only for UI work, and a Scrum-Master) follow a Spec-Driven workflow with explicit hand-off gates.
 
 - Enforces **plan → specify → conditional design → implement → validate → cross-provider review**, with a status flag at every boundary.
-- Runs the final review through **Codex CLI (OpenAI)** so it comes from a different model family than the implementation team.
+- Runs the final review through the *other* provider from whichever host is driving the loop — Codex CLI on a Claude Code host, a `claude -p` pass on a Codex CLI host — so it never comes from the same model family as the implementation team.
 - Bounds every run with an explicit loop contract (BUDGET/STOP); `/goal` can drive one task to completion under the same guardrails.
 - Feeds phase telemetry, retros, and lessons back into later runs.
 - Installs once as a plugin and works across repos without per-repo copies or version drift.
@@ -35,13 +36,23 @@ See [docs/history.md](docs/history.md) for the story of how the project got here
 
 ## Prerequisites
 
+**On a Claude Code host:**
+
 - Claude Code (≥ the version that supports plugins, v2.1.x).
-- Codex CLI installed and authenticated. Run `/codex:setup` once if you have the Codex plugin, or follow https://developers.openai.com/codex/cli.
-- **Sandbox-enabled sessions need extra settings.** See [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) for the Codex review path's required sandbox exclusion (`sandbox.excludedCommands`) and permission settings.
+- Codex CLI installed and authenticated, for the review pass. Run `/codex:setup` once if you have the Codex plugin, or follow https://developers.openai.com/codex/cli.
+
+**On a Codex CLI host:**
+
+- Codex CLI.
+- Claude Code CLI installed and authenticated, for the review pass — see [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 7.
+
+**Sandbox-enabled sessions need extra settings on both hosts.** See [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) for the Codex review path's required sandbox exclusion (`sandbox.excludedCommands`) and permission settings.
 
 ## Install
 
-This repo is both the plugin and its own marketplace (`ripsawjp`). Install once per machine:
+This repo is both the plugin and its own marketplace (`ripsawjp`). Install once per machine, on whichever host you use — both are shown below.
+
+**Claude Code:**
 
 ```text
 /plugin marketplace add RipsawJP/shell-team
@@ -54,12 +65,48 @@ Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir w
 /shell-team:team-init
 ```
 
+**Codex CLI:**
+
+```text
+codex plugin marketplace add RipsawJP/shell-team
+codex plugin add shell-team@ripsawjp
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+```
+
+Then initialize per-repo data once, with the same host-neutral scaffolder the Claude Code block above drives through a slash command:
+
+```text
+bash "<plugin root>/bin/team-init.sh" .
+```
+
+These three printed lines are not the whole path: repository trust, the sandbox's writable roots, the Claude Code CLI prerequisite, network access, and the `PATH` export are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
+
+Which instruction surface a Codex CLI orchestrator **loads automatically is unmeasured from this repository** — the runbook linked above is what this project relies on instead. The loop's own stop points are the same on both hosts: **merge and push** stay yours, and when the independent reviewer cannot be reached the review returns `BLOCKED` rather than quietly falling back to a same-family one.
+
 **Decide once whether `.shell-team/` belongs in git.** Because the plugin never edits your root `.gitignore`, the base dir shows up as *untracked* in your repo — only the per-run telemetry inside it is ignored, via a self-contained `<base>/.gitignore`. Both choices are supported, and the plugin will not make the call for you:
 
 - **Track it** — the board, specs, and review artifacts become versioned project records (that is how this repo dogfoods itself).
 - **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore` (scoped to that repo, trivially reversed), or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in. Either choice leaves the base dir untracked, and it is that untracked state — not which ignore rule produced it — that this loop's durability gates react to: an untracked base dir makes every durability gate report `not-durable` permanently, with every hand-off staying local-only to that machine, and the repo-level `.gitignore` line carries that same cost. What the repo-level line does avoid is scope: the global route additionally hides the base dir in every other repository on the machine, including one where you later *do* want the board tracked, unless that repo's own root `.gitignore` adds `!.shell-team/` to bring it back (repo-level patterns outrank the global file) — which is why the repo-level line is the scoped, reversible choice of the two, never a way to avoid the durability cost itself. This repo carries that line for exactly that reason. [docs/adopting.md](docs/adopting.md) covers one further consequence, for tooling that asks git whether a path is ignored.
 
-Full details, updates, and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
+Full details and the air-gapped fallback: [docs/distribution.md](docs/distribution.md).
+
+## Update
+
+**Claude Code host:**
+
+```text
+/plugin marketplace update ripsawjp
+```
+
+**Codex CLI host:**
+
+```text
+codex plugin marketplace upgrade ripsawjp
+```
+
+The Codex path has one extra follow-up: the generated custom agents under `.codex/agents` go stale on upgrade, so re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`) and run `bash "<plugin root>/bin/check-codex-agents.sh"` to confirm — it reports drift against the current role files without writing anything.
+
+See [docs/distribution.md](docs/distribution.md) for the full update path, version-line policy, and the air-gapped fallback.
 
 ## Usage
 
