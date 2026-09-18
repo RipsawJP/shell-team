@@ -104,7 +104,7 @@ Codex CLI の orchestrator がどの instruction 面を自動で読み込むか�
 codex plugin marketplace upgrade ripsawjp
 ```
 
-upgrade の後は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従うこと。そのうえで、shell-team を使っている適用先リポジトリごとに generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
+upgrade の後は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従うこと。そのうえで、shell-team を使っている適用先リポジトリごとに、そのリポジトリそのものの root から generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
 
 更新の全体像・バージョン方針・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 

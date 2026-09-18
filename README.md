@@ -104,7 +104,7 @@ Full details and the air-gapped fallback: [docs/distribution.md](docs/distributi
 codex plugin marketplace upgrade ripsawjp
 ```
 
-After the upgrade, follow [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 1's own version check, and in each repository where you use shell-team, re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh"`) and confirm with `bash "<plugin root>/bin/check-codex-agents.sh"`.
+After the upgrade, follow [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 1's own version check, and in each repository where you use shell-team, from that repository's own root, re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh"`) and confirm with `bash "<plugin root>/bin/check-codex-agents.sh"`.
 
 See [docs/distribution.md](docs/distribution.md) for the full update path, version-line policy, and the air-gapped fallback.
 
