@@ -46,7 +46,7 @@ See [docs/history.md](docs/history.md) for the story of how the project got here
 - Codex CLI.
 - Claude Code CLI installed and authenticated, for the review pass — see [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 7.
 
-**Sandbox-enabled sessions need extra settings on both hosts.** See [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) for the Codex review path's required sandbox exclusion (`sandbox.excludedCommands`) and permission settings.
+**Sandbox-enabled sessions need extra settings on both hosts.** On a Claude Code host, see [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) for the Codex review path's required sandbox exclusion (`sandbox.excludedCommands`) and permission settings. On a Codex CLI host, see [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) steps 6 and 8 for the sandbox's own writable-root grant (`.git`, plus `.codex` when the generator runs inside the session) and the network access the `claude -p` review pass needs.
 
 ## Install
 

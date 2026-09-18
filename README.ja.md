@@ -46,7 +46,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 - Codex CLI。
 - Claude Code CLI のインストールと認証（レビュー pass 用）— 詳細は [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 7 を参照。
 
-**サンドボックス有効なセッションでは、どちらの host でも追加設定が必要**。Codex レビュー経路の sandbox 除外（`sandbox.excludedCommands`）と permission の設定は [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照。
+**サンドボックス有効なセッションでは、どちらの host でも追加設定が必要**。Claude Code host では、Codex レビュー経路の sandbox 除外（`sandbox.excludedCommands`）と permission の設定を [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) で参照。Codex CLI host では、sandbox 自身の writable-root 付与（`.git`、generator をセッション内で走らせる場合は `.codex` も）と `claude -p` レビュー pass に必要な network access を [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 6・8 で参照。
 
 ## インストール
 
