@@ -50,7 +50,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 
 ## インストール
 
-このリポは「プラグイン本体」と「自前マーケットプレイス（`ripsawjp`）」を兼ねる。マシンごとに、使っている host で 1 回だけ — 両方を下に示す：
+このリポは「プラグイン本体」と「自前マーケットプレイス（`ripsawjp`）」を兼ねる。プラグイン本体のインストールはマシンごとに 1 回だけで、使っている host で行う — 両方を下に示す。各ブロックのコマンドのうち、どれが適用先リポジトリごとに繰り返し必要かは、ブロックごとに個別に述べる。
 
 **Claude Code:**
 
@@ -59,7 +59,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 /plugin install shell-team@ripsawjp
 ```
 
-その後、適用先リポの per-repo データを 1 回初期化（単一 base dir `.shell-team/` にボード＋既定 Loop 契約を scaffold。host root の `CLAUDE.md` / `.gitignore` は改変しない。冪等。詳細は [docs/adopting.md](docs/adopting.md)）：
+上の 2 コマンドはマシンごとに 1 回だけのプラグインインストール。その後、適用先リポの per-repo データを 1 回初期化（単一 base dir `.shell-team/` にボード＋既定 Loop 契約を scaffold。host root の `CLAUDE.md` / `.gitignore` は改変しない。冪等。詳細は [docs/adopting.md](docs/adopting.md)）：
 
 ```text
 /shell-team:team-init
@@ -73,7 +73,7 @@ codex plugin add shell-team@ripsawjp
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 ```
 
-その後、適用先リポの per-repo データを 1 回初期化する（上の Claude Code ブロックがスラッシュコマンド経由で叩いているのと同じ host-neutral な scaffolder）：
+上の最初の 2 コマンドはマシンごとに 1 回だけのプラグインインストール。3 行目の generator は、適用先リポジトリそのものの root から、そのリポジトリごとに実行する — 下の `team-init.sh` の手順と同じスコープ。その後、適用先リポの per-repo データを 1 回初期化する（上の Claude Code ブロックがスラッシュコマンド経由で叩いているのと同じ host-neutral な scaffolder）：
 
 ```text
 bash "<plugin root>/bin/team-init.sh" .
@@ -104,13 +104,7 @@ Codex CLI の orchestrator がどの instruction 面を自動で読み込むか�
 codex plugin marketplace upgrade ripsawjp
 ```
 
-そのコマンドが終わったら、`codex plugin list` の `VERSION` 列を自分が実行したいリリースと比較すること — [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 2 自身の staleness テストは `bin/gen-codex-agents.sh` の存在とその役割リストの presence しか見ないため、ファイルも役割リストも既に揃っている 1 リリース遅れのインストールをこれだけでは見分けられない。`VERSION` がまだ実行したいリリースより古ければ、そのインストールは古い:
-
-```text
-codex plugin add shell-team@ripsawjp
-```
-
-を再実行してから先に進むこと — 手順 1 自身のこのケースへの対処。バージョンが一致して初めて、Codex 側にはもう 1 つ follow-up がある: upgrade すると `.codex/agents` 配下の生成済みカスタムエージェントも陳腐化するため、generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認する — 何も書き込まず、現在の役割ファイルとの drift を報告するだけ。
+upgrade の後は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従うこと。そのうえで、shell-team を使っている適用先リポジトリごとに generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
 
 更新の全体像・バージョン方針・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 

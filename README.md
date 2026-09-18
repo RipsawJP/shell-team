@@ -50,7 +50,7 @@ See [docs/history.md](docs/history.md) for the story of how the project got here
 
 ## Install
 
-This repo is both the plugin and its own marketplace (`ripsawjp`). Install once per machine, on whichever host you use — both are shown below.
+This repo is both the plugin and its own marketplace (`ripsawjp`). Installing the plugin itself is a once-per-machine step, on whichever host you use — both are shown below; which of each block's own commands repeat in every repository you adopt shell-team into is stated separately, block by block.
 
 **Claude Code:**
 
@@ -59,7 +59,7 @@ This repo is both the plugin and its own marketplace (`ripsawjp`). Install once 
 /plugin install shell-team@ripsawjp
 ```
 
-Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir with the board + default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; idempotent — see [docs/adopting.md](docs/adopting.md)):
+Both commands above are the once-per-machine plugin install. Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir with the board + default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; idempotent — see [docs/adopting.md](docs/adopting.md)):
 
 ```text
 /shell-team:team-init
@@ -73,7 +73,7 @@ codex plugin add shell-team@ripsawjp
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 ```
 
-Then initialize per-repo data once, with the same host-neutral scaffolder the Claude Code block above drives through a slash command:
+The first two commands above are the once-per-machine plugin install; the third — the generator — runs in each repository you adopt shell-team into, from that repository's own root, alongside the `team-init.sh` step below. Then initialize per-repo data once, with the same host-neutral scaffolder the Claude Code block above drives through a slash command:
 
 ```text
 bash "<plugin root>/bin/team-init.sh" .
@@ -104,13 +104,7 @@ Full details and the air-gapped fallback: [docs/distribution.md](docs/distributi
 codex plugin marketplace upgrade ripsawjp
 ```
 
-After that command finishes, compare `codex plugin list`'s `VERSION` column against the release you intend to run — [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 2's own staleness test only checks whether `bin/gen-codex-agents.sh` and its full role list are present, and a one-release-behind install already has both, so nothing in that presence test can see a version gap. If `VERSION` still shows an older release than the one you intend to run, the install is stale: re-run
-
-```text
-codex plugin add shell-team@ripsawjp
-```
-
-before continuing — step 1's own remedy for this exact case. Only once the version matches does the Codex path have one extra follow-up: the generated custom agents under `.codex/agents` go stale on upgrade too, so re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`) and run `bash "<plugin root>/bin/check-codex-agents.sh"` to confirm — it reports drift against the current role files without writing anything.
+After the upgrade, follow [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 1's own version check, and in each repository where you use shell-team, re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh"`) and confirm with `bash "<plugin root>/bin/check-codex-agents.sh"`.
 
 See [docs/distribution.md](docs/distribution.md) for the full update path, version-line policy, and the air-gapped fallback.
 
