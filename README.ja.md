@@ -79,7 +79,7 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-この 3 行だけが手順の全てではない: リポジトリの trust・sandbox の writable roots・Claude Code CLI という前提・ネットワークアクセス・`PATH` の export は、それぞれ [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
+この 3 行だけが手順の全てではない: 生成されたエージェントの `.gitignore` 登録・リポジトリの trust・sandbox の writable roots・Claude Code CLI という前提・ネットワークアクセス・`PATH` の export は、それぞれ [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
 
 Codex CLI の orchestrator がどの instruction 面を自動で読み込むかは、**このリポジトリからは測定**できていません。拠り所にするのは上でリンクした runbook の手順です。ループ自身の停止点はどちらの host でも同じで、**マージ**と **push** はあなたの判断のまま、独立レビュアーに到達できない場合は同一ファミリーへ黙って切り替えず `BLOCKED` を返します。
 
@@ -104,7 +104,13 @@ Codex CLI の orchestrator がどの instruction 面を自動で読み込むか�
 codex plugin marketplace upgrade ripsawjp
 ```
 
-Codex 側にはもう 1 つ follow-up がある: upgrade すると `.codex/agents` 配下の生成済みカスタムエージェントが陳腐化するため、generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認する — 何も書き込まず、現在の役割ファイルとの drift を報告するだけ。
+そのコマンドが終わったら、`codex plugin list` の `VERSION` 列を自分が実行したいリリースと比較すること — [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 2 自身の staleness テストは `bin/gen-codex-agents.sh` の存在とその役割リストの presence しか見ないため、ファイルも役割リストも既に揃っている 1 リリース遅れのインストールをこれだけでは見分けられない。`VERSION` がまだ実行したいリリースより古ければ、そのインストールは古い:
+
+```text
+codex plugin add shell-team@ripsawjp
+```
+
+を再実行してから先に進むこと — 手順 1 自身のこのケースへの対処。バージョンが一致して初めて、Codex 側にはもう 1 つ follow-up がある: upgrade すると `.codex/agents` 配下の生成済みカスタムエージェントも陳腐化するため、generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認する — 何も書き込まず、現在の役割ファイルとの drift を報告するだけ。
 
 更新の全体像・バージョン方針・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 

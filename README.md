@@ -79,7 +79,7 @@ Then initialize per-repo data once, with the same host-neutral scaffolder the Cl
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-These three printed lines are not the whole path: repository trust, the sandbox's writable roots, the Claude Code CLI prerequisite, network access, and the `PATH` export are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
+These three printed lines are not the whole path: gitignoring the generated agents, repository trust, the sandbox's writable roots, the Claude Code CLI prerequisite, network access, and the `PATH` export are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
 
 Which instruction surface a Codex CLI orchestrator **loads automatically is unmeasured from this repository** — the runbook linked above is what this project relies on instead. The loop's own stop points are the same on both hosts: **merge and push** stay yours, and when the independent reviewer cannot be reached the review returns `BLOCKED` rather than quietly falling back to a same-family one.
 
@@ -104,7 +104,13 @@ Full details and the air-gapped fallback: [docs/distribution.md](docs/distributi
 codex plugin marketplace upgrade ripsawjp
 ```
 
-The Codex path has one extra follow-up: the generated custom agents under `.codex/agents` go stale on upgrade, so re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`) and run `bash "<plugin root>/bin/check-codex-agents.sh"` to confirm — it reports drift against the current role files without writing anything.
+After that command finishes, compare `codex plugin list`'s `VERSION` column against the release you intend to run — [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 2's own staleness test only checks whether `bin/gen-codex-agents.sh` and its full role list are present, and a one-release-behind install already has both, so nothing in that presence test can see a version gap. If `VERSION` still shows an older release than the one you intend to run, the install is stale: re-run
+
+```text
+codex plugin add shell-team@ripsawjp
+```
+
+before continuing — step 1's own remedy for this exact case. Only once the version matches does the Codex path have one extra follow-up: the generated custom agents under `.codex/agents` go stale on upgrade too, so re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents`) and run `bash "<plugin root>/bin/check-codex-agents.sh"` to confirm — it reports drift against the current role files without writing anything.
 
 See [docs/distribution.md](docs/distribution.md) for the full update path, version-line policy, and the air-gapped fallback.
 
