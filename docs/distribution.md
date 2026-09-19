@@ -3,7 +3,7 @@
 [![English](https://img.shields.io/badge/lang-English-1f6feb?style=flat-square)](distribution.md)
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](distribution.ja.md)
 
-`shell-team` is distributed as a plugin for two hosts: **Claude Code** (v0.1.0+) and **Codex CLI**. Installing the plugin is a one-time step per machine, and it makes the team's sub-agents, skills, and `bin/` helpers reachable from either host. What is **not** per machine: on a Codex CLI host, the custom agents that let Codex dispatch these roles are generated **per adopted repository**, from that repository's own root — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
+`shell-team` is distributed as a plugin for two hosts: **Claude Code** (v0.1.0+) and **Codex CLI**. Installing the plugin is a one-time step per machine, and it makes the team's sub-agents and `bin/` helpers reachable from either host. The `/shell-team:<skill>` slash-command surface is a Claude Code mechanism. What is **not** per machine: on a Codex CLI host, the custom agents that let Codex dispatch these roles are generated **per adopted repository**, from that repository's own root — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
 
 > Versioning: `v0.0.1` is the pre-plugin baseline (5-agent single-pass pipeline, `bin/install` snapshot copy). From `v0.1.0` the project is a plugin and Loop Engineering framework; breaking changes are allowed across the `v0.0.x → v0.1.x` boundary.
 
@@ -97,7 +97,7 @@ The `"codex *"` exclusion is observed-working as described above, via the operat
 
 ## Update
 
-Bump `version` in `.claude-plugin/plugin.json`, commit, then on each machine:
+Bump `version` in `.claude-plugin/plugin.json`, commit, then on each machine. Omitting `version` makes the plugin track the latest commit SHA instead of pinned releases — this holds for the manifest both hosts' plugin managers read from, not for either host specifically.
 
 **Claude Code:**
 
@@ -118,7 +118,7 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/check-codex-agents.sh"
 ```
 
-Omitting `version` makes the plugin track the latest commit SHA instead of pinned releases. See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for the full procedure and its own checks.
+See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for the full procedure and its own checks.
 
 ## Version line
 

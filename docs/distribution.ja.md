@@ -3,7 +3,7 @@
 [![English](https://img.shields.io/badge/lang-English-lightgrey?style=flat-square)](distribution.md)
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](distribution.ja.md)
 
-`shell-team` は 2 つの host 向けに配布されるプラグインです: **Claude Code**（v0.1.0 以降）と **Codex CLI**。プラグインのインストールはマシンごとに 1 回だけで、どちらの host からでもチームのサブエージェント・スキル・`bin/` ヘルパーに到達できるようになります。マシンごとでは**ない**のは、Codex CLI host 上で Codex がこれらのロールを dispatch するために使う生成済みカスタムエージェントで、これは適用先リポジトリそのものの root から、**リポジトリごと**に生成されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。
+`shell-team` は 2 つの host 向けに配布されるプラグインです: **Claude Code**（v0.1.0 以降）と **Codex CLI**。プラグインのインストールはマシンごとに 1 回だけで、どちらの host からでもチームのサブエージェントと `bin/` ヘルパーに到達できるようになります。`/shell-team:<skill>` の slash command 面は Claude Code の仕組みです。マシンごとでは**ない**のは、Codex CLI host 上で Codex がこれらのロールを dispatch するために使う生成済みカスタムエージェントで、これは適用先リポジトリそのものの root から、**リポジトリごと**に生成されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。
 
 > バージョニング: `v0.0.1` はプラグイン化前のベースライン（5 エージェントの単一パスパイプライン、`bin/install` によるスナップショットコピー）です。`v0.1.0` からプロジェクトはプラグイン兼 Loop Engineering フレームワークになりました。`v0.0.x → v0.1.x` の境界では破壊的変更が許容されます。
 
@@ -67,7 +67,7 @@ claude --plugin-dir ./
 
 ## アップデート
 
-`.claude-plugin/plugin.json` の `version` を bump してコミットし、各マシンで:
+`.claude-plugin/plugin.json` の `version` を bump してコミットし、各マシンで実行します。`version` を省略すると、プラグインは固定リリースではなく最新のコミット SHA を追従します——これはどちらの host のプラグインマネージャも読む manifest 自体の性質で、どちらか一方の host に固有の話ではありません。
 
 **Claude Code の場合:**
 
@@ -88,7 +88,7 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/check-codex-agents.sh"
 ```
 
-`version` を省略すると、プラグインは固定リリースではなく最新のコミット SHA を追従します。全体の手順とその自身のチェックは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
+全体の手順とその自身のチェックは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
 
 ## バージョン系統
 
