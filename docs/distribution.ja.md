@@ -3,13 +3,15 @@
 [![English](https://img.shields.io/badge/lang-English-lightgrey?style=flat-square)](distribution.md)
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](distribution.ja.md)
 
-`shell-team` は **Claude Code プラグイン**（v0.1.0 以降）として配布されます。マシンごとに 1 回インストールすれば、チームのサブエージェント・スキル・`bin/` ヘルパーが**すべて**のリポジトリで使えるようになります — リポジトリごとのコピーは不要です。
+`shell-team` は 2 つの host 向けに配布されるプラグインです: **Claude Code**（v0.1.0 以降）と **Codex CLI**。プラグインのインストールはマシンごとに 1 回だけで、どちらの host からでもチームのサブエージェント・スキル・`bin/` ヘルパーに到達できるようになります。マシンごとでは**ない**のは、Codex CLI host 上で Codex がこれらのロールを dispatch するために使う生成済みカスタムエージェントで、これは適用先リポジトリそのものの root から、**リポジトリごと**に生成されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。
 
 > バージョニング: `v0.0.1` はプラグイン化前のベースライン（5 エージェントの単一パスパイプライン、`bin/install` によるスナップショットコピー）です。`v0.1.0` からプロジェクトはプラグイン兼 Loop Engineering フレームワークになりました。`v0.0.x → v0.1.x` の境界では破壊的変更が許容されます。
 
 ## インストール
 
-このリポジトリは**プラグインであると同時に、それ自身のマーケットプレイス**です（manifest は `.claude-plugin/` 内）。マーケットプレイス名は `ripsawjp` です。
+このリポジトリは**プラグインであると同時に、それ自身のマーケットプレイス**です（manifest は `.claude-plugin/` 内）。マーケットプレイス名は `ripsawjp` です。プラグインのインストールは、使っている host（**Claude Code** でも **Codex CLI** でも）にかかわらず、マシンごとに 1 回だけです。
+
+**Claude Code の場合:**
 
 ```text
 # 1) マーケットプレイスを追加
@@ -25,6 +27,21 @@ CLI での同等コマンド:
 claude plugin marketplace add RipsawJP/shell-team
 claude plugin install shell-team@ripsawjp --scope user
 ```
+
+**Codex CLI の場合:**
+
+```
+codex plugin marketplace add RipsawJP/shell-team
+codex plugin add shell-team@ripsawjp
+```
+
+そのうえで、リポジトリそのものの root から、Codex が dispatch するカスタムエージェントを生成します — **リポジトリごと**であり、マシンごとではありません:
+
+```
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+```
+
+リポジトリの trust・sandbox の writable roots・network 許可など、ここでは触れないセットアップの残りは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
 
 プラグインの各エージェントは `/shell-team:<agent>`、スキルは `/shell-team:<skill>`（例: `/shell-team:run`）として解決され、`bin/` スクリプトは `bash "<plugin root>/bin/<script>"` として起動します——プラグインが有効でも `PATH` に載るとは限りません。`<plugin root>` は自ホストの報告値から読んでください（[adopting.ja.md](adopting.ja.md) の "Locate the installed plugin root" 手順を参照）。
 
@@ -52,15 +69,36 @@ claude --plugin-dir ./
 
 `.claude-plugin/plugin.json` の `version` を bump してコミットし、各マシンで:
 
+**Claude Code の場合:**
+
 ```text
 /plugin marketplace update ripsawjp
 ```
 
-`version` を省略すると、プラグインは固定リリースではなく最新のコミット SHA を追従します。
+**Codex CLI の場合:**
+
+```
+codex plugin marketplace upgrade ripsawjp
+```
+
+`codex plugin list` に載っていることは最新であることを意味しません: スキップする前に、その `VERSION` 列を実行したいリリースと比較してください。古ければ `codex plugin add shell-team@ripsawjp` を再実行します。いずれの場合も、リポジトリそのものの root から、適用先リポジトリごとに generator を再実行して確認します（checker は `--out-dir` しか読まないため）:
+
+```
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+bash "<plugin root>/bin/check-codex-agents.sh"
+```
+
+`version` を省略すると、プラグインは固定リリースではなく最新のコミット SHA を追従します。全体の手順とその自身のチェックは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
 
 ## バージョン系統
 
-**shell-team は単一のリリース線として配布されます。** `main` がリリースを担い、`develop` がその統合ブランチです。`plugin.json` の version は通常の `0.x.y` リリーススケジュールに従って進みます。`#ref` を付けない既定の `plugin marketplace add RipsawJP/shell-team` は default branch（`main`）の HEAD から marketplace manifest を解決するため、素の install は常に最新リリースを得ます。`/plugin marketplace update` はその ref を再取得し version を比較します。以前の並行配布体制（ref で pin する凍結 v0.2 系を v0.3 と併存させる構成）は廃止したので、pin・切り替え・backport の対象となる別系統はもうありません。チェックアウト上の `claude --plugin-dir ./` dogfood 経路は変わりません。
+**shell-team は単一のリリース線として配布されます。** `main` がリリースを担い、`develop` がその統合ブランチです。`plugin.json` の version は通常の `0.x.y` リリーススケジュールに従って進みます。
+
+`#ref` を付けない既定の `plugin marketplace add RipsawJP/shell-team` は default branch（`main`）の HEAD から marketplace manifest を解決するため、素の install は常に最新リリースを得ます。`/plugin marketplace update` はその ref を再取得し version を比較します。
+
+**Codex CLI** host では、同等の読み取りは `codex plugin list` です: その `VERSION` 列を、実行したいリリースと比較してください。実際に「インストール済み」を意味する STATUS 値は、単にリストに現れることではなく、正確に `installed, enabled` という文字列です。
+
+以前の並行配布体制（ref で pin する凍結 v0.2 系を v0.3 と併存させる構成）は廃止したので、pin・切り替え・backport の対象となる別系統はもうありません。チェックアウト上の `claude --plugin-dir ./` dogfood 経路は変わりません。
 
 ## ホスト限定のスケジューリング
 
@@ -75,4 +113,8 @@ claude --plugin-dir ./
 
 ## エアギャップ / ロックされた CI でのフォールバック（vendoring）
 
-`/plugin install` が使えない環境（CI ランナーでマーケットプレイスにアクセスできない等）では、`bin/install` がエージェントファイルをターゲットリポジトリにスナップショットコピーするフォールバックを提供します。これはレガシーな避難経路です — プラグイン経路を優先してください。
+`/plugin install` が使えない環境（CI ランナーでマーケットプレイスにアクセスできない等）では、`bin/install` がエージェントファイルをターゲットリポジトリにスナップショットコピーするフォールバックを提供します。
+
+これはレガシーな避難経路です — プラグイン経路を優先してください。
+
+このリポジトリのチェックアウトも、どちらの host（Claude Code でも Codex CLI でも）でも `<plugin root>` として機能し、インストールもアップグレードも一切不要です。詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。

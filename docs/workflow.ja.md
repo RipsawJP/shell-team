@@ -18,6 +18,16 @@
 
 `ui-designer` は **`pm-spec` と `engineer` の間、ただし UI 作業のときだけ**入ります（画面・コンポーネント・スタイル・視覚的/UX 変更）。engineer が実装の拠り所とする design note（`<specs dir>/design-note-T-NNN.md`）を生成し、`tech-lead` と同様に status flag は**書きません**（ボードは `READY_FOR_ARCH` のまま。design note の存在が engineer のゲートになる）。UI を伴わないタスクでは `ui-designer` はまったく参加しません。利用可能なときは `frontend-design` Skill を使い、無いときは内蔵ガイダンスへ縮退します（黙ってではなく明示して） — `frontend-design` は任意依存であってハード依存ではありません。
 
+## 2 つのホスト、1 つのループ
+
+同じループが、どちらの host からでも `READY_FOR_MERGE` まで走ります: phase flow・5 つの status flag・両方の gate は、どちらの host で駆動しても同一です。
+
+異なるのは role の dispatch 方法です。**Claude Code** では orchestrator が Agent tool で role を dispatch します。**Codex CLI** では、生成済みのカスタムエージェントを Codex 自身の `spawn_agent` tool で spawn します — 生成される role は 5 つ（`tech-lead`、`pm-spec`、`engineer`、`qa-verifier`、`code-reviewer`）で、`ui-designer` と `scrum-master` は生成されません。どちらかが必要なタスクは Claude Code host から駆動してください。
+
+review pass がもう 1 つの非対称性で、これは意図的なものです: Claude Code host では `code-reviewer` が Codex CLI を通して走り、Codex CLI host では代わりに `claude -p` パスが走ります——つまり review は常に、その host が使っていない側の provider から来ます。これは下の `## Codex CLI クイックリファレンス` セクション（Claude Code host 上での reviewer 自身の Codex 呼び出しを列挙したもの）とは別物です。
+
+セットアップの全体——プラグインを Codex CLI にインストールする、エージェントを生成する、リポジトリの trust、sandbox の許可、`PATH` の export——は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) にあります。
+
 ## タスク適性 — フルループが向くタスク
 
 **第一の分岐 — 最終検証面がループ内で閉じるか？**

@@ -3,13 +3,15 @@
 [![English](https://img.shields.io/badge/lang-English-1f6feb?style=flat-square)](distribution.md)
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](distribution.ja.md)
 
-`shell-team` is distributed as a **Claude Code plugin** (v0.1.0+). One install per machine makes the team's sub-agents, skills, and `bin/` helpers available in **every** repo — no per-repo copying.
+`shell-team` is distributed as a plugin for two hosts: **Claude Code** (v0.1.0+) and **Codex CLI**. Installing the plugin is a one-time step per machine, and it makes the team's sub-agents, skills, and `bin/` helpers reachable from either host. What is **not** per machine: on a Codex CLI host, the custom agents that let Codex dispatch these roles are generated **per adopted repository**, from that repository's own root — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
 
 > Versioning: `v0.0.1` is the pre-plugin baseline (5-agent single-pass pipeline, `bin/install` snapshot copy). From `v0.1.0` the project is a plugin and Loop Engineering framework; breaking changes are allowed across the `v0.0.x → v0.1.x` boundary.
 
 ## Install
 
-This repo is **both the plugin and its own marketplace** (manifests in `.claude-plugin/`). The marketplace name is `ripsawjp`.
+This repo is **both the plugin and its own marketplace** (manifests in `.claude-plugin/`). The marketplace name is `ripsawjp`. Installing the plugin is a one-time step per machine on whichever host you use — **Claude Code** or **Codex CLI**.
+
+**Claude Code:**
 
 ```text
 # 1) add the marketplace
@@ -25,6 +27,21 @@ CLI equivalents:
 claude plugin marketplace add RipsawJP/shell-team
 claude plugin install shell-team@ripsawjp --scope user
 ```
+
+**Codex CLI:**
+
+```
+codex plugin marketplace add RipsawJP/shell-team
+codex plugin add shell-team@ripsawjp
+```
+
+Then, from that repository's own root, generate the custom agents Codex dispatches — **per adopted repository**, not once per machine:
+
+```
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+```
+
+See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for repository trust, the sandbox's writable roots, the network grant and the rest of the setup this page points at rather than restates.
 
 The plugin's agents resolve as `/shell-team:<agent>`, skills as `/shell-team:<skill>` (e.g. `/shell-team:run`), and `bin/` scripts are invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even while the plugin is enabled; read `<plugin root>` from what your host reports, see [adopting.md](adopting.md)'s "Locate the installed plugin root" step for how.
 
@@ -82,15 +99,36 @@ The `"codex *"` exclusion is observed-working as described above, via the operat
 
 Bump `version` in `.claude-plugin/plugin.json`, commit, then on each machine:
 
+**Claude Code:**
+
 ```text
 /plugin marketplace update ripsawjp
 ```
 
-Omitting `version` makes the plugin track the latest commit SHA instead of pinned releases.
+**Codex CLI:**
+
+```
+codex plugin marketplace upgrade ripsawjp
+```
+
+Presence in `codex plugin list` is not currency: compare its `VERSION` column against the release you intend to run before treating an existing install as current. If it is older, run `codex plugin add shell-team@ripsawjp` again. Either way, re-run the generator and confirm it — per adopted repository, from that repository's own root, because the checker reads `--out-dir` and nothing else:
+
+```
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
+bash "<plugin root>/bin/check-codex-agents.sh"
+```
+
+Omitting `version` makes the plugin track the latest commit SHA instead of pinned releases. See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for the full procedure and its own checks.
 
 ## Version line
 
-**shell-team ships as a single released line.** `main` carries releases and `develop` is its integration branch; `plugin.json` advances on the ordinary `0.x.y` release schedule. A default `plugin marketplace add RipsawJP/shell-team` (no `#ref`) resolves the marketplace manifest from `main` HEAD, so a fresh install always gets the latest release, and `/plugin marketplace update` re-fetches that ref and compares versions. The earlier parallel-distribution arrangement — a frozen v0.2 line pinned by ref alongside v0.3 — has been retired: there is no separate maintenance line to pin to, switch between, or backport to. The `claude --plugin-dir ./` dogfood path from a checkout is unchanged.
+**shell-team ships as a single released line.** `main` carries releases and `develop` is its integration branch; `plugin.json` advances on the ordinary `0.x.y` release schedule.
+
+A default `plugin marketplace add RipsawJP/shell-team` (no `#ref`) resolves the marketplace manifest from `main` HEAD, so a fresh install always gets the latest release, and `/plugin marketplace update` re-fetches that ref and compares versions.
+
+On a **Codex CLI** host, `codex plugin list` is the equivalent read: its `VERSION` column is what to compare against the release you intend to run, and the STATUS value that actually means installed is the exact string `installed, enabled` — not mere presence in the list.
+
+The earlier parallel-distribution arrangement — a frozen v0.2 line pinned by ref alongside v0.3 — has been retired: there is no separate maintenance line to pin to, switch between, or backport to. The `claude --plugin-dir ./` dogfood path from a checkout is unchanged.
 
 ## Host-only scheduling
 
@@ -105,4 +143,8 @@ Two ways a host operator can drive a `schedule` trigger:
 
 ## Air-gapped / locked CI fallback (vendoring)
 
-Where `/plugin install` is unavailable (no marketplace access on a CI runner), `bin/install` snapshot-copies the agent files into a target repo as a fallback. This is a legacy escape hatch — prefer the plugin path.
+Where `/plugin install` is unavailable (no marketplace access on a CI runner), `bin/install` snapshot-copies the agent files into a target repo as a fallback.
+
+This is a legacy escape hatch — prefer the plugin path.
+
+A checkout of this repository also works as `<plugin root>` on either host — Claude Code or Codex CLI — needing no install or upgrade at all. See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
