@@ -43,7 +43,7 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 
 See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for repository trust, the sandbox's writable roots, the network grant and the rest of the setup this page points at rather than restates.
 
-The plugin's agents resolve as `/shell-team:<agent>`, skills as `/shell-team:<skill>` (e.g. `/shell-team:run`), and `bin/` scripts are invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even while the plugin is enabled; read `<plugin root>` from what your host reports, see [adopting.md](adopting.md)'s "Locate the installed plugin root" step for how.
+On **Claude Code**, the plugin's agents resolve as `/shell-team:<agent>` and skills as `/shell-team:<skill>` (e.g. `/shell-team:run`). On **Codex CLI**, a role's generated custom agent is dispatched with Codex's own `spawn_agent` tool instead — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli). On either host, `bin/` scripts are invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even while the plugin is enabled; read `<plugin root>` from what your host reports, see [adopting.md](adopting.md)'s "Locate the installed plugin root" step for how.
 
 ## Adopt in a target repo
 
@@ -132,7 +132,7 @@ See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cl
 
 **shell-team ships as a single released line.** `main` carries releases and `develop` is its integration branch; `plugin.json` advances on the ordinary `0.x.y` release schedule.
 
-A default `plugin marketplace add RipsawJP/shell-team` (no `#ref`) resolves the marketplace manifest from `main` HEAD, so a fresh install always gets the latest release, and `/plugin marketplace update` re-fetches that ref and compares versions.
+On **Claude Code**, a default `plugin marketplace add RipsawJP/shell-team` (no `#ref`) resolves the marketplace manifest from `main` HEAD, so a fresh install always gets the latest release, and `/plugin marketplace update` re-fetches that ref and compares versions.
 
 On a **Codex CLI** host, `codex plugin list` is the equivalent read: its `VERSION` column is what to compare against the release you intend to run, and the STATUS value that actually means installed is the exact string `installed, enabled` — not mere presence in the list.
 

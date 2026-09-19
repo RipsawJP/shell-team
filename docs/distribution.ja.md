@@ -43,7 +43,7 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 
 リポジトリの trust・sandbox の writable roots・network 許可など、ここでは触れないセットアップの残りは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
 
-プラグインの各エージェントは `/shell-team:<agent>`、スキルは `/shell-team:<skill>`（例: `/shell-team:run`）として解決され、`bin/` スクリプトは `bash "<plugin root>/bin/<script>"` として起動します——プラグインが有効でも `PATH` に載るとは限りません。`<plugin root>` は自ホストの報告値から読んでください（[adopting.ja.md](adopting.ja.md) の "Locate the installed plugin root" 手順を参照）。
+**Claude Code** では、プラグインの各エージェントは `/shell-team:<agent>`、スキルは `/shell-team:<skill>`（例: `/shell-team:run`）として解決されます。**Codex CLI** では、代わりに role の生成済みカスタムエージェントが Codex 自身の `spawn_agent` tool で dispatch されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。どちらの host でも、`bin/` スクリプトは `bash "<plugin root>/bin/<script>"` として起動します——プラグインが有効でも `PATH` に載るとは限りません。`<plugin root>` は自ホストの報告値から読んでください（[adopting.ja.md](adopting.ja.md) の "Locate the installed plugin root" 手順を参照）。
 
 ## ターゲットリポジトリへの導入
 
@@ -102,7 +102,7 @@ bash "<plugin root>/bin/check-codex-agents.sh"
 
 **shell-team は単一のリリース線として配布されます。** `main` がリリースを担い、`develop` がその統合ブランチです。`plugin.json` の version は通常の `0.x.y` リリーススケジュールに従って進みます。
 
-`#ref` を付けない既定の `plugin marketplace add RipsawJP/shell-team` は default branch（`main`）の HEAD から marketplace manifest を解決するため、素の install は常に最新リリースを得ます。`/plugin marketplace update` はその ref を再取得し version を比較します。
+**Claude Code** では、`#ref` を付けない既定の `plugin marketplace add RipsawJP/shell-team` は default branch（`main`）の HEAD から marketplace manifest を解決するため、素の install は常に最新リリースを得ます。`/plugin marketplace update` はその ref を再取得し version を比較します。
 
 **Codex CLI** host では、同等の読み取りは `codex plugin list` です: その `VERSION` 列を、実行したいリリースと比較してください。実際に「インストール済み」を意味する STATUS 値は、単にリストに現れることではなく、正確に `installed, enabled` という文字列です。
 
