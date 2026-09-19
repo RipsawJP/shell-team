@@ -3,7 +3,7 @@
 [![English](https://img.shields.io/badge/lang-English-1f6feb?style=flat-square)](distribution.md)
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](distribution.ja.md)
 
-`shell-team` is distributed as a plugin for two hosts: **Claude Code** (v0.1.0+) and **Codex CLI**. Installing the plugin is a one-time step per machine, and it makes the team's sub-agents and `bin/` helpers reachable from either host. The `/shell-team:<skill>` slash-command surface is a Claude Code mechanism. What is **not** per machine: on a Codex CLI host, the custom agents that let Codex dispatch these roles are generated **per adopted repository**, from that repository's own root — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
+`shell-team` is distributed as a plugin for two hosts: **Claude Code** (v0.1.0+) and **Codex CLI**. Installing the plugin is a one-time step per machine, and it makes `bin/` helpers reachable from either host. On a Codex CLI host, the roles Codex can dispatch are the five `bin/gen-codex-agents.sh` generates by default (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `code-reviewer`); the roles it does not generate stay Claude Code roles. The `/shell-team:<skill>` slash-command surface is a Claude Code mechanism. What is **not** per machine: on a Codex CLI host, the custom agents for those five roles are generated **per adopted repository**, from that repository's own root — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
 
 > Versioning: `v0.0.1` is the pre-plugin baseline (5-agent single-pass pipeline, `bin/install` snapshot copy). From `v0.1.0` the project is a plugin and Loop Engineering framework; breaking changes are allowed across the `v0.0.x → v0.1.x` boundary.
 
@@ -53,7 +53,13 @@ After install, initialize a repo's per-project data once. Everything lands under
 /shell-team:team-init
 ```
 
-`team-init` is idempotent — re-running skips existing files and never modifies host-root files. Only project **data** lives in the target repo, confined to the base dir (todo/specs/loops/runs/retros/reviews). The framework itself (agents/skills/scripts/templates) stays in the plugin — update once, every repo benefits.
+On a Codex CLI host, run the same host-neutral scaffolder directly, from the adopted repository's own root:
+
+```text
+bash "<plugin root>/bin/team-init.sh" .
+```
+
+`team-init` is idempotent — re-running skips existing files and never modifies host-root files. Only project **data** lives in the target repo, confined to the base dir (todo/specs/loops/runs/retros/reviews). The framework itself (agents/skills/scripts/templates) updates once per machine when you install a new plugin version; on a Codex CLI host, the generated custom agents in each adopted repository still need their own regeneration and drift check after that update — see `## Update` below.
 
 ## Develop / dogfood this repo
 

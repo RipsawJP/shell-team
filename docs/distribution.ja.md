@@ -3,7 +3,7 @@
 [![English](https://img.shields.io/badge/lang-English-lightgrey?style=flat-square)](distribution.md)
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](distribution.ja.md)
 
-`shell-team` は 2 つの host 向けに配布されるプラグインです: **Claude Code**（v0.1.0 以降）と **Codex CLI**。プラグインのインストールはマシンごとに 1 回だけで、どちらの host からでもチームのサブエージェントと `bin/` ヘルパーに到達できるようになります。`/shell-team:<skill>` の slash command 面は Claude Code の仕組みです。マシンごとでは**ない**のは、Codex CLI host 上で Codex がこれらのロールを dispatch するために使う生成済みカスタムエージェントで、これは適用先リポジトリそのものの root から、**リポジトリごと**に生成されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。
+`shell-team` は 2 つの host 向けに配布されるプラグインです: **Claude Code**（v0.1.0 以降）と **Codex CLI**。プラグインのインストールはマシンごとに 1 回だけで、`bin/` ヘルパーはどちらの host からでも到達できます。Codex CLI host 上で Codex が dispatch できるロールは、`bin/gen-codex-agents.sh` が既定で生成する 5 つ（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・`code-reviewer`）で、生成されないロールは Claude Code のロールのままです。`/shell-team:<skill>` の slash command 面は Claude Code の仕組みです。マシンごとでは**ない**のは、その 5 ロール向けに Codex がこれらを dispatch するために使う生成済みカスタムエージェントで、これは適用先リポジトリそのものの root から、**リポジトリごと**に生成されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。
 
 > バージョニング: `v0.0.1` はプラグイン化前のベースライン（5 エージェントの単一パスパイプライン、`bin/install` によるスナップショットコピー）です。`v0.1.0` からプロジェクトはプラグイン兼 Loop Engineering フレームワークになりました。`v0.0.x → v0.1.x` の境界では破壊的変更が許容されます。
 
@@ -53,7 +53,13 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 /shell-team:team-init
 ```
 
-`team-init` は冪等です — 再実行しても既存ファイルはスキップし、ホストルートのファイルは決して変更しません。ターゲットリポジトリに置かれるのはプロジェクトの**データ**だけで、ベースディレクトリ（todo/specs/loops/runs/retros/reviews）に閉じます。フレームワーク本体（agents/skills/scripts/templates）はプラグイン側に残ります — 1 回更新すれば、すべてのリポジトリが恩恵を受けます。
+Codex CLI host では、同じ host-neutral な scaffolder を、適用先リポジトリそのものの root から直接実行します:
+
+```text
+bash "<plugin root>/bin/team-init.sh" .
+```
+
+`team-init` は冪等です — 再実行しても既存ファイルはスキップし、ホストルートのファイルは決して変更しません。ターゲットリポジトリに置かれるのはプロジェクトの**データ**だけで、ベースディレクトリ（todo/specs/loops/runs/retros/reviews）に閉じます。フレームワーク本体（agents/skills/scripts/templates）は、新しいプラグインバージョンをインストールした時点でマシンごとに 1 回更新されます — Codex CLI host では、適用先リポジトリごとに生成されたカスタムエージェント自身の再生成と drift check がその後さらに必要です — 詳細は下の `## アップデート` を参照。
 
 ## このリポジトリを開発 / dogfood する
 
