@@ -348,6 +348,86 @@ REGION_PLAIN_AFTER_DECL="$TMP/region-plain-after-decl.md"
 grep -qF -- 'user-visible' "$REGION_PLAIN_AFTER_DECL" || fail "cad-region-plain-after-decl: fixture sanity — declaration text absent"
 assert_case "cad-region-plain-after-decl-still-pass" 0 "" "$REGION_PLAIN_AFTER_DECL"
 
+# --- QA round-3 gap (cross-provider review, class
+# `positional-boundary-unbounded-at-END`): R has no upper bound at the
+# intent block's own END marker — an intent block carrying NO `^## `
+# heading before END leaves R open (1) all the way to the file's next real
+# heading, however far past END that falls. A well-formed `- user-visible:`
+# or `- shipped-docs:` line placed in that dead zone (after END, before the
+# next heading) used to be recorded well-placed on R alone; it is now also
+# required to sit strictly before `end_ln`, the same second positional
+# clause WAIVER_RE/SURFACE_RE already carried. Each pair below is
+# discriminating: the "bad" member places the line after END in a
+# heading-less block; the "control" places the identical line inside the
+# block instead, with the block otherwise byte-identical. -------------------
+REGION_END_DECL_BAD="$TMP/region-end-decl-bad.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- [ ] **AC1** x\n'
+  printf '<!-- END intent-block: T-999 -->\n'
+  printf -- '- user-visible: no — sneaky, after END, before the first real heading\n'
+  printf '\n## Non-goals\n\n- none\n\n## Input space\n\nn/a\n'
+} > "$REGION_END_DECL_BAD"
+grep -qF -- '## Non-goals' "$REGION_END_DECL_BAD" || fail "cad-region-end-bounds-decl: fixture sanity — must still carry a real heading somewhere"
+assert_case "cad-region-end-bounds-decl" 1 declaration-misplaced "$REGION_END_DECL_BAD"
+
+REGION_END_DECL_CONTROL="$TMP/region-end-decl-control.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- user-visible: no — inside the block, no heading present in it\n'
+  printf '<!-- END intent-block: T-999 -->\n'
+  printf '\n## Non-goals\n\n- none\n\n## Input space\n\nn/a\n'
+} > "$REGION_END_DECL_CONTROL"
+assert_case "cad-region-end-bounds-decl-control" 0 "" "$REGION_END_DECL_CONTROL"
+
+# The shipped-docs pair uses a MEASURED sneaky path (a `- check:` line
+# naming it, placed after the real heading) so the verdict isolates
+# POSITION alone — an unmeasured path would trip `shipped-docs-unmeasured`
+# instead (precedence: `shipped-docs-misplaced` sits earlier than
+# `shipped-docs-unmeasured`, so this would still redden correctly even with
+# an unmeasured path, but isolating the finding is clearer).
+REGION_END_SHIPPED_BAD="$TMP/region-end-shipped-bad.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- user-visible: yes — ships a thing\n'
+  printf -- '- shipped-docs: docs/x.md — this-task\n'
+  printf -- '- [ ] **AC1** x\n  - adopter-surface: docs/x.md\n'
+  printf '<!-- END intent-block: T-999 -->\n'
+  printf -- '- shipped-docs: docs/sneaky.md — this-task\n'
+  printf '\n## Non-goals\n\n- none\n- check: test -f docs/sneaky.md\n\n## Input space\n\nn/a\n'
+} > "$REGION_END_SHIPPED_BAD"
+grep -qF -- 'docs/sneaky.md' "$REGION_END_SHIPPED_BAD" || fail "cad-region-end-bounds-shipped: fixture sanity — sneaky path absent"
+assert_case "cad-region-end-bounds-shipped" 1 shipped-docs-misplaced "$REGION_END_SHIPPED_BAD"
+
+REGION_END_SHIPPED_CONTROL="$TMP/region-end-shipped-control.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- user-visible: yes — ships a thing\n'
+  printf -- '- shipped-docs: docs/x.md — this-task\n'
+  printf -- '- [ ] **AC1** x\n  - adopter-surface: docs/x.md\n'
+  printf '<!-- END intent-block: T-999 -->\n'
+  printf '\n## Non-goals\n\n- none\n\n## Input space\n\nn/a\n'
+} > "$REGION_END_SHIPPED_CONTROL"
+assert_case "cad-region-end-bounds-shipped-control" 0 "" "$REGION_END_SHIPPED_CONTROL"
+
+# Fenced-END variant: a fenced decl-shaped line sitting in the same dead
+# zone (after END, before the next real heading) must stay completely
+# invisible — F's delimiter/content classification takes precedence over
+# the new end-bound check, exactly as it does everywhere else in this file;
+# a legit, well-placed declaration alone still passes.
+REGION_END_DECL_FENCED="$TMP/region-end-decl-fenced.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- user-visible: no — legit, inside, no heading in block\n'
+  printf '<!-- END intent-block: T-999 -->\n'
+  printf '%s\n' "$TIC"
+  printf -- '- user-visible: yes — sneaky, fenced, after END\n'
+  printf '%s\n' "$TIC"
+  printf '\n## Non-goals\n\n- none\n\n## Input space\n\nn/a\n'
+} > "$REGION_END_DECL_FENCED"
+grep -qF -- 'sneaky, fenced' "$REGION_END_DECL_FENCED" || fail "cad-region-end-bounds-decl-fenced: fixture sanity — fenced sneaky text absent"
+assert_case "cad-region-end-bounds-decl-fenced" 0 "" "$REGION_END_DECL_FENCED"
+
 # --- boundary placements (first line of block / last line before ## Non-goals)
 # — both are VALID placements ------------------------------------------------
 FIRST_LINE="$TMP/first-line.md"

@@ -77,9 +77,19 @@
 #   heading takes, so a spec quoting its own grammar in a fenced block never
 #   closes R by accident.
 #   `- user-visible:` and `- shipped-docs:` are valid ("well-placed") only
-#   when R == R1 at the moment they are matched; a well-formed occurrence at
-#   R0 or R2 is `declaration-misplaced` / `shipped-docs-misplaced`, never
-#   "missing" (a different repair from "you forgot it").
+#   when R == R1 AND the occurrence's own line sits strictly before the
+#   intent block's END marker (`i < end_ln`) at the moment they are matched;
+#   a well-formed occurrence at R0 or R2, OR one at R1 but at-or-after END,
+#   is `declaration-misplaced` / `shipped-docs-misplaced`, never "missing"
+#   (a different repair from "you forgot it"). The second clause exists
+#   because R alone has no upper bound at END: an intent block that itself
+#   carries no `^## ` heading before END leaves R open past END, all the way
+#   to the file's next heading (wherever that falls) — exactly the same
+#   `begin_ln < i < end_ln` bound WAIVER_RE/SURFACE_RE already apply, now
+#   applied to this family too (round-3 review fix, class
+#   `positional-boundary-unbounded-at-END`; R's OWN closing rule — first
+#   `^## ` heading after BEGIN — is unchanged, this is a second, independent
+#   positional clause on top of it, not a redefinition of R).
 #
 #   S — acceptance-criterion scope, tracked across the WHOLE file (not
 #   bounded to the intent block) mirroring this repository's own board-entry
@@ -130,11 +140,18 @@
 # `shipped-docs-unmeasured` is decided as a STRING RELATION between lines of
 # the same file: a `this-task` path is unmeasured when it is a literal
 # substring of NO fence-aware line matching `^[[:space:]]*- check:` or
-# `^[[:space:]]*- adopter-surface:` anywhere in the file (not bounded to the
-# intent block). This script performs NO filesystem access on that path —
-# never `test -f`, never a glob, never a path resolution — T-1061's frozen
-# Non-goal (no content judgment, no path allowlist) is the design invariant
-# this task inherits rather than revisits.
+# `^[[:space:]]*- adopter-surface:` anywhere in the file. Unlike every other
+# window this file tracks, `MEASURE_LINES` is DELIBERATELY whole-file, not
+# bounded to the intent block: AC11's own Input space and the Goal's wording
+# ("a literal substring of no fence-aware ... line in the file") both name
+# the whole file as the reading side, so a `- check:` line living in
+# `## Notes for engineer` legitimately discharges an in-block path — this
+# was re-swept for the round-3 review's boundary-escape class and confirmed
+# intentional, not a second instance of the same defect. This script
+# performs NO filesystem access on that path — never `test -f`, never a
+# glob, never a path resolution — T-1061's frozen Non-goal (no content
+# judgment, no path allowlist) is the design invariant this task inherits
+# rather than revisits.
 #
 # A `- shipped-docs:` line beside a `no` declaration reuses the existing
 # `marker-conflict` token rather than minting a fifteenth.
@@ -180,7 +197,10 @@
 #   declaration-misplaced (1)   — exactly one well-formed occurrence, but it
 #                                  sits outside the declaration region R
 #                                  (before BEGIN, at/after the first `## `
-#                                  heading after BEGIN, or after END).
+#                                  heading after BEGIN, or at/after END —
+#                                  the last of these reachable only when the
+#                                  intent block itself carries no `^## `
+#                                  heading before END, per the round-3 fix).
 #   marker-conflict (1)         — a `yes` declaration carrying both waiver
 #                                  and surface at once, or a `no` declaration
 #                                  carrying a waiver, a surface, or a
@@ -196,7 +216,9 @@
 #                                  (an all-whitespace surface value counts as
 #                                  undischarged, not as a separate refusal).
 #   shipped-docs-misplaced (1)  — a `yes` declaration with at least one
-#                                  `- shipped-docs:` occurrence outside R.
+#                                  `- shipped-docs:` occurrence outside R
+#                                  (before BEGIN, at/after the first `## `
+#                                  heading after BEGIN, or at/after END).
 #   shipped-docs-malformed (1)  — a `yes` declaration with at least one
 #                                  `- shipped-docs:` occurrence whose
 #                                  separator is absent, whose path is empty,
@@ -520,7 +542,13 @@ else
     CANDS+=("declaration-malformed")
     decl_family_bad=1
   fi
-  if [ "$drval" -ne 1 ]; then
+  # R alone is not a sufficient bound: an intent block carrying no `^## `
+  # heading before its own END marker leaves R open (1) past END, so a
+  # SECOND positional clause — dpos < end_ln — is required in addition to
+  # R == 1, exactly as WAIVER_RE/SURFACE_RE already require begin_ln < i <
+  # end_ln. A well-formed occurrence at or after END is misplaced, on the
+  # same footing as one before BEGIN (R0) or after the first heading (R2).
+  if [ "$drval" -ne 1 ] || [ "$dpos" -ge "$end_ln" ]; then
     CANDS+=("declaration-misplaced")
     decl_family_bad=1
   fi
@@ -560,7 +588,11 @@ if [ "$decl_family_bad" -eq 0 ]; then
         spos="${SHIP_POS[$k]}"
         srval="${SHIP_RVAL[$k]}"
         sline="${LINES[$spos]}"
-        if [ "$srval" -ne 1 ]; then
+        # Same second positional clause as the declaration check above: R
+        # alone does not bound this family either, so a `- shipped-docs:`
+        # line at or after END (R still open, no heading seen yet) is
+        # misplaced too, not accepted.
+        if [ "$srval" -ne 1 ] || [ "$spos" -ge "$end_ln" ]; then
           ship_bad_place=1
         fi
         srest="${sline#"- shipped-docs:"}"
