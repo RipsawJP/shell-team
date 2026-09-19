@@ -67,13 +67,15 @@ claude --plugin-dir ./
 
 ## アップデート
 
-`.claude-plugin/plugin.json` の `version` を bump してコミットし、各マシンで実行します。`version` を省略すると、プラグインは固定リリースではなく最新のコミット SHA を追従します——これはどちらの host のプラグインマネージャも読む manifest 自体の性質で、どちらか一方の host に固有の話ではありません。
+`.claude-plugin/plugin.json` の `version` を bump してコミットし、各マシンで実行します:
 
 **Claude Code の場合:**
 
 ```text
 /plugin marketplace update ripsawjp
 ```
+
+`version` を省略すると、プラグインは固定リリースではなく最新のコミット SHA を追従します。
 
 **Codex CLI の場合:**
 

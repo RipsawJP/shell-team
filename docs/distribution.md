@@ -97,13 +97,15 @@ The `"codex *"` exclusion is observed-working as described above, via the operat
 
 ## Update
 
-Bump `version` in `.claude-plugin/plugin.json`, commit, then on each machine. Omitting `version` makes the plugin track the latest commit SHA instead of pinned releases — this holds for the manifest both hosts' plugin managers read from, not for either host specifically.
+Bump `version` in `.claude-plugin/plugin.json`, commit, then on each machine:
 
 **Claude Code:**
 
 ```text
 /plugin marketplace update ripsawjp
 ```
+
+Omitting `version` makes the plugin track the latest commit SHA instead of pinned releases.
 
 **Codex CLI:**
 
