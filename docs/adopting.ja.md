@@ -569,8 +569,15 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
     `shell-team-code-reviewer`）を spawn して役割を dispatch する——host
     ごとの dispatch 文言（`skills/run/SKILL.md` に splice 済み）は
     `templates/prompt-blocks/host-dispatch.md` を参照——`code-reviewer` が
-    2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
-    `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
+    2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。
+    spawn した役割は、その番が完了するまで待つ。数分応答が無い役割は、
+    それだけでは stall とみなさない——このループの長い手順は数分かかる
+    のが通常である。待ちが長いと感じたら status nudge を送ってよい——
+    応答があれば nudge は進捗であり stall ではない——abort を記録する
+    前には必ず再測定を行う。経過時間だけを理由に abort してはならない。
+    詳細な規則（この host での class-B re-freeze gate を含む）は
+    `templates/prompt-blocks/host-dispatch.md` の dispatch 文言を参照。
+    その `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
     host も Codex CLI セッションを一度も離れない。`pm-spec` がスペック
     ファイルを書き出すときは `<specs dir>/<task-id>-<slug>.md` という
     名前にする——これは precedent ではなく規則である:
