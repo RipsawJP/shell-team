@@ -46,6 +46,8 @@ verbatim, then fill it in per the instructions beside each section.
 
 ## Install / update
 
+**Claude Code:**
+
 ```text
 /plugin marketplace add RipsawJP/shell-team
 /plugin install shell-team@ripsawjp
@@ -55,6 +57,20 @@ Already installed? Update the marketplace listing:
 
 ```text
 /plugin marketplace update ripsawjp
+```
+
+**Codex CLI:**
+
+```text
+codex plugin marketplace add RipsawJP/shell-team
+codex plugin add shell-team@ripsawjp
+```
+
+Already installed? Refresh the marketplace snapshot, then re-run the
+generator per adopted repository (see the [adopting](https://github.com/RipsawJP/shell-team/blob/main/docs/adopting.md#using-shell-team-from-codex-cli) runbook):
+
+```text
+codex plugin marketplace upgrade ripsawjp
 ```
 
 ## Links

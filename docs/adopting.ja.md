@@ -569,8 +569,15 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
     `shell-team-code-reviewer`）を spawn して役割を dispatch する——host
     ごとの dispatch 文言（`skills/run/SKILL.md` に splice 済み）は
     `templates/prompt-blocks/host-dispatch.md` を参照——`code-reviewer` が
-    2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。その
-    `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
+    2 回目の Codex pass の代わりに走らせる `claude -p` レシピも含む。
+    spawn した役割は、その番が完了するまで待つ。数分応答が無い役割は、
+    それだけでは stall とみなさない——このループの長い手順は数分かかる
+    のが通常である。待ちが長いと感じたら status nudge を送ってよい——
+    応答があれば nudge は進捗であり stall ではない——abort を記録する
+    前には必ず再測定を行う。経過時間だけを理由に abort してはならない。
+    詳細な規則（この host での class-B re-freeze gate を含む）は
+    `templates/prompt-blocks/host-dispatch.md` の dispatch 文言を参照。
+    その `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
     host も Codex CLI セッションを一度も離れない。`pm-spec` がスペック
     ファイルを書き出すときは `<specs dir>/<task-id>-<slug>.md` という
     名前にする——これは precedent ではなく規則である:
@@ -717,24 +724,32 @@ user-visible capability には adopter-docs 用の surface が無い」ことを
 宣言にどちらかの marker を付けることは refuse される。これは `no` の宣言が
 単独で pass することと対をなす原則である。
 
-現時点の強制は**チェッカーではなく duty** である。タスクの最初の凍結時に、
-coordinating session がこの宣言領域を自分で読み、宣言がちょうど 1 行・
-rationale が非空であることを要求する。`yes` の場合はさらに、criterion
-配下の `- adopter-surface:` 行か非空の `- adopter-docs-waiver:` 行の
-いずれか一方を要求する（両方は不可、`no` に付けるのも不可）。満たさない
-spec は凍結を refuse して著者に差し戻す。**機械的なチェッカーはまだ出荷
-されていない。** 一度実装したが、scan のスコープ判定に独立した欠陥が
-2 ラウンド連続で見つかったため、T-1061 自身の pre-commitment に従って
-issue #250 へ切り出した。refuse すべき spec を pass させるゲートを出荷
-することは、正直な prose の duty を出荷することより悪い。したがって
-3 回目のパッチではなく再設計を待つ。境界はどちらの形でも変わらない。
-この sweep は spec が名付けた surface を**開かない**——resolve も
-validate もしない。ある surface が本当に adopter 向けかどうかの判定は
-reviewing gates と人間の役割であり、mechanical check の役割ではない。
-path の allowlist を作れば、adopter のリポジトリをこの repository の
-レイアウトに強制することになってしまう。この duty はタスクの bootstrap
-freeze でのみ適用され、すでに記録済みのハッシュの re-freeze では適用され
-ない。
+現時点の強制は `bin/check-adopter-docs.sh <spec.md>`（T-1151）で行う。
+タスクの最初の凍結時、intent-hash を記録する前に実行する。この宣言領域を
+自ら読み、宣言がちょうど 1 行・rationale が非空であることを要求する。
+`yes` の場合はさらに、criterion 配下の `- adopter-surface:` 行か非空の
+`- adopter-docs-waiver:` 行のいずれか一方を要求する（両方は不可、`no` に
+付けるのも不可）。満たさない spec は非零 exit と stderr 上の 1 token を
+返し、凍結は refuse されて著者に差し戻される。境界はこれまでの prose duty
+と変わらない——このチェッカーは spec が名付けた surface を**開かない**
+——resolve も validate もしない。ある surface が本当に adopter 向けか
+どうかの判定は reviewing gates と人間の役割であり、mechanical check の
+役割ではない。path の allowlist を作れば、adopter のリポジトリをこの
+repository のレイアウトに強制することになってしまう。この duty はタスクの
+bootstrap freeze でのみ適用され、すでに記録済みのハッシュの re-freeze
+では適用されない。
+
+`yes` の宣言はさらに、同じ宣言領域内に、unindented な
+`- shipped-docs: <repo-relative path> — this-task | issue #<N>` 行を
+1 行以上持つことを要求される（issue #577）。spec 自身の prose が
+「変更する」と名指す出荷 document はそれぞれ 1 行を持ち、`this-task`
+（この task の diff が編集する場合。その path は同じ spec の
+`- check:` 行か `- adopter-surface:` 行のいずれかに literal substring
+として現れなければならない）か `issue #<N>`（更新を意図的に filed
+follow-up へ繰り延べる場合）のいずれかを disposition として持つ。
+`bin/check-adopter-docs.sh` はこの path をファイルシステムに対して
+開く・stat する・resolve することを一切行わない——`this-task` の path が
+同じファイルの別の行に名指されているかどうかだけを確認する。
 
 ## 両ゲート green と自分のリポジトリの CI
 
