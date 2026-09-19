@@ -563,7 +563,15 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
     `templates/prompt-blocks/host-dispatch.md` (spliced into
     `skills/run/SKILL.md`) for the per-host dispatch text this loop's own
     phase list reads, including the `claude -p` recipe `code-reviewer`
-    runs instead of a second Codex pass. Its `APPROVE` reaches
+    runs instead of a second Codex pass. Wait on each spawned role
+    until its turn completes: a role that has not spoken for several
+    minutes is not thereby stalled, since this loop's longer steps
+    legitimately take minutes. Send a status nudge if the wait feels
+    long — an answered nudge is progress, not a stall — and do the
+    re-measurement before recording any abort, since elapsed time alone
+    never justifies one; see `templates/prompt-blocks/host-dispatch.md`'s
+    dispatch text for the full rule, including the class-B re-freeze
+    gate it restates for this host. Its `APPROVE` reaches
     `READY_FOR_MERGE` — both gates green — without either host ever
     leaving the Codex CLI session. When `pm-spec` writes the spec file, it
     names it `<specs dir>/<task-id>-<slug>.md` — a rule, not a precedent:
