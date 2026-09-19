@@ -18,6 +18,16 @@
 
 `ui-designer` slots in **between `pm-spec` and `engineer`, but only for UI work** (screens, components, styles, visual/UX changes). It produces a design note (`<specs dir>/design-note-T-NNN.md`) that the engineer implements against, and — like `tech-lead` — it does **not** write a status flag (the board stays at `READY_FOR_ARCH`; the design note's existence gates the engineer). For non-UI tasks `ui-designer` does not participate at all. It uses the `frontend-design` Skill when available and degrades to in-house guidance (announced, not silent) when it is not — `frontend-design` is an optional, not a hard, dependency.
 
+## Two hosts, one loop
+
+The same loop runs from either host, up to `READY_FOR_MERGE`: the phase flow, the status flags and both gates are identical whichever host you drive it from.
+
+What differs is how a role is dispatched. On **Claude Code** the orchestrator dispatches a role with the Agent tool. On **Codex CLI** it spawns a generated custom agent with Codex's own `spawn_agent` tool — five roles are generated (`tech-lead`, `pm-spec`, `engineer`, `qa-verifier`, `code-reviewer`); `ui-designer` and `scrum-master` are not, so a task needing either one is driven from a Claude Code host.
+
+The review pass is the other asymmetry, and it is deliberate: on a Claude Code host `code-reviewer` runs through Codex CLI, and on a Codex CLI host it runs a `claude -p` pass instead, so under the shipped default binding the review comes from the provider the host is not. That binding is the shipped default, not an unconditional invariant: a host may rebind `code-reviewer` to a same-family executor in its own `binding.conf`, and once such a rebind exists the loop no longer guarantees this. This is a different thing from the `## Codex CLI quick-reference` section below, which lists the reviewer's own Codex invocations on a Claude Code host.
+
+The full setup — installing the plugin into Codex CLI, generating the agents, repository trust, the sandbox grants and the `PATH` export — is in [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
+
 ## Task aptitude — When the full loop fits
 
 **First branch — does the final verification surface close inside the loop?**
