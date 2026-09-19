@@ -292,6 +292,62 @@ REGION_BEFORE="$TMP/region-before.md"
 } > "$REGION_BEFORE"
 assert_case "cad-region-before-first-heading" 0 "" "$REGION_BEFORE"
 
+# --- QA round-1 gap (a): R's non-content identity transition across a
+# FENCED `^## ` heading sitting INSIDE R (round-1's cad-fence-* cases only
+# exercised a fenced heading AFTER R had already closed, via the control
+# pair and cad-fence-scope-survives — never one BEFORE R closes). Two
+# placements, each as a fenced/unfenced pair: the heading between BEGIN and
+# the declaration, and the heading between the declaration and the real
+# `## Non-goals`. Fenced must not close R (declaration stays well-placed,
+# pass); the same heading unfenced closes R (declaration-misplaced) — the
+# same fence/no-fence control-pair discipline AC3 already applies to S. ----
+REGION_FENCE_BEFORE_DECL_OK="$TMP/region-fence-before-decl-ok.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf '%s\n## Assumptions\n%s\n' "$TIC" "$TIC"
+  printf -- '- user-visible: no — after a fenced heading, still inside R\n'
+  printf '\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** x\n\n## Input space\n\nn/a\n\n<!-- END intent-block: T-999 -->\n'
+} > "$REGION_FENCE_BEFORE_DECL_OK"
+grep -qF -- '## Assumptions' "$REGION_FENCE_BEFORE_DECL_OK" || fail "cad-region-fence-before-decl: fixture sanity — heading text absent"
+assert_case "cad-region-fence-before-decl-pass" 0 "" "$REGION_FENCE_BEFORE_DECL_OK"
+
+REGION_PLAIN_BEFORE_DECL_BAD="$TMP/region-plain-before-decl-bad.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf '## Assumptions\n'
+  printf -- '- user-visible: no — after an UNFENCED heading, R already closed\n'
+  printf '\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** x\n\n## Input space\n\nn/a\n\n<!-- END intent-block: T-999 -->\n'
+} > "$REGION_PLAIN_BEFORE_DECL_BAD"
+assert_case "cad-region-fence-before-decl-control" 1 declaration-misplaced "$REGION_PLAIN_BEFORE_DECL_BAD"
+
+# The "between the declaration and ## Non-goals" placement does NOT form a
+# discriminating fenced/unfenced pair — verified live before writing this
+# comment: a declaration is classified by its OWN line's R value at the
+# moment it is matched, so a heading appearing AFTER it, fenced or not,
+# never retroactively changes the declaration's already-recorded placement.
+# Both members below pass; this is reported honestly as a non-discriminating
+# confirmation (the placement was considered, not a coverage gap) rather
+# than mislabelled as a red/green control pair.
+REGION_FENCE_AFTER_DECL="$TMP/region-fence-after-decl.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- user-visible: no — before a fenced heading, still inside R\n'
+  printf '%s\n## Assumptions\n%s\n' "$TIC" "$TIC"
+  printf '\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** x\n\n## Input space\n\nn/a\n\n<!-- END intent-block: T-999 -->\n'
+} > "$REGION_FENCE_AFTER_DECL"
+grep -qF -- '## Assumptions' "$REGION_FENCE_AFTER_DECL" || fail "cad-region-fence-after-decl: fixture sanity — heading text absent"
+assert_case "cad-region-fence-after-decl-pass" 0 "" "$REGION_FENCE_AFTER_DECL"
+
+REGION_PLAIN_AFTER_DECL="$TMP/region-plain-after-decl.md"
+{
+  printf '# Fixture\n\n## Goal\n\n<!-- BEGIN intent-block: T-999 -->\n'
+  printf -- '- user-visible: no — before an unfenced extra heading\n'
+  printf '## Assumptions\n'
+  printf '\n## Non-goals\n\n- none\n\n## Acceptance criteria\n\n- [ ] **AC1** x\n\n## Input space\n\nn/a\n\n<!-- END intent-block: T-999 -->\n'
+} > "$REGION_PLAIN_AFTER_DECL"
+grep -qF -- 'user-visible' "$REGION_PLAIN_AFTER_DECL" || fail "cad-region-plain-after-decl: fixture sanity — declaration text absent"
+assert_case "cad-region-plain-after-decl-still-pass" 0 "" "$REGION_PLAIN_AFTER_DECL"
+
 # --- boundary placements (first line of block / last line before ## Non-goals)
 # — both are VALID placements ------------------------------------------------
 FIRST_LINE="$TMP/first-line.md"
@@ -585,12 +641,39 @@ SHIP_PASS_ISSUE="$TMP/ship-pass-issue.md"
 mkship "$SHIP_PASS_ISSUE" '- shipped-docs: docs/y.md — issue #577' '  - adopter-surface: docs/x.md' '' ''
 assert_case "cad-shipped-pass-issue" 0 "" "$SHIP_PASS_ISSUE"
 
+# --- QA round-1 gap (b): the `issue #<N>` disposition grammar's own edge
+# cases — a non-digit tail, no digits at all, a digit run with a trailing
+# non-digit, and the boundary value `0` (legal: the grammar requires digits,
+# not a positive integer) -----------------------------------------------------
+SHIP_ISSUE_NONDIGIT="$TMP/ship-issue-nondigit.md"
+mkship "$SHIP_ISSUE_NONDIGIT" '- shipped-docs: docs/x.md — issue #abc' '  - adopter-surface: docs/x.md' '' ''
+assert_case "cad-shipped-issue-nondigit" 1 shipped-docs-malformed "$SHIP_ISSUE_NONDIGIT"
+
+SHIP_ISSUE_NODIGITS="$TMP/ship-issue-nodigits.md"
+mkship "$SHIP_ISSUE_NODIGITS" '- shipped-docs: docs/x.md — issue #' '  - adopter-surface: docs/x.md' '' ''
+assert_case "cad-shipped-issue-nodigits" 1 shipped-docs-malformed "$SHIP_ISSUE_NODIGITS"
+
+SHIP_ISSUE_TRAILING="$TMP/ship-issue-trailing.md"
+mkship "$SHIP_ISSUE_TRAILING" '- shipped-docs: docs/x.md — issue #12a' '  - adopter-surface: docs/x.md' '' ''
+assert_case "cad-shipped-issue-trailing-nondigit" 1 shipped-docs-malformed "$SHIP_ISSUE_TRAILING"
+
+SHIP_ISSUE_ZERO="$TMP/ship-issue-zero.md"
+mkship "$SHIP_ISSUE_ZERO" '- shipped-docs: docs/x.md — issue #0' '  - adopter-surface: docs/x.md' '' ''
+assert_case "cad-shipped-issue-zero" 0 "" "$SHIP_ISSUE_ZERO"
+
 SHIP_CONFLICT_NO="$TMP/ship-conflict-no.md"
 mk "$SHIP_CONFLICT_NO" '- user-visible: no — internal' '' '' '- shipped-docs: docs/x.md — this-task'
 assert_case "cad-shipped-conflict-no" 1 marker-conflict "$SHIP_CONFLICT_NO"
 CLEAN_NO="$TMP/ship-clean-no.md"
 mk "$CLEAN_NO" '- user-visible: no — internal' '' '' ''
 assert_case "cad-shipped-clean-no" 0 "" "$CLEAN_NO"
+
+# --- yes/no x waiver/surface/shipped-docs conflict matrix: the remaining
+# untested cell — a `no` declaration carrying BOTH a waiver AND a surface
+# at once still reuses `marker-conflict` (no new precedence interaction) ----
+SHIP_CONFLICT_NO_BOTH="$TMP/ship-conflict-no-both.md"
+mk "$SHIP_CONFLICT_NO_BOTH" '- user-visible: no — internal' '  - adopter-surface: docs/x.md' '- adopter-docs-waiver: nothing to document' ''
+assert_case "cad-conflict-no-with-both" 1 marker-conflict "$SHIP_CONFLICT_NO_BOTH"
 
 # --- cad-nofs-*: the no-filesystem-access probe (AC11) — filesystem truth
 # and checker verdict must invert cleanly in both directions ------------------
