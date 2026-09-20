@@ -716,24 +716,31 @@ user-visible capability with no adopter-docs surface — a first-class
 outcome, not a workaround. Carrying either marker beside a `no` declaration
 is refused, on the same footing as a `no` declaration passing on its own.
 
-Enforcement today is a **duty, not a checker**. At a task's first freeze
-the coordinating session reads that declaration region itself, requires
-exactly one declaration with a non-empty rationale, and — for `yes` —
-requires either the `- adopter-surface:` line under a criterion or a
-non-empty `- adopter-docs-waiver:`, never both and never either beside a
-`no`; anything else refuses the freeze and routes the spec back to its
-author. **no mechanical checker ships for it yet.** One was built and
-then carved out to issue #250 under T-1061's own pre-commitment, after
-two consecutive review rounds found independent defects in its
-scan-scoping logic; shipping a gate that passes a spec it should refuse
-is worse than shipping an honest prose duty, so the mechanism waits for a
-redesign rather than a third patch. The boundary is unchanged in either
-form: the sweep **does not open**, resolve or validate the surface a spec
-names — whether a named surface is really adopter-facing is a matter for
-the reviewing gates and the human, never for a mechanical check, and a
-path allowlist would coerce every adopter's repository into this one's
-layout. The duty applies at a task's bootstrap freeze only, never at a
-re-freeze of an already-recorded hash.
+Enforcement today is `bin/check-adopter-docs.sh <spec.md>` (T-1151),
+run at a task's first freeze, before the intent-hash is recorded. It reads
+that declaration region itself, requires exactly one declaration with a
+non-empty rationale, and — for `yes` — requires either the
+`- adopter-surface:` line under a criterion or a non-empty
+`- adopter-docs-waiver:`, never both and never either beside a `no`;
+anything else exits non-zero with one refusal token on stderr, and the
+freeze routes the spec back to its author. The boundary is unchanged from
+the prose duty it replaces: the checker **does not open**, resolve or
+validate the surface a spec names — whether a named surface is really
+adopter-facing is a matter for the reviewing gates and the human, never for
+a mechanical check, and a path allowlist would coerce every adopter's
+repository into this one's layout. The duty applies at a task's bootstrap
+freeze only, never at a re-freeze of an already-recorded hash.
+
+A `yes` declaration additionally carries one or more unindented
+`- shipped-docs: <repo-relative path> — this-task | issue #<N>` lines
+inside the same declaration region (issue #577): every shipped document the
+spec's own prose names as changing gets its own line, dispositioned
+`this-task` when this task's diff edits it (in which case its path must
+also appear, as a literal substring, in one of the spec's own `- check:` or
+`- adopter-surface:` lines) or `issue #<N>` when the update is deliberately
+deferred to a filed follow-up. `bin/check-adopter-docs.sh` never opens,
+stats or resolves the named path against the filesystem; it only checks
+that a `this-task` path is named elsewhere in the same file.
 
 ## Both gates green and your own CI
 
