@@ -71,6 +71,34 @@ claude --plugin-dir ./
 
 `agents/*`・`skills/*`・`bin/*` を編集したら `/reload-plugins` で変更を反映します（スキル本体の編集はライブ反映）。このリポジトリはもう `.claude/agents/` のコピーを保持していません — `--plugin-dir ./` が dogfood の経路です。
 
+## サンドボックス有効時の permission 設定
+
+Claude Code セッションが **sandbox 有効**で動いているとき、Codex 別プロバイダレビュー経路（`code-reviewer`）が機能するのは、そのセッションの設定が Codex の呼び出しを sandbox の**外側**に置いている場合だけです。関係する設定層は 2 つあり、混同してはいけません——公式の Claude Code permissions / sandboxing ドキュメントを参照してください。
+
+- **`sandbox.excludedCommands`**（主要な層）——このパターンに一致するコマンドは sandbox の**外側**で走ります。実際に `sandbox_apply: Operation not permitted` の失敗を直すのはこの層です。
+- **`permissions.allow`**（補助的・任意の層）——一致する Bash 呼び出しの permission プロンプトを抑制するだけです。単独では sandbox から何も除外しないため、`permissions.allow` のルールだけを足しても sandbox の失敗は直りません。
+
+`.claude/settings.local.json` に `sandbox.excludedCommands` の形を追加すると、直接 `codex` を呼ぶ経路がカバーされます。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です:
+
+```json
+{
+  "sandbox": {
+    "excludedCommands": [
+      "codex *"
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(codex *)"
+    ]
+  }
+}
+```
+
+sandbox 除外パターンはコマンドラインの先頭トークンに一致するため、`code-reviewer` / `drift-evaluator` が `codex exec …` を裸の第一トークンとして直接実行している限り、これは構造的な修正であって設定上の回避策ではありません。
+
+**ここで検証できること・できないこと。** 呼び出しの**形**——caller の codex 呼び出しが `"codex *"` の除外パターンに一致する、裸の第一トークン `codex exec …` 行であること——は、このリポの CI（`tests/codex-skeleton-hygiene/run.sh`）が機械的に検証する構造的事実です。その呼び出しが**実行時に実際に sandbox の外側で走るか**は CI でも、このリポの QA サブエージェントのパスでも検証できません——sandbox が有効な Claude Code の自セッションだけが確認できるものとして扱ってください。
+
 ## アップデート
 
 `.claude-plugin/plugin.json` の `version` を bump してコミットし、各マシンで実行します:

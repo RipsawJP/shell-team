@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.7.2-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.7.3-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.ja.md#codex-cli-から-shell-team-を使う)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
@@ -28,9 +28,9 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 
 - **plan → specify →（必要時のみ design）→ implement → validate → cross-provider review** を強制し、各境界に status flag を置く。
 - 最終レビューは、ループを駆動している host とは別のプロバイダで走る — Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass — 実装チームと同じモデルファミリーには決してならない。
-- 各実行を明示的な Loop 契約（BUDGET/STOP）で bound し、`/goal` が同じガードレールの下で 1 タスクを完了まで駆動する。
-- 各フェーズのテレメトリと retro / lessons を、次の実行へ還流させる。
-- プラグインとして一度導入すれば全リポで使え、リポごとのコピーやバージョンドリフトを避けられる。
+- 各実行を明示的な Loop 契約（BUDGET/STOP）で bound し、`/goal`（Claude Code のスラッシュコマンド）が同じガードレールの下で 1 タスクを完了まで駆動する。
+- 各フェーズのテレメトリと retro / lessons を、次の実行へ還流させる——retro / lessons を書く役割は今のところ Claude Code 側の役割として出荷されている。
+- プラグインとして一度導入すれば、使っている host のどちらでも使える。Codex CLI host では、適用先リポジトリごとに生成された `.codex/agents/` を個別に持つ——プラグイン本体のインストールはこれに触れず、アップグレード後は generator を再実行するまでリポジトリごとに stale になり得る。
 
 プロジェクトがここまでどう進化したかは [docs/history.ja.md](docs/history.ja.md) を参照してください。
 
@@ -79,7 +79,7 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-この 3 行だけが手順の全てではない: 生成されたエージェントの `.gitignore` 登録・リポジトリの trust・sandbox の writable roots・Claude Code CLI という前提・ネットワークアクセス・`PATH` の export は、それぞれ [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
+この 3 行だけが手順の全てではない: インストール済み plugin root の特定・生成されたエージェントの `.gitignore` 登録・リポジトリの trust・sandbox の writable roots・Claude Code CLI という前提・ネットワークアクセス・`PATH` の export は、それぞれ [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
 
 Codex CLI の orchestrator がどの instruction 面を自動で読み込むかは、**このリポジトリからは測定**できていません。拠り所にするのは上でリンクした runbook の手順です。ループ自身の停止点はどちらの host でも同じで、**マージ**と **push** はあなたの判断のまま、独立レビュアーに到達できない場合は同一ファミリーへ黙って切り替えず `BLOCKED` を返します。
 
@@ -168,7 +168,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 │   ├── ui-designer.md               # UI 作業時のみデザイン担当（frontend-design Skill・任意依存）
 │   ├── engineer.md                  # 実装（既定 non-worktree・並列時のみ opt-in 隔離）
 │   ├── qa-verifier.md               # テスト実行 / 受け入れ条件チェック
-│   ├── code-reviewer.md            # Codex CLI 別プロバイダレビュー
+│   ├── code-reviewer.md            # 別プロバイダレビュー（どちらの host でも）
 │   ├── scrum-master.md              # retro / lessons 生成
 │   └── triage-orchestrator.md       # 外側ループの triage 統合（propose-only）
 ├── skills/
@@ -204,7 +204,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 [Design]    ui-designer     → （UI 時のみ）design note  新フラグなし
 [Implement] engineer        → コード + テスト          READY_FOR_QA
 [Validate]  qa-verifier     → 実行 + 条件チェック       READY_FOR_REVIEW
-[Review]    code-reviewer  → Codex CLI の判定         READY_FOR_MERGE
+[Review]    code-reviewer  → 別プロバイダの判定（どちらの host でも） READY_FOR_MERGE
 ```
 
 `[Design]` は**条件付き**（UI 作業時のみ `ui-designer` が参加）。新しい status flag は持たず、design note の存在で順序を担保する。`frontend-design` Skill は任意依存（未インストール時は内蔵指針に縮退モード明示で fallback）。
@@ -355,7 +355,7 @@ stderr に警告を出す（refuse は決してせず、exit status も変えな
 - **真実源はファイルのみ**：`tasks/todo.md` ＋ status flag がエージェント間の単一の真実源。
 - **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身も同じ既定レイアウトで動くので、自分の board・specs・retros も `.shell-team/` 配下にある。resolver は、base dir 集約より前にチームを導入したリポのために legacy な `tasks/` + `docs/specs/` レイアウトも今なお検出・対応する——本ドキュメント群が `tasks/…` / `docs/specs/…` と書いている箇所は、その legacy レイアウトでの同じ artifact を指す。[docs/adopting.md](docs/adopting.md) 参照。
 - **Engineer は既定で non-worktree**：編集は現在の feature ブランチに直接着地する。並列実装時のみ orchestrator が起動時に `isolation: worktree` を opt-in。
-- **別プロバイダレビューの Codex 紐付けは「出荷時の既定」**：`code-reviewer` は既定で Codex CLI に紐付けられている。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。Codex CLI が使えない場合は Claude にフォールバックせず `BLOCKED` を返す。
+- **別プロバイダレビューの紐付けは「出荷時の既定」・どちらの host でも**：`code-reviewer` は、ループを駆動している host とは別のプロバイダで走る——Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。独立レビュアーに到達できない場合は同一ファミリーへフォールバックせず `BLOCKED` を返す。
 
 ## バージョニング
 
