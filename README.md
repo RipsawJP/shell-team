@@ -28,9 +28,9 @@ A spec-driven dev team you can run from **either Claude Code or Codex CLI** — 
 
 - Enforces **plan → specify → conditional design → implement → validate → cross-provider review**, with a status flag at every boundary.
 - Runs the final review through the *other* provider from whichever host is driving the loop — Codex CLI on a Claude Code host, a `claude -p` pass on a Codex CLI host — so it never comes from the same model family as the implementation team.
-- Bounds every run with an explicit loop contract (BUDGET/STOP); `/goal` can drive one task to completion under the same guardrails.
-- Feeds phase telemetry, retros, and lessons back into later runs.
-- Installs once as a plugin and works across repos without per-repo copies or version drift.
+- Bounds every run with an explicit loop contract (BUDGET/STOP); `/goal`, a Claude Code slash command, can drive one task to completion under the same guardrails.
+- Feeds phase telemetry, retros, and lessons back into later runs — the retro/lessons generator ships as a Claude Code role today.
+- Installs once as a plugin, on whichever host you use. On a Codex CLI host, each adopted repository additionally carries its own generated `.codex/agents/`, which the plugin install itself does not touch and which can go stale per adopted repository after an upgrade until its generator is re-run.
 
 See [docs/history.md](docs/history.md) for the story of how the project got here.
 
@@ -79,7 +79,7 @@ The first two commands above are the once-per-machine plugin install; the third 
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-These three printed lines are not the whole path: gitignoring the generated agents, repository trust, the sandbox's writable roots, the Claude Code CLI prerequisite, network access, and the `PATH` export are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
+These three printed lines are not the whole path: locating the installed plugin root, gitignoring the generated agents, repository trust, the sandbox's writable roots, the Claude Code CLI prerequisite, network access, and the `PATH` export are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
 
 Which instruction surface a Codex CLI orchestrator **loads automatically is unmeasured from this repository** — the runbook linked above is what this project relies on instead. The loop's own stop points are the same on both hosts: **merge and push** stay yours, and when the independent reviewer cannot be reached the review returns `BLOCKED` rather than quietly falling back to a same-family one.
 
@@ -168,7 +168,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 │   ├── ui-designer.md               # Design for UI work only (frontend-design Skill; optional dep)
 │   ├── engineer.md                  # Implementer (non-worktree by default; opt-in isolation)
 │   ├── qa-verifier.md               # Test runner / acceptance checker
-│   ├── code-reviewer.md            # Codex CLI cross-provider reviewer
+│   ├── code-reviewer.md            # cross-provider reviewer, either host
 │   ├── scrum-master.md              # Retro / lessons generator
 │   └── triage-orchestrator.md       # Outer-loop triage consolidator (propose-only)
 ├── skills/
@@ -204,7 +204,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 [Design]    ui-designer     → (UI only) design note   no new flag
 [Implement] engineer        → code + tests           READY_FOR_QA
 [Validate]  qa-verifier     → run + check criteria   READY_FOR_REVIEW
-[Review]    code-reviewer  → Codex CLI verdict       READY_FOR_MERGE
+[Review]    code-reviewer  → cross-provider verdict (either host)  READY_FOR_MERGE
 ```
 
 `[Design]` is **conditional** (only when the task involves UI work). It carries no new status flag — the design note's existence gates the engineer. The `frontend-design` Skill is an optional dependency (degrades to in-house guidance, announced not silent, when absent).
@@ -350,7 +350,7 @@ grammar and exit-code contract.
 - **Files are the only shared state**: the board (`todo.md`) + status flags are the single source of truth between agents.
 - **Single base dir, host root untouched**: adopted repos keep all operating files under one base dir (`.shell-team/` by default, resolved by `bin/team-paths.sh`; override with `TEAM_RUN_BASE`). `team-init` never edits the host's `CLAUDE.md` or root `.gitignore`. This repo runs on that same default layout, so its own board, specs, and retros live under `.shell-team/` too. The resolver still detects and supports the earlier `tasks/` + `docs/specs/` layout for repos that adopted the team before the base dir was consolidated — where these docs write `tasks/…` or `docs/specs/…`, they name the same artifacts in that legacy layout. See [docs/adopting.md](docs/adopting.md).
 - **Engineer is non-worktree by default**: its edits land directly on the current feature branch; the orchestrator opts into `isolation: worktree` at invocation only for parallel implementations.
-- **The reviewer's cross-provider binding is the shipped default**: `code-reviewer` ships bound to Codex CLI because a model reviewing output from its own family shares its blind spots. A host-authored `binding.conf` may rebind `code-reviewer` to a same-family executor; doing so changes which executor gets resolved and which value telemetry records, but does not wire up an alternate-executor invocation path and does not guarantee cross-provider review once such a rebind exists. If Codex CLI is unavailable, the review returns `BLOCKED` rather than falling back to Claude.
+- **The reviewer's cross-provider binding is the shipped default, on either host**: `code-reviewer` runs opposite whichever host drives the loop — Codex CLI on a Claude Code host, a `claude -p` pass on a Codex CLI host — because a model reviewing output from its own family shares its blind spots. A host-authored `binding.conf` may rebind `code-reviewer` to a same-family executor; doing so changes which executor gets resolved and which value telemetry records, but does not wire up an alternate-executor invocation path and does not guarantee cross-provider review once such a rebind exists. If the independent reviewer is unavailable, the review returns `BLOCKED` rather than falling back to a same-family one.
 
 ## Versioning
 
