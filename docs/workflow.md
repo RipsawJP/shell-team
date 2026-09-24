@@ -166,8 +166,8 @@ codex exec --sandbox read-only --cd <repo> review --base <base> --json -o <out-f
 # Fallback when `codex review` is unavailable
 codex exec --ephemeral --json "<prompt>"
 
-# Adversarial second pass on suspect files
-codex exec --ephemeral --json "Play devil's advocate on <file>. What could break this?"
+# The evidence pass opens this round's perspectives file (never changing a character of the path) and returns a per-perspective evidence ledger
+codex exec --sandbox read-only --cd <repo> --json -o <out-file> "Open the file at the absolute path <perspectives-file> without changing a character of the path, and follow the instructions it contains."
 ```
 
 ## Conventions
