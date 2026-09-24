@@ -687,16 +687,16 @@ grep -Fq -- '--alloc --stem T-XXX-codex-specreview' "$CODEX_REVIEWER_MD" \
 grep -Fq -- '--alloc --stem T-XXX-drift-codex' "$DRIFT_EVALUATOR_MD" \
   || fail "agentmd-bare-codex-present: missing '--alloc --stem T-XXX-drift-codex' in agents/drift-evaluator.md"
 # shellcheck disable=SC2016  # deliberately literal -F pattern, not a shell expansion.
-grep -Fq -- '--publish --stem T-XXX-codex-primary --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$CODEX_REVIEWER_MD" \
+grep -Fq -- '--publish --stem T-XXX-codex-primary --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>" --thread-id "<THREAD_ID>"' "$CODEX_REVIEWER_MD" \
   || fail "agentmd-bare-codex-present: missing the primary --publish full-sentence form in agents/code-reviewer.md"
 # shellcheck disable=SC2016
-grep -Fq -- '--publish --stem T-XXX-codex-adversarial --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$CODEX_REVIEWER_MD" \
+grep -Fq -- '--publish --stem T-XXX-codex-adversarial --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>" --thread-id "<THREAD_ID>"' "$CODEX_REVIEWER_MD" \
   || fail "agentmd-bare-codex-present: missing the adversarial --publish full-sentence form in agents/code-reviewer.md"
 # shellcheck disable=SC2016
-grep -Fq -- '--publish --stem T-XXX-codex-specreview --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$CODEX_REVIEWER_MD" \
+grep -Fq -- '--publish --stem T-XXX-codex-specreview --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>" --thread-id "<THREAD_ID>"' "$CODEX_REVIEWER_MD" \
   || fail "agentmd-bare-codex-present: missing the spec-review --publish full-sentence form in agents/code-reviewer.md (T-1092)"
 # shellcheck disable=SC2016
-grep -Fq -- '--publish --stem T-XXX-drift-codex --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>"' "$DRIFT_EVALUATOR_MD" \
+grep -Fq -- '--publish --stem T-XXX-drift-codex --publish-out "<RAW_OUT>" --publish-jsonl "<RAW_JSONL>" --thread-id "<THREAD_ID>"' "$DRIFT_EVALUATOR_MD" \
   || fail "agentmd-bare-codex-present: missing the drift --publish full-sentence form in agents/drift-evaluator.md"
 pass "agentmd-bare-codex-present — agents/code-reviewer.md / agents/drift-evaluator.md carry exactly 3 / 1 bare 'codex exec ' lines and every AC10/T-1092 confirmed --alloc/--publish full-sentence form (grep rc=0 required)"
 
@@ -1018,9 +1018,10 @@ elif mode == "connector":
         raise SystemExit(f"connector mutation anchor {marker!r} not found in: {cmd_line!r}")
     lines[idx + 1] = cmd_line.replace(marker, marker + " && touch /tmp/pwned-test", 1)
 elif mode == "tailconnector":
-    # T-111 form 2 (T-107 round6-A repro): append an UNQUOTED connector AFTER
-    # the block's LAST content line -- i.e. after the trailing `> "<RAW_JSONL>"
-    # 2>&1` redirection, which is outside every quoted region. The round4/5
+    # T-111 form 2 (T-107 round6-A repro; T-1152 reworded -- the block no
+    # longer ends in a shell redirection): append an UNQUOTED connector AFTER
+    # the block's LAST content line -- i.e. after the closing double quote of
+    # the prompt argument, which is outside every quoted region. The round4/5
     # connector check only ever inspected the block's FIRST physical line, so
     # this injection position is invisible to it by construction.
     idx = nth_marker_index("codex", site_n)
@@ -1169,8 +1170,9 @@ pass "agentmd-fence-mutation — unmodified control copies of both agent files s
 #   1. an unquoted connector on the block's FIRST physical line
 #      (closed by the round5 `connector` check above),
 #   2. an unquoted connector appended AFTER the block's LAST line — past the
-#      trailing redirection, outside every quoted region (still open: the
-#      round5 check only ever inspects the first line),
+#      closing double quote of the prompt argument, outside every quoted
+#      region (still open: the round5 check only ever inspects the first
+#      line),
 #   3. a BACKTICK command substitution inside the double-quoted prompt —
 #      backticks, unlike `&&` / `;`, are NOT neutralized by double quotes, so
 #      lines the checker treats as inert prose still carry a live primitive
@@ -1671,6 +1673,81 @@ set -e
 [[ "$tci_rc" -eq 0 ]] \
   || fail "template-check-ignore: expected git check-ignore to report the probe capture-temp path as ignored (exit 0), got $tci_rc"
 pass "template-check-ignore — templates/shell-team.gitignore's 'reviews/.codex-capture.*' pattern ignores a probe capture-temp path under reviews/"
+
+# =============================================================================
+# agentmd-no-trailing-operator (T-1152, AC13 -- Droppable 1st, see spec
+# ## Pre-commitment) + agentmd-no-trailing-operator-mutation
+#
+# T-1152's own Goal requires every shipped `codex exec` block to write only
+# `-o "<RAW_OUT>"` and carry no redirection, stdin redirect, connector or
+# background operator after its arguments (the shape Claude Code 2.1.278+
+# exempts from its sandbox under the "codex *" exclusion). AC1's inline
+# `- check:` line pins the two agent files; this case extends the same
+# assertion to a fifth site (the alternate-executor recipe line) and gives it
+# its own independent, non-vacuous suite lock with a mutation case, matching
+# the discipline agentmd-fence-mutation / agentmd-block-verbatim-mutation
+# already apply elsewhere in this file.
+# =============================================================================
+
+# no_trailing_operator LINE — returns 0 (clean) unless LINE carries a shell
+# operator after its arguments: a redirection (`>` / `<`, which also covers
+# `2>&1`), a connector (`&&` / `||`), or a statement separator (`;`).
+# Angle-bracket placeholder tokens (`<repo>`, `<RAW_OUT>`, `<BRIEFING_FILE>`,
+# ...) are stripped first -- they are literal argument text, not shell
+# redirection, and every one of them is a single space-free `<...>` run.
+no_trailing_operator() {
+  local line="$1" stripped
+  stripped="$(printf '%s' "$line" | sed -E 's/<[^<> ]+>//g')"
+  case "$stripped" in
+    *'>'* | *'<'* | *'&&'* | *'||'* | *';'*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+printf -- '\n--- agentmd-no-trailing-operator ---\n'
+ALT_EXEC_MD="$REPO_ROOT/templates/prompt-blocks/alternate-executor-invocation.md"
+
+nto_check_live() {
+  local label="$1" line="$2"
+  no_trailing_operator "$line" \
+    || fail "agentmd-no-trailing-operator: $label: the covered site's last line carries a shell operator: $line"
+}
+
+nto_check_live "code-reviewer.md primary" "$(extract_marked_block "$CODEX_REVIEWER_MD" codex 1 | tail -n 1)"
+nto_check_live "code-reviewer.md adversarial" "$(extract_marked_block "$CODEX_REVIEWER_MD" codex 2 | tail -n 1)"
+nto_check_live "code-reviewer.md spec-review" "$(extract_marked_block "$CODEX_REVIEWER_MD" codex 3 | tail -n 1)"
+nto_check_live "drift-evaluator.md" "$(extract_marked_block "$DRIFT_EVALUATOR_MD" codex 1 | tail -n 1)"
+nto_check_live "alternate-executor-invocation.md" "$(grep '^codex exec ' "$ALT_EXEC_MD")"
+pass "agentmd-no-trailing-operator — none of the five covered codex-exec sites (code-reviewer.md primary/adversarial/spec-review, drift-evaluator.md, the alternate-executor recipe line) carry a shell operator after their arguments"
+
+printf -- '\n--- agentmd-no-trailing-operator-mutation ---\n'
+
+NTO_MUT_REVIEWER1="$TMP/nto-mut-reviewer1.md"
+mutate_fence_site "$CODEX_REVIEWER_MD" 1 tailconnector "$NTO_MUT_REVIEWER1"
+no_trailing_operator "$(extract_marked_block "$NTO_MUT_REVIEWER1" codex 1 | tail -n 1)" \
+  && fail "agentmd-no-trailing-operator-mutation: code-reviewer.md primary: an injected trailing connector was NOT caught"
+
+NTO_MUT_REVIEWER2="$TMP/nto-mut-reviewer2.md"
+mutate_fence_site "$CODEX_REVIEWER_MD" 2 tailconnector "$NTO_MUT_REVIEWER2"
+no_trailing_operator "$(extract_marked_block "$NTO_MUT_REVIEWER2" codex 2 | tail -n 1)" \
+  && fail "agentmd-no-trailing-operator-mutation: code-reviewer.md adversarial: an injected trailing connector was NOT caught"
+
+NTO_MUT_REVIEWER3="$TMP/nto-mut-reviewer3.md"
+mutate_fence_site "$CODEX_REVIEWER_MD" 3 tailconnector "$NTO_MUT_REVIEWER3"
+no_trailing_operator "$(extract_marked_block "$NTO_MUT_REVIEWER3" codex 3 | tail -n 1)" \
+  && fail "agentmd-no-trailing-operator-mutation: code-reviewer.md spec-review: an injected trailing connector was NOT caught"
+
+NTO_MUT_DRIFT="$TMP/nto-mut-drift.md"
+mutate_fence_site "$DRIFT_EVALUATOR_MD" 1 tailconnector "$NTO_MUT_DRIFT"
+no_trailing_operator "$(extract_marked_block "$NTO_MUT_DRIFT" codex 1 | tail -n 1)" \
+  && fail "agentmd-no-trailing-operator-mutation: drift-evaluator.md: an injected trailing connector was NOT caught"
+
+NTO_MUT_ALT="$TMP/nto-mut-alt.md"
+sed 's/^codex exec .*/&  > \/tmp\/pwned-test/' "$ALT_EXEC_MD" > "$NTO_MUT_ALT"
+no_trailing_operator "$(grep '^codex exec ' "$NTO_MUT_ALT")" \
+  && fail "agentmd-no-trailing-operator-mutation: alternate-executor-invocation.md: an injected trailing redirection was NOT caught"
+
+pass "agentmd-no-trailing-operator-mutation — appending a shell operator after each of the five covered sites, in a scratch copy, is caught at every site (4 agent codex blocks via the shared tailconnector mutator, plus the alternate-executor recipe line via a standalone sed mutation)"
 
 # =============================================================================
 # Summary

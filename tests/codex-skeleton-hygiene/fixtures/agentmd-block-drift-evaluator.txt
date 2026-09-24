@@ -9,4 +9,4 @@ align with the frozen intent's meaning, and whether every non-trivial provenance
 a real grounding citation (a decision whose grounding value literally reads 'none (ungrounded)' \
 is a candidate for ungrounded-decision, not an automatic pass). Return your verdict as exactly one \
 of: aligned, drift-detected, ungrounded-decision, OOD-novelty, plus your reasoning and which files \
-you actually read." > "<RAW_JSONL>" 2>&1
+you actually read."
