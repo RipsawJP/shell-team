@@ -560,8 +560,13 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    is not needed otherwise. When the loop's own `code-reviewer` role hits
    this exact `Not logged in` failure during its Codex-host review pass,
    it now stops with a `BLOCKED` report that already applies this same
-   two-candidate diagnosis on its own — read that report's stated cause
-   and fix rather than re-running the steps above by hand.
+   two-candidate diagnosis on its own — deciding between the two exactly
+   as step 7's own isolation call does (`ok` and exit `0` means the
+   network refusal above; a login prompt or an authentication error means
+   step 7's own auth failure and `/login` genuinely is the fix; anything
+   else from that call means neither, and the report says so as-is) —
+   read that report's stated cause and fix rather than re-running the
+   steps above by hand.
 9. **Export `<plugin root>/bin` onto `PATH` before starting `codex`
    (T-1135, closing the PATH-resolution gap slice 1 disclosed).** A spawned Codex custom agent inherits
    the parent process's own `PATH`, so running
