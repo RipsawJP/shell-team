@@ -1,7 +1,4 @@
 # T-107-step: codex
 codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
-"Review the diff between <base> and HEAD. \
-Read the files yourself with git diff / nl -ba — do not expect any diff in this prompt. \
-Focus on: correctness against docs/specs/<slug>.md acceptance criteria, \
-security issues, edge cases the tests miss, and any design smells. \
-Return findings as a JSON array of {severity, file, line, issue, suggestion}."
+"Open the file at the absolute path <PERSPECTIVES_FILE> without changing a character of the path, \
+and follow the instructions it contains."
