@@ -557,7 +557,11 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    invocation, or the equivalent `network_access = true` entry under
    `[sandbox_workspace_write]` in your Codex `config.toml`. `--sandbox
    danger-full-access` also works, at the cost of the whole sandbox, and
-   is not needed otherwise.
+   is not needed otherwise. When the loop's own `code-reviewer` role hits
+   this exact `Not logged in` failure during its Codex-host review pass,
+   it now stops with a `BLOCKED` report that already applies this same
+   two-candidate diagnosis on its own — read that report's stated cause
+   and fix rather than re-running the steps above by hand.
 9. **Export `<plugin root>/bin` onto `PATH` before starting `codex`
    (T-1135, closing the PATH-resolution gap slice 1 disclosed).** A spawned Codex custom agent inherits
    the parent process's own `PATH`, so running
