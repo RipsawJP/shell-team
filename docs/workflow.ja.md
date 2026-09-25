@@ -163,8 +163,8 @@ codex exec --sandbox read-only --cd <repo> review --base <base> --json -o <out-f
 # `codex review` が使えないときのフォールバック
 codex exec --ephemeral --json "<prompt>"
 
-# 疑わしいファイルへの敵対的セカンドパス
-codex exec --ephemeral --json "Play devil's advocate on <file>. What could break this?"
+# evidence pass — 今回ラウンドの perspectives ファイルをパスの一字も変えずに開き、観点ごとの evidence ledger を返す
+codex exec --sandbox read-only --cd <repo> --json -o <out-file> "Open the file at the absolute path <perspectives-file> without changing a character of the path, and follow the instructions it contains."
 ```
 
 ## 規約

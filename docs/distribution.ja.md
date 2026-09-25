@@ -78,6 +78,8 @@ Claude Code セッションが **sandbox 有効**で動いているとき、Code
 - **`sandbox.excludedCommands`**（主要な層）——このパターンに一致するコマンドは sandbox の**外側**で走ります。実際に `sandbox_apply: Operation not permitted` の失敗を直すのはこの層です。
 - **`permissions.allow`**（補助的・任意の層）——一致する Bash 呼び出しの permission プロンプトを抑制するだけです。単独では sandbox から何も除外しないため、`permissions.allow` のルールだけを足しても sandbox の失敗は直りません。
 
+**一致のルールは Claude Code 2.1.278 で変わりました。** それ以前は `sandbox.excludedCommands` のパターンはコマンドラインの先頭トークンだけに一致していたため、行末にシェルのリダイレクトが付いていても `codex exec …` 行は除外対象のままでした。Claude Code 2.1.278 はこれを変更し、コマンドの**すべての部分**が一致したときだけ除外されるようになりました（先頭トークンだけではありません。計測日 2026-09-24、Claude Code **2.1.281**、codex-cli **0.156.1**）。このプラグインが出荷していた `codex exec` ブロックはどれも `> "<jsonl の生パス>" 2>&1` で終わっていたため、2.1.278 以降ではこのリダイレクトが一致しない 2 つめの部分となり、呼び出し全体が sandbox の**内側**で走っていました——うるさく失敗する形（`workspace routing discovery failed` → `turn.failed`、exit 1、最終メッセージのファイルは書かれない）か、静かに失敗する形（exit 0、`Unable to determine.` のような判断不能文、イベントストリームに `sandbox_apply` エラー）のいずれかです。リダイレクトを持たない裸の形は、2.1.278 以降でも、それより前のどのバージョンでも sandbox の外側で走り、正常に完了します。出荷される `codex exec` ブロックは今はすべて、自分自身の `-o` キャプチャだけを書く単一の裸コマンドです——リダイレクトも、標準入力のリダイレクトも、コマンド置換も、connector もありません。これにより `"codex *"` の除外パターンが呼び出し全体に再び一致します。
+
 `.claude/settings.local.json` に `sandbox.excludedCommands` の形を追加すると、直接 `codex` を呼ぶ経路がカバーされます。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です:
 
 ```json
@@ -95,9 +97,9 @@ Claude Code セッションが **sandbox 有効**で動いているとき、Code
 }
 ```
 
-sandbox 除外パターンはコマンドラインの先頭トークンに一致するため、`code-reviewer` / `drift-evaluator` が `codex exec …` を裸の第一トークンとして直接実行している限り、これは構造的な修正であって設定上の回避策ではありません。
+**キャプチャされる `.jsonl` の出所が変わりました。** 出荷される `codex exec` ブロックはもう自分の出力をリダイレクトしないため、キャプチャされるペアの `.jsonl` 側はシェルのリダイレクトでは作られません。`codex exec` は実行のたびに、自分自身のイベントストリーム記録——`rollout-<timestamp>-<thread_id>.jsonl` ファイル——を自分自身の状態ディレクトリ `${CODEX_HOME:-$HOME/.codex}/sessions/<YYYY>/<MM>/<DD>/` に書きます。これはこのプラグインが何をするかとは無関係です。`bin/codex-capture.sh --publish` は任意の 1 フラグ `--thread-id <id>` を取り、そのスレッドの rollout 記録を bit-for-bit で publish 対象の `.jsonl` に取り込みます。そのレコードが完了した実行を示さない場合（成功したコマンドが無い、終端イベントが無い、最終メッセージが null、または error が null でない）は、verdict として publish せずに拒否します。`CODEX_HOME` は Codex CLI 自身のホームディレクトリの上書き先で、未設定のときは `$HOME/.codex` にフォールバックします。
 
-**ここで検証できること・できないこと。** 呼び出しの**形**——caller の codex 呼び出しが `"codex *"` の除外パターンに一致する、裸の第一トークン `codex exec …` 行であること——は、このリポの CI（`tests/codex-skeleton-hygiene/run.sh`）が機械的に検証する構造的事実です。その呼び出しが**実行時に実際に sandbox の外側で走るか**は CI でも、このリポの QA サブエージェントのパスでも検証できません——sandbox が有効な Claude Code の自セッションだけが確認できるものとして扱ってください。
+**ここで検証できること。** 呼び出しの**形**——出荷される `codex exec` 行がすべて、引数の後に他の部分を持たない単一の裸コマンドであり、`"codex *"` の除外パターンに構造的に一致すること——は、このリポの CI（`tests/codex-skeleton-hygiene/run.sh` の `agentmd-bare-codex-present`、`agentmd-no-trailing-operator` とそれぞれの mutation 対照ケース）が機械的に検証する構造的事実です。この形の呼び出しが Claude Code 2.1.278 以降で**実行時に実際に sandbox の外側で走るか**は、このホストでの sandbox 有効・実セッションのライブプローブ（計測日 2026-09-24、Claude Code **2.1.281**、codex-cli **0.156.1**）で確認済みです：Codex は自分自身のコマンドを実行し、`-o` キャプチャが書かれ、`<sandbox_violations>`・`sandbox_apply`・`workspace routing discovery failed` のいずれも現れませんでした。同じプローブを修正前の出荷形（末尾のリダイレクトつき）で走らせると、うるさい失敗が再現しました。このプローブと rollout の証跡は、この変更を行ったタスクのこのリポジトリ自身の provenance 記録に残っています。
 
 ## アップデート
 
