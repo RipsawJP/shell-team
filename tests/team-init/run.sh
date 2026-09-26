@@ -243,6 +243,74 @@ init "$T_LEG" >/dev/null 2>&1 || fail "legacy: team-init exited non-zero on a le
 [ ! -e "$T_LEG/test-recipe.md" ]     || fail "legacy: test-recipe.md must not be created at the host root"
 pass "legacy: AGENTS.md follows the resolved base to tasks/AGENTS.md (no host-root / no .shell-team leak)"
 
+# =============================================================================
+# T-1155 (issue #606): the scaffolded <base>/.gitignore ignores published raw
+# review captures (codex-capture.sh --publish output) per layout, while the
+# curated <task-id>.md review record and the scaffold's .gitkeep stay
+# trackable. `git check-ignore` works on paths that do not exist, so no raw
+# file need be created. Targets live under $GIT_TMP (a real git repository is
+# required), never under $TMP — see .shell-team/test-recipe.md's T-1042 entry
+# and this suite's own T-1097 comment on why plain $TMP fails a `git init`.
+# Paths are derived through bin/team-paths.sh --root <target> --get reviews /
+# --get runs, never hardcoded, so each layout's own resolved location is
+# exercised. Every git check-ignore pins core.excludesFile=/dev/null so an
+# operator's global excludes file can neither help nor hide the assertion;
+# "not ignored" requires exit status exactly 1, distinguishing it from a
+# 128 usage/repo error.
+# =============================================================================
+assert_raw_captures_ignored() {
+  local label="$1" target="$2"
+  local reviews_dir runs_dir p r
+  reviews_dir="$(bash "$REPO_ROOT/bin/team-paths.sh" --root "$target" --get reviews)"
+  runs_dir="$(bash "$REPO_ROOT/bin/team-paths.sh" --root "$target" --get runs)"
+  for p in \
+    "$reviews_dir/T-9999-codex-primary.txt" \
+    "$reviews_dir/T-9999-codex-primary.jsonl" \
+    "$reviews_dir/T-9999-codex-primary.json" \
+    "$reviews_dir/.codex-capture.s.out.XYZ123" \
+    "$runs_dir/x.jsonl"
+  do
+    git -C "$target" -c core.excludesFile=/dev/null check-ignore -q -- "$p" \
+      || fail "$label: expected ignored, is not: $p"
+  done
+  for p in "$reviews_dir/T-9999.md" "$reviews_dir/.gitkeep"; do
+    set +e
+    git -C "$target" -c core.excludesFile=/dev/null check-ignore -q -- "$p"
+    r=$?
+    set -e
+    [ "$r" -eq 1 ] || fail "$label: expected NOT ignored (exit status 1), got exit $r: $p"
+  done
+  pass "$label published .txt/.jsonl/.json and the .codex-capture.* temp are ignored in $reviews_dir, a file under $runs_dir is ignored, and the curated .md record plus .gitkeep in $reviews_dir stay trackable"
+}
+
+# --- raw-captures-ignored-default: default .shell-team/ layout --------------
+RC_DEFAULT="$GIT_TMP/raw-captures-default"
+mkdir -p "$RC_DEFAULT"
+git init -q "$RC_DEFAULT" >/dev/null 2>&1 \
+  || fail "raw-captures-ignored-default: git init failed (control)"
+init "$RC_DEFAULT" >/dev/null 2>&1 \
+  || fail "raw-captures-ignored-default: team-init exited non-zero"
+assert_raw_captures_ignored "raw-captures-ignored-default" "$RC_DEFAULT"
+
+# --- raw-captures-ignored-legacy: tasks/ + docs/specs/ legacy layout --------
+RC_LEGACY="$GIT_TMP/raw-captures-legacy"
+mkdir -p "$RC_LEGACY/tasks/loops"
+cp "$REPO_ROOT/templates/shell-team.contract.yaml" "$RC_LEGACY/tasks/loops/shell-team.contract.yaml"
+git init -q "$RC_LEGACY" >/dev/null 2>&1 \
+  || fail "raw-captures-ignored-legacy: git init failed (control)"
+init "$RC_LEGACY" >/dev/null 2>&1 \
+  || fail "raw-captures-ignored-legacy: team-init exited non-zero"
+assert_raw_captures_ignored "raw-captures-ignored-legacy" "$RC_LEGACY"
+
+# --- raw-captures-ignored-override: $TEAM_RUN_BASE relocates the base dir --
+RC_OVERRIDE="$GIT_TMP/raw-captures-override"
+mkdir -p "$RC_OVERRIDE"
+git init -q "$RC_OVERRIDE" >/dev/null 2>&1 \
+  || fail "raw-captures-ignored-override: git init failed (control)"
+TEAM_RUN_BASE=.ops bash "$INIT" "$RC_OVERRIDE" >/dev/null 2>&1 \
+  || fail "raw-captures-ignored-override: team-init exited non-zero with TEAM_RUN_BASE=.ops"
+TEAM_RUN_BASE=.ops assert_raw_captures_ignored "raw-captures-ignored-override" "$RC_OVERRIDE"
+
 # --- T-060: --force protection of the append-only recipe ---------------------
 # The recipe is an append-only asset (engineers accumulate procedures in it), so
 # --force must NOT overwrite it — while other scaffold files keep the historical

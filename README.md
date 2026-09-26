@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.7.4-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.7.5-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.md#using-shell-team-from-codex-cli)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
@@ -83,7 +83,7 @@ These three printed lines are not the whole path: locating the installed plugin 
 
 Which instruction surface a Codex CLI orchestrator **loads automatically is unmeasured from this repository** — the runbook linked above is what this project relies on instead. The loop's own stop points are the same on both hosts: **merge and push** stay yours, and when the independent reviewer cannot be reached the review returns `BLOCKED` rather than quietly falling back to a same-family one.
 
-**Decide once whether `.shell-team/` belongs in git.** Because the plugin never edits your root `.gitignore`, the base dir shows up as *untracked* in your repo — only the per-run telemetry inside it is ignored, via a self-contained `<base>/.gitignore`. Both choices are supported, and the plugin will not make the call for you:
+**Decide once whether `.shell-team/` belongs in git.** Because the plugin never edits your root `.gitignore`, the base dir shows up as *untracked* in your repo — the per-run telemetry and published raw review captures (`reviews/*.txt`, `reviews/*.jsonl`) inside it are ignored, via a self-contained `<base>/.gitignore`; the curated `<task-id>.md` review records stay trackable. Both choices are supported, and the plugin will not make the call for you:
 
 - **Track it** — the board, specs, and review artifacts become versioned project records (that is how this repo dogfoods itself).
 - **Keep it out of git** — add `.shell-team/` to your repo's `.gitignore` (scoped to that repo, trivially reversed), or to your global excludes (`git config --global core.excludesFile`) if you would rather keep it out of every repo you work in. Either choice leaves the base dir untracked, and it is that untracked state — not which ignore rule produced it — that this loop's durability gates react to: an untracked base dir makes every durability gate report `not-durable` permanently, with every hand-off staying local-only to that machine, and the repo-level `.gitignore` line carries that same cost. What the repo-level line does avoid is scope: the global route additionally hides the base dir in every other repository on the machine, including one where you later *do* want the board tracked, unless that repo's own root `.gitignore` adds `!.shell-team/` to bring it back (repo-level patterns outrank the global file) — which is why the repo-level line is the scoped, reversible choice of the two, never a way to avoid the durability cost itself. This repo carries that line for exactly that reason. [docs/adopting.md](docs/adopting.md) covers one further consequence, for tooling that asks git whether a path is ignored.

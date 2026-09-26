@@ -9,9 +9,11 @@
 # Raw review dumps and telemetry are never committed.
 # Mirrors the hygiene rule this project adopted after a 2026 PII incident:
 # curated review notes are tracked, raw transcripts and run logs are not.
-# `.shell-team/.gitignore` already covers `runs/` telemetry and the
-# codex-capture temps; these patterns add the raw review dumps, which the
-# shipped base-dir template deliberately leaves to the host repo.
+# `.shell-team/.gitignore` (the installed copy of the shipped base-dir
+# template) already covers `runs/` telemetry, the codex-capture temps and
+# these same raw-dump patterns; the patterns below are kept here too,
+# redundantly but deliberately, so this root file stays a self-contained lock
+# on this checkout's own raw dumps independent of the base-dir layer.
 .shell-team/reviews/*.txt
 .shell-team/reviews/*.json
 .shell-team/reviews/*.jsonl

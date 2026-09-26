@@ -29,14 +29,27 @@ that already uses the legacy `tasks/` + `docs/specs/` layout is detected and reu
 ├── test-recipe.md               # per-repo test-run recipe (engineer/QA read first, append
 │                                #   established procedures; never overwritten, even with --force)
 ├── binding.conf.example         # inert executor-binding specimen; rename to binding.conf to opt in
-└── .gitignore                   # self-contained; ignores runs/ telemetry
+└── .gitignore                   # self-contained; ignores runs/ telemetry and reviews/ raw captures
 ```
 
 **Your host root is left untouched.** `team-init` does not edit your `CLAUDE.md`
-and does not append to your root `.gitignore`. Telemetry is ignored via the
-self-contained `<base>/.gitignore`. Whether to also git-ignore the whole base
-dir — and whether to copy the operating rules below into your own `CLAUDE.md` —
-is your call; the plugin will not make those edits for you.
+and does not append to your root `.gitignore`. Telemetry and published raw
+review captures are ignored via the self-contained `<base>/.gitignore`.
+Whether to also git-ignore the whole base dir — and whether to copy the
+operating rules below into your own `CLAUDE.md` — is your call; the plugin
+will not make those edits for you.
+
+**Upgrading an existing adopter repository.** `team-init` only writes
+`<base>/.gitignore` when none already exists, so a copy installed by an
+earlier version of the plugin keeps its old, narrower pattern set forever —
+`team-init --force` is **not** the way to pick up a template change, because
+it also overwrites `todo.md`, the loop contract and every other scaffold
+file. To pick up the raw-capture coverage, append `reviews/*.txt`,
+`reviews/*.jsonl` and `reviews/*.json` to your `<base>/.gitignore` by hand.
+Raw review captures you already committed stay tracked either way — the
+plugin performs no migration of its own, and removing them from the index or
+rewriting history to remove them is your own decision, not one it makes for
+you.
 
 If you keep the base dir out of git, the two ways of doing that differ in scope.
 A `.shell-team/` line in the repo's own `.gitignore` applies to that repo and is
@@ -1287,8 +1300,8 @@ one where it did not. It does not verify a `pass-role` label's
 truthfulness against its own verbatim field, or that a recorded argv is
 the argv that actually ran. And it cannot see whether the raw file a
 `raw-capture` field names is **not present on disk** — raw captures are
-untracked by construction (`/.gitignore`), so a stem naming nothing is
-conformant to this checker.
+untracked by construction (ignored via `<base>/.gitignore`), so a stem
+naming nothing is conformant to this checker.
 
 ## Deriving the release version at freeze time
 
@@ -1342,6 +1355,11 @@ session performs this derivation as a read, and no mechanical checker ships for 
 - Files are the only shared state between agents (they do not share memory): the
   board (`<base>/todo.md`), the specs (`<base>/specs/`), and the loop contract are
   the single source of truth.
+- Every script under `bin/` answers `--help` and `-h` as its first argument
+  with usage on stdout and exit `0`, before any other argument validation
+  runs — the same `bash "<plugin root>/bin/<script>"` invocation form
+  described above, with `--help` / `-h` in place of the script's own
+  arguments (T-1157, issue #592).
 
 ## The superseded role name
 

@@ -139,11 +139,15 @@
 # task; with `--thread-id`, that raw must still be the empty file `--alloc`
 # created — `--publish` fills it from the run's own rollout record.
 #
-# Reviews dir resolution: `--reviews-dir` if given, else `team-paths.sh --get
-# reviews`, tried bare on PATH first (`command -v team-paths.sh`), then
-# falling back to the cwd-relative `bin/team-paths.sh`, and dying with a
-# clear error if neither resolves — PATH is never assumed to carry it, and
-# there is no third, plugin-root-relative fallback in this resolver
+# Reviews dir resolution: `--reviews-dir` if given, else the sibling
+# `team-paths.sh` that ships next to this script (its own directory is
+# located symlink-safely from how this script itself was invoked, the same
+# pattern `bin/close-out.sh` already uses, and it is run WITHOUT `--root` so
+# its result still follows the CALLER's cwd layout — default, legacy, or
+# `$TEAM_RUN_BASE`); only when no such sibling file exists does resolution
+# fall back, in order, to `team-paths.sh` on PATH (`command -v
+# team-paths.sh`) and then to the cwd-relative `bin/team-paths.sh`, dying
+# with a clear error naming every location tried if none resolves
 # (2026-06-17 lesson: self-resolve from the CALLER's cwd — the adopted/target
 # repo — never `cd` to this script's own repo root).
 #
@@ -179,6 +183,11 @@
 #      existence/non-empty check failed)
 
 set -euo pipefail
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  awk 'NR==1 { next } /^set -euo pipefail$/ { exit } { line = $0; sub(/^#[ \t]*/, "", line); print line }' "${BASH_SOURCE[0]}"
+  exit 0
+fi
 
 die() {  # $1 = exit code, $2 = message
   printf 'codex-capture: %s\n' "$2" >&2 || true
@@ -251,16 +260,38 @@ else
 fi
 
 # --- resolve the reviews dir -------------------------------------------------
-# Self-resolve from cwd (2026-06-17 lesson) — never cd to this script's own
-# repo root. `bin/team-paths.sh` below is deliberately cwd-relative, matching
-# how the agents themselves already invoke it directly.
+# Sibling-first (T-1154, #594): the `team-paths.sh` shipped beside this
+# script is tried FIRST, located symlink-safely from how this script itself
+# was invoked (same pattern as `bin/close-out.sh`'s SCRIPT_DIR resolution)
+# and run WITHOUT --root and WITHOUT moving this process's own cwd, so its
+# result still follows the CALLER's cwd layout exactly as before (2026-06-17
+# lesson: self-resolve from the CALLER's cwd — the adopted/target repo —
+# never cd to this script's own repo root). A sibling file that exists but
+# fails is a die 2, never a fall-through: falling through would let an
+# unrelated team-paths.sh answer after the plugin's own resolver already
+# refused. Only when no sibling file exists at all does resolution fall
+# back, in order, to team-paths.sh on PATH and then to a cwd-relative
+# bin/team-paths.sh.
 if [ -z "$reviews_dir" ]; then
-  if command -v team-paths.sh >/dev/null 2>&1; then
+  script_path="${BASH_SOURCE[0]}"
+  while [ -L "$script_path" ]; do
+    link_target="$(readlink "$script_path")"
+    case "$link_target" in
+      /*) script_path="$link_target" ;;
+      *)  script_path="$(cd "$(dirname "$script_path")" && pwd)/$link_target" ;;
+    esac
+  done
+  script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+  sibling_team_paths="$script_dir/team-paths.sh"
+  if [ -f "$sibling_team_paths" ]; then
+    reviews_dir="$(bash "$sibling_team_paths" --get reviews)" \
+      || die 2 "sibling team-paths.sh failed ($sibling_team_paths --get reviews)"
+  elif command -v team-paths.sh >/dev/null 2>&1; then
     reviews_dir="$(team-paths.sh --get reviews)" || die 2 "team-paths.sh --get reviews failed"
   elif [ -f bin/team-paths.sh ]; then
     reviews_dir="$(bash bin/team-paths.sh --get reviews)" || die 2 "bin/team-paths.sh --get reviews failed"
   else
-    die 2 "cannot resolve reviews dir: team-paths.sh not found on PATH and bin/team-paths.sh not found relative to cwd ($(pwd)); pass --reviews-dir explicitly"
+    die 2 "cannot resolve reviews dir: no sibling team-paths.sh next to $script_path, team-paths.sh not found on PATH, and bin/team-paths.sh not found relative to cwd ($(pwd)); pass --reviews-dir explicitly"
   fi
 fi
 [ -d "$reviews_dir" ] || die 2 "resolved reviews dir does not exist or is not a directory: $reviews_dir"

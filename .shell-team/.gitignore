@@ -6,3 +6,13 @@ runs/
 # hold raw Codex output with PII; the trap-based cleanup doesn't fire on
 # SIGKILL, so this pattern is the mandatory backstop (both-layout coverage).
 reviews/.codex-capture.*
+# codex-capture.sh --publish raw review captures. Raw Codex output can carry
+# personal information, which is exactly why the pre-publish temps above are
+# already ignored — a published <stem>.txt/.jsonl is the same raw content
+# under its permanent name. The curated <task-id>.md review record a human
+# writes from that raw output stays trackable (not matched by these three
+# patterns); reviews/*.json is included defensively even though nothing ships
+# that extension today.
+reviews/*.txt
+reviews/*.jsonl
+reviews/*.json

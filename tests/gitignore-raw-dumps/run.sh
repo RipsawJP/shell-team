@@ -17,15 +17,15 @@
 #
 # Operating paths are resolved through bin/team-paths.sh — the reviews dir is
 # never hardcoded as `.shell-team/reviews`. The raw-review-dump patterns this
-# suite locks are specific to THIS repo's own default-layout root .gitignore
-# (a self-hosting addition, not part of the shared, layout-agnostic
-# `templates/shell-team.gitignore`, which only ships `runs/` and
-# `reviews/.codex-capture.*`). So the legacy-layout coverage below is a
-# resolver-correctness check — proving the suite derives the reviews dir
-# dynamically per layout rather than assuming one hardcoded string — not a
-# claim that a legacy-layout repo ships the same raw-dump patterns; inventing
-# a new legacy ignore file is out of scope (spec Non-goals: "Designing new
-# .gitignore patterns").
+# suite locks now also ship in the shared, layout-agnostic
+# `templates/shell-team.gitignore` (T-1155, issue #606) alongside `runs/` and
+# `reviews/.codex-capture.*`; this suite still locks THIS repository's own
+# root `.gitignore` layer independently of that base-dir layer. So the
+# legacy-layout coverage below is a resolver-correctness check — proving the
+# suite derives the reviews dir dynamically per layout rather than assuming
+# one hardcoded string — not a claim that a legacy-layout repo ships an
+# equivalent root-level ignore file of its own; inventing a new legacy ignore
+# file is out of scope (spec Non-goals: "Designing new .gitignore patterns").
 #
 # Uses mktemp under $TMPDIR (repo lesson, 2026-06-16 / T-038) — no process
 # substitution, cmp -s instead of diff <(...).

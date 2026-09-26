@@ -31,14 +31,27 @@
 ├── test-recipe.md               # repo 固有のテスト実行レシピ（engineer/QA が最初に読み、
 │                                #   確立した手順を追記。--force でも上書きされない）
 ├── binding.conf.example         # 不活性な executor-binding specimen；binding.conf にリネームで opt-in
-└── .gitignore                   # 自己完結。runs/ テレメトリを無視
+└── .gitignore                   # 自己完結。runs/ テレメトリと reviews/ の raw capture を無視
 ```
 
 **ホストルートには手を触れません。** `team-init` はあなたの `CLAUDE.md` を編集せず、
-ルートの `.gitignore` にも追記しません。テレメトリは自己完結した
-`<base>/.gitignore` で無視されます。ベースディレクトリ全体を git 無視にするか、
-下記の運用ルールを自分の `CLAUDE.md` にコピーするか——どちらもあなたの判断に
-委ねられており、プラグインが勝手に編集することはありません。
+ルートの `.gitignore` にも追記しません。テレメトリと publish 済みの raw review
+capture は自己完結した `<base>/.gitignore` で無視されます。ベースディレクトリ
+全体を git 無視にするか、下記の運用ルールを自分の `CLAUDE.md` にコピーするか
+——どちらもあなたの判断に委ねられており、プラグインが勝手に編集することは
+ありません。
+
+**既存の adopter リポジトリをアップグレードする場合。** `team-init` は
+`<base>/.gitignore` がまだ存在しない時にしか書き込みません。そのため、
+プラグインの以前のバージョンでインストール済みのファイルは、古く狭いパターン
+集合のまま永久に残ります。`team-init --force` は `todo.md`・loop contract・
+その他すべての scaffold ファイルもまとめて上書きしてしまうため、テンプレートの
+更新を取り込む手段には**なりません**。raw-capture のカバレッジを取り込むには、
+`reviews/*.txt`・`reviews/*.jsonl`・`reviews/*.json` を自分の `<base>/.gitignore`
+に手で追記してください。すでに commit 済みの raw review capture はどちらにせよ
+追跡されたままです — プラグイン自身は何の移行処理も行わないため、index から
+取り除くか、履歴を書き換えて取り除くかはあなた自身の判断であり、プラグインが
+代わりに決めることはありません。
 
 base dir を git に載せない方法は 2 つあり、効く範囲が違います。repo 自身の
 `.gitignore` に `.shell-team/` を書けば、その repo だけに効き、取り消しも容易
@@ -1246,8 +1259,8 @@ committed byte に対するいかなる判定も、briefing が executor の con
 `pass-role` label の真偽も、記録された argv が実際に走った argv である
 ことも検証しない。そして `raw-capture` field が名指す raw file が
 **not present on disk**（disk 上に存在しない）ことも見抜けない。
-`raw-capture` の値は構造上 untracked（`/.gitignore`）なので、何も指さ
-ない stem もこの checker には conformant である。
+`raw-capture` の値は構造上 untracked（`<base>/.gitignore` で無視される）
+なので、何も指さない stem もこの checker には conformant である。
 
 ## freeze 時にリリースバージョンを導出する
 
@@ -1302,6 +1315,11 @@ derived tier が承認済み premise と一致しないということは、そ�
 - レビュアーは意図的に別のモデルプロバイダ（Codex）で走ります。ループの中に必ず入れておくこと。
 - エージェント間の共有状態はファイルだけです（メモリは共有されない）。ボード
   （`<base>/todo.md`）・各仕様（`<base>/specs/`）・ループ契約が唯一の真実源です。
+- `bin/` 配下のすべてのスクリプトは、第一引数としての `--help` と `-h` に
+  応答する。他の引数バリデーションより前に、usage を stdout へ出力して
+  exit `0` する——上に記した `bash "<plugin root>/bin/<script>"` という
+  呼び出し形そのもので、スクリプト自身の引数の代わりに `--help` / `-h`
+  を渡す（T-1157, issue #592）。
 
 ## 旧ロール名の扱い
 
