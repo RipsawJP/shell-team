@@ -53,8 +53,8 @@ maintainer's side of the work, not yours.
 A new `bin/` script must answer `--help` and `-h` as its first argument by
 printing its own usage to stdout and exiting `0`, before any other argument
 validation runs — surfaced from the script's own header comment, never a
-separate helper. `tests/bin-help/run.sh` enforces this in CI for every
-tracked `bin/` entry (T-1157, issue #592).
+separate helper. The `bin-help` suite enforces this in CI for every tracked
+`bin/` entry (T-1157, issue #592).
 
 ## The pull-request flow
 
