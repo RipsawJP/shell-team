@@ -183,6 +183,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  awk 'NR==1 { next } /^set -euo pipefail$/ { exit } { line = $0; sub(/^#[ \t]*/, "", line); print line }' "${BASH_SOURCE[0]}"
+  exit 0
+fi
+
 die() { printf 'log-run: %s\n' "$1" >&2 || true; exit 2; }
 
 # Resolve this script's own directory (symlink-safe) so we can call the sibling

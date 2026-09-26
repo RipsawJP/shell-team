@@ -48,6 +48,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  awk 'NR==1 { next } /^set -euo pipefail$/ { exit } { line = $0; sub(/^#[ \t]*/, "", line); print line }' "${BASH_SOURCE[0]}"
+  exit 0
+fi
+
 REQUIRED_KEYS=(loop_id run_id seq ts span phase iteration attempt status)
 REQUIRED_EVENT_KEYS=(loop_id run_id seq ts kind event)
 SPAN_ONLY_KEYS=(span phase iteration attempt status model tokens tool_uses duration_ms verdict usd error parent_span_id provider effort adapter instance)

@@ -63,6 +63,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  awk 'NR==1 { next } /^set -euo pipefail$/ { exit } { line = $0; sub(/^#[ \t]*/, "", line); print line }' "${BASH_SOURCE[0]}"
+  exit 0
+fi
+
 # Byte-wise locale so the ISO-8601 UTC `ts` lexical min/max below is also the
 # chronological order, regardless of the caller's locale collation. (Raw byte
 # output of the multibyte flag glyphs is unaffected — printf emits bytes.)

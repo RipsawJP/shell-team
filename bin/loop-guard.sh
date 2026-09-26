@@ -50,7 +50,10 @@
 # guard.
 #
 # Exit: 0 = CONTINUE, 3 = STOP (terminal condition), 2 = STOP:guard_error
-#       (could not evaluate — fail-closed). stdout always carries the decision.
+#       (could not evaluate — fail-closed). stdout always carries the
+#       decision, except --help / -h as the first argument, which print this
+#       header instead and exit 0 (T-1157, issue #592) — the one case where
+#       STOP:guard_error is deliberately not printed for a leading `--*`.
 #
 # Concurrent-review-window counting carve-out (T-1080, S5, comment/header
 # text only — the decision logic below is unmodified). Inside a declared
@@ -63,6 +66,11 @@
 #   a discarded concurrent-review-window verdict is not a cycle and adds nothing to this count
 
 set -euo pipefail
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  awk 'NR==1 { next } /^set -euo pipefail$/ { exit } { line = $0; sub(/^#[ \t]*/, "", line); print line }' "${BASH_SOURCE[0]}"
+  exit 0
+fi
 
 emit_stop() { printf 'STOP:%s\n' "$1"; exit 3; }
 
