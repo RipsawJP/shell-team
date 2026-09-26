@@ -95,7 +95,8 @@ override with $TEAM_RUN_BASE; an existing tasks/ layout is detected and reused):
   <base>/AGENTS.md                      (from templates/AGENTS.md; cross-tool pointer doc)
   <base>/test-recipe.md                 (from templates/test-recipe.md; per-repo test-run
                                          recipe — protected: never overwritten, even with --force)
-  <base>/.gitignore                     (ignores runs/ telemetry; host root untouched)
+  <base>/.gitignore                     (ignores runs/ telemetry and reviews/ raw captures;
+                                         host root untouched)
   <base>/binding.conf.example           (from templates/binding-template.conf; scaffolded
                                          INERT — never binding.conf, so resolve-executor.sh's
                                          own default lookup never finds it and no adopter's
@@ -379,8 +380,8 @@ printf 'Operating files live under: %s/ (host root left untouched).\n' "$TEAM_RU
 if [ "$TEAM_SPECS_DIR" != "$TEAM_RUN_BASE/specs" ]; then
   printf 'Specs live under: %s/ (legacy split-root layout).\n' "$TEAM_SPECS_DIR"
 fi
-printf 'Telemetry (%s/) is ignored via %s/.gitignore — commit the rest if you want it tracked.\n' \
-  "$TEAM_RUNS_DIR" "$TEAM_RUN_BASE"
+printf 'Telemetry (%s/) and published raw review captures (%s/*.txt, *.jsonl) are ignored via %s/.gitignore; curated %s/<task-id>.md review records stay trackable.\n' \
+  "$TEAM_RUNS_DIR" "$TEAM_REVIEWS_DIR" "$TEAM_RUN_BASE" "$TEAM_REVIEWS_DIR"
 printf 'Cross-tool pointer doc: %s/AGENTS.md (points other tools at the truth sources; not a root convention file).\n' \
   "$TEAM_RUN_BASE"
 printf 'Test recipe: %s/test-recipe.md (engineer/QA read it first, append established procedures; never overwritten).\n' \

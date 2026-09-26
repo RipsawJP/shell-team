@@ -31,7 +31,9 @@ Do this:
    - `runs/.gitkeep`, `retros/.gitkeep`, `reviews/.gitkeep`, `specs/.gitkeep`
    - `AGENTS.md` — cross-tool pointer/mirror to the truth sources (board, specs, project_status, Codex review)
    - `test-recipe.md` — per-repo test-run recipe (engineer/QA read it first, append established procedures; protected — never overwritten, even with `--force`)
-   - `.gitignore` — self-contained, ignores `runs/` telemetry
+   - `.gitignore` — self-contained, ignores `runs/` telemetry and published raw review
+     captures (`reviews/*.txt`, `reviews/*.jsonl`, `reviews/*.json`); curated
+     `<task-id>.md` review records stay trackable
 
    In a **legacy** `tasks/` layout the specs dir is the one exception — it stays
    at `docs/specs/` (the historical split-root quirk), not under `<base>/`. The
