@@ -126,6 +126,34 @@
 #                          regular files directly under the resolved reviews
 #                          dir with the expected `.codex-capture.<stem>.
 #                          {out,jsonl}.` basename prefixes.
+#   reviews-dir-sibling-default (T-1154, #594) from an adopter-shaped cwd
+#                          (default .shell-team/ layout) with no
+#                          team-paths.sh on PATH, invoking codex-capture.sh
+#                          by absolute path with no --reviews-dir allocates
+#                          both files under that cwd's .shell-team/reviews
+#                          via the sibling team-paths.sh shipped beside it.
+#   reviews-dir-sibling-precedence (T-1154, #594) a team-paths.sh on PATH
+#                          pointing at a different (decoy) directory does not
+#                          win over the sibling team-paths.sh; the decoy
+#                          directory stays empty.
+#   reviews-dir-sibling-symlink (T-1154, #594) invoking codex-capture.sh
+#                          through a symlink whose OWN directory carries no
+#                          team-paths.sh still resolves the sibling next to
+#                          the symlink's target.
+#   reviews-dir-sibling-legacy (T-1154, #594) from a legacy-layout adopter
+#                          cwd (tasks/loops/shell-team.contract.yaml
+#                          present), the sibling resolves that cwd's
+#                          tasks/reviews (run without --root, cwd never
+#                          moved).
+#   reviews-dir-unresolvable (T-1154, #594) with no sibling team-paths.sh,
+#                          none on PATH, and no cwd-relative
+#                          bin/team-paths.sh, --alloc exits 2 with a
+#                          "codex-capture: cannot resolve reviews dir"
+#                          stderr line.
+#   reviews-dir-sibling-fails (T-1154, #594) a sibling team-paths.sh that
+#                          exits non-zero is exit 2, even with a working fake
+#                          team-paths.sh first on PATH — a failing sibling
+#                          never falls through to PATH.
 #   publish-foreign-path-reject (T-107, DP-b — most important) `--publish`
 #                          refuses (exit 2, no `mv` attempted, no canonical
 #                          created) a raw whose parent directory is outside
@@ -505,6 +533,156 @@ case "$(basename -- "$alloc_p2")" in
 esac
 rm -f "$alloc_p1" "$alloc_p2"
 pass "alloc-paths-in-reviews-dir — --alloc exits 0, prints exactly 2 stdout lines, both regular files directly under the resolved reviews dir with the expected .codex-capture.<stem>.{out,jsonl}. basename prefixes"
+
+# =============================================================================
+# reviews-dir-sibling-default / reviews-dir-sibling-precedence /
+# reviews-dir-sibling-symlink / reviews-dir-sibling-legacy /
+# reviews-dir-unresolvable / reviews-dir-sibling-fails (T-1154, #594)
+#
+# Every case above passes --reviews-dir explicitly and never reaches
+# codex-capture.sh's own reviews-dir RESOLVER. These six run the script from
+# an adopter-shaped temp cwd (never this checkout's own root, which already
+# carries bin/team-paths.sh) with PATH stripped down to /usr/bin:/bin (no
+# team-paths.sh reachable through it) — or they would pass for the wrong
+# reason.
+# =============================================================================
+SRD_ROOT="$TMP/sibling-resolver"
+mkdir -p "$SRD_ROOT"
+SRD_STRIPPED_PATH="/usr/bin:/bin"
+SRD_EXTRA_PATH=""
+srd_out="$TMP/srd.out"
+srd_err="$TMP/srd.err"
+srd_rc=0
+
+# srd_run CWD SCRIPT_PATH [ARGS...] -- runs SCRIPT_PATH with `bash` from CWD,
+# PATH reduced to $SRD_STRIPPED_PATH (optionally prefixed with
+# $SRD_EXTRA_PATH), capturing stdout/stderr/rc into $srd_out/$srd_err/$srd_rc.
+srd_run() {
+  local cwd="$1"; shift
+  local path="$SRD_STRIPPED_PATH"
+  [[ -z "$SRD_EXTRA_PATH" ]] || path="$SRD_EXTRA_PATH:$SRD_STRIPPED_PATH"
+  set +e
+  ( cd "$cwd" && env PATH="$path" bash "$@" ) > "$srd_out" 2> "$srd_err"
+  srd_rc=$?
+  set -e
+}
+
+# srd_expect_reviews_dir WANT_DIR -- asserts $srd_out has exactly two lines,
+# both existing regular files whose physical parent directory is WANT_DIR,
+# then removes them. Returns non-zero on any mismatch.
+srd_expect_reviews_dir() {
+  local want="$1" line_count p1 p2 p1_dir p2_dir
+  line_count="$(grep -c . "$srd_out" || true)"
+  [[ "$line_count" -eq 2 ]] || return 1
+  p1="$(sed -n '1p' "$srd_out")"
+  p2="$(sed -n '2p' "$srd_out")"
+  [[ -f "$p1" ]] || return 1
+  [[ -f "$p2" ]] || return 1
+  p1_dir="$(cd "$(dirname -- "$p1")" && pwd -P)"
+  p2_dir="$(cd "$(dirname -- "$p2")" && pwd -P)"
+  [[ "$p1_dir" == "$want" ]] || return 1
+  [[ "$p2_dir" == "$want" ]] || return 1
+  rm -f "$p1" "$p2"
+}
+
+# --- reviews-dir-sibling-default --------------------------------------------
+printf -- '\n--- reviews-dir-sibling-default ---\n'
+SRD_DEFAULT_ADOPTER="$SRD_ROOT/default/adopter"
+mkdir -p "$SRD_DEFAULT_ADOPTER/.shell-team/reviews"
+SRD_DEFAULT_WANT="$(cd "$SRD_DEFAULT_ADOPTER/.shell-team/reviews" && pwd -P)"
+srd_run "$SRD_DEFAULT_ADOPTER" "$SCRIPT" --alloc --stem t1154-default
+[[ "$srd_rc" -eq 0 ]] || fail "reviews-dir-sibling-default: expected exit 0, got $srd_rc (stderr: $(cat "$srd_err"))"
+srd_expect_reviews_dir "$SRD_DEFAULT_WANT" \
+  || fail "reviews-dir-sibling-default: --alloc output did not land in the adopter's .shell-team/reviews (stdout: $(cat "$srd_out"))"
+pass "reviews-dir-sibling-default — from an adopter-shaped cwd with no team-paths.sh on PATH, invoking codex-capture.sh by absolute path with no --reviews-dir allocates both files under that cwd's .shell-team/reviews via the sibling team-paths.sh"
+
+# --- reviews-dir-sibling-precedence ------------------------------------------
+printf -- '\n--- reviews-dir-sibling-precedence ---\n'
+SRD_PREC_ADOPTER="$SRD_ROOT/precedence/adopter"
+SRD_PREC_DECOY="$SRD_ROOT/precedence/decoy"
+SRD_PREC_FAKEBIN="$SRD_ROOT/precedence/fakebin"
+mkdir -p "$SRD_PREC_ADOPTER/.shell-team/reviews" "$SRD_PREC_DECOY" "$SRD_PREC_FAKEBIN"
+SRD_PREC_WANT="$(cd "$SRD_PREC_ADOPTER/.shell-team/reviews" && pwd -P)"
+printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$SRD_PREC_DECOY" > "$SRD_PREC_FAKEBIN/team-paths.sh"
+chmod +x "$SRD_PREC_FAKEBIN/team-paths.sh"
+[[ "$("$SRD_PREC_FAKEBIN/team-paths.sh")" == "$SRD_PREC_DECOY" ]] \
+  || fail "reviews-dir-sibling-precedence: positive control failed — the fake team-paths.sh did not print the decoy path"
+SRD_EXTRA_PATH="$SRD_PREC_FAKEBIN"
+srd_run "$SRD_PREC_ADOPTER" "$SCRIPT" --alloc --stem t1154-precedence
+SRD_EXTRA_PATH=""
+[[ "$srd_rc" -eq 0 ]] || fail "reviews-dir-sibling-precedence: expected exit 0, got $srd_rc (stderr: $(cat "$srd_err"))"
+srd_expect_reviews_dir "$SRD_PREC_WANT" \
+  || fail "reviews-dir-sibling-precedence: --alloc output did not land in the adopter's .shell-team/reviews even though the sibling should have won (stdout: $(cat "$srd_out"))"
+[[ -z "$(find "$SRD_PREC_DECOY" -mindepth 1 -print)" ]] \
+  || fail "reviews-dir-sibling-precedence: the decoy directory received files even though the sibling should have won"
+pass "reviews-dir-sibling-precedence — a team-paths.sh on PATH pointing at a different directory does not win over the sibling team-paths.sh (positive control: the fake is asserted to print the decoy path); the decoy directory stays empty"
+
+# --- reviews-dir-sibling-symlink ---------------------------------------------
+printf -- '\n--- reviews-dir-sibling-symlink ---\n'
+SRD_SYM_PLUGIN="$SRD_ROOT/symlink/plugin/bin"
+SRD_SYM_LINKDIR="$SRD_ROOT/symlink/link"
+SRD_SYM_ADOPTER="$SRD_ROOT/symlink/adopter"
+mkdir -p "$SRD_SYM_PLUGIN" "$SRD_SYM_LINKDIR" "$SRD_SYM_ADOPTER/.shell-team/reviews"
+cp "$SCRIPT" "$REPO_ROOT/bin/team-paths.sh" "$SRD_SYM_PLUGIN/"
+ln -s "$SRD_SYM_PLUGIN/codex-capture.sh" "$SRD_SYM_LINKDIR/codex-capture.sh"
+[[ -L "$SRD_SYM_LINKDIR/codex-capture.sh" ]] \
+  || fail "reviews-dir-sibling-symlink: positive control failed — the invoked path is not actually a symlink"
+[[ ! -e "$SRD_SYM_LINKDIR/team-paths.sh" ]] \
+  || fail "reviews-dir-sibling-symlink: positive control failed — the symlink's own directory unexpectedly carries a team-paths.sh"
+SRD_SYM_WANT="$(cd "$SRD_SYM_ADOPTER/.shell-team/reviews" && pwd -P)"
+srd_run "$SRD_SYM_ADOPTER" "$SRD_SYM_LINKDIR/codex-capture.sh" --alloc --stem t1154-symlink
+[[ "$srd_rc" -eq 0 ]] || fail "reviews-dir-sibling-symlink: expected exit 0, got $srd_rc (stderr: $(cat "$srd_err"))"
+srd_expect_reviews_dir "$SRD_SYM_WANT" \
+  || fail "reviews-dir-sibling-symlink: --alloc output did not land in the adopter's .shell-team/reviews (stdout: $(cat "$srd_out"))"
+pass "reviews-dir-sibling-symlink — invoking codex-capture.sh through a symlink whose OWN directory carries no team-paths.sh still resolves the sibling next to the symlink's target (positive control: the invoked path is asserted a symlink, its directory asserted to carry no team-paths.sh)"
+
+# --- reviews-dir-sibling-legacy -----------------------------------------------
+printf -- '\n--- reviews-dir-sibling-legacy ---\n'
+SRD_LEGACY_ADOPTER="$SRD_ROOT/legacy/adopter"
+mkdir -p "$SRD_LEGACY_ADOPTER/tasks/loops" "$SRD_LEGACY_ADOPTER/tasks/reviews"
+: > "$SRD_LEGACY_ADOPTER/tasks/loops/shell-team.contract.yaml"
+SRD_LEGACY_WANT="$(cd "$SRD_LEGACY_ADOPTER/tasks/reviews" && pwd -P)"
+srd_run "$SRD_LEGACY_ADOPTER" "$SCRIPT" --alloc --stem t1154-legacy
+[[ "$srd_rc" -eq 0 ]] || fail "reviews-dir-sibling-legacy: expected exit 0, got $srd_rc (stderr: $(cat "$srd_err"))"
+srd_expect_reviews_dir "$SRD_LEGACY_WANT" \
+  || fail "reviews-dir-sibling-legacy: --alloc output did not land in the legacy cwd's tasks/reviews (stdout: $(cat "$srd_out"))"
+pass "reviews-dir-sibling-legacy — from a legacy-layout adopter cwd (tasks/loops/shell-team.contract.yaml present), the sibling team-paths.sh resolves that cwd's tasks/reviews (run without --root, cwd never moved)"
+
+# --- reviews-dir-unresolvable --------------------------------------------------
+printf -- '\n--- reviews-dir-unresolvable ---\n'
+SRD_UNRES_LONE="$SRD_ROOT/unresolvable/lone"
+SRD_UNRES_ADOPTER="$SRD_ROOT/unresolvable/adopter"
+mkdir -p "$SRD_UNRES_LONE" "$SRD_UNRES_ADOPTER"
+cp "$SCRIPT" "$SRD_UNRES_LONE/"
+srd_run "$SRD_UNRES_ADOPTER" "$SRD_UNRES_LONE/codex-capture.sh" --alloc --stem t1154-unresolvable
+[[ "$srd_rc" -eq 2 ]] || fail "reviews-dir-unresolvable: expected exit 2, got $srd_rc (stderr: $(cat "$srd_err"))"
+grep -qF -- 'codex-capture: cannot resolve reviews dir' "$srd_err" \
+  || fail "reviews-dir-unresolvable: expected stderr to carry 'codex-capture: cannot resolve reviews dir', got: $(cat "$srd_err")"
+pass "reviews-dir-unresolvable — with no sibling team-paths.sh, none on PATH, and no cwd bin/team-paths.sh, --alloc exits 2 with a 'codex-capture: cannot resolve reviews dir' stderr line"
+
+# --- reviews-dir-sibling-fails -------------------------------------------------
+printf -- '\n--- reviews-dir-sibling-fails ---\n'
+SRD_FAIL_BROKEN="$SRD_ROOT/fails/broken"
+SRD_FAIL_ADOPTER="$SRD_ROOT/fails/adopter"
+SRD_FAIL_DECOY="$SRD_ROOT/fails/decoy"
+SRD_FAIL_FAKEBIN="$SRD_ROOT/fails/fakebin"
+mkdir -p "$SRD_FAIL_BROKEN" "$SRD_FAIL_ADOPTER/.shell-team/reviews" "$SRD_FAIL_DECOY" "$SRD_FAIL_FAKEBIN"
+cp "$SCRIPT" "$SRD_FAIL_BROKEN/"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SRD_FAIL_BROKEN/team-paths.sh"
+chmod +x "$SRD_FAIL_BROKEN/team-paths.sh"
+printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$SRD_FAIL_DECOY" > "$SRD_FAIL_FAKEBIN/team-paths.sh"
+chmod +x "$SRD_FAIL_FAKEBIN/team-paths.sh"
+[[ "$("$SRD_FAIL_FAKEBIN/team-paths.sh")" == "$SRD_FAIL_DECOY" ]] \
+  || fail "reviews-dir-sibling-fails: positive control failed — the fake team-paths.sh did not print the decoy path"
+SRD_EXTRA_PATH="$SRD_FAIL_FAKEBIN"
+srd_run "$SRD_FAIL_ADOPTER" "$SRD_FAIL_BROKEN/codex-capture.sh" --alloc --stem t1154-fails
+SRD_EXTRA_PATH=""
+[[ "$srd_rc" -eq 2 ]] || fail "reviews-dir-sibling-fails: expected exit 2, got $srd_rc (stderr: $(cat "$srd_err"))"
+grep -q '^codex-capture: ' "$srd_err" \
+  || fail "reviews-dir-sibling-fails: expected a codex-capture: stderr line, got: $(cat "$srd_err")"
+[[ -z "$(find "$SRD_FAIL_DECOY" "$SRD_FAIL_ADOPTER/.shell-team/reviews" -mindepth 1 -print)" ]] \
+  || fail "reviews-dir-sibling-fails: a failing sibling must never fall through to PATH — something was created in the decoy or adopter reviews dir"
+pass "reviews-dir-sibling-fails — a sibling team-paths.sh that exits non-zero is exit 2, even with a working fake team-paths.sh first on PATH (positive control: the fake is asserted to print the decoy path); a failing sibling never falls through"
 
 # =============================================================================
 # publish-foreign-path-reject (T-107, DP-b — most important)
