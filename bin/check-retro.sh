@@ -68,6 +68,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  awk 'NR==1 { next } /^set -euo pipefail$/ { exit } { line = $0; sub(/^#[ \t]*/, "", line); print line }' "${BASH_SOURCE[0]}"
+  exit 0
+fi
+
 if [[ "$#" -lt 1 ]]; then
   printf 'usage: check-retro.sh <retro.md> [<retro.md>...]\n' >&2 || true
   exit 2

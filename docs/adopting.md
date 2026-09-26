@@ -1355,6 +1355,11 @@ session performs this derivation as a read, and no mechanical checker ships for 
 - Files are the only shared state between agents (they do not share memory): the
   board (`<base>/todo.md`), the specs (`<base>/specs/`), and the loop contract are
   the single source of truth.
+- Every script under `bin/` answers `--help` and `-h` as its first argument
+  with usage on stdout and exit `0`, before any other argument validation
+  runs — the same `bash "<plugin root>/bin/<script>"` invocation form
+  described above, with `--help` / `-h` in place of the script's own
+  arguments (T-1157, issue #592).
 
 ## The superseded role name
 

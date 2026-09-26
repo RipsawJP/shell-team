@@ -31,6 +31,9 @@ jobs:
       - name: shellcheck (T-1151 additions)
         run: shellcheck bin/check-adopter-docs.sh tests/check-adopter-docs/run.sh
 
+      - name: shellcheck (T-1157 additions)
+        run: shellcheck tests/bin-help/run.sh
+
       - name: Run check-adopter-docs fixture suite
         run: bash tests/check-adopter-docs/run.sh
 
@@ -371,3 +374,6 @@ jobs:
           done
           bash bin/check-codex-agents.sh --root . --out-dir "$scratch/out"
           rm -rf "$scratch"
+
+      - name: Run bin-help suite
+        run: bash tests/bin-help/run.sh
