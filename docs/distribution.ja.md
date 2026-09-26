@@ -101,7 +101,7 @@ Claude Code セッションが **sandbox 有効**で動いているとき、Code
 
 **ここで検証できること。** 呼び出しの**形**——出荷される `codex exec` 行がすべて、引数の後に他の部分を持たない単一の裸コマンドであり、`"codex *"` の除外パターンに構造的に一致すること——は、このリポの CI（`tests/codex-skeleton-hygiene/run.sh` の `agentmd-bare-codex-present`、`agentmd-no-trailing-operator` とそれぞれの mutation 対照ケース）が機械的に検証する構造的事実です。この形の呼び出しが Claude Code 2.1.278 以降で**実行時に実際に sandbox の外側で走るか**は、このホストでの sandbox 有効・実セッションのライブプローブ（計測日 2026-09-24、Claude Code **2.1.281**、codex-cli **0.156.1**）で確認済みです：Codex は自分自身のコマンドを実行し、`-o` キャプチャが書かれ、`<sandbox_violations>`・`sandbox_apply`・`workspace routing discovery failed` のいずれも現れませんでした。同じプローブを修正前の出荷形（末尾のリダイレクトつき）で走らせると、うるさい失敗が再現しました。このプローブと rollout の証跡は、この変更を行ったタスクのこのリポジトリ自身の provenance 記録に残っています。
 
-Codex CLI host 側でも同様に、cross-provider レビューの `claude -p` 行（`templates/prompt-blocks/host-dispatch.md`）は host 側、つまり Codex sandbox の外側で実行します。sandbox の内側からの実行では host 側の Claude セッションを使えないためです（host 自身の Claude Code CLI がログイン済みでも同じです）。この行が `Not logged in` を返すのは、host がログアウトしているのではなく sandbox 内で実行されたことの兆候です。sandbox の外側で再実行するか、外側で実行する経路が無い場合は正確なエラーとともに `BLOCKED` として報告してください——別の executor に差し替えることはありません。
+Codex CLI host 側でも同様に、cross-provider レビューの `claude -p` 行（`templates/prompt-blocks/host-dispatch.md`）は host 側、つまり Codex sandbox の外側で実行します。sandbox の内側からの実行では host 側の Claude セッションを使えないためです（host 自身の Claude Code CLI がログイン済みでも同じです）。この行が `Not logged in` を返すのは、host がログアウトしているのではなく sandbox 内で実行されたことの兆候です——ただし host が実際にログアウトしている場合も sandbox の外側で同じ失敗になるため、両者を見分けるのはこの後の再実行です。sandbox の外側で再実行するか、外側で実行する経路が無い場合は正確なエラーとともに `BLOCKED` として報告してください——別の executor に差し替えることはありません。
 
 ## アップデート
 
