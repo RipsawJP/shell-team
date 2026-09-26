@@ -565,15 +565,7 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
    `config.toml` の `[sandbox_workspace_write]` に同等の
    `network_access = true` エントリを設定する。`--sandbox
    danger-full-access` でも通るが、sandbox 全体を失う代償を伴い、他に
-   必要な場面はない。このループ自身の `code-reviewer` role が Codex
-   ホストのレビュー pass でこの `Not logged in` に遭遇すると、この同じ
-   二択診断を——手順 7 自身の isolation call とまったく同じ形で両者を
-   判定して（`ok` を出力し exit `0` になれば上記の network 拒否、
-   ログインプロンプトや認証エラーが出れば手順 7 自身の認証失敗で
-   `/login` が本当に対処法、その呼び出しがそれ以外の結果を返せば
-   どちらでもなくそのまま報告する）——適用済みの `BLOCKED` レポートで
-   停止するようになった——手順を手動でやり直す前に、そのレポートが
-   示す原因と対処法を読むこと。
+   必要な場面はない。
 9. **`codex` を起動する前に `<plugin root>/bin` を `PATH` に export する
    （T-1135）。** spawn された Codex custom agent は親プロセス自身の
    `PATH` を継承するので、`codex` を起動するシェルで（セッション内から
