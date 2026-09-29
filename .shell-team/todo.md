@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1158** The run skill warns at Step 0 when a published raw review capture would not be ignored, and states that raw captures are never staged (issue #622) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1158-raw-capture-existing-adopters.md
+- [ ] **T-1158** The run skill warns at Step 0 when a published raw review capture would not be ignored, and states that raw captures are never staged (issue #622) — `READY_FOR_QA` — spec: .shell-team/specs/T-1158-raw-capture-existing-adopters.md
   - entry-mode: pm-authored
   - source: issue #622 (the task's own tracker item; no separate issue filed for the spec). Not stacked: cut from `develop` at `0b229093`. Relayed premise measured false at authoring: `skills/run/SKILL.md` is a `contain`-mode prompt-block sync consumer (`templates/prompt-blocks/registry.txt:35`–`:57`), carried into AC6.
   - dispatch-reflection: implement — T-1157 — repeat — T-1157's recorded value is `serial`; two prose insertions in one file, no partition and no judge role.
@@ -27,6 +27,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - freeze-attestation (v1, 2026-09-29): lines=7/7 sweep=mutual-satisfiability verdict=3P/4F owner=coordinating session (Opus 5.5 orchestrator). All 7 `- check:` lines ran live (`CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh <spec>`) at `d56956a2` plus the untracked spec and modified board: AC5–AC7 PASS; AC1, AC2 and AC4 FAIL only for the absent Step-0 probe and never-staged sentence; AC3 FAIL only for the absent `128` in the Step-0 region — its git half was run standalone and holds (old two-line `<base>/.gitignore` 1/1/1, root-level patterns 0/0/0, shipped template 0/0/0, outside a repository 128). Post-implementation read: every clause can hold once the two sentences exist; AC5's allow-list names the spec, provenance, interventions and `reviews/T-1158.md`, and published raws stay out of `git ls-files --others --exclude-standard` through this repository's root `.gitignore`; AC4's single-line count is not tripped by the Step-0 warning provided the warning does not say `never staged`. Borrowed counts re-measured at `0b229093` equal the spec's values. Gates read: adopter-docs exit 0; base-ref-discriminator `not-applicable` (no open predecessor — conformant for the measured stack); entry-mode `pm-authored` agrees with the Routing Map; spec-review `none` agrees; verification-ceiling `unit-and-static` with no criterion above it; oversight exit 0.
   - version-derivation (v1, 2026-09-29): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH v2.7.6, approved at sprint raw-capture-reach planning 2026-09-29 — grounds: an existing adopter is warned and a run stops staging raw captures; nothing new becomes possible.
   - intent-hash (v1): a058ace5544ad7f2ec764ee6a772d06c419a8046
+  - implement (engineer, 2026-09-29): skills/run/SKILL.md gains the Step-0 read-only raw-capture ignore probe (check-ignore x3, warning naming adopting.md, 128 on its own line) and one never-staged sentence; diff +3/-0, check-acs 7/7 PASS, prompt-sync green.
 
 
 
