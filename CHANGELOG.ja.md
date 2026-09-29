@@ -6,6 +6,8 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.7.6**
+  - **run skill が毎回の run の最初に、公開済みの raw review キャプチャが無視されるかを確かめ、raw キャプチャは commit しないと明記する。** v2.7.5 より前に scaffold した adopter は古い `<base>/.gitignore` のままで、記録をすぐ commit する規律に従うと reviewer の raw `.txt` / `.jsonl` キャプチャまで commit していた。Step 0 は、解決した reviews dir の下にある実在しない `.txt`・`.jsonl`・`.json` のプローブパスに対して read-only の `git check-ignore -q` を実行する。どれか 1 つでも無視されなければ、`docs/adopting.md` の「Upgrading an existing adopter repository」段落を指す警告を 1 行出す。git が判定できないプローブ（exit 128）は別の 1 行で報告し、無視済みとは扱わない。Implement フェーズには、reviewer の記録で commit するのは人が書く `<task-id>.md` だけだと明記した。すでに commit 済みのキャプチャは追跡されたまま残る。（T-1158・#622）
 - **v2.7.5**
   - **`bin/codex-capture.sh` が、自分と同じ場所に出荷される `team-paths.sh` で reviews dir を解決する。** code-reviewer と drift-evaluator はこれを `bash "<plugin root>/bin/codex-capture.sh"` として `--reviews-dir` 無しで呼ぶが、adopter のリポジトリからは `PATH` と cwd 相対の `bin/team-paths.sh` しか試さないため exit 2 で止まっていた。スクリプトは自分のディレクトリを symlink 越しにも正しく特定して同じ場所の `team-paths.sh` を先に実行し、`--root` を渡さず cwd も動かさないので、結果は呼び出し側のレイアウト（既定・legacy・`$TEAM_RUN_BASE`）に従う。存在するのに失敗した場合は exit 2 で、他へは落ちない。`PATH` と cwd 相対のコピーは、同じ場所に無いときだけの fallback として残る。（T-1154・#594）
   - **`team-init` が入れる base dir の `.gitignore` が、公開済みの raw review キャプチャを無視する。** `runs/` とキャプチャの一時ファイルに加えて `reviews/*.txt`・`reviews/*.jsonl`・`reviews/*.json` を持つようになり、普通の `git add -A` で公開済みキャプチャ（絶対パスや review が読んだファイルの中身を含みうる）が stage されなくなった。人が書く `<task-id>.md` と `.gitkeep` は追跡されたまま。既定・legacy・`$TEAM_RUN_BASE` のどのレイアウトでも同じ。`team-init` は既存の `<base>/.gitignore` を上書きしないので、既に使っている adopter はこの 3 行を手で追記する（board など他の scaffold も上書きする `team-init --force` は使わない）。既に commit したキャプチャは、adopter が外すまで追跡されたまま。（T-1155・#606）
