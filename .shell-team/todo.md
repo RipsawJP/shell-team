@@ -11,6 +11,25 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1160** A non-converging Specify-seam spec review reaches the operator mechanically: a checker-backed round cap and same-class-2 detection (issue #630) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1160-spec-review-round-cap.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #630 (the task's own tracker item; no separate issue filed for the spec). Stacked: cut from T-1159's tip `d48d87b1` (`feature/631-spec-review-calibration`, PR #633 open), so base-side reads use the two-arm discriminator declared in the spec. Relayed premise measured false at authoring: the Routing Map's example `SAME_CLASS_2` key `criterion-ac1` yields `AC1` under `bin/goal-state.sh`'s case-insensitive whole-word signature grep, so the spec requires only a `NO_VERDICT`-clean key. Relayed premise measured incomplete: `docs/adopting.md` has no contract section, and the optional-budget-key docs live in `docs/tuning-oversight.md`.
+  - dispatch-reflection: implement — T-1159 — repeat — T-1159's recorded value is `serial`; one checker mode plus gate and reviewer prose that change in lockstep, no balanced disjoint partition
+  - dispatch-reflection: verify-fixture — T-1159 — repeat — T-1159's recorded value is `serial`; a handful of small existing suites sharing temp roots, below the fan-out threshold
+  - dispatch-reflection: verify-mechanism — T-1159 — repeat — T-1159's recorded value is `tier1-fanout`; the diff reaches bin/, agents/, skills/ and templates/, so the docs-only carve-out does not apply; runs once at the release sweep under A2
+  - dispatch-reflection: specify — T-1159 — repeat — T-1159's recorded value is `pm-authored`; the inputs are the issue body and the Routing Map, handed over as text
+  - dispatch-reflection: spec-review — T-1159 — repeat — T-1159's recorded value is `none`; the record grammar and the both-host prose path are in-repo and measured by the criteria
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — measured negative at this scale; the checker mode, gate prose and reviewer prose must change together
+  - dispatch: verify-fixture — serial — unconditional — recommendation: tier1-verification-fanout — staged adoption; small suite population below the fan-out threshold
+  - dispatch: verify-mechanism — tier1-fanout — unconditional — saving: tier1-verification-fanout — full-population two-arm sweep once at the release under A2
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined, does not fire; the adversarial-parser risk is carried by the pre-commitment and full-strength code review
+  - freeze-attestation (v1, 2026-09-30): lines=15/15 sweep=mutual-satisfiability verdict=4P/11F owner=coordinating session
+  - freeze-reads (v1, 2026-09-30): the eleven reds are each red for the absent guard mode, prose, docs, enum or optional-key validation, and each clause was read against the post-implementation tree and is satisfiable; cross-join: AC5's close-out matrix and AC1–AC4/AC8/AC12's guard matrix call different modes, AC7's fixture-and-count equality is compatible with a guard call that is not a `codex exec`, AC4's `08`-as-eight agrees with AC13's `08` lint-clean; AC14's allow-list names this task's own records and the telemetry file is gitignored; entry-mode read = pm-authored and spec-review read = none, both match the Routing Map; verification-ceiling = unit-and-static, conformant; base-ref-discriminator = two-arm expression, correct (predecessor feature/631-spec-review-calibration exists locally, PR #633 open); check-adopter-docs rc=0; borrowed counts re-measured at d48d87b1 and recorded in the spec
+  - version-derivation (v1, 2026-09-30): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH v2.7.7, approved at sprint spec-review-escalation planning 2026-09-30 — grounds: the documented same-class escalation and a round bound now actually fire at the Specify seam; nothing new becomes possible.
+  - intent-hash (v1): 916dfcfda5604378d95558ee94457ac042940dfc
+
 
 
 
