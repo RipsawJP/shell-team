@@ -767,23 +767,6 @@ steps from them on every round, runs them locally under the version the
 workflow pins (or records that none is pinned), and a non-zero exit is a
 FAIL of the round — not a surprise on your pull request's first push.
 
-From QA round 2 on (a QA round that follows a rework), the run skill briefs
-`qa-verifier` to run a scoped re-verification round instead of repeating
-everything. It names the previous QA base (the commit that recorded the
-previous QA round's verdict) and the findings that caused the rework. QA
-re-runs every criterion the rework diff can reach, independently re-derives
-the closure of each finding as a class, and runs the CI parity steps and
-suites the rework diff reaches on the rework head — that local run is how
-"CI green on the rework head" is discharged. Every other criterion that
-passed in the previous round is carried forward, and the verdict names both
-sets as AC-label lists on a `Carried forward from round <n>` line and a
-`Re-run this round` line. QA round 1, an invocation whose briefing declares
-no scoped round (the goal loop included) and every `code-reviewer` round are
-unchanged, and a round falls back to full re-verification when the previous
-QA base cannot be resolved or the rework touches the task's own spec. If a
-defect is later found inside a carried-forward criterion, the default reverts
-to full re-verification until you re-evaluate it.
-
 What it does not cover: a step that cannot be run locally — a deploy, a
 cloud-credentialled test, a container build — is named explicitly by QA,
 never silently skipped, but is not executed; and nothing here reads a result
