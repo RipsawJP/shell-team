@@ -184,6 +184,15 @@ contract に宣言された ratifier は AI の自己規律ではなく **operat
 挙げるか、そして宣言が当てはまらない時に何を言うかだけです。延長が
 承認された場合は、決定の記録が残るようタスクの board entry に記録されます。
 
+`budget:` には任意項目 `max_spec_review_rounds`（T-1160）もあります。
+`bin/check-spec-review.sh --rounds` が、loop が review を再度呼ばずに
+あなたへエスカレーションするまでに許す Specify seam の spec-review round
+数です。`extension_ratifier` や `max_iterations` とは独立しています
+（spec-review の round は loop iteration ではありません）。項目が無ければ
+`3`、`0` で上限を無効にでき、run-loop テンプレート
+（`templates/shell-team.contract.yaml`）だけが出荷します。上の
+`extension_ratifier` に関する「3 つのテンプレート全部」の記述は変わりません。
+
 ## 限界
 
 `CLAUDE.md` は context であって Claude が従わなければならない設定ではありません。これを通じた緩和も強化も、**確率を変えるだけで機構を変えません**。確実に成立させたいものは CI（このリポジトリ自身の check がそうしています）か hook に属します。

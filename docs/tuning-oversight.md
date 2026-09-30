@@ -183,6 +183,15 @@ request anywhere: the field only changes who the escalation message names and
 what it says when the declaration does not apply. A granted extension is
 recorded on the task's board entry so the decision has a durable trail.
 
+`budget:` also accepts an optional `max_spec_review_rounds` (T-1160): the
+number of Specify-seam spec-review rounds `bin/check-spec-review.sh --rounds`
+allows before the loop escalates to you instead of invoking the review
+again. It is independent of `extension_ratifier` and of `max_iterations`
+(a spec-review round is not a loop iteration). It defaults to `3` when
+absent, `0` disables the cap, and only the run-loop template
+(`templates/shell-team.contract.yaml`) ships it; the `extension_ratifier`
+sentence above about all three templates is unchanged.
+
 ## Limits
 
 A `CLAUDE.md` is context, not configuration Claude must obey — loosening or

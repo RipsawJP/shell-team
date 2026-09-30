@@ -29,7 +29,10 @@
 #                    vocabulary if it ever grows).
 #   --stop-reason    STOP mode: exactly one of loop-guard.sh's STOP enum:
 #                    max_iterations_reached | budget_exhausted |
-#                    no_progress | guard_error
+#                    no_progress | guard_error, plus (T-1160) the one
+#                    Specify-seam value spec_review_rounds_reached, which
+#                    check-spec-review.sh --rounds reports as
+#                    STOP:spec_review_rounds_reached (use --phase review)
 #   --trigger        early mode: exactly one enum value: same-class-2 — run
 #                    this the moment same-class-2 is reached, before any
 #                    loop-guard STOP. `--stop-reason` and `--trigger` are
@@ -131,7 +134,8 @@ usage: rework-digest.sh --round N --phase validate|review --class <slug> \
   --stop-reason or --trigger is required (mutually exclusive):
     --stop-reason  one of loop-guard.sh's STOP reasons:
                    max_iterations_reached | budget_exhausted | no_progress |
-                   guard_error
+                   guard_error, or the Specify-seam value
+                   spec_review_rounds_reached (T-1160)
     --trigger      exactly the enum value same-class-2 (early, non-STOP
                    escalation) — requires the records to show a repeated
                    class (>= 2 occurrences).
@@ -242,8 +246,8 @@ while [[ $# -gt 0 ]]; do
       if [[ $# -lt 2 ]]; then fail "missing value for --stop-reason"; fi
       if [[ -n "$STOP_REASON" ]]; then fail "duplicate --stop-reason"; fi
       case "$2" in
-        max_iterations_reached|budget_exhausted|no_progress|guard_error) STOP_REASON="$2" ;;
-        *) fail "--stop-reason must be a loop-guard STOP reason: '$2'" ;;
+        max_iterations_reached|budget_exhausted|no_progress|guard_error|spec_review_rounds_reached) STOP_REASON="$2" ;;
+        *) fail "--stop-reason must be a loop-guard STOP reason or spec_review_rounds_reached: '$2'" ;;
       esac
       shift 2
       ;;

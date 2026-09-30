@@ -1136,6 +1136,29 @@ close-out backstop reads for real. How often the round changes an
 otherwise-implemented, wrong-about-the-world spec remains `undetermined` —
 that claim is about the axis's *effect*, which neither checker measures.
 
+**The round bound (T-1160, issue #630).** A spec-review round is not a
+loop iteration, so `bin/loop-guard.sh`'s `max_iterations` never counts
+it; a separate guard bounds the rounds instead. After every spec-review
+`REQUEST_CHANGES`, the run skill calls
+`bash "<plugin root>/bin/check-spec-review.sh" --rounds --task T-NNN
+--contract <loops dir>/shell-team.contract.yaml`, which counts the
+`### Codex Spec-Review verdict:` lines of the task's review record and
+prints `CONTINUE`, `APPROVED` or `STOP:spec_review_rounds_reached`. The
+cap is the optional `budget.max_spec_review_rounds` key of the loop
+contract: `3` when the key is absent (the run-loop template ships it as
+`3`), any other 1-9 digit value to raise or lower it, and `0` to turn the
+cap off. On `STOP` the loop does not invoke the review again; it
+escalates to you through the rework digest (`--stop-reason
+spec_review_rounds_reached`), and the `code-reviewer` itself refuses to
+start another pass, returning `BLOCKED — spec-review round cap reached`.
+When the reviewer records `- gating-criterion:` lines, the guard also
+prints `SAME_CLASS_2:<key>` for a criterion that gates two distinct
+rounds, and the loop then runs the same-class-2 early escalation. A
+record line outside the closed verdict grammar, or an unreadable record
+or contract, is refused rather than counted, and a refusal is never
+read as `CONTINUE`. The count is only as honest as the record is
+append-only: nothing here resists deleting earlier verdict lines.
+
 ## Choosing an oversight profile
 
 A host repository selects an **oversight profile** in a host-authored
