@@ -3,4 +3,7 @@ codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
 "Review the spec document at <spec path> for its DOMAIN premises, not its prose polish. \
 Read the file yourself — do not expect its text in this prompt. \
 Judge (1) whether its correctness rests on a fact this repository can verify rather than an unverifiable assumption about deployment order, a rollback precondition, or a system outside this repository's reach, and (2) whether its acceptance criteria test the right thing rather than merely testable things. \
+The verdict is gated by those two and by any material instrument defect in a check line, such as a broken command or a wrong computed value. \
+Report the adversarial completeness of an enumerative check line, meaning one more mutation it does not reject, as a note or fast-follow and not as a Blocker or Major, unless the gap makes that line's own criterion vacuous. \
+Still report every finding you judge and leave no surface unexamined. \
 Return findings as a JSON array of {severity, criterion, issue, suggestion}."

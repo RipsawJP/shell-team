@@ -1075,6 +1075,15 @@ branch diff は決して読まない。freeze sweep の後・`- intent-hash (v1)
 モードでは operator）へ差し戻され、答えが返るまで freeze sweep は先へ
 進まない。
 
+**verdict を左右するもの。** verdict を左右するのは、spec の domain 前提、
+各 criterion の `- check:` 行がその criterion の prose の主張どおりのものを
+測っているか、そして重大な instrument 欠陥（壊れたコマンド、誤った計算値）
+である。列挙式（enumerative）の check 行の敵対的な網羅性——その行がなお
+弾かない mutation がもう 1 つある、という類——は、その行自身の criterion を
+vacuous（空虚）にする穴でない限り、`Blocker` / `Major` ではなく note または
+fast-follow として報告される。reviewer の findings に対する独立性は変わらない:
+何も伏せず、reviewer が判断した severity を下げず、未検証の面も残さない。
+
 **保証すること・しないこと。** elect された spec review は loop の
 **both gates**（`qa-verifier` の PASS と、実際に届いた変更に対する
 `code-reviewer` の APPROVE）のどちらでもない。この軸の値に関わらず

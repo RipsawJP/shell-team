@@ -175,6 +175,8 @@ Default mode above reviews the delivered change against the frozen intent; `## F
 
 **Mandate**, issue #332's own two halves: (1) are the spec's **domain premises** sound — does its correctness rest on a fact this repository can itself verify, rather than an unverifiable deployment or ordering assumption, a rollback precondition that may not hold in production, or a blast-radius claim about a system outside this repository's reach; (2) do the acceptance criteria **test the right thing rather than merely testable things** — would satisfying every `- check:` line actually demonstrate the Goal, or only demonstrate something convenient to script.
 
+**Verdict scope and severity calibration**: the verdict is gated by the two halves of the mandate above and by any material instrument defect in a `- check:` line (a broken command, a wrong computed value), including a check that measures something other than what its criterion's prose claims. The adversarial completeness of an enumerative check line — a static list of rejected shapes that always admits one more mutation it does not reject — is reported as a note or a fast-follow, not as a `Blocker` or `Major`, unless the gap makes that line's own criterion vacuous (the check passes with its target artifact absent, or cannot fail); that exception is bound to the one criterion and does not promote another criterion's gaps. This calibrates severity only: your independence over findings is untouched, so you never withhold a finding, never lower a severity you judge, and never leave a surface unexamined; a finding outside the verdict scope is still reported and left for the coordinating session to disposition.
+
 Run the same read-only codex-capture skeleton discipline as the two default-mode read paths above — one standalone Bash invocation per block (never bundled, never captured into a bash variable), `alloc`'s two printed paths substituted as literal strings for `"<RAW_OUT>"` / `"<RAW_JSONL>"` everywhere below, `diagnose` then `cleanup` on a non-zero `codex` block (skip `publish`), and BLOCKED with the exact error on a non-zero `alloc` or `publish`. Its `codex` block, too, runs in the foreground with its timeout set to 600000 ms and is never backgrounded or detached, falling back to the same bounded foreground poll on `<RAW_OUT>` if it somehow outlives that ceiling (the rule stated at the primary pass above). The blocks:
 ```bash
 # T-107-step: alloc
@@ -186,6 +188,9 @@ codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
   "Review the spec document at <spec path> for its DOMAIN premises, not its prose polish. \
 Read the file yourself — do not expect its text in this prompt. \
 Judge (1) whether its correctness rests on a fact this repository can verify rather than an unverifiable assumption about deployment order, a rollback precondition, or a system outside this repository's reach, and (2) whether its acceptance criteria test the right thing rather than merely testable things. \
+The verdict is gated by those two and by any material instrument defect in a check line, such as a broken command or a wrong computed value. \
+Report the adversarial completeness of an enumerative check line, meaning one more mutation it does not reject, as a note or fast-follow and not as a Blocker or Major, unless the gap makes that line's own criterion vacuous. \
+Still report every finding you judge and leave no surface unexamined. \
 Return findings as a JSON array of {severity, criterion, issue, suggestion}."
 ```
 ```bash
