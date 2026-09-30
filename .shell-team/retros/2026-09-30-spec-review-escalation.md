@@ -44,6 +44,8 @@ T-1159（#633）が churn 源（spec review の verdict scope と severity calib
 - **interventions の `unclassified` が今回も 1 件出た。** review record フィールドの手書き欠落と close-out 拒否は現行 7 クラスのどれにも当てはまらず `unclassified` に落ちた。この repo の `unclassified` の全体傾向は今回の入力からは判断できない（レトロ入力は 152 ファイルのカウントのみで、クラス別集計は行っていない）。 — source: `.shell-team/interventions/T-1160.md`
 - **ゴールの実質（オペレーターに届く）は unit-and-static の天井でしか検証されていない。** guard のスクリプトは fixture で検証されたが、ゲート側は「STOP を受けたら再呼び出しせず escalate する」という prose をオーケストレーターと reviewer が読んで従うことに依存する。QA 自身が「live agent run 無し（ceiling）」と書いている。 — source: board の QA round 1 verdict（Prose judgment、Verification ceiling）
 
+- **【根本原因・オペレーター指摘を受けたオーケストレーター追記】検証の値段が「変更の大きさ」でなく「溜まった検証の量」に比例し、しかも round ごと・リリースごとに全量を払い直している。** 上の「round 2 に 61 分」は個別の非効率ではなく、この構造の 1 症状で、リリース前 sweep はさらに長くかかっている（このレトロ執筆時点で継続中）。構成要素は 3 つ。(1) spec の `- check:` が CI のテスト一式をそのまま再実行する（T-1159 の AC5 は 8 本、T-1160 の AC10 は 14 本）ので、spec が 1 本増えるたびに「CI を丸ごと再実行する check」が 1 本増える。(2) 手戻り round でも検証範囲を変更 surface に絞らない（QA round 1 は 676 秒、3 行修正の QA round 2 は 1994 秒で round 1 より長い。Codex は両 round とも diff 全体を 2 パス: 1303 秒・1574 秒）。(3) リリース sweep は全 spec を 2 腕で再実行し、その中にはマージ時点に縛られて後で必ず赤になる scope-lock（T-1159 の AC8 など）が含まれ、その分類コストも毎回払う。上の Problem 1 を「今回のデータだけでは決められない」と保留したのは、この構造に届いていない書き方だった。 — source: `.shell-team/runs/shell-team.jsonl`（`20260930T040100Z-t1160` の qa-verifier・code-reviewer span の duration）、`.shell-team/specs/T-1159-spec-review-calibration.md` AC5、`.shell-team/specs/T-1160-spec-review-round-cap.md` AC10
+
 <!-- retro-section: try -->
 ## Try
 
@@ -53,6 +55,8 @@ T-1159（#633）が churn 源（spec review の verdict scope と severity calib
 - **手戻りラウンドの QA 範囲を、変更された surface に絞る選択肢を測る。** 手戻りが 3 行の prose 修正に留まるとき、QA round 2 が 15 基準を全て再走する必要があるかを、次に同型の手戻りが出た時に所要時間つきで比較する。今回のデータだけで運用を変えると、round 2 が独立にクラスを再導出した価値を失う。owner: オーケストレーター（次スプリントの QA briefing）。 — source: `.shell-team/runs/shell-team.jsonl`、board の QA round 2 verdict
 - **cap の実挙動を live で 1 回見る機会を作る。** 次に実際の spec review が 3 ラウンドに達する場面（または fixture ではなく実エージェントによる rehearsal）で、STOP 後にオーケストレーターが再呼び出しせず escalate したかを interventions か board に記録する。owner: オーケストレーター。 — source: board の QA round 1 verdict（Verification ceiling）
 - 次スプリントの持ち越し入力（決定済み・ここでは着手案ではなく入力としてのみ記載）: #628（Codex host のセットアップと起動を 1 コマンド化）、次いで #625。本スプリントの fast-follow は #632（T-1159）、#634・#635（T-1160）。
+
+- **【オペレーター指摘を受けたオーケストレーター追記】検証コストの構造問題を次スプリントの入力にする。ただし、過去に並列化の検証スプリントが数日を使って採用できる成果をほとんど残さなかった型を繰り返さない。** 条件: (a) 最初の作業は新しい機構ではなく既存 telemetry と今回の sweep 出力からの所要時間の分解で、上限を決めて行う。仮説（suite 再実行が支配的）が測定で外れたら、その時点で計画に戻る。(b) ゴール指標は「判定可能にする」ではなく、手戻り QA round と リリース sweep の実時間そのもの（基準値と目標値を着手前に書く）。(c) 足すより引く（check からの suite 再実行の除去・scope-lock の sweep 除外・手戻り範囲の限定）を先に試し、並列化などの新機構は範囲外。(d) 1 タスク目で実時間が目標まで下がらなければ、次のタスクを足さずに打ち切る。owner: オーケストレーター（次スプリントのプランニング）。
 
 <!-- retro-section: traps -->
 ## Loop-trap check
@@ -70,6 +74,7 @@ T-1159（#633）が churn 源（spec review の verdict scope と severity calib
 - `[common]` QA や reviewer が「2 つの surface の不一致」を 1 つ見つけて note にする時は、同じクラスの全サイトを機械列挙して件数を note に含める。1 サイトだけ書いた note は、次の round で Major として再び来る。発火条件: risk note が「X と Y の不一致」を名指しした時。発火主体: note を書く QA／reviewer。（adjacent to an existing "全サイト列挙" 系 entry in lessons.md 付近 184・407 行。それらは spec の受入基準側の規則で、note 側は別）
 - `[target-specific]` `release` テレメトリ event は、`bin/close-out.sh` の exit 0 を確認した後にだけ送る。発火条件: オーケストレーターが close-out と同じコマンドで event を送ろうとした時。発火主体: オーケストレーター。より強い形は、送信の機会自体を close-out 側に移すこと（Try 参照。当否は未調査）。 — source: `.shell-team/runs/shell-team.jsonl`（seq 21 二重）
 - `[target-specific]` review record のように checker が文法を強制するフィールド行は、記述する役割が思い出して書くのでなく、実行した呼び出しから生成された骨格を渡される形にすると、`pass-role` 欠落・fidelity のキー違い・pass id の再利用・raw-capture のパス形といった拒否が構造的に消える。今回の観測は close-out 拒否 1 件のみ（サンプル 1）なので、上の「記憶から書く機会」レンズに合う仮説として提案し、2 件目が出るまで確定させない。発火条件: 同じ種類の record フィールド拒否が 2 度目に出た時。発火主体: オーケストレーター（次スプリントの入力として上げる）。 — source: `.shell-team/interventions/T-1160.md`
+- `[common]` 検証の追加は「1 回の値段」だけでなく「以後の全 round・全リリースで払い続ける値段」で見積もる。spec の check が既存テスト一式を再実行する形は、その spec が存在する限り sweep ごとに課金される。発火条件: `- check:` 行が他の suite や CI 相当を呼ぶ時。発火主体: pm-spec（書く時）と tech-lead（見積もる時）。 — source: 上の Problem【根本原因】
 
 ## Notes
 
