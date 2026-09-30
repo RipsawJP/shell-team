@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1159** The Specify-seam spec review states its verdict scope and severity calibration at every round (issue #631) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1159-spec-review-calibration.md
+- [ ] **T-1159** The Specify-seam spec review states its verdict scope and severity calibration at every round (issue #631) — `READY_FOR_QA` — spec: .shell-team/specs/T-1159-spec-review-calibration.md
   - entry-mode: pm-authored
   - source: issue #631 (the task's own tracker item; no separate issue filed for the spec). Not stacked: cut from `develop` at `db8c2797` (T-1158 merged). Relayed premise measured false at authoring: the Routing Map's `verification-class: no-mechanism` — the diff edits a fixture under `tests/` and a `codex exec` prompt, so the spec declares `mechanism` (sweep deferred to the release under A2).
   - dispatch-reflection: implement — T-1158 — repeat — prose insertions in three files plus one fixture changing in lockstep; no partition unit, same as T-1158

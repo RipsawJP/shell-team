@@ -1104,6 +1104,16 @@ record. A `REQUEST_CHANGES` routes back to the spec's own author
 (`pm-spec` in `pm-authored` mode, the operator in `operator-authored`
 mode); the freeze sweep does not proceed until it is answered.
 
+**What gates the verdict.** The verdict is gated by the spec's domain
+premises, by whether each criterion's `- check:` line measures what that
+criterion's prose claims, and by material instrument defects (a broken
+command, a wrong computed value). The adversarial completeness of an
+enumerative check line — one more mutation the line does not reject — is
+reported as a note or a fast-follow, not as a `Blocker` or `Major`, unless
+the gap makes that line's own criterion vacuous. The reviewer's
+independence over findings is untouched: nothing is withheld, no severity
+it judges is lowered, and no surface is left unexamined.
+
 **What it does and does not guarantee.** An elected spec review is never
 one of the loop's **both gates** — `qa-verifier`'s PASS and
 `code-reviewer`'s APPROVE on the delivered change both remain required
