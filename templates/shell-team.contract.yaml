@@ -31,6 +31,7 @@ budget:
   max_wallclock_min: 0     # untracked (host-dependent)
   max_subagents: 5         # tech-lead, pm-spec, engineer, qa-verifier, code-reviewer
   max_usd: 0               # untracked (host-dependent)
+  max_spec_review_rounds: 3   # Specify-seam spec-review rounds before the loop escalates to the operator; 0 disables the cap
   extension_ratifier: operator   # default; or: authoring-session
 
 stop:

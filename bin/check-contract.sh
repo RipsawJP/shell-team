@@ -87,6 +87,23 @@ if [[ -n "$budget_line" ]]; then
   for k in max_iterations max_wallclock_min max_subagents max_usd; do
     require_subkey "$budget_body" "$k" budget "$budget_line"
   done
+
+  # --- budget: OPTIONAL max_spec_review_rounds (T-1160) ---
+  # Never required. When present it must be 1-9 ASCII digits (the same width
+  # bound and inline-`# comment` stripping check-spec-review.sh --rounds
+  # applies at run time; 0 is legal and disables the round cap). The first
+  # record wins, as in the guard's own extractor. awk single-pass (not
+  # `grep | head`) so an early-closed pipe cannot raise SIGPIPE.
+  cap_record="$(awk -F'\t' '$2 ~ /^[[:space:]]*max_spec_review_rounds:/ { print; exit }' <<< "$budget_body")"
+  if [[ -n "$cap_record" ]]; then
+    cap_lineno="${cap_record%%$'\t'*}"
+    cap_val="${cap_record#*$'\t'}"
+    cap_val="${cap_val#*max_spec_review_rounds:}"
+    cap_val="$(sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<< "$cap_val")"
+    if [[ ! "$cap_val" =~ ^[0-9]{1,9}$ ]]; then
+      emit "$cap_lineno" "budget.max_spec_review_rounds must be 1-9 ASCII digits (0 disables the spec-review round cap): '$cap_val'"
+    fi
+  fi
 fi
 
 # --- stop: mandatory terminal conditions ---

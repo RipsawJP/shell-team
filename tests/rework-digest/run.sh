@@ -443,4 +443,42 @@ reject "convergence: --never-dropped name violates slug charset" "${R1c[@]}" --r
 reject "convergence: trailing --never-dropped with no value" "${R1c[@]}" --rounds-total 1 --never-dropped
 reject "convergence: any convergence input with --trigger same-class-2" --round 1 --phase validate --class alpha-one --round 2 --phase review --class alpha-one --trigger same-class-2 --rounds-total 2 --never-dropped parser-core=green --instance alpha-one=distinct
 
+# --- T-1160 (issue #630): --stop-reason spec_review_rounds_reached ----------
+# Pass lines go to stderr so the frozen golden stdout above stays byte-identical.
+SR3=(--round 1 --phase review --class c1 --round 2 --phase review --class c2 --round 3 --phase review --class c3)
+sr_ok() {
+  local label="$1"; shift
+  local out_f="$TMP/sr-out" rc
+  set +e
+  bash "$RD" "$@" > "$out_f" 2> "$TMP/sr-err"; rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "$label: expected exit 0, got $rc"
+  printf 'PASS: %s\n' "$label" >&2
+}
+sr_ok "T-1160 spec_review_rounds_reached accepted" "${SR3[@]}" --stop-reason spec_review_rounds_reached
+grep -qx 'stop-reason: spec_review_rounds_reached' "$TMP/sr-out" || fail "T-1160: the stop-reason line is missing"
+sr_ok "T-1160 spec_review_rounds_reached accepts the convergence inputs" "${SR3[@]}" --stop-reason spec_review_rounds_reached --rounds-total 3 --never-dropped n1=green
+grep -qE '^convergence: ' "$TMP/sr-out" || fail "T-1160: convergence line missing"
+for ok_reason in max_iterations_reached budget_exhausted no_progress guard_error; do
+  sr_ok "T-1160 existing reason $ok_reason still accepted" "${SR3[@]}" --stop-reason "$ok_reason"
+done
+sr_reject() {
+  local label="$1"; shift
+  local out_f="$TMP/sr-out" rc
+  set +e
+  bash "$RD" "$@" > "$out_f" 2> "$TMP/sr-err"; rc=$?
+  set -e
+  [ "$rc" -eq 2 ] || fail "$label: expected exit 2, got $rc"
+  [ ! -s "$out_f" ] || fail "$label: stdout must be empty"
+  printf 'PASS: %s\n' "$label" >&2
+}
+# near-misses: singular, upper case, hyphenated, trailing/leading garbage, empty
+for bad_reason in spec_review_round_reached SPEC_REVIEW_ROUNDS_REACHED spec-review-rounds-reached spec_review_rounds_reached_ xspec_review_rounds_reached 'spec_review_rounds_reached ' ' spec_review_rounds_reached' '' spec_review_rounds; do
+  sr_reject "T-1160 near-miss reason '$bad_reason' refused" "${SR3[@]}" --stop-reason "$bad_reason"
+done
+sr_reject "T-1160 new reason with --trigger same-class-2 refused" "${SR3[@]}" --stop-reason spec_review_rounds_reached --trigger same-class-2
+sr_reject "T-1160 duplicate --stop-reason refused" "${SR3[@]}" --stop-reason spec_review_rounds_reached --stop-reason no_progress
+# the key the round guard prints is a legal class for the early escalation
+sr_ok "T-1160 a guard-shaped class key is accepted in two review-phase records" --round 1 --phase review --class criterion-n1 --round 2 --phase review --class criterion-n1 --trigger same-class-2
+
 printf '\nAll rework-digest assertions passed.\n'

@@ -1095,6 +1095,28 @@ judgment 以上の何かにすることもない。この軸はまだ一度も e
 発火していないため、world について誤った spec の実装をどれだけ防げるかは
 `undetermined`（未測定）である。
 
+**round の上限（T-1160、issue #630）。** spec-review の round は loop
+iteration ではないので、`bin/loop-guard.sh` の `max_iterations` は数えない。
+代わりに別の guard が round 数に上限を掛ける。spec-review が
+`REQUEST_CHANGES` を返すたびに run skill は
+`bash "<plugin root>/bin/check-spec-review.sh" --rounds --task T-NNN
+--contract <loops dir>/shell-team.contract.yaml` を呼ぶ。これは task の
+review record にある `### Codex Spec-Review verdict:` 行を数え、
+`CONTINUE`、`APPROVED`、`STOP:spec_review_rounds_reached` のいずれかを
+出力する。上限は loop contract の任意項目 `budget.max_spec_review_rounds`
+で、項目が無ければ `3`（run-loop テンプレートは `3` を出荷している）、
+1〜9 桁の他の値で増減でき、`0` で上限を無効にできる。`STOP` の時、loop は
+review を再度呼ばず、rework digest（`--stop-reason
+spec_review_rounds_reached`）を通じて operator にエスカレーションし、
+`code-reviewer` 自身も次の pass の開始を拒み
+`BLOCKED — spec-review round cap reached` を返す。reviewer が
+`- gating-criterion:` 行を記録していれば、guard は 2 つの別々の round で同じ
+criterion が gate になった時に `SAME_CLASS_2:<key>` も出力し、loop は
+same-class-2 の early escalation を実行する。verdict の閉じた文法から外れた
+record 行や、読めない record / contract は数えずに拒否され、拒否が
+`CONTINUE` として扱われることはない。count は record が append-only で
+ある範囲でしか正直でない: 過去の verdict 行の削除に対する耐性はここには無い。
+
 ## oversight profile を選ぶ
 
 host repo は、host が自ら作成する `<base>/oversight.conf` で **oversight
