@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1160** A non-converging Specify-seam spec review reaches the operator mechanically: a checker-backed round cap and same-class-2 detection (issue #630) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1160-spec-review-round-cap.md
+- [ ] **T-1160** A non-converging Specify-seam spec review reaches the operator mechanically: a checker-backed round cap and same-class-2 detection (issue #630) — `READY_FOR_QA` — spec: .shell-team/specs/T-1160-spec-review-round-cap.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #630 (the task's own tracker item; no separate issue filed for the spec). Stacked: cut from T-1159's tip `d48d87b1` (`feature/631-spec-review-calibration`, PR #633 open), so base-side reads use the two-arm discriminator declared in the spec. Relayed premise measured false at authoring: the Routing Map's example `SAME_CLASS_2` key `criterion-ac1` yields `AC1` under `bin/goal-state.sh`'s case-insensitive whole-word signature grep, so the spec requires only a `NO_VERDICT`-clean key. Relayed premise measured incomplete: `docs/adopting.md` has no contract section, and the optional-budget-key docs live in `docs/tuning-oversight.md`.
