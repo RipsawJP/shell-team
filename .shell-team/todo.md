@@ -11,25 +11,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1159** The Specify-seam spec review states its verdict scope and severity calibration at every round (issue #631) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1159-spec-review-calibration.md
-  - entry-mode: pm-authored
-  - source: issue #631 (the task's own tracker item; no separate issue filed for the spec). Not stacked: cut from `develop` at `db8c2797` (T-1158 merged). Relayed premise measured false at authoring: the Routing Map's `verification-class: no-mechanism` — the diff edits a fixture under `tests/` and a `codex exec` prompt, so the spec declares `mechanism` (sweep deferred to the release under A2).
-  - dispatch-reflection: implement — T-1158 — repeat — prose insertions in three files plus one fixture changing in lockstep; no partition unit, same as T-1158
-  - dispatch-reflection: verify-fixture — T-1158 — repeat — a handful of small existing suites plus check-acs, below the fan-out threshold
-  - dispatch-reflection: verify-mechanism — T-1158 — repeat — the diff reaches agents/, skills/ and tests/, so the docs-only carve-out does not apply; runs once at the release sweep under A2
-  - dispatch-reflection: specify — T-1158 — repeat — the inputs are the issue body and the Routing Map, handed over as text; judgment-density does not fire
-  - dispatch-reflection: spec-review — T-1158 — repeat — correctness rests on in-repo text and fixtures the criteria measure; domain-premise does not fire
-  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — measured negative at this scale; three prose surfaces plus one fixture must change in lockstep
-  - dispatch: verify-fixture — serial — unconditional — recommendation: tier1-verification-fanout — staged adoption; small suite population below the fan-out threshold
-  - dispatch: verify-mechanism — tier1-fanout — unconditional — saving: tier1-verification-fanout — full-population sweep once at the release under A2
-  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
-  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined, does not fire
-  - freeze-attestation (v1, 2026-09-30): lines=9/9 sweep=mutual-satisfiability verdict=5P/4F owner=coordinating session
-  - freeze-reads (v1, 2026-09-30): AC1/AC2/AC3/AC6 red only for the absent new text, each clause read against the post-implementation tree and satisfiable; AC8 allow-list names the spec, provenance, interventions and review records and the telemetry file is gitignored; cross-join of the four reds against AC3's no-`$`/no-backtick rule and AC5's fixture equality is satisfiable; entry-mode read = pm-authored, matches the Routing Map; spec-review read = none, matches the Routing Map; verification-ceiling = unit-and-static, conformant; base-ref-discriminator = not-applicable, correct (no open predecessor); check-adopter-docs rc=0; check-oversight rc=0; borrowed counts re-measured at db8c2797 and recorded in the spec
-  - version-derivation (v1, 2026-09-30): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH v2.7.7, approved at sprint spec-review-escalation planning 2026-09-30 — grounds: an elected spec review is calibrated on the shipped path; nothing new becomes possible.
-  - intent-hash (v1): 741adb75e5fa293a1dfc3e8cb3709ffbf0dc74fb
-  - fast-follow disposition (2026-09-30): Minor 1 (the calibration paragraph says "not a Blocker or Major" and "never lower a severity it judges" together; shared with the step-6 canon) — filed as issue #632, bundled with the next edit of the step-6 bullet; Minor 2 (frozen Goal says S3 carries four clauses while AC3 and the symmetry audit scope S3 to three) — waived: the intent block is frozen and the asymmetry is disclosed in the spec's own symmetry audit; nit 3 (no "note" label in the prompt's JSON severity field) — waived: a reviewer maps it to minor or nit unambiguously; nit 4 (AC7 checks presence, not uniqueness) — waived: the diff to the file is purely additive, read directly
-  - reviewer self-report (round 1): the first adversarial `codex exec` attempt carried a `| head` and died on a broken pipe; the reviewer re-ran it as a bare command and it completed; recorded here because it was reported only in the hand-back
 
 
 
@@ -6906,6 +6887,27 @@ Supersedes nothing above (rounds 1-3's own numbers stand as measured then); this
 `bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
 
 ## Done
+
+- [x] **T-1159** The Specify-seam spec review states its verdict scope and severity calibration at every round (issue #631) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1159-spec-review-calibration.md
+  - closed: 2026-09-30, PR #633 → develop, closes #631 — both gates green; stacked in the sprint train, merge waits for the batch GO
+  - entry-mode: pm-authored
+  - source: issue #631 (the task's own tracker item; no separate issue filed for the spec). Not stacked: cut from `develop` at `db8c2797` (T-1158 merged). Relayed premise measured false at authoring: the Routing Map's `verification-class: no-mechanism` — the diff edits a fixture under `tests/` and a `codex exec` prompt, so the spec declares `mechanism` (sweep deferred to the release under A2).
+  - dispatch-reflection: implement — T-1158 — repeat — prose insertions in three files plus one fixture changing in lockstep; no partition unit, same as T-1158
+  - dispatch-reflection: verify-fixture — T-1158 — repeat — a handful of small existing suites plus check-acs, below the fan-out threshold
+  - dispatch-reflection: verify-mechanism — T-1158 — repeat — the diff reaches agents/, skills/ and tests/, so the docs-only carve-out does not apply; runs once at the release sweep under A2
+  - dispatch-reflection: specify — T-1158 — repeat — the inputs are the issue body and the Routing Map, handed over as text; judgment-density does not fire
+  - dispatch-reflection: spec-review — T-1158 — repeat — correctness rests on in-repo text and fixtures the criteria measure; domain-premise does not fire
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — measured negative at this scale; three prose surfaces plus one fixture must change in lockstep
+  - dispatch: verify-fixture — serial — unconditional — recommendation: tier1-verification-fanout — staged adoption; small suite population below the fan-out threshold
+  - dispatch: verify-mechanism — tier1-fanout — unconditional — saving: tier1-verification-fanout — full-population sweep once at the release under A2
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined, does not fire
+  - freeze-attestation (v1, 2026-09-30): lines=9/9 sweep=mutual-satisfiability verdict=5P/4F owner=coordinating session
+  - freeze-reads (v1, 2026-09-30): AC1/AC2/AC3/AC6 red only for the absent new text, each clause read against the post-implementation tree and satisfiable; AC8 allow-list names the spec, provenance, interventions and review records and the telemetry file is gitignored; cross-join of the four reds against AC3's no-`$`/no-backtick rule and AC5's fixture equality is satisfiable; entry-mode read = pm-authored, matches the Routing Map; spec-review read = none, matches the Routing Map; verification-ceiling = unit-and-static, conformant; base-ref-discriminator = not-applicable, correct (no open predecessor); check-adopter-docs rc=0; check-oversight rc=0; borrowed counts re-measured at db8c2797 and recorded in the spec
+  - version-derivation (v1, 2026-09-30): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH v2.7.7, approved at sprint spec-review-escalation planning 2026-09-30 — grounds: an elected spec review is calibrated on the shipped path; nothing new becomes possible.
+  - intent-hash (v1): 741adb75e5fa293a1dfc3e8cb3709ffbf0dc74fb
+  - fast-follow disposition (2026-09-30): Minor 1 (the calibration paragraph says "not a Blocker or Major" and "never lower a severity it judges" together; shared with the step-6 canon) — filed as issue #632, bundled with the next edit of the step-6 bullet; Minor 2 (frozen Goal says S3 carries four clauses while AC3 and the symmetry audit scope S3 to three) — waived: the intent block is frozen and the asymmetry is disclosed in the spec's own symmetry audit; nit 3 (no "note" label in the prompt's JSON severity field) — waived: a reviewer maps it to minor or nit unambiguously; nit 4 (AC7 checks presence, not uniqueness) — waived: the diff to the file is purely additive, read directly
+  - reviewer self-report (round 1): the first adversarial `codex exec` attempt carried a `| head` and died on a broken pipe; the reviewer re-ran it as a bare command and it completed; recorded here because it was reported only in the hand-back
 
 - [x] **T-1158** The run skill warns at Step 0 when a published raw review capture would not be ignored, and states that raw captures are never staged (issue #622) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1158-raw-capture-existing-adopters.md
   - closed: 2026-09-29, PR #624 → develop, closes #622
