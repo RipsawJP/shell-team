@@ -86,5 +86,33 @@ assert "loop-contract-template.yaml lints clean" 0 \
 assert "goal.contract.yaml lints clean" 0 \
   "$REPO_ROOT/templates/goal.contract.yaml"
 
+# T-1160: optional budget.max_spec_review_rounds — validated when present,
+# never required. The fixtures are built inline from valid.yaml (the suite
+# avoids mktemp, so the derived files live under $FIX and are removed).
+mk_cap() {
+  # mk_cap <value-line-or-empty> <outfile>
+  awk -v x="$1" '{ print } /^  max_iterations:/ { if (x != "") print x }' "$FIX/valid.yaml" > "$2"
+}
+CAPF="$FIX/.t1160-cap.yaml"
+trap 'rm -f "$CAPF"' EXIT
+grep -c '^  max_iterations:' "$FIX/valid.yaml" | grep -qx 1 || fail "T-1160 precondition: valid.yaml carries one max_iterations line"
+for ok in 3 0 08 999999999 "2   # tuned"; do
+  mk_cap "  max_spec_review_rounds: $ok" "$CAPF"
+  assert "T-1160 max_spec_review_rounds: $ok lints clean" 0 "$CAPF"
+done
+for bad in abc -1 1234567890 3.5 '"3"' "3 4" ""; do
+  mk_cap "  max_spec_review_rounds: $bad" "$CAPF"
+  assert "T-1160 max_spec_review_rounds: '$bad' -> exit 1" 1 "$CAPF" "max_spec_review_rounds"
+done
+# an absent key is never a violation, and a misplaced key (under stop:) is not read
+assert "T-1160 absent max_spec_review_rounds lints clean" 0 "$FIX/valid.yaml"
+awk '{ print } /^  no_progress:/ { print "  max_spec_review_rounds: abc" }' "$FIX/valid.yaml" > "$CAPF"
+assert "T-1160 a junk value under stop: (not budget:) is not read" 0 "$CAPF"
+mk_cap "  # max_spec_review_rounds: abc" "$CAPF"
+assert "T-1160 a commented-out key is not read" 0 "$CAPF"
+# the shipped run-loop template and this repo's own contract carry the key and lint clean
+assert "T-1160 this repo's own contract lints clean" 0 "$REPO_ROOT/.shell-team/loops/shell-team.contract.yaml"
+rm -f "$CAPF"
+
 printf 'OK\n'
 exit 0

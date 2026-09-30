@@ -1075,6 +1075,15 @@ branch diff は決して読まない。freeze sweep の後・`- intent-hash (v1)
 モードでは operator）へ差し戻され、答えが返るまで freeze sweep は先へ
 進まない。
 
+**verdict を左右するもの。** verdict を左右するのは、spec の domain 前提、
+各 criterion の `- check:` 行がその criterion の prose の主張どおりのものを
+測っているか、そして重大な instrument 欠陥（壊れたコマンド、誤った計算値）
+である。列挙式（enumerative）の check 行の敵対的な網羅性——その行がなお
+弾かない mutation がもう 1 つある、という類——は、その行自身の criterion を
+vacuous（空虚）にする穴でない限り、`Blocker` / `Major` ではなく note または
+fast-follow として報告される。reviewer の findings に対する独立性は変わらない:
+何も伏せず、reviewer が判断した severity を下げず、未検証の面も残さない。
+
 **保証すること・しないこと。** elect された spec review は loop の
 **both gates**（`qa-verifier` の PASS と、実際に届いた変更に対する
 `code-reviewer` の APPROVE）のどちらでもない。この軸の値に関わらず
@@ -1085,6 +1094,28 @@ branch diff は決して読まない。freeze sweep の後・`- intent-hash (v1)
 judgment 以上の何かにすることもない。この軸はまだ一度も end-to-end で
 発火していないため、world について誤った spec の実装をどれだけ防げるかは
 `undetermined`（未測定）である。
+
+**round の上限（T-1160、issue #630）。** spec-review の round は loop
+iteration ではないので、`bin/loop-guard.sh` の `max_iterations` は数えない。
+代わりに別の guard が round 数に上限を掛ける。spec-review が
+`REQUEST_CHANGES` を返すたびに run skill は
+`bash "<plugin root>/bin/check-spec-review.sh" --rounds --task T-NNN
+--contract <loops dir>/shell-team.contract.yaml` を呼ぶ。これは task の
+review record にある `### Codex Spec-Review verdict:` 行を数え、
+`CONTINUE`、`APPROVED`、`STOP:spec_review_rounds_reached` のいずれかを
+出力する。上限は loop contract の任意項目 `budget.max_spec_review_rounds`
+で、項目が無ければ `3`（run-loop テンプレートは `3` を出荷している）、
+1〜9 桁の他の値で増減でき、`0` で上限を無効にできる。`STOP` の時、loop は
+review を再度呼ばず、rework digest（`--stop-reason
+spec_review_rounds_reached`）を通じて operator にエスカレーションし、
+`code-reviewer` 自身も次の pass の開始を拒み
+`BLOCKED — spec-review round cap reached` を返す。reviewer が
+`- gating-criterion:` 行を記録していれば、guard は 2 つの別々の round で同じ
+criterion が gate になった時に `SAME_CLASS_2:<key>` も出力し、loop は
+same-class-2 の early escalation を実行する。verdict の閉じた文法から外れた
+record 行や、読めない record / contract は数えずに拒否され、拒否が
+`CONTINUE` として扱われることはない。count は record が append-only で
+ある範囲でしか正直でない: 過去の verdict 行の削除に対する耐性はここには無い。
 
 ## oversight profile を選ぶ
 
