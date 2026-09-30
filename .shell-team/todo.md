@@ -34,7 +34,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Verified: `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh .shell-team/specs/T-1161-rework-qa-scope.md 2>&1 | tail -1` → `check-acs: 7 passed, 0 failed, 1 skipped, 0 unrecognized` (AC8 SKIP is the coordinating session's replay); `bash bin/check-provenance.sh .shell-team/provenance/T-1161.md` → conformant.
     - Shape scan: `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` rc=1, 0 findings on the files written this round; the one hit in `agents/qa-verifier.md` sits in an untouched generated prompt block.
     - Note for QA: AC8 replay is not done by the engineer; the confound (installed snapshot's `qa-verifier`, not this branch's) is the coordinating session's to record.
-- [ ] **T-1162** Two host-shell commands set up and launch shell-team on the Codex CLI host: codex-setup.sh and codex-launch.sh (issue #628) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1162-codex-setup-launch.md
+- [ ] **T-1162** Two host-shell commands set up and launch shell-team on the Codex CLI host: codex-setup.sh and codex-launch.sh (issue #628) — `BLOCKED` — spec: .shell-team/specs/T-1162-codex-setup-launch.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1161 — repeat — T-1161's recorded value is `serial`; two new scripts share one plugin-root and drift contract and land with their docs together, no balanced disjoint partition
