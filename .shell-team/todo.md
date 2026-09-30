@@ -11,6 +11,23 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1161** A QA round after a rework verifies what the rework changed and carries the rest forward by an explicit label list (issue #639) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1161-rework-qa-scope.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - dispatch-reflection: implement — T-1160 — repeat — T-1160's recorded value is `serial`; two prose files that change together, no balanced disjoint partition
+  - dispatch-reflection: verify — T-1160 — no-predecessor-row — T-1160 recorded the `verify-fixture` and `verify-mechanism` refinements, not the parent axis; this task has no mechanism half since the full-population release sweep left the release conditions (2026-09-30)
+  - dispatch-reflection: specify — T-1160 — repeat — T-1160's recorded value is `pm-authored`; the inputs are the issue body and the Routing Map, handed over as text
+  - dispatch-reflection: spec-review — T-1160 — repeat — T-1160's recorded value is `none`; every premise is in-repo telemetry and prose, measured by the criteria
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — two prose files that must change in lockstep; no balanced disjoint partition
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — a few existing suites and one spec's check-acs, below the fan-out threshold
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined, does not fire
+  - freeze-attestation (v1, 2026-09-30): lines=7/7 sweep=mutual-satisfiability verdict=3P/4F owner=coordinating session
+  - freeze reads (v1, 2026-09-30): pre-implementation reds AC1/AC3/AC5 are the new tokens' absence; AC4's red isolated to the one `Scoped re-verification round (T-1161)` grep in the generated toml (all nine suites rc=0 with 0 FAIL lines, check-prompt-sync 0, gen/check-codex-agents 0); post-implementation read: AC6's allow-list covers every record this task writes (telemetry is gitignored), AC1/AC3 line-survival locks are compatible with the additive edits the Notes prescribe; adopter-docs gate rc=0; base-ref-discriminator read = `not-applicable` (no open predecessor); entry-mode read = `pm-authored`, matches the Routing Map; spec-review read = `none`, matches; verification-ceiling read = `unit-and-static` with AC8 above-ceiling (owner coordinating session); check-oversight rc=0; singular-determiner read: the spec's own section resolves each determiner, no blocker; borrowed-count measurements recorded in the spec's Assumptions
+  - version-derivation (v1, 2026-09-30): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH, approved at the 2026-09-30 sprint planning (performance work on the default loop, adopter contract unchanged) — grounds: user-visible yes is the trigger, not the verdict; nothing new becomes possible
+  - intent-hash (v1): 235fb49ffd44112189c146b933fa5d7cb1befe0c
+  - source: issue #639 (the task's own tracker item; no separate issue filed for the spec). Not stacked: cut from `develop` at `8a6cc48c`. Premise flagged at authoring: issue clause (3) "CI green on the rework head" is read as QA's local run of the reached CI-parity steps on the rework head, because QA reads nothing back from GitHub (`docs/adopting.md` `## Both gates green and your own CI`); a GitHub check-run reading would be a class-B re-freeze. The immediate replay (AC8) is the coordinating session's, after the engineer and before QA.
+
 
 
 
