@@ -777,6 +777,21 @@ follow-up へ繰り延べる場合）のいずれかを disposition として持
 ければその旨を記録する）、非ゼロ終了は round の FAIL になる（プルリクエス
 トを初めて push した時の驚きではなく）。
 
+QA round 2 以降（rework の後の QA round）では、run スキルが `qa-verifier` に
+全件の再実行ではなく scoped re-verification round を指示する。briefing は
+previous QA base（直前の QA round の verdict を記録したコミット）と rework の
+原因となった finding を名指しする。QA は rework diff が到達しうる criterion を
+すべて再実行し、各 finding の closure を class として独立に導出し直し、
+rework diff が到達する CI parity のステップとスイートを rework head で
+ローカル実行する——この実行が「rework head で CI green」を満たす。直前の
+round で PASS した他の criterion は持ち越され、verdict は両方の集合を
+`Carried forward from round <n>` 行と `Re-run this round` 行に AC ラベルの
+一覧として書く。QA round 1、scoped round を宣言しない briefing の呼び出し
+（goal ループを含む）、すべての `code-reviewer` round は変わらない。previous
+QA base を解決できない場合や rework がタスク自身の spec に触れる場合は
+full re-verification にフォールバックする。持ち越した criterion の中に後で
+欠陥が見つかった場合、既定は再評価されるまで full re-verification に戻る。
+
 カバーされないもの: ローカルで実行できないステップ（デプロイ・cloud
 credential が要るテスト・container build）は、QA が黙って skip せず明示的に
 名指しするが、実行はされない。また、ここでの検証は GitHub から結果を

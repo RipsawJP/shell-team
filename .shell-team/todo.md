@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1161** A QA round after a rework verifies what the rework changed and carries the rest forward by an explicit label list (issue #639) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1161-rework-qa-scope.md
+- [ ] **T-1161** A QA round after a rework verifies what the rework changed and carries the rest forward by an explicit label list (issue #639) — `READY_FOR_QA` — spec: .shell-team/specs/T-1161-rework-qa-scope.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1160 — repeat — T-1160's recorded value is `serial`; two prose files that change together, no balanced disjoint partition
@@ -27,6 +27,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-09-30): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH, approved at the 2026-09-30 sprint planning (performance work on the default loop, adopter contract unchanged) — grounds: user-visible yes is the trigger, not the verdict; nothing new becomes possible
   - intent-hash (v1): 235fb49ffd44112189c146b933fa5d7cb1befe0c
   - source: issue #639 (the task's own tracker item; no separate issue filed for the spec). Not stacked: cut from `develop` at `8a6cc48c`. Premise flagged at authoring: issue clause (3) "CI green on the rework head" is read as QA's local run of the reached CI-parity steps on the rework head, because QA reads nothing back from GitHub (`docs/adopting.md` `## Both gates green and your own CI`); a GitHub check-run reading would be a class-B re-freeze. The immediate replay (AC8) is the coordinating session's, after the engineer and before QA.
+  - engineer hand-off (2026-09-30, 5-line form):
+    - Changed: `skills/run/SKILL.md` (one step-5 bullet `Scoped re-verification briefing (T-1161)`), `agents/qa-verifier.md` (one paragraph after the `## Your loop` list plus short clauses on loop steps 1, 2 and the CI parity line), `docs/adopting.md` and `docs/adopting.ja.md` (one paragraph each); record `.shell-team/provenance/T-1161.md`. Nothing under `bin/`, `tests/`, `templates/`, no generated block touched.
+    - Verified: `CHECK_ACS_TIMEOUT=300 bash bin/check-acs.sh .shell-team/specs/T-1161-rework-qa-scope.md 2>&1 | tail -1` → `check-acs: 7 passed, 0 failed, 1 skipped, 0 unrecognized` (AC8 SKIP is the coordinating session's replay); `bash bin/check-provenance.sh .shell-team/provenance/T-1161.md` → conformant.
+    - Shape scan: `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` rc=1, 0 findings on the files written this round; the one hit in `agents/qa-verifier.md` sits in an untouched generated prompt block.
+    - Note for QA: AC8 replay is not done by the engineer; the confound (installed snapshot's `qa-verifier`, not this branch's) is the coordinating session's to record.
 
 
 
