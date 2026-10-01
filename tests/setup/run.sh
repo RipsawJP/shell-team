@@ -32,9 +32,8 @@ ok() { local d="$1"; shift; if "$@"; then pass "$d"; else fail "$d"; fi; }
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/t1163-setup.XXXXXX")"
 T="$(cd "$T" && pwd -P)"
-# shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below
-cleanup() { chmod -R u+rwx "$T" 2>/dev/null || true; rm -rf "$T"; }
-trap cleanup EXIT
+# The scratch root is left under ${TMPDIR:-/tmp}: no recursive delete runs here.
+# Every read-only fixture below restores its own permissions right after use.
 
 export HOME="$T/home" CODEX_HOME="$T/ch" XDG_CONFIG_HOME="$T/home/.config"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -216,9 +215,9 @@ cmp -s "$T/own" "$R/.codex/agents/my-own.toml" && pass "AC5: an adopter's own ag
 PR2="$T/pr"; mkdir -p "$PR2"; cp -R "$REPO_ROOT/bin" "$REPO_ROOT/templates" "$PR2/"
 x="$( (cd "$R" && bash "$PR2/bin/check-codex-agents.sh" --out-dir "$R/.codex/agents" > /dev/null 2>&1); printf '%s' "$?")"
 [ ! -e "$PR2/agents" ] && [ "$x" = 2 ] && pass "AC5: a plugin root without agents/ makes the checker exit 2 (precondition)" || fail "AC5: exit-2 precondition (rc=$x)"
-rm -rf "$T/a0"; cp -R "$R/.codex/agents" "$T/a0"
+A0="$(mktemp -d "$T/a0.XXXXXX")"; cp -R "$R/.codex/agents/." "$A0/"
 x="$( (cd "$R" && PATH="$SP" bash "$PR2/bin/team-setup.sh" --host codex-cli < /dev/null > "$T/o" 2> "$T/e"); printf '%s' "$?")"
-[ "$x" = 2 ] && diff -r "$T/a0" "$R/.codex/agents" > /dev/null && pass "AC5: checker exit 2 makes setup exit 2 with .codex/agents byte-identical" || fail "AC5: checker exit 2 (rc=$x)"
+[ "$x" = 2 ] && diff -r "$A0" "$R/.codex/agents" > /dev/null && pass "AC5: checker exit 2 makes setup exit 2 with .codex/agents byte-identical" || fail "AC5: checker exit 2 (rc=$x)"
 R="$T/repo-d2"; mk "$R"
 x="$( (cd "$R" && PATH="$SP" bash "$PR2/bin/team-setup.sh" --host codex-cli < /dev/null > "$T/o" 2> "$T/e"); printf '%s' "$?")"
 [ "$x" != 0 ] && [ -z "$(find "$R/.codex" -name '*.toml' -print 2>/dev/null)" ] && pass "AC5: a first run against a source that cannot regenerate fails and writes no role file" || fail "AC5: first run, unusable source (rc=$x)"

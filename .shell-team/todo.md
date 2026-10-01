@@ -51,7 +51,12 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - intent-hash (v1): cdb9794e7000976c7a0be3f45878ef3b215a8eab
   - superseded (2026-10-01): not implemented; issue #628 closed as expanded into #640 (prompt-triggered setup on both hosts, confirmations bounded to the plugin's own artifacts, clean-install verification); the launch script's composition of the host's sandbox settings was on the wrong side of the plugin/host boundary
   - source: issue #628 plus its owner scope-addition comment (2026-09-30), both relayed verbatim by the coordinating session and quoted in the spec's `## Problem`; the task's own tracker item, so no separate issue was filed. Stacked on `feature/639-rework-qa-scope` at `81d0d4cd` (T-1161 records, which ride this train per the operator's 2026-10-01 ruling); no criterion reads a base-side blob, so `base-ref-discriminator: not-applicable`. The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
-- [ ] **T-1163** One prompt sets up or updates shell-team in the current repository, on both hosts (issue #640) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1163-setup-prompt.md
+- [ ] **T-1163** One prompt sets up or updates shell-team in the current repository, on both hosts (issue #640) — `READY_FOR_QA` — spec: .shell-team/specs/T-1163-setup-prompt.md
+  - rework (coordinator-requested, not a review verdict; flag READY_FOR_REVIEW to READY_FOR_QA, 2026-10-01): engineer hand-off, T-1163 recursive-delete removal
+  - changed: `tests/setup/run.sh` only: the EXIT-trap cleanup (`chmod -R u+rwx` plus the recursive delete) removed, scratch root left under `${TMPDIR:-/tmp}`; the mid-suite reset of the `a0` copy replaced by a fresh `mktemp -d` directory (`A0`). The `chmod -R` existed only to let the delete succeed: every read-only fixture (AC6 cases, the `repo-tkq` case) already restores its own mode right after use, so no later case depended on it.
+  - pre-run grep: `grep -nE 'rm -[a-zA-Z]*[rR]|find .*-delete' tests/setup/run.sh bin/team-setup.sh` printed nothing, rc=1, before the suite ran.
+  - results: `bash tests/setup/run.sh > $TMPDIR/s.log` rc=0; `grep -c '^PASS:' $TMPDIR/s.log` gives 70; `grep -c '^FAIL:' $TMPDIR/s.log` gives 0; `shellcheck bin/team-setup.sh tests/setup/run.sh` rc=0.
+  - not run, per instruction: `check-acs` of this or any other spec (the coordinating session runs it at the freeze); no merged spec's `- check:` line.
   - engineer: implemented bin/team-setup.sh, skills/setup/SKILL.md, tests/setup/run.sh, CI wiring, test recipe, ten shipped docs; blast-radius reds at HEAD versus the pre-implementation commit are listed in the engineer hand-off.
   - entry-mode: pm-authored
   - spec-review: none
