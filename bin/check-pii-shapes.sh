@@ -623,7 +623,12 @@ is_known_shape() {  # $1 = path (repo-root-relative)
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/check-pii-shapes.XXXXXX")" \
   || fail_structural "failed to create a scratch directory under mktemp"
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
-cleanup() { rm -rf "$WORKDIR"; }
+cleanup() {
+  if [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
+    rm -f "$WORKDIR"/* 2>/dev/null || true
+    rmdir "$WORKDIR" 2>/dev/null || true
+  fi
+}
 trap cleanup EXIT
 
 FINDINGS_FILE="$WORKDIR/findings"
