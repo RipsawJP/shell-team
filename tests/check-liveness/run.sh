@@ -79,7 +79,6 @@ WORKFLOW="$REPO_ROOT/.github/workflows/check-handoff.yml"
 # the frozen spec's own check lines instead, which all use this exact
 # ${TMPDIR:-/tmp} idiom uniformly and never the $HERE fallback.
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-liveness-fixtures.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }

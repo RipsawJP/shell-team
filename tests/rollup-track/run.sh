@@ -32,8 +32,6 @@ FIX="$HERE/fixtures"
 DATE="2026-07-07"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rollup-track.XXXXXX")"
-cleanup() { rm -rf "$WORK"; }
-trap cleanup EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }

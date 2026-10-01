@@ -25,9 +25,6 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 # Explicit ${TMPDIR:-/tmp} template (repo convention, T-038/T-112).
 T="$(mktemp -d "${TMPDIR:-/tmp}/check-fanout-instances-suite.XXXXXX")"
-# shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below
-cleanup() { rm -rf "$T" 2>/dev/null || true; }
-trap cleanup EXIT
 
 EM=$'\xe2\x80\x94'
 
@@ -353,6 +350,43 @@ if [ "$rc" = "3" ] && grep -q 'no-rows' "$T/nr.err" && [ "$(grep -c . "$T/nr.out
 else
   fail "no-rows: rc=$rc err=$(cat "$T/nr.err" 2>/dev/null)"
 fi
+
+# =============================================================================
+# T-1165: check-fanout-instances.sh cleans up its scratch directory by name and rmdir, never
+# a recursive delete. Two runs of one command against fresh TMPDIRs: a plain
+# run, and a run with a PATH shim whose rmdir exits 1 without touching
+# anything. The exit status must be identical, the plain run must leave no
+# check-fanout-instances.* directory, and the shimmed run must leave exactly one (proving the
+# cleanup really reached rmdir and that its failure did not move the status).
+# =============================================================================
+t1165_rmdir_case() {  # $1 = tool (no .sh); $2.. = command; optional T1165_CWD
+  local tool="$1" d e a=0 b=0 nn=0 ns=0
+  shift
+  d="$(mktemp -d "${TMPDIR:-/tmp}/t1165-${tool}.XXXXXX")" \
+    || { fail "T-1165: ${tool}.sh: cannot create the case directory"; return 0; }
+  mkdir "$d/n" "$d/s" "$d/shim"
+  printf '#!/bin/sh\nexit 1\n' > "$d/shim/rmdir"
+  chmod +x "$d/shim/rmdir"
+  (cd "${T1165_CWD:-.}" && TMPDIR="$d/n" "$@" >/dev/null 2>&1) || a=$?
+  (cd "${T1165_CWD:-.}" && PATH="$d/shim:$PATH" TMPDIR="$d/s" "$@" >/dev/null 2>&1) || b=$?
+  for e in "$d/n/${tool}".*; do
+    if [ -e "$e" ]; then nn=$((nn + 1)); fi
+  done
+  for e in "$d/s/${tool}".*; do
+    if [ -e "$e" ]; then ns=$((ns + 1)); fi
+  done
+  if [ "$a" = "$b" ] && [ "$ns" -eq 1 ]; then
+    pass "T-1165: ${tool}.sh exit status survives a failed rmdir"
+  else
+    fail "T-1165: ${tool}.sh exit status survives a failed rmdir (plain rc=$a, shimmed rc=$b, shimmed leftovers=$ns)"
+  fi
+  if [ "$nn" -eq 0 ]; then
+    pass "T-1165: ${tool}.sh leaves no scratch directory"
+  else
+    fail "T-1165: ${tool}.sh leaves no scratch directory (plain run left $nn)"
+  fi
+}
+t1165_rmdir_case check-fanout-instances bash "$SCRIPT" --telemetry "$TEL_MAIN" --run-id R1 --phase verify --aggregation "$AGGF" --label t1082-suite
 
 printf '\n'
 if [ "$fails" -eq 0 ]; then

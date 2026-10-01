@@ -41,7 +41,6 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-durability-test.XXXXXX")"
 EMPTY_GIT_TPL="$TMP/empty-git-template"
 mkdir -p "$EMPTY_GIT_TPL"
-trap 'rm -rf "$TMP"' EXIT
 
 # build_repo <root> — a default-layout scratch repo, empty-template git init
 # pinned to /dev/null excludes.

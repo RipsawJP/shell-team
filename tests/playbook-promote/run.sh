@@ -13,7 +13,7 @@
 # scriptable — see the spec's AC4 runtime sub-bullet.
 #
 # Temp files live under $TMPDIR when set (restricted sandboxes), falling back
-# to $HERE/tmp-roots on plain CI runners. Cleaned via trap.
+# to ${TMPDIR:-/tmp}/tmp-roots on plain CI runners. Left under TMPDIR (nothing is removed).
 
 set -euo pipefail
 
@@ -25,13 +25,12 @@ BASE="$HERE/fixtures/lessons-base.md"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/playbook-promote-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 fresh_lessons() {  # $1 = destination path
   cp "$BASE" "$1"
@@ -132,7 +131,6 @@ cmp -s "$FC_ROOT/.shell-team/lessons.md" "$TMP/t1006-fail-closed-orig.md" \
   || fail "T-1006: an invalid \$TEAM_RUN_BASE must leave the resolved default byte-untouched"
 
 STUB_BIN="$TMP/t1006-stub-bin"
-rm -rf "$STUB_BIN"
 cp -R "$REPO_ROOT/bin" "$STUB_BIN"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_BIN/team-paths.sh"
 chmod 755 "$STUB_BIN/team-paths.sh"

@@ -16,9 +16,8 @@ DEFAULT_CONFIG="$REPO_ROOT/templates/refreeze-grant-default.conf"
 if [ -n "${TMPDIR:-}" ]; then
   T="$(mktemp -d "${TMPDIR%/}/check-refreeze-grant-test.XXXXXX")"
 else
-  T="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  T="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
-trap 'rm -rf "$T"' EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
@@ -140,38 +139,38 @@ pass "malformed: across all nine shapes, captured stdout carries 'grant class-m'
 # =============================================================================
 occ_case() {  # desc setup_fn
   local desc="$1"
-  rc=$(invoke --base "$T/occfix" --print-grant)
+  rc=$(invoke --base "$OCC" --print-grant)
   [ "$rc" = "2" ] || fail "$desc (expected exit 2, got $rc; stderr: $(cat "$T/err" 2>/dev/null))"
   [ ! -s "$T/out" ] || fail "$desc: stdout must be empty on refusal"
   [ -s "$T/err" ] || fail "$desc: stderr must carry a refusal token"
   pass "$desc"
 }
 
-rm -rf "$T/occfix"; mkdir -p "$T/occfix/refreeze-grant.conf"
+OCC="$(mktemp -d "$T/occfix.XXXXXX")"; mkdir -p "$OCC/refreeze-grant.conf"
 occ_case "crg-occupancy-not-granted: a directory at the record path refuses declaration-occupancy"
 grep -qF -- 'declaration-occupancy' "$T/err" || fail "directory occupant must name declaration-occupancy"
 pass "crg-occupancy-not-granted"
 
-rm -rf "$T/occfix"; mkdir -p "$T/occfix"
-ln -s "$T/occfix/absent-target" "$T/occfix/refreeze-grant.conf"
+OCC="$(mktemp -d "$T/occfix.XXXXXX")"
+ln -s "$OCC/absent-target" "$OCC/refreeze-grant.conf"
 occ_case "occupancy: a dangling symlink at the record path refuses declaration-occupancy"
 
 if command -v mkfifo >/dev/null 2>&1; then
-  rm -rf "$T/occfix"; mkdir -p "$T/occfix"
-  mkfifo "$T/occfix/refreeze-grant.conf"
+  OCC="$(mktemp -d "$T/occfix.XXXXXX")"
+  mkfifo "$OCC/refreeze-grant.conf"
   occ_case "occupancy: a FIFO at the record path refuses declaration-occupancy"
 else
   fail "mkfifo is required for this suite and is not on PATH"
 fi
 
 if [ "$(id -u)" != "0" ]; then
-  rm -rf "$T/occfix"; mkdir -p "$T/occfix"
-  printf 'schema 1\ngrant class-m\n' > "$T/occfix/refreeze-grant.conf"
-  chmod 000 "$T/occfix/refreeze-grant.conf"
-  [ ! -r "$T/occfix/refreeze-grant.conf" ] || fail "unreadable fixture must really be unreadable before it is trusted"
+  OCC="$(mktemp -d "$T/occfix.XXXXXX")"
+  printf 'schema 1\ngrant class-m\n' > "$OCC/refreeze-grant.conf"
+  chmod 000 "$OCC/refreeze-grant.conf"
+  [ ! -r "$OCC/refreeze-grant.conf" ] || fail "unreadable fixture must really be unreadable before it is trusted"
   occ_case "occupancy: an unreadable regular file refuses declaration-unreadable"
   grep -qF -- 'declaration-unreadable' "$T/err" || fail "unreadable occupant must name declaration-unreadable"
-  chmod 700 "$T/occfix/refreeze-grant.conf" 2>/dev/null || true
+  chmod 700 "$OCC/refreeze-grant.conf" 2>/dev/null || true
 else
   pass "occupancy: unreadable-file case skipped (running as root defeats chmod 000)"
 fi

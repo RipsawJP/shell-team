@@ -37,7 +37,6 @@ pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-model-pins-test.XXXXXX")" || { echo "FAIL: could not create scratch root" >&2; exit 1; }
-trap 'rm -rf "$TMP"' EXIT
 
 # build_installed_tree <dest> — a scratch copy of bin/ + templates/ +
 # agents/, the sanctioned way to exercise a mutated sibling/registry: this

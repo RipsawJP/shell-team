@@ -14,7 +14,7 @@
 #        baked into the generated files.
 #   override: $TEAM_RUN_BASE relocates the whole scaffold under that base dir.
 #
-# Avoids mktemp (writes under $HERE/tmp-targets, cleaned via trap) so the suite
+# Avoids mktemp (writes under ${TMPDIR:-/tmp}/tmp-targets, left under TMPDIR) so the suite
 # runs in restricted sandboxes.
 
 set -euo pipefail
@@ -27,7 +27,7 @@ CHECK_CONTRACT="$REPO_ROOT/bin/check-contract.sh"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/team-init-test-targets.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-targets.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-targets.XXXXXX")"
 fi
 
 # T-1097: a SECOND, $TMPDIR-backed root reserved for git-needing fixtures,
@@ -38,7 +38,7 @@ fi
 if [ -n "${TMPDIR:-}" ]; then
   GIT_TMP="$(mktemp -d "${TMPDIR%/}/team-init-test-git.XXXXXX")"
 else
-  GIT_TMP="$(mktemp -d "$HERE/tmp-git.XXXXXX")"
+  GIT_TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-git.XXXXXX")"
 fi
 # GIT_CEILING_DIRECTORIES stops git's upward search for an ANCESTOR
 # repository at this root — this repository's own work tree, in particular
@@ -57,7 +57,6 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # assertions are not perturbed by the caller's environment.
 init() { env -u TEAM_RUN_BASE bash "$INIT" "$@"; }
 
-trap 'rm -rf "$TMP" "$GIT_TMP"' EXIT
 
 # --- AC1: fresh target -> scaffold under .shell-team/ -------------------------
 T1="$TMP/fresh"

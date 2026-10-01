@@ -8,7 +8,7 @@
 #   - --export is eval-safe, including roots / bases containing a space
 #   - bad usage exits 2 (no mode, unknown --get key, unknown flag)
 #
-# Avoids mktemp (writes under $HERE/tmp-roots, cleaned via trap) so the suite
+# Avoids mktemp (writes under ${TMPDIR:-/tmp}/tmp-roots, left under TMPDIR) so the suite
 # runs in restricted sandboxes — mirrors tests/team-init/run.sh.
 
 set -euo pipefail
@@ -19,13 +19,12 @@ PATHS="$REPO_ROOT/bin/team-paths.sh"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/team-paths-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 # get <root> <key> [env-assignment...] -> prints the resolved path
 get() {

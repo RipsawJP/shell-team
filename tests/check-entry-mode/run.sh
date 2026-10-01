@@ -14,9 +14,8 @@ SCRIPT="$REPO_ROOT/bin/check-entry-mode.sh"
 if [ -n "${TMPDIR:-}" ]; then
   T="$(mktemp -d "${TMPDIR%/}/check-entry-mode-test.XXXXXX")"
 else
-  T="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  T="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
-trap 'rm -rf "$T"' EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }

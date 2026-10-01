@@ -8,7 +8,7 @@
 # Regression guard for the footprint leak where, in a .shell-team/ host, log-run
 # fell back to a hardcoded tasks/runs because the orchestrator's exported
 # TEAM_RUNS_DIR did not persist across Bash tool calls. Avoids mktemp (writes
-# under $HERE/tmp-roots, cleaned via trap) so it runs in restricted sandboxes.
+# under $HERE/tmp-roots, left under TMPDIR) so it runs in restricted sandboxes.
 #
 # T-042 (AC2) extends this suite with the post-write self-check auto-chain:
 #   (a) a self-check failure on the just-written row surfaces as log-run's own
@@ -24,13 +24,12 @@ LOGRUN="$REPO_ROOT/bin/log-run.sh"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/log-run-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 SPAN_ARGS=(probe --run-id r1 --seq 0 --span s --phase p --iteration 0 --attempt 0 --status success)
 
@@ -129,7 +128,7 @@ set +e
 ( cd "$D" && bash "$NOREAD/bin/log-run.sh" checkrun-noread --run-id r1 --seq 0 --span s --phase p --iteration 0 --attempt 0 --status success ) >/dev/null 2>&1
 noread_rc=$?
 set -e
-chmod a+r "$NOREAD/bin/check-run.sh"   # restore so the EXIT trap's rm -rf can remove it
+chmod a+r "$NOREAD/bin/check-run.sh"   # restore the read bit (the tree is left under TMPDIR)
 [ "$noread_rc" -eq 0 ] || fail "check-run.sh unreadable: expected exit 0, got $noread_rc"
 pass "check-run.sh present but unreadable -> log-run still exits 0"
 

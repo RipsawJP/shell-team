@@ -46,10 +46,6 @@ fails=0
 pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-commit-identity-suite.XXXXXX")"
-# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
-cleanup() { rm -rf "$WORK"; }
-trap cleanup EXIT
 
 # =============================================================================
 # identity fragments — every non-noreply address is assembled from fragments.
@@ -428,6 +424,44 @@ if [ "$RC" -eq 1 ] \
 else
   fail "no-leak: finding output never echoes the identity value (rc=$RC out=$OUT)"
 fi
+
+# =============================================================================
+# T-1165: check-commit-identity.sh cleans up its scratch directory by name and rmdir, never
+# a recursive delete. Two runs of one command against fresh TMPDIRs: a plain
+# run, and a run with a PATH shim whose rmdir exits 1 without touching
+# anything. The exit status must be identical, the plain run must leave no
+# check-commit-identity.* directory, and the shimmed run must leave exactly one (proving the
+# cleanup really reached rmdir and that its failure did not move the status).
+# =============================================================================
+t1165_rmdir_case() {  # $1 = tool (no .sh); $2.. = command; optional T1165_CWD
+  local tool="$1" d e a=0 b=0 nn=0 ns=0
+  shift
+  d="$(mktemp -d "${TMPDIR:-/tmp}/t1165-${tool}.XXXXXX")" \
+    || { fail "T-1165: ${tool}.sh: cannot create the case directory"; return 0; }
+  mkdir "$d/n" "$d/s" "$d/shim"
+  printf '#!/bin/sh\nexit 1\n' > "$d/shim/rmdir"
+  chmod +x "$d/shim/rmdir"
+  (cd "${T1165_CWD:-.}" && TMPDIR="$d/n" "$@" >/dev/null 2>&1) || a=$?
+  (cd "${T1165_CWD:-.}" && PATH="$d/shim:$PATH" TMPDIR="$d/s" "$@" >/dev/null 2>&1) || b=$?
+  for e in "$d/n/${tool}".*; do
+    if [ -e "$e" ]; then nn=$((nn + 1)); fi
+  done
+  for e in "$d/s/${tool}".*; do
+    if [ -e "$e" ]; then ns=$((ns + 1)); fi
+  done
+  if [ "$a" = "$b" ] && [ "$ns" -eq 1 ]; then
+    pass "T-1165: ${tool}.sh exit status survives a failed rmdir"
+  else
+    fail "T-1165: ${tool}.sh exit status survives a failed rmdir (plain rc=$a, shimmed rc=$b, shimmed leftovers=$ns)"
+  fi
+  if [ "$nn" -eq 0 ]; then
+    pass "T-1165: ${tool}.sh leaves no scratch directory"
+  else
+    fail "T-1165: ${tool}.sh leaves no scratch directory (plain run left $nn)"
+  fi
+}
+T1165_REPO="$(new_repo)"
+T1165_CWD="$T1165_REPO" t1165_rmdir_case check-commit-identity bash "$BIN" --base HEAD
 
 # =============================================================================
 printf '\n'
