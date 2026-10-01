@@ -68,6 +68,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-01): verdict=match — derived=MINOR — headline=met — default-reach=met — premise=sprint B planning approval of 2026-10-01, expected tier MINOR (v2.8.0) on the ground that the setup prompt is a new adopter-perceivable capability on the default install path — grounds: a shipped skill and bin script reachable on every install with no configuration; T-1164 (PATCH) rides the same release
   - freeze-attestation (v1, 2026-10-01): lines=16/16 sweep=mutual-satisfiability verdict=2P/14F owner=coordinating session
   - intent-hash (v1): 43d5618fd3b957a10d44b894f69c4d1a9ee3a5af
+  - intent-ratified (2026-10-01): v1→v2 — human GO given in-session on the orchestrator's ratification request ("T-1163 v2 再凍結 GO"), after the operator stated that `rm -rf` is one of the very few prohibitions set on the host — every one of the 16 `- check:` lines ended by removing its own temp directory with `rm -rf`; v2 drops that cleanup and leaves the temp directories under $TMPDIR; `check-refreeze-class.sh` reports mechanics, differing=16 (old-hash 43d5618fd3b957a10d44b894f69c4d1a9ee3a5af, new 5b23958fa45af104151ab1a3ecb2c7a1642dba12)
 
 
 
