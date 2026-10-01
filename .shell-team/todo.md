@@ -27,6 +27,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-01): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=sprint delete-guardrail planning approval of 2026-10-01, expected tier PATCH (v2.7.8) on the ground that the bin cleanup change is internal and the tests are not shipped — grounds: user-visible no; the eight tools keep their exit status and output
   - freeze-attestation (v1, 2026-10-01): lines=11/11 sweep=mutual-satisfiability verdict=2P/9F owner=coordinating session
   - intent-hash (v1): 41745b4656cf5867b879fcb0d04c40edb585713a
+  - ci: 110300460183 — conclusion: success — head: de82d319f897e60edf3a4fa1694866f5effa152d
 
 
 
