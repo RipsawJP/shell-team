@@ -363,6 +363,40 @@ for t in trust_level writable_roots network_access sandbox_workspace_write dange
 done
 [ "$tok_ok" -eq 1 ] && pass "AC10: none of the fifteen tokens occurs in the script, the skill or the run output" || fail "AC10: a forbidden token occurs"
 
+# ---------------------------------------------------------------------------
+# Symlinked write targets (decision 4's bound): setup refuses with exit 2 and
+# writes nothing, neither in the repository nor behind the link.
+# ---------------------------------------------------------------------------
+# Positive control: the same layout without a symlink writes the five agents.
+R="$T/repo-sl-ctl"; mk "$R"; mkdir -p "$R/.codex"
+x="$(st "$R" --host codex-cli)"
+n="$(find "$R/.codex/agents" -name 'shell-team-*.toml' 2>/dev/null | wc -l | tr -d ' ')"
+[ "$x" = 0 ] && [ "$n" = 5 ] && pass "symlink control: a real .codex dir writes five agent files (exit $x, $n files)" || fail "symlink control: exit $x, $n files"
+sl_case() { # <label> <host>
+  local label="$1" host="$2" R="$T/repo-sl-$1-$2" D="$T/sl-target-$1-$2"
+  mk "$R"; mkdir -p "$D"
+  case "$label" in
+    codex)       ln -s "$D" "$R/.codex" ;;
+    codex-agents) mkdir -p "$R/.codex"; ln -s "$D" "$R/.codex/agents" ;;
+    base)        ln -s "$D" "$R/.shell-team" ;;
+    base-sub)    mkdir -p "$R/.shell-team"; ln -s "$D" "$R/.shell-team/runs" ;;
+    info)        mv "$R/.git/info" "$R/.git/info-real"; ln -s "$D" "$R/.git/info" ;;
+  esac
+  snap "$R" > "$T/sl0"
+  x="$(st "$R" --host "$host")"
+  snap "$R" > "$T/sl1"
+  [ "$x" = 2 ] && pass "symlink $label: exits 2" || fail "symlink $label: exit $x"
+  [ -z "$(ls -A "$D")" ] && pass "symlink $label: the link target is still empty" || fail "symlink $label: the link target gained $(ls -A "$D")"
+  cmp -s "$T/sl0" "$T/sl1" && pass "symlink $label: nothing new appeared in the repository" || fail "symlink $label: the repository changed"
+  grep -qF 'symlink' "$T/e" && pass "symlink $label: stderr names the symlink" || fail "symlink $label: stderr does not name a symlink"
+}
+sl_case codex codex-cli
+sl_case codex-agents codex-cli
+sl_case base codex-cli
+sl_case base claude-code
+sl_case base-sub claude-code
+sl_case info codex-cli
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'setup suite: all assertions passed\n'

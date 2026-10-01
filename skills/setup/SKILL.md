@@ -52,11 +52,21 @@ Do this:
 
 5. **Close with the operator's part.** Point the user at the lines under
    `Remains the operator's decision:`, including the review-transfer line, and
-   say that each is their call. Then tell them they can run:
+   say that each is their call. Then tell them how to start the loop. On Claude
+   Code they can run:
 
    ```
    /shell-team:run <what you want built>
    ```
+
+   On the Codex CLI they start a Codex session in the repository and dispatch
+   the generated `shell-team-tech-lead` agent with Codex's own `spawn_agent`
+   tool, as `docs/adopting.md`'s "Using shell-team from Codex CLI" section
+   describes.
+
+   After exit `2`, report the refusal and its `- run yourself:` line (when the
+   report prints one) to the operator and stop; do not work around the refusal
+   by writing the artifact yourself or by another route.
 
 Boundary — what you never do in this skill:
 

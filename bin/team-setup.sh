@@ -37,8 +37,9 @@
 # Exit codes (precedence 2 > 3 > 1 > 0):
 #   0  everything in place, nothing refused, nothing missing
 #   1  a prerequisite CLI is missing (reported, never installed)
-#   2  usage error, not in a git work tree, an unsafe path, or a step that
-#      could not complete; refusals happen before any write
+#   2  usage error, not in a git work tree, an unsafe path, a symlink where
+#      setup would write, or a step that could not complete; refusals happen
+#      before any write
 #   3  a write was refused; its exact command is printed under the report's
 #      last section
 #
@@ -92,7 +93,8 @@ Exit codes (precedence 2 > 3 > 1 > 0):
   0  everything in place
   1  the other provider's CLI is missing from PATH (reported only)
   2  usage error, not in a git work tree, an unsafe path (a single quote or a
-     control character), or a step that could not complete
+     control character), a symlink where setup would write, or a step that
+     could not complete
   3  a write was refused; the report prints one exact command per refused
      write, for the host's own per-command approval or for you to run
 EOF
@@ -184,6 +186,36 @@ if [ "$HOST" = "codex-cli" ]; then
     die "the git common directory contains a single quote or a control character, so a command naming it cannot be quoted safely; nothing was written"
   fi
   EXCL="$common/info/exclude"
+fi
+
+# A directory this run writes into must not be a symlink at any component below
+# the repository root: mkdir -p and the writers would follow it and write
+# outside the repository. Refused before any write; the operator decides (no
+# single artifact command exists for a repository that commits such a link).
+no_symlink_below() { # <base-dir> <relative-path>
+  local acc="$1" part rest="$2"
+  while [ -n "$rest" ]; do
+    part="${rest%%/*}"
+    if [ "$part" = "$rest" ]; then rest=""; else rest="${rest#*/}"; fi
+    [ -n "$part" ] || continue
+    acc="$acc/$part"
+    if [ -L "$acc" ]; then
+      die "$acc is a symlink, and setup writes under it; refusing so nothing is written outside the repository (nothing was written). Whether to replace the symlink with a real directory is the operator's decision"
+    fi
+  done
+  return 0
+}
+for rel in "$BASE" "$LOOPS_DIR" "$(tp TEAM_RUNS_DIR)" "$(tp TEAM_RETROS_DIR)" \
+  "$(tp TEAM_REVIEWS_DIR)" "$(tp TEAM_SPECS_DIR)" "$(tp TEAM_PROVENANCE_DIR)" \
+  "$(tp TEAM_INTERVENTIONS_DIR)"; do
+  [ -n "$rel" ] || die "the path resolver printed an empty operating path; nothing was written"
+  no_symlink_below "$ROOT" "$rel"
+done
+if [ "$HOST" = "codex-cli" ]; then
+  no_symlink_below "$ROOT" ".codex/agents"
+  if [ -L "${EXCL%/exclude}" ] || [ -L "$EXCL" ]; then
+    die "${EXCL%/exclude} or $EXCL is a symlink, and setup appends to it; refusing so nothing is written outside the git directory (nothing was written). Whether to replace it is the operator's decision"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
