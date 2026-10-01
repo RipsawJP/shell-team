@@ -11,26 +11,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1165** No recursive delete in the test suites, the docs fixture or the eight bin tools' cleanup (issue #641) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1165-no-recursive-delete.md
-  - entry-mode: pm-authored
-  - spec-review: none
-  - source: issue #641 (the task's own tracker item; no separate issue filed for the spec). Cut from develop at 8a6cc48c, no open predecessor PR; predecessor on this branch's board is T-1160. Bound by the operator's standing rule of 2026-10-01 (no recursive delete anywhere; no local run of a file containing one; merged specs' check lines never run), quoted verbatim in the spec's frozen constraint block.
-  - relayed-baseline: tests-recursive-delete-files — 56 files / 99 occurrences (issue, relayed) vs 55 / 97 (tech-lead tool read, wider pattern) — owner coordinating session; derived value to follow after step 2a, through bin/derive-populations.sh, embedded in the spec's Population section
-  - dispatch-reflection: implement — T-1160 — repeat — T-1160 recorded `serial`; about 55 suites plus 8 tools are countable, but the bin conversion must land before anything runs the record tools, so the work is ordered rather than split
-  - dispatch-reflection: verify — T-1160 — no-predecessor-row — T-1160 recorded the `verify-fixture` / `verify-mechanism` refinements, not the parent `verify` key; this task has no mechanism-class half (merged-spec sweeps are forbidden by the standing rule) and records the parent alone
-  - dispatch-reflection: specify — T-1160 — repeat — T-1160 recorded `pm-authored`; the inputs are the issue body and the Routing Map, handed over as text
-  - dispatch-reflection: spec-review — T-1160 — repeat — T-1160 recorded `none`; every premise (rmdir semantics, the workflow, the suite list) is measurable in this repository
-  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — measured negative at this scale; the bin conversion is ordered before the suites, so the work is sequenced, not split
-  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — the authority over the suite population is CI read through MCP, not a local fan-out; the local duty is one grep gate plus the suites whose behaviour changed, and fanning out would multiply local runs of exactly the files the standing rule restricts
-  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — the judgment-density trigger was examined and does not fire
-  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — the domain-premise trigger was examined and does not fire; the one unmeasured fact (whether the runner exports TMPDIR) is removed by the `${TMPDIR:-/tmp}` fallback
-  - version-derivation (v1, 2026-10-01): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=sprint delete-guardrail planning approval of 2026-10-01, expected tier PATCH (v2.7.8) on the ground that the bin cleanup change is internal and the tests are not shipped — grounds: user-visible no; the eight tools keep their exit status and output
-  - freeze-attestation (v1, 2026-10-01): lines=11/11 sweep=mutual-satisfiability verdict=2P/9F owner=coordinating session
-  - intent-hash (v1): 41745b4656cf5867b879fcb0d04c40edb585713a
-  - ci: 110320071019 — conclusion: success — head: d4ee27ca4e301bcad4f6e9e8487a09e6a3db9193
-  - self-detected (qa round 2, 2026-10-01): a counter-probe of the round-1 unquoted close-out payload split at a space in the path and created an empty file `two` in the repository root; QA moved it with `mv` to its scratch directory instead of deleting it (standing rule) and confirmed a clean tree — transcribed by the coordinating session from the QA hand-back
-  - Codex round 1 REQUEST_CHANGES (one Major: the check-review-input canary could not fire inside the quoted prompt argument) → rework 44bff18d; round 2 returned APPROVE with no Codex pass and no evidence ledger — not transcribed (review not established); round 3 Codex primary + evidence passes, 23-row evidence ledger, APPROVE → READY_FOR_MERGE (record `.shell-team/reviews/T-1165.md`, check-review-input exit 0)
-  - fast-follow disposition (2026-10-01): stale EXIT-trap wording in tests/check-pii-shapes/run.sh:57, tests/check-intent/run.sh:434, tests/check-provenance/run.sh:605 — waived: comment and label text only, dev-scaffold; tests/install fixed scratch root — waived: deliberate pre-existing sandbox root that AC3's frozen check passes; relative TMPDIR with --all in bin/check-pii-shapes.sh — filed as issue #643 (leaves a directory, removes nothing outside its own; identical at base)
 
 
 
@@ -6944,6 +6924,28 @@ Supersedes nothing above (rounds 1-3's own numbers stand as measured then); this
 `bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
 
 ## Done
+
+- [x] **T-1165** No recursive delete in the test suites, the docs fixture or the eight bin tools' cleanup (issue #641) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1165-no-recursive-delete.md
+  - closed: 2026-10-01, PR #642 → develop, closes #641
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #641 (the task's own tracker item; no separate issue filed for the spec). Cut from develop at 8a6cc48c, no open predecessor PR; predecessor on this branch's board is T-1160. Bound by the operator's standing rule of 2026-10-01 (no recursive delete anywhere; no local run of a file containing one; merged specs' check lines never run), quoted verbatim in the spec's frozen constraint block.
+  - relayed-baseline: tests-recursive-delete-files — 56 files / 99 occurrences (issue, relayed) vs 55 / 97 (tech-lead tool read, wider pattern) — owner coordinating session; derived value to follow after step 2a, through bin/derive-populations.sh, embedded in the spec's Population section
+  - dispatch-reflection: implement — T-1160 — repeat — T-1160 recorded `serial`; about 55 suites plus 8 tools are countable, but the bin conversion must land before anything runs the record tools, so the work is ordered rather than split
+  - dispatch-reflection: verify — T-1160 — no-predecessor-row — T-1160 recorded the `verify-fixture` / `verify-mechanism` refinements, not the parent `verify` key; this task has no mechanism-class half (merged-spec sweeps are forbidden by the standing rule) and records the parent alone
+  - dispatch-reflection: specify — T-1160 — repeat — T-1160 recorded `pm-authored`; the inputs are the issue body and the Routing Map, handed over as text
+  - dispatch-reflection: spec-review — T-1160 — repeat — T-1160 recorded `none`; every premise (rmdir semantics, the workflow, the suite list) is measurable in this repository
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — measured negative at this scale; the bin conversion is ordered before the suites, so the work is sequenced, not split
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — the authority over the suite population is CI read through MCP, not a local fan-out; the local duty is one grep gate plus the suites whose behaviour changed, and fanning out would multiply local runs of exactly the files the standing rule restricts
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — the judgment-density trigger was examined and does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — the domain-premise trigger was examined and does not fire; the one unmeasured fact (whether the runner exports TMPDIR) is removed by the `${TMPDIR:-/tmp}` fallback
+  - version-derivation (v1, 2026-10-01): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=sprint delete-guardrail planning approval of 2026-10-01, expected tier PATCH (v2.7.8) on the ground that the bin cleanup change is internal and the tests are not shipped — grounds: user-visible no; the eight tools keep their exit status and output
+  - freeze-attestation (v1, 2026-10-01): lines=11/11 sweep=mutual-satisfiability verdict=2P/9F owner=coordinating session
+  - intent-hash (v1): 41745b4656cf5867b879fcb0d04c40edb585713a
+  - ci: 110320071019 — conclusion: success — head: d4ee27ca4e301bcad4f6e9e8487a09e6a3db9193
+  - self-detected (qa round 2, 2026-10-01): a counter-probe of the round-1 unquoted close-out payload split at a space in the path and created an empty file `two` in the repository root; QA moved it with `mv` to its scratch directory instead of deleting it (standing rule) and confirmed a clean tree — transcribed by the coordinating session from the QA hand-back
+  - Codex round 1 REQUEST_CHANGES (one Major: the check-review-input canary could not fire inside the quoted prompt argument) → rework 44bff18d; round 2 returned APPROVE with no Codex pass and no evidence ledger — not transcribed (review not established); round 3 Codex primary + evidence passes, 23-row evidence ledger, APPROVE → READY_FOR_MERGE (record `.shell-team/reviews/T-1165.md`, check-review-input exit 0)
+  - fast-follow disposition (2026-10-01): stale EXIT-trap wording in tests/check-pii-shapes/run.sh:57, tests/check-intent/run.sh:434, tests/check-provenance/run.sh:605 — waived: comment and label text only, dev-scaffold; tests/install fixed scratch root — waived: deliberate pre-existing sandbox root that AC3's frozen check passes; relative TMPDIR with --all in bin/check-pii-shapes.sh — filed as issue #643 (leaves a directory, removes nothing outside its own; identical at base)
 
 - [x] **T-1160** A non-converging Specify-seam spec review reaches the operator mechanically: a checker-backed round cap and same-class-2 detection (issue #630) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1160-spec-review-round-cap.md
   - closed: 2026-09-30, PR #636 → develop, closes #630 — both gates green (QA r2 PASS, Codex r2 APPROVE); stacked on PR #633; merge waits for the batch GO
