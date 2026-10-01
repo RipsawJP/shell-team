@@ -72,9 +72,8 @@ bad() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/errexit-safe-fixtures.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-fixtures.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-fixtures.XXXXXX")"
 fi
-trap 'rm -rf "$TMP"' EXIT
 
 # --- M1 fixture: a READABLE spec with zero AC headings, so check-acs.sh falls
 # through past its `[ -r "$SPEC" ]` readability gate and actually reaches the
@@ -474,20 +473,17 @@ while IFS= read -r rec; do
   target="$probe_dir/$rw_file"
   if [ ! -f "$target" ]; then
     content_rewrite_fails=$((content_rewrite_fails + 1))
-    rm -rf "$probe_dir"
     continue
   fi
   before_n=$(rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]} $0==o{n++} END{print n+0}' "$target")
   if [ "$before_n" != "$n_decl" ]; then
     content_rewrite_fails=$((content_rewrite_fails + 1))
-    rm -rf "$probe_dir"
     continue
   fi
   rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]; p="  printf \"T1038 REWRITE PROBE\" >&2; exit 42"} $0==o{print p; next} {print}' "$target" > "$probe_dir/.rewritten.tmp" && mv "$probe_dir/.rewritten.tmp" "$target"
   after_n=$(rw_old="$rw_content" awk 'BEGIN{o=ENVIRON["rw_old"]} $0==o{n++} END{print n+0}' "$target")
   if [ "$after_n" != "0" ]; then
     content_rewrite_fails=$((content_rewrite_fails + 1))
-    rm -rf "$probe_dir"
     continue
   fi
   derive_candidates "$probe_dir" > "$TMP/rewrite-cand.txt"
@@ -497,7 +493,6 @@ while IFS= read -r rec; do
   if [ "$fwd_n" -lt 1 ] || [ "$rev_n" -lt 1 ]; then
     content_rewrite_fails=$((content_rewrite_fails + 1))
   fi
-  rm -rf "$probe_dir"
 done < "$NOT_APPLY_ITER_FILE"
 if [ "$content_rewrite_checked" -ge 1 ] && [ "$content_rewrite_fails" -eq 0 ]; then
   ok "content-rewrite self-check: rewriting a registered line's text to an unsafe form is caught in BOTH directions — forward as an unregistered key, reverse as a count mismatch"
@@ -526,7 +521,6 @@ while IFS= read -r rec; do
   target="$probe_dir/$dup_file"
   if [ ! -f "$target" ]; then
     duplicate_fails=$((duplicate_fails + 1))
-    rm -rf "$probe_dir"
     continue
   fi
   printf '%s\n' "$dup_content" >> "$target"
@@ -537,7 +531,6 @@ while IFS= read -r rec; do
   if [ "$fwd_n" -lt 1 ] || [ "$rev_n" -lt 1 ]; then
     duplicate_fails=$((duplicate_fails + 1))
   fi
-  rm -rf "$probe_dir"
 done < "$NOT_APPLY_ITER_FILE"
 if [ "$duplicate_checked" -ge 1 ] && [ "$duplicate_fails" -eq 0 ]; then
   ok "duplicate-site self-check: a second byte-identical unguarded line in the same file changes the measured occurrence count and IS caught — the dedup blind spot is closed"

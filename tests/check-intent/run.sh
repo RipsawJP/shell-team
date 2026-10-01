@@ -61,21 +61,20 @@ CHECKER="$REPO_ROOT/bin/check-intent.sh"
 # Collision-safe temp root (#233 item 3): `mktemp -d` gives EACH invocation
 # its own unique directory (unlike a fixed, predictable name), so two
 # concurrent runs of this suite cannot clobber each other's fixtures via a
-# shared `rm -rf`.
+# shared directory removal.
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/check-intent-fixtures.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
-trap 'rm -rf "$TMP"' EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
 # dump_cmp_diag <label> <file1> <file2> [<file3> ...] (#301 fast-follow):
 # when a byte-precise `cmp` comparison across invocation styles FAILs below,
-# `fail()` immediately triggers the EXIT-trap (`rm -rf "$TMP"`) that deletes
-# the very temp files the failure message points to ("see $C/out-1.txt /
+# `fail()` exits immediately, so a suite whose exit path removed its temp
+# tree would delete the very temp files the failure message points to ("see $C/out-1.txt /
 # ..."), so a CI log cannot show WHAT differed post-hoc. Every cmp-comparison
 # failure branch below calls this helper BEFORE fail() fires, so the
 # differing bytes themselves survive in captured stderr. Called only on an
@@ -428,7 +427,8 @@ if ! cmp -s "$C/c.txt" "$C/d.txt"; then
   DEMO_MATCH_OUT="$(dump_cmp_diag "(#301-demo-match)" "$C/c.txt" "$C/d.txt" 2>&1 >/dev/null)"
 fi
 [ -z "$DEMO_MATCH_OUT" ] || fail "#301 demo (b): a matching pair must never invoke the diagnostic-emit path, got: $DEMO_MATCH_OUT"
-rm -rf "$C"
+rm -f "$C"/*
+rmdir "$C" 2>/dev/null || true
 [ ! -e "$C" ] || fail "#301 demo (b): expected the demonstration's own temp dir to be fully removable (no stray handle) after cleanup, found $C"
 
 pass "#301 diagnostics: forced cmp mismatch surfaces the diff before EXIT-trap cleanup"
@@ -810,7 +810,7 @@ pass "AC8 non-vacuous counterfactual — the OLD (unsplit) bootstrap silently pr
 # SAME path for two independent invocations, by construction (no actual
 # concurrency needed to prove the collision SURFACE exists — the OLD literal
 # is not derived from any per-run entropy) — a second run's
-# `rm -rf "$TMP"; mkdir -p "$TMP"` reset would clobber the first run's
+# reset of the shared `$TMP` (remove, then re-create it) would clobber the first run's
 # in-flight fixtures. `mktemp -d` guarantees two independent invocations get
 # DIFFERENT directories.
 # ============================================================================
@@ -824,7 +824,7 @@ OLD_TMP_B="${TMPDIR:-/tmp}/${FIXED_NAME_STANDIN}"
 NEW_TMP_A="$(mktemp -d "${TMPDIR:-/tmp}/check-intent-fixtures.XXXXXX")"
 NEW_TMP_B="$(mktemp -d "${TMPDIR:-/tmp}/check-intent-fixtures.XXXXXX")"
 [ "$NEW_TMP_A" != "$NEW_TMP_B" ] || fail "AC6: two independent mktemp -d temp roots should never collide"
-rm -rf "$NEW_TMP_A" "$NEW_TMP_B"
+rmdir "$NEW_TMP_A" "$NEW_TMP_B" 2>/dev/null || true
 pass "AC6: fixed-name temp roots collide by construction across independent invocations (OLD_TMP_A == OLD_TMP_B); mktemp -d roots never do (NEW_TMP_A != NEW_TMP_B) — non-vacuous counterfactual"
 
 # ============================================================================

@@ -13,7 +13,7 @@
 # Temp git roots live under $TMPDIR (sandboxed runs deny writes to a nested
 # .git/ inside the repo tree and deny process substitution — see
 # tests/close-out/run.sh and tests/check-handoff/run.sh for the same
-# constraints), cleaned via trap.
+# constraints), left under TMPDIR.
 
 set -euo pipefail
 
@@ -26,7 +26,6 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-board-headings-test.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
 
 out="$TMP/out"
 err="$TMP/err"
@@ -1103,6 +1102,43 @@ old_tab_dupes="$(old_other_dupes "$OLDLOG2")"
 [[ -n "$old_tab_dupes" ]] || fail "T-1099 dup-active counterfactual (identity-encoding, internal-tab class): expected the OLD read-side extraction to falsely collapse two distinct tab-containing identities to the same truncated field, but got no duplicate"
 printf '%s' "$old_tab_dupes" | grep -Fq 'Foo' || fail "T-1099 dup-active counterfactual: expected the OLD extraction's false duplicate to be the truncated common prefix 'Foo' (got: $old_tab_dupes)"
 pass "T-1099 dup-active counterfactual — the OLD (pre-round-1-rework) tab-delimited read-side extraction falsely collapses 'Foo${TABCHAR}Bar' and 'Foo${TABCHAR}Baz' to the same truncated field 'Foo' (this is the Major itself, reproduced inline); the rework's byte-offset reconstruction above correctly keeps them distinct"
+
+# =============================================================================
+# T-1165: check-board-headings.sh cleans up its scratch directory by name and rmdir, never
+# a recursive delete. Two runs of one command against fresh TMPDIRs: a plain
+# run, and a run with a PATH shim whose rmdir exits 1 without touching
+# anything. The exit status must be identical, the plain run must leave no
+# check-board-headings.* directory, and the shimmed run must leave exactly one (proving the
+# cleanup really reached rmdir and that its failure did not move the status).
+# =============================================================================
+t1165_rmdir_case() {  # $1 = tool (no .sh); $2.. = command; optional T1165_CWD
+  local tool="$1" d e a=0 b=0 nn=0 ns=0
+  shift
+  d="$(mktemp -d "${TMPDIR:-/tmp}/t1165-${tool}.XXXXXX")" \
+    || { fail "T-1165: ${tool}.sh: cannot create the case directory"; }
+  mkdir "$d/n" "$d/s" "$d/shim"
+  printf '#!/bin/sh\nexit 1\n' > "$d/shim/rmdir"
+  chmod +x "$d/shim/rmdir"
+  (cd "${T1165_CWD:-.}" && TMPDIR="$d/n" "$@" >/dev/null 2>&1) || a=$?
+  (cd "${T1165_CWD:-.}" && PATH="$d/shim:$PATH" TMPDIR="$d/s" "$@" >/dev/null 2>&1) || b=$?
+  for e in "$d/n/${tool}".*; do
+    if [ -e "$e" ]; then nn=$((nn + 1)); fi
+  done
+  for e in "$d/s/${tool}".*; do
+    if [ -e "$e" ]; then ns=$((ns + 1)); fi
+  done
+  if [ "$a" = "$b" ] && [ "$ns" -eq 1 ]; then
+    pass "T-1165: ${tool}.sh exit status survives a failed rmdir"
+  else
+    fail "T-1165: ${tool}.sh exit status survives a failed rmdir (plain rc=$a, shimmed rc=$b, shimmed leftovers=$ns)"
+  fi
+  if [ "$nn" -eq 0 ]; then
+    pass "T-1165: ${tool}.sh leaves no scratch directory"
+  else
+    fail "T-1165: ${tool}.sh leaves no scratch directory (plain run left $nn)"
+  fi
+}
+T1165_CWD="$TMP" t1165_rmdir_case check-board-headings bash "$SCRIPT" "$FIX/base.md" --base-file "$FIX/base.md"
 
 printf 'OK\n'
 exit 0

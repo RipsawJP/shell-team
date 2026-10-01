@@ -41,9 +41,6 @@ pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/gitignore-raw-dumps.XXXXXX")"
-# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
-cleanup() { rm -rf "$WORK"; }
-trap cleanup EXIT
 
 # =============================================================================
 # resolver derivation (AC19): never hardcode `.shell-team/reviews` — derive it

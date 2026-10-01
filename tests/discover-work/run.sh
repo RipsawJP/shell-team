@@ -9,7 +9,7 @@
 #   AC7: the --max cap is enforced and truncation is reported (no silent cap).
 #
 # Uses a committed env-driven gh stub (fixtures/gh). Writes under $HERE/tmp
-# (no mktemp) so it runs in restricted sandboxes; cleaned via trap.
+# (no mktemp) so it runs in restricted sandboxes; left under TMPDIR.
 
 set -euo pipefail
 
@@ -21,14 +21,13 @@ STUB="$HERE/fixtures/gh"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/discover-work-test.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"
 fi
 ORIG_PATH="$PATH"
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 chmod +x "$STUB"
 

@@ -52,7 +52,6 @@ export GIT_CEILING_DIRECTORIES
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$GIT_TMP"' EXIT
 
 tp() { env -u TEAM_RUN_BASE bash "$TEAM_PATHS_BIN" "$@"; }
 ti() { env -u TEAM_RUN_BASE bash "$TEAM_INIT_BIN" "$@"; }
@@ -145,12 +144,9 @@ probe_repo_sees() {
   # `core.excludesFile`, read under the CURRENTLY EXPORTED scratch scope,
   # must equal <expected-value>.
   local expected="$1" probe seen
-  probe="$GIT_TMP/probe-$$-$RANDOM"
-  rm -rf "$probe"
-  mkdir -p "$probe"
+  probe="$(mktemp -d "$GIT_TMP/probe.XXXXXX")" || return 1
   git -C "$probe" init -q >/dev/null 2>&1 || return 1
   seen="$(git -C "$probe" config --get core.excludesFile 2>/dev/null || true)"
-  rm -rf "$probe"
   [ "$seen" = "$expected" ]
 }
 

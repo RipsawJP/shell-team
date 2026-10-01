@@ -15,7 +15,6 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/check-count-claims-test.XXXXXX")"
-trap 'rm -rf "$T"' EXIT
 
 # mkboard PATH BODY — a one-entry T-901 board under ## Active, BODY expanded
 # via printf %b (so \n inside a caller's string becomes a real newline).

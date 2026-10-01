@@ -50,9 +50,6 @@ n_total="$(printf '%s\n' "$POP" | grep -c . || true)"
 pass "population $n_total tracked entries under bin/ (population source: git ls-files -- bin/), non-empty"
 
 SCRATCH_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/t1157-bin-help.XXXXXX")"
-# shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below
-cleanup() { rm -rf "$SCRATCH_ROOT"; }
-trap cleanup EXIT
 
 while IFS= read -r member; do
   [ -n "$member" ] || continue
@@ -71,7 +68,8 @@ while IFS= read -r member; do
       out_size="$(wc -c <"$out" 2>/dev/null || printf '?')"
       fail "$member $flag: rc=$rc stdout_bytes=$out_size leftover_in_cwd=${remaining:-none} stderr=$(cat "$err" 2>/dev/null || true)"
     fi
-    rm -rf "$dir" "$out" "$err"
+    rm -f "$out" "$err"
+    rmdir "$dir" 2>/dev/null || true
   done
 done <<<"$POP"
 

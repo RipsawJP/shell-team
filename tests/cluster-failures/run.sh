@@ -119,7 +119,6 @@ before="$(cksum "$BOARD_BASE/todo.md")"
 TEAM_RUN_BASE="$BOARD_BASE" bash "$CLUSTER" "$FIX/multi-run.jsonl" "$FIX/tie-break.jsonl" "$FIX/nulls.jsonl" >/dev/null
 after="$(cksum "$BOARD_BASE/todo.md")"
 [ "$before" = "$after" ] || fail "AC3: the resolved board changed across a run"
-rm -rf "$BOARD_BASE"
 pass "AC3: resolved board byte-unchanged (propose-only)"
 
 grep -vE '^[[:space:]]*#' "$CLUSTER" | grep -qE '\bgh\b' \
