@@ -11,6 +11,18 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1164** The run skill checks, read-only, that setup is present and current before the first dispatch, and the review's approval request names what it sends and where (issue #640) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1164-run-prereq-check.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #640 ("At run time (absorbed from #625)" paragraph and the Problem observation), relayed verbatim by the coordinating session and quoted in the spec's `## Problem`; the task's own tracker item, so no separate issue was filed. T-1163 is the setup prompt; this task is the run-time check plus the review-transfer approval wording; the clean-install re-measurement is step V (AC17). Stacked on `feature/640-setup-prompt` (tip `1ada0bbf`, PR #647 open); PR base `develop`; two-arm base-ref expression in AC14/AC15. The review-transfer denial premise (Codex CLI host, guardian, run B') is relayed from the coordinating session's measurement notes and recorded in the spec's Assumptions. Planned tier PATCH (relayed). The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - dispatch-reflection: implement — T-1163 — repeat — T-1163's recorded value is `serial`; one new read-only checker, its suite, the run skill paragraph, the reviewer wording and the docs land in lockstep, with no balanced disjoint partition
+  - dispatch-reflection: verify — T-1163 — repeat — T-1163's recorded value is `serial`; one new fixture suite plus a few existing CI-wired suites and one spec's check-acs, with no mechanism-class full-population half
+  - dispatch-reflection: specify — T-1163 — repeat — T-1163's recorded value is `pm-authored`; the inputs are the issue paragraph and the measured-inputs list, handed over as text
+  - dispatch-reflection: spec-review — T-1163 — repeat — T-1163's recorded value is `none`; the external host premises (how an approval UI or automatic approval reviewer reads a justification) are relayed and re-measured by step V, which a cross-provider spec review cannot measure
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — checker, suite, run skill paragraph, reviewer wording and docs must land in lockstep; the tier2 trigger was examined and does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one new fixture suite sharing one temp root, a handful of existing suites and one spec's check-acs, below the fan-out threshold
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — the judgment-density trigger was examined and does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — the domain-premise trigger was examined and does not fire: the external premises are relayed measurements re-confirmed by step V, which a cross-provider spec review cannot measure; the security boundary gets adversarial depth at code review
 - [ ] **T-1161** A QA round after a rework verifies what the rework changed and carries the rest forward by an explicit label list (issue #639) — `BLOCKED` — spec: .shell-team/specs/T-1161-rework-qa-scope.md
   - entry-mode: pm-authored
   - spec-review: none
