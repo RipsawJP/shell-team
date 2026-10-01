@@ -35,7 +35,7 @@ codex plugin marketplace add RipsawJP/shell-team
 codex plugin add shell-team@ripsawjp
 ```
 
-Then, in each repository you adopt shell-team into — **per adopted repository**, not once per machine — type `set up shell-team` in the session (see `## Adopt in a target repo` below). On a Codex CLI host, setup generates the custom agents Codex dispatches into `.codex/agents`; run by hand, from the repository's own root, that step is:
+Then, in each repository you adopt shell-team into — **per adopted repository**, not once per machine — type `set up shell-team` in the session (see `## Adopt in a target repo` below). On a Codex CLI host, setup generates the custom agents Codex dispatches into `.codex/agents`; run by hand, from that repository's own root, that step is:
 
 ```
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents

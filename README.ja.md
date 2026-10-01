@@ -74,7 +74,13 @@ set up shell-team
 
 このプロンプトで setup スキル（[`skills/setup/SKILL.md`](skills/setup/SKILL.md)）が起動し、リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行する。単一 base dir `.shell-team/`（ボードと既定のループ契約）を scaffold し（host root の `CLAUDE.md` / `.gitignore` は改変しない。既存ファイルは書き換えない）、Codex CLI host ではさらに `.codex/agents/` を生成して git ディレクトリの `info/exclude` で無視するため、tracked ファイルは変わらない。これ以外は何も書かず、host の設定には触れず、最後に「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を短く報告する。host が書き込みを拒否した場合、報告には承認または自分で実行するための正確なコマンドが 1 つ出る。冪等。
 
-プロンプトが自動化している手動の手順は、Claude Code host では `/shell-team:team-init`。Codex CLI host では generator と scaffolder を、リポジトリそのものの root から実行する:
+プロンプトが自動化している手動の手順は、Claude Code host では次のスラッシュコマンド:
+
+```text
+/shell-team:team-init
+```
+
+Codex CLI host では generator と scaffolder を、リポジトリそのものの root から実行する:
 
 ```text
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents

@@ -74,14 +74,20 @@ set up shell-team
 
 The prompt triggers the setup skill ([`skills/setup/SKILL.md`](skills/setup/SKILL.md)), which runs `bash "<plugin root>/bin/team-setup.sh"` from the repository. It scaffolds the single `.shell-team/` base dir (the board and the default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; existing files are never rewritten). On a Codex CLI host it also generates `.codex/agents/` and ignores it through the git directory's `info/exclude`, so no tracked file changes. It writes nothing else, never touches a host setting, and ends with a short report: what was done, what was already in place, and what remains your decision. Where your host refuses one of its writes, the report prints the one exact command to approve or run yourself. It is idempotent.
 
-The manual path, which the prompt automates, is `/shell-team:team-init` on a Claude Code host. On a Codex CLI host it is the generator and the scaffolder, run from the repository's own root:
+The manual path, which the prompt automates, is this slash command on a Claude Code host:
+
+```text
+/shell-team:team-init
+```
+
+On a Codex CLI host it is the generator and the scaffolder, run from the repository's own root:
 
 ```text
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-Locating the installed plugin root, ignoring the generated agents, and each host-side condition (repository trust, write access for commits, the Claude Code CLI prerequisite, network for the review pass, and the `PATH` export) are covered step by step, with what has been measured, in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
+Locating the installed plugin root, ignoring the generated agents, and each host-side condition (repository trust, write access for commits, the Claude Code CLI prerequisite, network for the review pass, and the `PATH` export) are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli), with what has been measured about each.
 
 Which instruction surface a Codex CLI orchestrator **loads automatically is unmeasured from this repository** — the runbook linked above is what this project relies on instead. The loop's own stop points are the same on both hosts: **merge and push** stay yours, and when the independent reviewer cannot be reached the review returns `BLOCKED` rather than quietly falling back to a same-family one.
 
