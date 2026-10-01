@@ -11,6 +11,22 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1165** No recursive delete in the test suites, the docs fixture or the eight bin tools' cleanup (issue #641) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1165-no-recursive-delete.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #641 (the task's own tracker item; no separate issue filed for the spec). Cut from develop at 8a6cc48c, no open predecessor PR; predecessor on this branch's board is T-1160. Bound by the operator's standing rule of 2026-10-01 (no recursive delete anywhere; no local run of a file containing one; merged specs' check lines never run), quoted verbatim in the spec's frozen constraint block.
+  - relayed-baseline: tests-recursive-delete-files — 56 files / 99 occurrences (issue, relayed) vs 55 / 97 (tech-lead tool read, wider pattern) — owner coordinating session; derived value to follow after step 2a, through bin/derive-populations.sh, embedded in the spec's Population section
+  - dispatch-reflection: implement — T-1160 — repeat — T-1160 recorded `serial`; about 55 suites plus 8 tools are countable, but the bin conversion must land before anything runs the record tools, so the work is ordered rather than split
+  - dispatch-reflection: verify — T-1160 — no-predecessor-row — T-1160 recorded the `verify-fixture` / `verify-mechanism` refinements, not the parent `verify` key; this task has no mechanism-class half (merged-spec sweeps are forbidden by the standing rule) and records the parent alone
+  - dispatch-reflection: specify — T-1160 — repeat — T-1160 recorded `pm-authored`; the inputs are the issue body and the Routing Map, handed over as text
+  - dispatch-reflection: spec-review — T-1160 — repeat — T-1160 recorded `none`; every premise (rmdir semantics, the workflow, the suite list) is measurable in this repository
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — measured negative at this scale; the bin conversion is ordered before the suites, so the work is sequenced, not split
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — the authority over the suite population is CI read through MCP, not a local fan-out; the local duty is one grep gate plus the suites whose behaviour changed, and fanning out would multiply local runs of exactly the files the standing rule restricts
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — the judgment-density trigger was examined and does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — the domain-premise trigger was examined and does not fire; the one unmeasured fact (whether the runner exports TMPDIR) is removed by the `${TMPDIR:-/tmp}` fallback
+  - version-derivation (v1, 2026-10-01): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=sprint delete-guardrail planning approval of 2026-10-01, expected tier PATCH (v2.7.8) on the ground that the bin cleanup change is internal and the tests are not shipped — grounds: user-visible no; the eight tools keep their exit status and output
+  - freeze-attestation (v1, 2026-10-01): lines=11/11 sweep=mutual-satisfiability verdict=2P/9F owner=coordinating session
+  - intent-hash (v1): 41745b4656cf5867b879fcb0d04c40edb585713a
 
 
 
