@@ -21,8 +21,6 @@ FIX="$HERE/fixtures"
 DATE="2026-06-18"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/consolidate-proposals.XXXXXX")"
-cleanup() { rm -rf "$WORK"; }
-trap cleanup EXIT
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }

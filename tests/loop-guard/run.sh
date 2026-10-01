@@ -11,7 +11,7 @@
 #
 # Asserts exact stdout AND exit code. Avoids mktemp so it runs in restricted
 # sandboxes — the T-1021 leading-zero scratch contracts below are written
-# under $HERE/tmp (rm -rf + trap-cleaned, same pattern tests/check-acs/run.sh
+# under a scratch root left under TMPDIR (same pattern tests/check-acs/run.sh
 # uses) rather than checked in as new fixture files under
 # tests/loop-guard/fixtures/, which T-1021's diff allow-list does not cover.
 
@@ -27,9 +27,8 @@ NOPROG_OFF="$FIX/noprog-off-contract.yaml"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/loop-guard-test.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"
 fi
-trap 'rm -rf "$TMP"' EXIT
 
 fail() {
   printf 'FAIL: %s\n' "$1" >&2

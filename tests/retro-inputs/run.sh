@@ -32,16 +32,14 @@ ORIG_PATH="$PATH"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/retro-inputs-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-# Any 0600-permission directories built below are chmod'd back to 0700 before
-# this runs, so `rm -rf` (which needs traverse permission on every ancestor)
-# can actually clean up the whole tree.
-trap 'chmod -R u+rwx "$TMP" 2>/dev/null || true; rm -rf "$TMP"' EXIT
+# Any non-writable directories built below are simply left under TMPDIR; the
+# suite removes nothing.
 
 chmod +x "$STUB_GH" "$STUB_GIT"
 

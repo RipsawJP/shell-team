@@ -13,7 +13,7 @@
 #        negative greps — the known false-positive lesson)
 #
 # Temp roots live under $TMPDIR when set (restricted sandboxes), falling back
-# to $HERE/tmp-roots on plain CI runners. Cleaned via trap.
+# to ${TMPDIR:-/tmp}/tmp-roots on plain CI runners. Left under TMPDIR (nothing is removed).
 
 set -euo pipefail
 
@@ -24,17 +24,16 @@ FIX="$HERE/fixtures/root"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/check-prompt-sync-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 clone_fixture() {
   local dst="$1"
-  rm -rf "$dst"
+  [ ! -e "$dst" ] || fail "clone_fixture: $dst already exists (every case needs a fresh directory)"
   cp -R "$FIX" "$dst"
 }
 
@@ -246,7 +245,6 @@ pass "T-040 AC2: careful-execution.md is self-contained (no external skill/path/
 # Snapshot just the files this block's registry line(s) touch, prove pristine is
 # green, then mutate the canonical file only and prove it flips to drift (exit 1).
 C="$TMP/careful-execution-drift"
-rm -rf "$C"
 mkdir -p "$C/templates/prompt-blocks" "$C/agents"
 cp "$CE_BLOCK" "$C/templates/prompt-blocks/careful-execution.md"
 grep 'careful-execution\.md' "$REPO_ROOT/templates/prompt-blocks/registry.txt" \

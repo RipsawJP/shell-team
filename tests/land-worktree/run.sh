@@ -41,9 +41,6 @@ pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/land-worktree-suite.XXXXXX")"
-# shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below
-cleanup() { rm -rf "$T" 2>/dev/null || true; }
-trap cleanup EXIT
 
 WORKER_COUNT=0
 OVERLAP_CASE_COUNT=0

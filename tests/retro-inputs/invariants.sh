@@ -73,16 +73,15 @@ RETRO_INPUTS="$REPO_ROOT/bin/retro-inputs.sh"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/retro-inputs-invariants-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-invariants.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-invariants.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-# The trailing rm -rf tolerates residual noise (issue #70: a background gc
-# recreating files mid-delete failed the step after every invariant passed) —
-# cleanup best-effort by design; the invariants themselves fail loudly above.
-trap 'chmod -R u+rwx "$TMP" 2>/dev/null || true; rm -rf "$TMP" 2>/dev/null || true' EXIT
+# The scratch tree is left under TMPDIR (nothing is removed), so residual noise
+# from a background gc (issue #70) cannot fail the step after every invariant
+# passed.
 
 # assert_invariant <description> -- <cmd...>
 # Runs the given command (typically `bash "$RETRO_INPUTS" ...` in a subshell
@@ -118,7 +117,7 @@ build_repo() {
   # Auto-gc raced the big-log fixture's tight commit loop on CI (issue #70,
   # fired twice on docs-only PRs): a detached background gc broke ref updates
   # mid-loop (`fatal: could not parse HEAD`) and recreated files under
-  # .git/objects/info while the EXIT trap's rm -rf was deleting the tree.
+  # .git/objects/info while the suite's old end-of-run tree removal was running.
   # Disable both auto-maintenance channels at the source, for every fixture.
   git -C "$dir" config gc.auto 0
   git -C "$dir" config maintenance.auto false

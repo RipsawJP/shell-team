@@ -27,7 +27,6 @@ pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/codex-agents-suite.XXXXXX")"
-trap 'rm -rf "$T"' EXIT
 
 # count_toml <dir> <glob> — 0 if <dir> does not exist (a refused generator run
 # never creates its out-dir at all), never lets a nonexistent-directory `find`
@@ -969,6 +968,44 @@ elif [ "$(grep -cF -- 'removed superseded legacy agent file' "$T/gen26.err" || t
 else
   pass "T-1146: widening --roles to include code-reviewer and re-running leaves the directory occupant in place with zero removal-notice bytes, confirming cell 4's claim"
 fi
+
+# =============================================================================
+# T-1165: check-codex-agents.sh cleans up its scratch directory by name and rmdir, never
+# a recursive delete. Two runs of one command against fresh TMPDIRs: a plain
+# run, and a run with a PATH shim whose rmdir exits 1 without touching
+# anything. The exit status must be identical, the plain run must leave no
+# check-codex-agents.* directory, and the shimmed run must leave exactly one (proving the
+# cleanup really reached rmdir and that its failure did not move the status).
+# =============================================================================
+t1165_rmdir_case() {  # $1 = tool (no .sh); $2.. = command; optional T1165_CWD
+  local tool="$1" d e a=0 b=0 nn=0 ns=0
+  shift
+  d="$(mktemp -d "${TMPDIR:-/tmp}/t1165-${tool}.XXXXXX")" \
+    || { fail "T-1165: ${tool}.sh: cannot create the case directory"; return 0; }
+  mkdir "$d/n" "$d/s" "$d/shim"
+  printf '#!/bin/sh\nexit 1\n' > "$d/shim/rmdir"
+  chmod +x "$d/shim/rmdir"
+  (cd "${T1165_CWD:-.}" && TMPDIR="$d/n" "$@" >/dev/null 2>&1) || a=$?
+  (cd "${T1165_CWD:-.}" && PATH="$d/shim:$PATH" TMPDIR="$d/s" "$@" >/dev/null 2>&1) || b=$?
+  for e in "$d/n/${tool}".*; do
+    if [ -e "$e" ]; then nn=$((nn + 1)); fi
+  done
+  for e in "$d/s/${tool}".*; do
+    if [ -e "$e" ]; then ns=$((ns + 1)); fi
+  done
+  if [ "$a" = "$b" ] && [ "$ns" -eq 1 ]; then
+    pass "T-1165: ${tool}.sh exit status survives a failed rmdir"
+  else
+    fail "T-1165: ${tool}.sh exit status survives a failed rmdir (plain rc=$a, shimmed rc=$b, shimmed leftovers=$ns)"
+  fi
+  if [ "$nn" -eq 0 ]; then
+    pass "T-1165: ${tool}.sh leaves no scratch directory"
+  else
+    fail "T-1165: ${tool}.sh leaves no scratch directory (plain run left $nn)"
+  fi
+}
+bash "$GEN" --root "$REPO_ROOT" --out-dir "$T/t1165-out" >/dev/null 2>&1 || fail "T-1165: setup — could not generate the comparison directory"
+t1165_rmdir_case check-codex-agents bash "$CHK" --root "$REPO_ROOT" --out-dir "$T/t1165-out"
 
 printf '\n'
 if [ "$fails" -eq 0 ]; then

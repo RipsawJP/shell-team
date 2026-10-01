@@ -11,7 +11,7 @@
 # zero file I/O (proven by feeding the exact same fixture lines through
 # `--line` and asserting identical exit codes / stderr categories).
 #
-# Avoids mktemp (writes under $HERE/tmp-runs, cleaned via trap) so the suite
+# Avoids mktemp (writes under ${TMPDIR:-/tmp}/tmp-runs, left under TMPDIR) so the suite
 # runs in restricted sandboxes.
 
 set -euo pipefail
@@ -24,11 +24,10 @@ FIX="$HERE/fixtures"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/check-run-test-runs.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-runs.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-runs.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
-trap 'rm -rf "$TMP"' EXIT
 
 # assert_check <desc> <expected_rc> <file> [stderr_grep]
 assert_check() {

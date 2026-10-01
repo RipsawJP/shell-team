@@ -215,7 +215,14 @@ else
 fi
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-review-input.XXXXXX")" || die "mktemp failed"
-trap 'rm -rf "$WORK"' EXIT
+# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
+cleanup() {
+  if [ -n "${WORK:-}" ] && [ -d "$WORK" ]; then
+    rm -f "$WORK"/* 2>/dev/null || true
+    rmdir "$WORK" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
 
 # --- verdict-heading line numbers FIRST, so field extraction below can
 # stamp each field line with its owning section as it goes. The section

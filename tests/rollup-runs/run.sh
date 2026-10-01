@@ -101,9 +101,8 @@ pass "with-events: event rows (T-1011) are skipped, output identical to the same
 # Scratch rows are written under a temp dir (never checked in as new
 # fixture files under tests/rollup-runs/fixtures/, which T-1021's diff
 # allow-list does not cover — only tests/rollup-runs/run.sh itself is in
-# scope) and cleaned up via trap.
+# scope) and left under TMPDIR.
 T1021_TMP="$(mktemp -d "${TMPDIR:-/tmp}/t1021-rollup.XXXXXX")"
-trap 'rm -rf "$T1021_TMP"' EXIT
 
 # `"tokens":010` (valid octal 8, decimal 10 — the two values genuinely
 # differ) must sum as 10, never as the octal-re-based 8.
@@ -131,10 +130,7 @@ pass "T-1021-rollup-runs-tokens (zero-fixture=08): sums as 8 with no raw arithme
 # (never checked in as new fixture files, matching the T-1021 idiom above).
 # =====================================================================
 T1058_TMP="$(mktemp -d "${TMPDIR:-/tmp}/t1058-rollup.XXXXXX")"
-# Re-declares the EXIT trap to cover BOTH scratch dirs (a second `trap ... EXIT`
-# replaces, never adds to, the first) — both variables are already set by the
-# time this trap actually fires.
-trap 'rm -rf "$T1021_TMP" "$T1058_TMP"' EXIT
+# Both scratch dirs are left under TMPDIR.
 
 # bindrow <seq> <span> <provider-or-empty> — a minimal span row; an empty
 # provider omits the key entirely ("this row does not say", same as a

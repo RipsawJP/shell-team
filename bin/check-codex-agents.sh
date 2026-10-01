@@ -102,7 +102,19 @@ ROLES_ARR=($ROLES)
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/check-codex-agents.XXXXXX")" || die "cannot create a scratch directory (TMPDIR=${TMPDIR:-/tmp} not writable?)"
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
-cleanup() { rm -rf "$SCRATCH" 2>/dev/null || true; }
+cleanup() {
+  # Two levels only: the generator writes into "$SCRATCH/fresh/". Each level
+  # is emptied by name (non-recursive glob) and then removed with rmdir; if an
+  # unknown entry remains, rmdir refuses and the directory is left in place.
+  if [ -n "${SCRATCH:-}" ] && [ -d "$SCRATCH" ]; then
+    if [ -d "$SCRATCH/fresh" ]; then
+      rm -f "$SCRATCH/fresh"/* 2>/dev/null || true
+      rmdir "$SCRATCH/fresh" 2>/dev/null || true
+    fi
+    rm -f "$SCRATCH"/* 2>/dev/null || true
+    rmdir "$SCRATCH" 2>/dev/null || true
+  fi
+}
 trap cleanup EXIT
 
 if ! gen_out="$(bash "$GENERATOR" --root "$ROOT" --out-dir "$SCRATCH/fresh" --roles "$ROLES" 2>&1)"; then

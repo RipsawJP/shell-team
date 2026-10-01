@@ -44,7 +44,6 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/gen-loop-replay-suite.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
 
 # --- smoke: the real generator, a committed fixture, exits 0 and produces a
 #     real page --------------------------------------------------------------

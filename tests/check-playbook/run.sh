@@ -13,7 +13,7 @@
 # style as tests/check-prompt-sync/run.sh's clone_fixture + mutate pattern.
 #
 # Temp files live under $TMPDIR when set (restricted sandboxes), falling back
-# to $HERE/tmp-roots on plain CI runners. Cleaned via trap.
+# to ${TMPDIR:-/tmp}/tmp-roots on plain CI runners. Left under TMPDIR (nothing is removed).
 
 set -euo pipefail
 
@@ -24,13 +24,12 @@ BASE="$HERE/fixtures/valid-base.md"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/check-playbook-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 run_checker() {  # $1 = file; prints exit code
   local rc=0
