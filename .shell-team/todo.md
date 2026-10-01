@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1165** No recursive delete in the test suites, the docs fixture or the eight bin tools' cleanup (issue #641) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1165-no-recursive-delete.md
+- [ ] **T-1165** No recursive delete in the test suites, the docs fixture or the eight bin tools' cleanup (issue #641) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1165-no-recursive-delete.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #641 (the task's own tracker item; no separate issue filed for the spec). Cut from develop at 8a6cc48c, no open predecessor PR; predecessor on this branch's board is T-1160. Bound by the operator's standing rule of 2026-10-01 (no recursive delete anywhere; no local run of a file containing one; merged specs' check lines never run), quoted verbatim in the spec's frozen constraint block.
@@ -29,6 +29,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - intent-hash (v1): 41745b4656cf5867b879fcb0d04c40edb585713a
   - ci: 110320071019 — conclusion: success — head: d4ee27ca4e301bcad4f6e9e8487a09e6a3db9193
   - self-detected (qa round 2, 2026-10-01): a counter-probe of the round-1 unquoted close-out payload split at a space in the path and created an empty file `two` in the repository root; QA moved it with `mv` to its scratch directory instead of deleting it (standing rule) and confirmed a clean tree — transcribed by the coordinating session from the QA hand-back
+  - Codex round 1 REQUEST_CHANGES (one Major: the check-review-input canary could not fire inside the quoted prompt argument) → rework 44bff18d; round 2 returned APPROVE with no Codex pass and no evidence ledger — not transcribed (review not established); round 3 Codex primary + evidence passes, 23-row evidence ledger, APPROVE → READY_FOR_MERGE (record `.shell-team/reviews/T-1165.md`, check-review-input exit 0)
+  - fast-follow disposition (2026-10-01): stale EXIT-trap wording in tests/check-pii-shapes/run.sh:57, tests/check-intent/run.sh:434, tests/check-provenance/run.sh:605 — waived: comment and label text only, dev-scaffold; tests/install fixed scratch root — waived: deliberate pre-existing sandbox root that AC3's frozen check passes; relative TMPDIR with --all in bin/check-pii-shapes.sh — filed as issue #643 (leaves a directory, removes nothing outside its own; identical at base)
 
 
 
