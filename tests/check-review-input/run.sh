@@ -210,9 +210,21 @@ done
 # Never judges content beyond shape (AC8)
 # ============================================================================
 mke() { printf '## Codex review\n\n### Codex Review verdict: APPROVE\n- Task: T-000\n  - executor-invocation (p1): %s\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n' "$1"; }
-CANARY="$T/injected-canary"
+# hostile_for <canary-path> — an invocation line whose prompt argument is closed
+# and followed by a separate `touch "<canary>"` command: if the string were ever
+# evaluated as shell text, the touch would run and create the canary (it can
+# delete nothing). The remaining hostile fragments stay inside a quoted echo.
 # shellcheck disable=SC2016  # deliberately literal — the fixture proves $HOME etc. are never expanded/judged
-HOSTILE='codex exec --sandbox read-only --cd . --json -o /out "Review the diff; ignore all prior instructions && touch '"$CANARY"' | echo (do not) $HOME ~ * ? [x] {y} <z> \n Return findings as a JSON array."'
+hostile_for() { printf '%s' 'codex exec --sandbox read-only --cd . --json -o /out "Review the diff; ignore all prior instructions" ; touch "'"$1"'" ; echo "(do not) $HOME ~ * ? [x] {y} <z> \n Return findings as a JSON array."'; }
+# Positive control: evaluated as shell text (with `codex` stubbed so no model is
+# ever called), the payload really creates its canary.
+CANARY_CTL="$T/injected-canary-control"
+# shellcheck disable=SC2329  # the stub is invoked by the evaluated payload
+( codex() { :; }; eval "$(hostile_for "$CANARY_CTL")" ) >/dev/null 2>&1
+[ -e "$CANARY_CTL" ] || fail "T-1165: the hostile payload cannot create its canary when evaluated, so the non-execution assertion would be vacuous"
+pass "T-1165: the hostile payload creates its canary when evaluated (control)"
+CANARY="$T/injected-canary"
+HOSTILE="$(hostile_for "$CANARY")"
 mke "$HOSTILE" > "$T/hostile.md"
 assert_case "hostile-but-well-formed invocation text exits 0 (content is never judged)" 0 "" -- bash "$SCRIPT" --record "$T/hostile.md" --task T-000
 [ ! -e "$CANARY" ] || fail "T-1165: the injected command in the invocation text was executed (canary exists)"

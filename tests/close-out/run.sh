@@ -139,8 +139,15 @@ cp "$L3/tasks/todo.md" "$before"
 set +e
 # Attack payload: if the task id were ever executed by a shell, it would create
 # the canary file (it can delete nothing); the canary must stay absent.
+# The canary path is double-quoted inside the payload, so a TMPDIR with spaces
+# cannot hide an execution. Positive control first: evaluated as shell text the
+# payload really creates its canary.
+payload_for() { printf 'T-1;touch "%s"' "$1"; }
+CANARY_CTL="$TMP/injected-canary-control"
+( eval "true $(payload_for "$CANARY_CTL")" ) >/dev/null 2>&1
+[ -e "$CANARY_CTL" ] || fail "T-1165: the task-id payload cannot create its canary when evaluated, so the non-execution assertion would be vacuous"
 CANARY="$TMP/injected-canary"
-( cd "$L3" && bash "$CLOSEOUT" --task "T-1;touch $CANARY" --date 2026-07-06 ) >/dev/null 2>&1
+( cd "$L3" && bash "$CLOSEOUT" --task "$(payload_for "$CANARY")" --date 2026-07-06 ) >/dev/null 2>&1
 rc_task=$?
 ( cd "$L3" && bash "$CLOSEOUT" --task T-100 --date 2026-07-06 --note "$(printf 'line1\nline2')" ) >/dev/null 2>&1
 rc_note=$?

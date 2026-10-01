@@ -67,7 +67,7 @@ bad() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 # =============================================================================
 # Fixture scratch dir — a single throwaway TMP directory for every fixture
-# file/tree this suite needs (parts ii-iv), removed in full on exit.
+# file/tree this suite needs (parts ii-iv), left under TMPDIR.
 # =============================================================================
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/errexit-safe-fixtures.XXXXXX")"

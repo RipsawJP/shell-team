@@ -1883,10 +1883,10 @@ else
 fi
 
 # =============================================================================
-# temp hygiene: every throwaway repo is created inside the trap-cleaned
+# temp hygiene: every throwaway repo is created inside the suite-owned
 # work dir (AC12)
 # =============================================================================
-printf '\n--- temp hygiene: every throwaway repo is created inside the trap-cleaned work dir ---\n'
+printf '\n--- temp hygiene: every throwaway repo is created inside the suite-owned work dir ---\n'
 
 stray_repos=0
 total_repos=0
@@ -1899,9 +1899,9 @@ while IFS= read -r _created; do
   esac
 done < "$CREATED_REPOS_LOG"
 if [ "$total_repos" -gt 0 ] && [ "$stray_repos" -eq 0 ]; then
-  pass "temp hygiene: every throwaway repo is created inside the trap-cleaned work dir ($total_repos repos, all under \$WORK)"
+  pass "temp hygiene: every throwaway repo is created inside the suite-owned work dir ($total_repos repos, all under \$WORK)"
 else
-  fail "temp hygiene: every throwaway repo is created inside the trap-cleaned work dir ($stray_repos of $total_repos repo(s) found outside \$WORK)"
+  fail "temp hygiene: every throwaway repo is created inside the suite-owned work dir ($stray_repos of $total_repos repo(s) found outside \$WORK)"
 fi
 
 # =============================================================================
