@@ -27,7 +27,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-01): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=sprint delete-guardrail planning approval of 2026-10-01, expected tier PATCH (v2.7.8) on the ground that the bin cleanup change is internal and the tests are not shipped — grounds: user-visible no; the eight tools keep their exit status and output
   - freeze-attestation (v1, 2026-10-01): lines=11/11 sweep=mutual-satisfiability verdict=2P/9F owner=coordinating session
   - intent-hash (v1): 41745b4656cf5867b879fcb0d04c40edb585713a
-  - ci: 110300460183 — conclusion: success — head: de82d319f897e60edf3a4fa1694866f5effa152d
+  - ci: 110320071019 — conclusion: success — head: d4ee27ca4e301bcad4f6e9e8487a09e6a3db9193
+  - self-detected (qa round 2, 2026-10-01): a counter-probe of the round-1 unquoted close-out payload split at a space in the path and created an empty file `two` in the repository root; QA moved it with `mv` to its scratch directory instead of deleting it (standing rule) and confirmed a clean tree — transcribed by the coordinating session from the QA hand-back
 
 
 
