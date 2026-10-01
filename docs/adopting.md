@@ -396,6 +396,47 @@ second, Codex-shaped copy of it. The role name `code-reviewer` stays as
 it is on both hosts — it is historical rather than descriptive here: on
 this host it is Claude, not Codex, that actually reviews (see step 10).
 
+**The short path: type `set up shell-team` in the session.** The setup skill
+runs `bash "<plugin root>/bin/team-setup.sh"` from the repository and does the
+plugin's own part. It scaffolds `.shell-team/` through `team-init.sh` (an
+existing file is never rewritten). It generates or refreshes `.codex/agents/`
+and ignores it through the git directory's `info/exclude`, so no tracked file
+is edited. It checks with `command -v claude` that the Claude Code CLI is
+present, without running it. And it ends with a three-part report: `Done:`,
+`Already in place:` and `Remains the operator's decision:`. After a plugin
+upgrade, type `update shell-team`: the same flow re-run, idempotent, so a
+second run changes nothing. The same prompt runs the same flow on a Claude
+Code host, without the `.codex` part. Setup writes nothing outside those
+artifacts, never writes your Codex or Claude Code configuration, and never
+adds an approval rule. When the Codex sandbox refuses one of its writes (it
+refuses creating `.codex/` and writing `.git/` by default), the report prints
+the one exact command, whose write set is that single plugin artifact, for you
+to approve per command in the host or to run yourself.
+
+What remains the operator's decision is only reported, never changed. Runs on
+`codex-cli 0.159.3` on 2026-10-01 were relayed to this repository and not
+re-measured by it; each item below says which kind of evidence it rests on:
+
+- **Repository trust** (step 5): project agents in `.codex/agents/` are
+  discovered only in a trusted repository. Relayed on 0.159.3: the host's own
+  first-launch trust prompt sufficed.
+- **Write access to the git directory, for commits** (step 6): measured on
+  0.154.0, the sandbox refuses writes under `.git/` by default.
+- **Network for the Claude-side review pass** (step 8): relayed on 0.159.3, the
+  review's `claude -p` call ran outside the sandbox under the host's own
+  per-command approval, so no network setting was needed for it. The 0.154.0
+  network measurement is therefore stale for that path.
+- **`<plugin root>/bin` on `PATH`** (step 9): undetermined. The operator
+  exported it in both 0.159.3 runs, so whether it is necessary was not
+  separated out.
+- **The review transfer**: the review pass sends repository content to
+  Claude, the other provider. Approving that transfer is the operator's
+  decision, and setup does not authorize it.
+- **Whether to track `.shell-team/` in git.**
+
+The numbered steps below are the manual fallback, and the record of what each
+host condition is and what was measured about it.
+
 1. **Install the plugin into Codex CLI**, if `codex plugin list` does not
    already report `shell-team` as `installed, enabled` — that exact STATUS
    value, not merely present in the list: the same column also prints
@@ -453,8 +494,8 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    skip both and reach for the other fallback already named just above: a
    checkout of this repository as `<plugin root>` needs no install or
    upgrade at all.
-3. **Run the generator from your own shell**, from the adopted
-   repository's own root:
+3. **Setup runs the generator for you; to run it by hand, use your own
+   shell**, from the adopted repository's own root:
 
    ```
    bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
@@ -476,27 +517,28 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    itself run this command inside a session, see step 6: the same
    sandbox that refuses `.git/` writes also refuses creating `.codex/`
    itself.
-4. **Add `.codex/agents` to your own repository's `.gitignore`, and commit
-   that change before starting the loop** (mirror this repository's own
-   entry) — or, if you would rather not touch a tracked file at all, add
-   the entry to `.git/info/exclude` instead, which needs no commit. The
-   generated TOMLs are reproducible, not committed, and either an
-   untracked `.codex/agents/` left un-ignored, or a `.gitignore` edit left
-   uncommitted, makes `git status --short` non-empty, which trips the
-   loop's own T-073 clean-tree check at the Implement-to-Validate seam.
-5. **Grant the repository Codex trust before starting a session in it.**
-   Codex discovers a project-level custom agent from `<repo>/.codex/agents/`
-   only when the repository is trusted — an untrusted, or
-   `--skip-git-repo-check`, run never sees these agents at all, whatever
-   step 3 already wrote there. Grant it with
-   `-c 'projects."<repo>".trust_level="trusted"'` on the `codex` invocation
-   (`<repo>` here is the adopted repository's own **absolute** path — the
-   same placeholder step 6's writable-roots override below uses), or the
-   equivalent `[projects."<repo>"]` `trust_level = "trusted"` entry under
-   your Codex `config.toml`.
-6. **Grant the sandbox write access to `.git` — and, only if Codex itself
-   runs step 3's generator inside the session, to `.codex` too.**
-   Measured (codex-cli 0.154.0): `codex exec --sandbox
+4. **Ignore `.codex/agents`; setup does it through `.git/info/exclude`,
+   which needs no commit and edits no tracked file.** By hand, add the entry
+   to `.git/info/exclude` the same way, or to your own repository's
+   `.gitignore` (mirror this repository's own entry) and commit that change
+   before starting the loop. The generated TOMLs are reproducible, not
+   committed, and either an untracked `.codex/agents/` left un-ignored, or a
+   `.gitignore` edit left uncommitted, makes `git status --short` non-empty,
+   which trips the loop's own T-073 clean-tree check at the
+   Implement-to-Validate seam.
+5. **Repository trust is the operator's decision.** Codex discovers a
+   project-level custom agent from `<repo>/.codex/agents/` only when the
+   repository is trusted — an untrusted, or `--skip-git-repo-check`, run never
+   sees these agents at all, whatever step 3 already wrote there. The host
+   records the decision under the key `projects."<repo>".trust_level` in its
+   own configuration, or takes it as a `-c` override on the `codex`
+   invocation (`<repo>` here is the adopted repository's own **absolute**
+   path). Setup never sets it. Evidence: the discovery rule is as measured on
+   0.154.0; relayed on 0.159.3, the host's own first-launch trust prompt
+   sufficed.
+6. **The sandbox's write policy for `.git`, and for `.codex` when Codex
+   itself runs step 3's generator inside the session, is the operator's
+   decision.** Measured (codex-cli 0.154.0): `codex exec --sandbox
    workspace-write` refuses every write under `.git/` (`Operation not
    permitted`, exit 128) regardless of actual filesystem permissions —
    which blocks `engineer`'s own commit before `READY_FOR_QA` — and
@@ -504,28 +546,26 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    (`mkdir: .codex: Operation not permitted`), the same policy applied to
    a second, Codex-owned directory name — which blocks
    `gen-codex-agents.sh`'s own `mkdir -p` of `--out-dir` when Codex runs
-   step 3 inside the session rather than from your own shell. Step 11's
-   checker never creates `--out-dir` — it only reads it, comparing it
-   against a scratch regeneration — so it needs no such grant even when
-   Codex runs it in-session. Running step 3 from your own shell — the
-   default path it already describes — avoids the `.codex` refusal
-   entirely, since only a role's own commit needs `.git` write access. Add
-   whichever directories apply to the sandbox's writable roots on the
-   invocation —
-   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'` for
-   commits alone, or
-   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
-   if Codex also runs step 3 inside the session — or the same
-   key under `[sandbox_workspace_write]` in your Codex `config.toml`;
-   `--sandbox danger-full-access` also works, at the cost of the whole
-   sandbox. (Codex's own configuration directory, `.agents`, is refused
-   the same way; nothing in this loop writes to it.)
+   step 3 inside the session rather than from your own shell. The host's
+   setting that governs this is the `sandbox_workspace_write` table, whose
+   `writable_roots` key lists the directories the sandbox may write; setup
+   never writes it. When setup itself runs inside the session and the
+   sandbox refuses a write, setup does not ask for a wider policy: it
+   relies on the host's own per-command approval for the one printed
+   command, or leaves that command for you to run. Step 11's checker never
+   creates `--out-dir` — it only reads it, comparing it against a scratch
+   regeneration — so it needs no such write access even when Codex runs it
+   in-session. Running step 3 from your own shell avoids the `.codex`
+   refusal entirely, since only a role's own commit needs `.git` write
+   access. (Codex's own configuration directory, `.agents`, is refused the
+   same way; nothing in this loop writes to it.)
 7. **Confirm Claude Code CLI is installed and authenticated on this host
    — outside any Codex session, before you rely on it inside one
    (T-1135).** The review pass (steps 8 and 10) runs a real `claude -p`
    **child process**, and its absence and its authentication are two
    different failure modes with two different symptoms — check the binary
-   first: `command -v claude`. If that reports nothing (exit 1), the CLI
+   first: `command -v claude` (this is the only check setup makes: it never
+   runs `claude`). If that reports nothing (exit 1), the CLI
    is simply not installed, and the shell fails the invocation with
    `command not found` before any application message is ever produced —
    install it first. If `command -v claude` finds it but it is not
@@ -536,11 +576,11 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    involved at all: `claude -p "reply with the single word ok"` should
    print `ok` and exit `0`. If it instead reports a login prompt or an
    authentication error, resolve that first (`claude /login`, or your
-   organization's own Claude Code provisioning) — step 8's network grant
-   cannot substitute for either of these prerequisites, and granting it
+   organization's own Claude Code provisioning) — step 8's network setting
+   cannot substitute for either of these prerequisites, and changing it
    will not fix a missing binary or an authentication failure.
-8. **Grant the sandbox network access the Claude-side review pass needs
-   (T-1135), and tell its `Not logged in` apart from step 7's.** Measured
+8. **Network for the Claude-side review pass is the operator's decision,
+   and its `Not logged in` is told apart from step 7's (T-1135).** Measured
    (codex-cli 0.154.0, Claude Code CLI 2.1.268): at the sandbox's default
    `sandbox_workspace_write.network_access = false`, the `claude -p`
    invocation step 10's review pass runs fails with the identical `Not
@@ -548,27 +588,29 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
    failure produces — but for a different reason, and the two need
    different fixes. Tell them apart by where step 7's own outside-Codex
    sanity call stood: if that call already failed **outside** any Codex
-   session, the cause is authentication — `/login` is the fix, and this
-   network grant will not help. If that same call **passed** outside a
-   Codex session but the review pass still fails with the identical
-   message **inside** one, the cause is this sandbox's own network
-   refusal, and `/login` fixes nothing here. Grant the network with `-c
-   'sandbox_workspace_write.network_access=true'` on the `codex`
-   invocation, or the equivalent `network_access = true` entry under
-   `[sandbox_workspace_write]` in your Codex `config.toml`. `--sandbox
-   danger-full-access` also works, at the cost of the whole sandbox, and
-   is not needed otherwise.
-9. **Export `<plugin root>/bin` onto `PATH` before starting `codex`
-   (T-1135, closing the PATH-resolution gap slice 1 disclosed).** A spawned Codex custom agent inherits
-   the parent process's own `PATH`, so running
+   session, the cause is authentication — `/login` is the fix, and the
+   sandbox's network setting is not involved. If that same call **passed**
+   outside a Codex session but the review pass still fails with the
+   identical message **inside** one, the cause is this sandbox's own network
+   refusal, and `/login` fixes nothing here. The host's network setting for
+   that sandbox is the `network_access` key of the `sandbox_workspace_write`
+   table; setup never writes it. Evidence is mixed: that measurement is
+   stale for the 0.159.3 runs relayed to this repository, in which the
+   review's `claude -p` call ran outside the sandbox under the host's own
+   per-command approval, so no network setting was needed for it there.
+9. **Whether `<plugin root>/bin` is on `PATH` when you start `codex` is the
+   operator's decision; its necessity is undetermined (T-1135, closing the
+   PATH-resolution gap slice 1 disclosed).** A spawned Codex custom agent
+   inherits the parent process's own `PATH`, so running
    `export PATH="<plugin root>/bin:$PATH"` in the shell you start `codex`
    from — before you start it, not from inside the session afterward — is
-   what makes a spawned role's bare-name `bin/*.sh` calls (`team-paths.sh`,
-   `check-acs.sh`, `check-handoff.sh` and the rest, called exactly as the
-   role prose already calls them) actually resolve once that role is
-   running inside the session. Skipping this step does not change what
-   the role prose says; it changes whether those calls can find the
-   scripts they name.
+   what would make a spawned role's bare-name `bin/*.sh` calls
+   (`team-paths.sh`, `check-acs.sh`, `check-handoff.sh` and the rest, called
+   exactly as the role prose already calls them) resolve once that role is
+   running inside the session. Without it, the role prose does not change;
+   what changes is whether those calls can find the scripts they name.
+   Evidence: the operator exported it in both relayed 0.159.3 runs, so
+   whether it was necessary there is undetermined.
 10. Start a Codex CLI session in the repository and dispatch a role by
     spawning its generated agent (`shell-team-tech-lead`, `shell-team-pm-spec`,
     `shell-team-engineer`, `shell-team-qa-verifier`, `shell-team-code-reviewer`)
@@ -602,7 +644,7 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
     human** pushes the branch and opens the pull request against the
     base the spec names, and the merge — and the merge GO — stay the
     human's.
-11. **Re-run step 3's command** after editing a role file, after a plugin
+11. **Type `update shell-team`, or re-run step 3's command by hand,** after editing a role file, after a plugin
     upgrade, or after changing your own `binding.conf` or `TEAM_RUN_BASE`:
     the generated TOML also depends on the resolved binding row (which
     provider, model, effort and adapter each role binds to), so a rebind
@@ -613,8 +655,8 @@ this host it is Claude, not Codex, that actually reviews (see step 10).
     the three changes under them. `bash "<plugin root>/bin/check-codex-agents.sh"`
     reports the drift against the current source, writing nothing, so it
     is the mechanical way to find out a re-run is due. Run this from your
-    own shell or have Codex run it inside the session — either way needs
-    no `.codex` writable-root grant, since it only reads `--out-dir` to
+    own shell or have Codex run it inside the session — either way it needs
+    no write access to `.codex`, since it only reads `--out-dir` to
     compare against a scratch regeneration and never creates or writes it.
 
 **Honest limits, stated plainly rather than left for you to discover.** Each
@@ -643,13 +685,12 @@ Sandboxing is disabled for the rest of this session`, measured on this
 host), which changes nothing about what actually confines this pass.
 Nor is `--sandbox workspace-write`'s own
 refusal of `.git/` writes something this plugin can suppress — it is Codex
-CLI's own policy, worked around only by the writable-roots step above. The
+CLI's own policy, and the operator's to change (step 6). The
 same sandbox policy refuses creating or writing `.codex/` itself, which
 blocks Codex from running step 3's generator inside a session rather than
-from your own shell — see step 6 for the same writable-roots remedy,
-extended to `.codex`. Step 11's checker never creates or writes
+from your own shell — see step 6. Step 11's checker never creates or writes
 `--out-dir` — it only reads it to compare against a scratch regeneration —
-so it needs no such grant, in-session or not. What model and reasoning
+so it needs no such write access, in-session or not. What model and reasoning
 effort a spawned role actually runs with: under the shipped default
 binding, neither a `model` nor a `model_reasoning_effort` key is emitted
 for any of the five roles, so each one inherits the parent Codex session's

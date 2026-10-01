@@ -46,7 +46,7 @@ See [docs/history.md](docs/history.md) for the story of how the project got here
 - Codex CLI.
 - Claude Code CLI installed and authenticated, for the review pass — see [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 7.
 
-**Sandbox-enabled sessions need extra settings on both hosts.** On a Claude Code host, see [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) for the Codex review path's required sandbox exclusion (`sandbox.excludedCommands`) and permission settings. On a Codex CLI host, see [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) steps 6 and 8 for the sandbox's own writable-root grant (`.git`, plus `.codex` when the generator runs inside the session) and the network access the `claude -p` review pass needs.
+**Host-side conditions are the operator's decision, on both hosts.** shell-team never changes your sandbox, trust, permission or network settings. Setup (see [Install](#install)) does the plugin's own part and ends by listing each condition the loop needs from your host under `Remains the operator's decision:`, with what it is needed for. On a Claude Code host the measured one is the Codex review call running outside the session's sandbox (the setting involved is `sandbox.excludedCommands`; see [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings)). On a Codex CLI host they are repository trust, write access to the git directory for commits, network for the `claude -p` review pass, and `<plugin root>/bin` on `PATH` (see [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli)); each is labelled there by what has been measured.
 
 ## Install
 
@@ -59,27 +59,29 @@ This repo is both the plugin and its own marketplace (`ripsawjp`). Installing th
 /plugin install shell-team@ripsawjp
 ```
 
-Both commands above are the once-per-machine plugin install. Then initialize per-repo data once (scaffolds a single `.shell-team/` base dir with the board + default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; idempotent — see [docs/adopting.md](docs/adopting.md)):
-
-```text
-/shell-team:team-init
-```
-
 **Codex CLI:**
 
 ```text
 codex plugin marketplace add RipsawJP/shell-team
 codex plugin add shell-team@ripsawjp
-bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 ```
 
-The first two commands above are the once-per-machine plugin install; the third — the generator — runs in each repository you adopt shell-team into, from that repository's own root, alongside the `team-init.sh` step below. Then initialize per-repo data once, with the same host-neutral scaffolder the Claude Code block above drives through a slash command:
+Both commands in each block above are the once-per-machine plugin install. Then, in each repository you adopt shell-team into, type this prompt in the session — the same prompt on both hosts:
 
 ```text
+set up shell-team
+```
+
+The prompt triggers the setup skill ([`skills/setup/SKILL.md`](skills/setup/SKILL.md)), which runs `bash "<plugin root>/bin/team-setup.sh"` from the repository. It scaffolds the single `.shell-team/` base dir (the board and the default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; existing files are never rewritten). On a Codex CLI host it also generates `.codex/agents/` and ignores it through the git directory's `info/exclude`, so no tracked file changes. It writes nothing else, never touches a host setting, and ends with a short report: what was done, what was already in place, and what remains your decision. Where your host refuses one of its writes, the report prints the one exact command to approve or run yourself. It is idempotent.
+
+The manual path, which the prompt automates, is `/shell-team:team-init` on a Claude Code host. On a Codex CLI host it is the generator and the scaffolder, run from the repository's own root:
+
+```text
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-These three printed lines are not the whole path: locating the installed plugin root, gitignoring the generated agents, repository trust, the sandbox's writable roots, the Claude Code CLI prerequisite, network access, and the `PATH` export are each covered step by step in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
+Locating the installed plugin root, ignoring the generated agents, and each host-side condition (repository trust, write access for commits, the Claude Code CLI prerequisite, network for the review pass, and the `PATH` export) are covered step by step, with what has been measured, in [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli).
 
 Which instruction surface a Codex CLI orchestrator **loads automatically is unmeasured from this repository** — the runbook linked above is what this project relies on instead. The loop's own stop points are the same on both hosts: **merge and push** stay yours, and when the independent reviewer cannot be reached the review returns `BLOCKED` rather than quietly falling back to a same-family one.
 
@@ -104,7 +106,15 @@ Full details and the air-gapped fallback: [docs/distribution.md](docs/distributi
 codex plugin marketplace upgrade ripsawjp
 ```
 
-After the upgrade, follow [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 1's own version check, and in each repository where you use shell-team, from that repository's own root, re-run the generator (`bash "<plugin root>/bin/gen-codex-agents.sh"`) and confirm with `bash "<plugin root>/bin/check-codex-agents.sh"`.
+After the upgrade, in each repository where you use shell-team, type this prompt in the session — the same prompt on both hosts:
+
+```text
+update shell-team
+```
+
+It is the same flow as `set up shell-team`, re-run: it refreshes a drifted `.codex/agents/` on a Codex CLI host, lists scaffold files that differ from the new templates without rewriting them, and reports what was done, what was already in place, and what remains your decision. A second run changes nothing.
+
+The manual path on a Codex CLI host is [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 1's own version check, then, from the repository's own root, re-running the generator (`bash "<plugin root>/bin/gen-codex-agents.sh"`) and confirming with `bash "<plugin root>/bin/check-codex-agents.sh"`.
 
 See [docs/distribution.md](docs/distribution.md) for the full update path, version-line policy, and the air-gapped fallback.
 
@@ -177,6 +187,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 │   ├── review/SKILL.md              # /shell-team:review
 │   ├── review-response/SKILL.md     # /shell-team:review-response (triage received review feedback)
 │   ├── team-init/SKILL.md           # /shell-team:team-init (scaffold a repo)
+│   ├── setup/SKILL.md               # "set up shell-team" / "update shell-team" (both hosts)
 │   └── loop-triage/SKILL.md         # /shell-team:loop-triage (discover work)
 ├── bin/                             # invoke as `bash "<plugin root>/bin/<script>"`
 │   ├── check-handoff.sh             # tasks/todo.md hand-off linter
@@ -186,6 +197,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 │   ├── gen-loop-replay.sh           # renders a run's telemetry as an HTML replay page
 │   ├── discover-work.sh             # read-only triage discovery engine
 │   ├── team-init.sh                 # adopting-repo scaffolder
+│   ├── team-setup.sh                # the setup prompt's script (scaffold, Codex agents, report)
 │   └── install                      # legacy vendoring fallback
 ├── templates/                       # generic scaffolds used by team-init
 ├── docs/

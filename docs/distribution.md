@@ -35,19 +35,27 @@ codex plugin marketplace add RipsawJP/shell-team
 codex plugin add shell-team@ripsawjp
 ```
 
-Then, from that repository's own root, generate the custom agents Codex dispatches — **per adopted repository**, not once per machine:
+Then, in each repository you adopt shell-team into — **per adopted repository**, not once per machine — type `set up shell-team` in the session (see `## Adopt in a target repo` below). On a Codex CLI host, setup generates the custom agents Codex dispatches into `.codex/agents`; run by hand, from the repository's own root, that step is:
 
 ```
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 ```
 
-See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for repository trust, the sandbox's writable roots, the network grant and the rest of the setup this page points at rather than restates.
+See [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli) for the host-side conditions this page points at rather than restates: repository trust, the sandbox's write policy, network for the review pass and `PATH`. Each is the operator's decision, and the page says what has been measured about it.
 
 On **Claude Code**, the plugin's agents resolve as `/shell-team:<agent>` and skills as `/shell-team:<skill>` (e.g. `/shell-team:run`). On **Codex CLI**, a role's generated custom agent is dispatched with Codex's own `spawn_agent` tool instead — see [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli). On either host, `bin/` scripts are invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even while the plugin is enabled; read `<plugin root>` from what your host reports, see [adopting.md](adopting.md)'s "Locate the installed plugin root" step for how.
 
 ## Adopt in a target repo
 
-After install, initialize a repo's per-project data once. Everything lands under a single base dir (`.shell-team/` by default; override with `TEAM_RUN_BASE`; an existing legacy `tasks/`+`docs/specs/` layout is detected and reused): `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` plus a self-contained `.shell-team/.gitignore`. The host root is left untouched — **no** `CLAUDE.md` edit and **no** root `.gitignore` change (see [adopting.md](adopting.md)):
+After install, type this prompt in the session, in the repository you want to adopt shell-team into. It is the same prompt on both hosts:
+
+```text
+set up shell-team
+```
+
+The setup skill runs `bash "<plugin root>/bin/team-setup.sh"` from the repository. It initializes the per-project data (the scaffold below, through `team-init.sh`; an existing file is never rewritten), and on a Codex CLI host it also generates `.codex/agents` and ignores it through the git directory's `info/exclude`. It writes nothing else and never touches a host setting. It ends with a report of what was done, what was already in place, and what remains the operator's decision. After a plugin update, type `update shell-team` in each adopted repository: the same flow re-run, idempotent.
+
+What the scaffold step produces: everything lands under a single base dir (`.shell-team/` by default; override with `TEAM_RUN_BASE`; an existing legacy `tasks/`+`docs/specs/` layout is detected and reused): `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` plus a self-contained `.shell-team/.gitignore`. The host root is left untouched — **no** `CLAUDE.md` edit and **no** root `.gitignore` change (see [adopting.md](adopting.md)). By hand on a Claude Code host:
 
 ```text
 /shell-team:team-init
@@ -80,7 +88,7 @@ When a Claude Code session runs with **sandbox enabled**, the Codex cross-provid
 
 **The matching rule changed in Claude Code 2.1.278.** Before that release, a `sandbox.excludedCommands` pattern matched on a command line's leading token alone, so a `codex exec …` line still counted as excluded even if it ended in a shell redirection. Claude Code 2.1.278 changed this: a command is exempted only when **every part** of it matches, not just its first token (measured, dated 2026-09-24: Claude Code **2.1.281**, codex-cli **0.156.1**). Every shipped `codex exec` block in this plugin used to end in `> "<a raw jsonl path>" 2>&1`; under 2.1.278+ that redirection is a second, non-matching part, and the whole call ran **inside** the sandbox — either loudly (`workspace routing discovery failed` → `turn.failed`, exit 1, no final-message file written) or silently (exit 0, an inability sentence such as `Unable to determine.`, with `sandbox_apply` errors in the event stream). The bare form with no redirection runs outside the sandbox and completes normally, on 2.1.278+ and on every earlier version alike. Every shipped `codex exec` block is now a single bare command writing only its own `-o` capture file — no redirection, no stdin redirect, no command substitution, no connector — so the `"codex *"` exclusion matches the whole call again.
 
-Add the `sandbox.excludedCommands` form to your `.claude/settings.local.json` so the direct-`codex` path is covered; the corresponding `permissions.allow` entry is an optional convenience that only silences the approval prompt:
+Whether to put the Codex path outside the sandbox is the operator's decision; shell-team never writes your settings files. The form below, in the operator's own `.claude/settings.local.json`, is what covers the direct-`codex` path; the corresponding `permissions.allow` entry is an optional convenience that only silences the approval prompt. Setup reports this condition under `Remains the operator's decision:` on a Claude Code host:
 
 ```json
 {
@@ -121,7 +129,7 @@ Omitting `version` makes the plugin track the latest commit SHA instead of pinne
 codex plugin marketplace upgrade ripsawjp
 ```
 
-Presence in `codex plugin list` is not currency: compare its `VERSION` column against the release you intend to run before treating an existing install as current. If it is older, run `codex plugin add shell-team@ripsawjp` again. Either way, re-run the generator and confirm it — per adopted repository, from that repository's own root, because the checker reads `--out-dir` and nothing else:
+After either update, type `update shell-team` in each adopted repository: it refreshes a drifted `.codex/agents` on a Codex CLI host, lists scaffold files that differ from the new templates without rewriting them, and reports what remains the operator's decision. Presence in `codex plugin list` is not currency: compare its `VERSION` column against the release you intend to run before treating an existing install as current. If it is older, run `codex plugin add shell-team@ripsawjp` again. By hand, re-run the generator and confirm it — per adopted repository, from that repository's own root, because the checker reads `--out-dir` and nothing else:
 
 ```
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
