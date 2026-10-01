@@ -397,6 +397,41 @@ sl_case base claude-code
 sl_case base-sub claude-code
 sl_case info codex-cli
 
+# ---------------------------------------------------------------------------
+# Containment (the path checked is the path written): operating paths are read
+# raw, and every write target must resolve physically inside the repository.
+# ---------------------------------------------------------------------------
+eb() { # <dir> <TEAM_RUN_BASE value> <host>: run setup with an override base; prints the exit status
+  local d="$1" b="$2" h="$3" r=0
+  (cd "$d" && TEAM_RUN_BASE="$b" PATH="$SP" bash "$S" --host "$h" < /dev/null > "$T/o" 2> "$T/e") || r=$?
+  printf '%s' "$r"
+}
+for h in claude-code codex-cli; do
+  R="$T/repo-ct1-$h"; mk "$R"; D="$T/ct1-out-$h"; mkdir -p "$D"
+  ln -s "$D" "$R"'/.a$b'
+  snap "$R" > "$T/c0"
+  x="$(eb "$R" '.a$b' "$h")"
+  snap "$R" > "$T/c1"
+  { [ "$x" = 2 ] && [ -z "$(ls -A "$D")" ] && cmp -s "$T/c0" "$T/c1"; } \
+    && pass "containment $h: a metacharacter base that is an outward symlink exits 2, nothing written outside or inside" \
+    || fail "containment $h: metacharacter base + outward symlink (rc=$x, outside: $(ls -A "$D"))"
+done
+R="$T/repo-ct2"; mk "$R"
+x="$(eb "$R" '.a$b' claude-code)"
+{ [ "$x" = 0 ] && [ -s "$R"'/.a$b/todo.md' ] && [ -d "$R"'/.a$b/specs' ] && [ ! -e "$R/.shell-team" ]; } \
+  && pass "containment control: a metacharacter base without a symlink scaffolds inside the repository" || fail "containment control: metacharacter base (rc=$x)"
+R="$T/repo-ct3"; mk "$R"; D="$T/ct3-out"; mkdir -p "$D"
+for b in '../ct3-out' "$D" 'a/../../ct3-out'; do
+  x="$(eb "$R" "$b" claude-code)"
+  { [ "$x" != 0 ] && [ -z "$(ls -A "$D")" ] && [ ! -e "$R/.shell-team" ]; } \
+    && pass "containment: TEAM_RUN_BASE '$b' is refused (rc=$x), nothing written outside or inside" || fail "containment: TEAM_RUN_BASE '$b' (rc=$x)"
+done
+# Outward symlink at an intermediate component of a metacharacter base.
+R="$T/repo-ct4"; mk "$R"; D="$T/ct4-out"; mkdir -p "$D"
+ln -s "$D" "$R"'/.p$q'
+x="$(eb "$R" '.p$q/inner' claude-code)"
+{ [ "$x" = 2 ] && [ -z "$(ls -A "$D")" ]; } && pass "containment: an outward symlink at a parent of the base exits 2, nothing written" || fail "containment: parent symlink (rc=$x)"
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'setup suite: all assertions passed\n'

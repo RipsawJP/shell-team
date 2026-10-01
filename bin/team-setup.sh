@@ -140,8 +140,17 @@ fi
 #    every git call below at a different repository, so it is dropped.
 # ---------------------------------------------------------------------------
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
-top="$(git rev-parse --show-toplevel 2>/dev/null)" \
+git rev-parse --show-toplevel >/dev/null 2>&1 \
   || die "not inside a git work tree (run it from inside the repository to set up)"
+# The sentinel keeps a trailing newline of the path itself (command substitution
+# would strip it and let the path slip past unsafe_path below).
+top="$(git rev-parse --show-toplevel 2>/dev/null; printf x)"
+top="${top%x}"
+top="${top%$'\n'}"
+if [ -z "$top" ]; then die "cannot resolve the repository root; nothing was written"; fi
+case "$top" in
+  *[[:cntrl:]]*) die "the repository root contains a single quote or a control character, so a command naming it cannot be quoted safely; nothing was written" ;;
+esac
 ROOT="$(cd "$top" && pwd -P)" || die "cannot resolve the repository root: $top"
 
 # ---------------------------------------------------------------------------
@@ -162,15 +171,26 @@ if unsafe_path "$PLUGIN_ROOT"; then
   die "the plugin root contains a single quote or a control character, so a command naming it cannot be quoted safely; nothing was written"
 fi
 
-# Operating paths come from the single resolver. Capture first and check, so a
-# resolver refusal (an invalid $TEAM_RUN_BASE) stops here before any write.
-if ! resolver_out="$(bash "$SCRIPT_DIR/team-paths.sh" --root "$ROOT" --export)"; then
-  die "could not resolve the operating paths (see the resolver's message above); nothing was written"
-fi
-tp() { printf '%s\n' "$resolver_out" | sed -n "s/^export $1=//p" | head -n 1; }
-BASE="$(tp TEAM_RUN_BASE)"
-LOOPS_DIR="$(tp TEAM_LOOPS_DIR)"
-[ -n "$BASE" ] && [ -n "$LOOPS_DIR" ] || die "the path resolver printed no base dir; nothing was written"
+# Operating paths come from the single resolver, one raw value per key
+# (`--get`, never the `--export` form, whose shell escaping is not the path).
+# Each call is checked, so a resolver refusal (an invalid $TEAM_RUN_BASE) stops
+# here before any write.
+getp() { bash "$SCRIPT_DIR/team-paths.sh" --root "$ROOT" --get "$1"; }
+RESOLVE_MSG="could not resolve the operating paths (see the resolver's message above); nothing was written"
+BASE="$(getp base)" || die "$RESOLVE_MSG"
+LOOPS_DIR="$(getp loops)" || die "$RESOLVE_MSG"
+RUNS_DIR="$(getp runs)" || die "$RESOLVE_MSG"
+RETROS_DIR="$(getp retros)" || die "$RESOLVE_MSG"
+REVIEWS_DIR="$(getp reviews)" || die "$RESOLVE_MSG"
+SPECS_DIR="$(getp specs)" || die "$RESOLVE_MSG"
+PROV_DIR="$(getp provenance)" || die "$RESOLVE_MSG"
+INTERV_DIR="$(getp interventions)" || die "$RESOLVE_MSG"
+TODO_FILE="$(getp todo)" || die "$RESOLVE_MSG"
+LESSONS_FILE="$(getp lessons)" || die "$RESOLVE_MSG"
+for v in "$BASE" "$LOOPS_DIR" "$RUNS_DIR" "$RETROS_DIR" "$REVIEWS_DIR" "$SPECS_DIR" \
+  "$PROV_DIR" "$INTERV_DIR" "$TODO_FILE" "$LESSONS_FILE"; do
+  [ -n "$v" ] || die "the path resolver printed an empty operating path; nothing was written"
+done
 
 EXCL=""
 if [ "$HOST" = "codex-cli" ]; then
@@ -205,10 +225,8 @@ no_symlink_below() { # <base-dir> <relative-path>
   done
   return 0
 }
-for rel in "$BASE" "$LOOPS_DIR" "$(tp TEAM_RUNS_DIR)" "$(tp TEAM_RETROS_DIR)" \
-  "$(tp TEAM_REVIEWS_DIR)" "$(tp TEAM_SPECS_DIR)" "$(tp TEAM_PROVENANCE_DIR)" \
-  "$(tp TEAM_INTERVENTIONS_DIR)"; do
-  [ -n "$rel" ] || die "the path resolver printed an empty operating path; nothing was written"
+for rel in "$BASE" "$LOOPS_DIR" "$RUNS_DIR" "$RETROS_DIR" "$REVIEWS_DIR" \
+  "$SPECS_DIR" "$PROV_DIR" "$INTERV_DIR"; do
   no_symlink_below "$ROOT" "$rel"
 done
 if [ "$HOST" = "codex-cli" ]; then
@@ -216,6 +234,52 @@ if [ "$HOST" = "codex-cli" ]; then
   if [ -L "${EXCL%/exclude}" ] || [ -L "$EXCL" ]; then
     die "${EXCL%/exclude} or $EXCL is a symlink, and setup appends to it; refusing so nothing is written outside the git directory (nothing was written). Whether to replace it is the operator's decision"
   fi
+fi
+
+# One containment check over every target this run (and the tools it calls)
+# writes, before the first write. The check resolves the target physically: the
+# deepest existing ancestor is resolved with `cd -P`, the not-yet-existing
+# remainder is appended, and the result must be the allowed root or sit under
+# it. The per-shape symlink refusals above stay as a fail-closed first layer;
+# this check is the one that does not depend on how a link is spelled.
+contained() { # <target-path (absolute)> <allowed-root (physical)>
+  local t="$1" allow="$2" d rest="" phys parent
+  d="$t"
+  while [ ! -e "$d" ] && [ ! -L "$d" ]; do
+    rest="/${d##*/}$rest"
+    d="${d%/*}"
+    [ -n "$d" ] || d="/"
+    [ "$d" != "/" ] || break
+  done
+  if [ -L "$d" ]; then
+    die "$d is a symlink, and setup writes at or under $t; refusing so nothing is written outside the repository (nothing was written). Whether to replace the symlink is the operator's decision"
+  fi
+  if [ -d "$d" ]; then
+    phys="$(cd -P -- "$d" 2>/dev/null && pwd -P)" || die "cannot resolve $d physically; nothing was written"
+  else
+    parent="${d%/*}"
+    [ -n "$parent" ] || parent="/"
+    phys="$(cd -P -- "$parent" 2>/dev/null && pwd -P)" || die "cannot resolve $parent physically; nothing was written"
+    phys="${phys%/}/${d##*/}"
+  fi
+  phys="${phys%/}$rest"
+  if [ "$phys" = "$allow" ]; then return 0; fi
+  case "$phys" in
+    "$allow"/*) return 0 ;;
+  esac
+  die "$t resolves to $phys, outside $allow, and setup would write there; refusing (nothing was written)"
+}
+for rel in "$BASE" "$LOOPS_DIR" "$RUNS_DIR" "$RETROS_DIR" "$REVIEWS_DIR" \
+  "$SPECS_DIR" "$PROV_DIR" "$INTERV_DIR" "$TODO_FILE" "$LESSONS_FILE" \
+  "$LOOPS_DIR/shell-team.contract.yaml" "$BASE/AGENTS.md" "$BASE/test-recipe.md" \
+  "$BASE/.gitignore" "$BASE/binding.conf.example"; do
+  contained "$ROOT/$rel" "$ROOT"
+done
+if [ "$HOST" = "codex-cli" ]; then
+  contained "$ROOT/.codex" "$ROOT"
+  contained "$ROOT/.codex/agents" "$ROOT"
+  contained "$(dirname "$EXCL")" "$common"
+  contained "$EXCL" "$common"
 fi
 
 # ---------------------------------------------------------------------------
