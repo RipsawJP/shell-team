@@ -203,7 +203,181 @@ The `AC4`–`AC6` lines run real suites. Set `CHECK_ACS_TIMEOUT` high enough for
 
 The relayed issue counts (56 files / 99 occurrences) and tech-lead's tool read (55 / 97) disagree, and neither is frozen. After step 2a, the coordinating session produces the base-side population with `bin/derive-populations.sh`, reading the base blobs and never running a file, and embeds the emitted block here, preceded by its own `- reproduce:` line.
 
-<!-- derivation block to follow after step 2a -->
+Produced after step 2a (the tool is clean at that point), reading the base blobs through `git grep <ref>` and never running a file. The tool reports 56 files and 95 sites (`path:line`) for the gate pattern `P`; the issue relayed 99 occurrences and tech-lead's read 55 / 97, and none of those counts is frozen.
+
+- reproduce: P='(^|[^[:alnum:]_.-])rm([[:space:]]+-[^[:space:]]*)*[[:space:]]+(-[[:alnum:]]*[rR][[:alnum:]]*|--recursive)([[:space:]]|$)|(^|[^[:alnum:]_-])find[[:space:]].*[[:space:]]-delete([[:space:]]|;|$)|xargs([[:space:]]+[^|;&]*)?[[:space:]]rm([[:space:]]|$)|-exec(dir)?[[:space:]]+rm([[:space:]]|$)|git[[:space:]]+clean([[:space:]]|$)'; export P; B=8a6cc48c8e6b82bf1cf99a1ec740dc8915a7a50b; bash bin/derive-populations.sh --label t1165-base --set 'tests-docs-sites=git grep -n -E -- "$P" '"$B"' -- tests docs/loop-engineering/subjects | cut -d: -f2,3' --set 'tests-docs-files=git grep -l -E -- "$P" '"$B"' -- tests docs/loop-engineering/subjects | cut -d: -f2' --set 'bin-sites=git grep -n -E -- "$P" '"$B"' -- bin | cut -d: -f2,3'
+
+<!-- BEGIN derivation: t1165-base -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: tests-docs-sites — status: 0 — lines: 95 — items: 95 — command: git grep -n -E -- "$P" 8a6cc48c8e6b82bf1cf99a1ec740dc8915a7a50b -- tests docs/loop-engineering/subjects | cut -d: -f2,3
+- set: tests-docs-files — status: 0 — lines: 56 — items: 56 — command: git grep -l -E -- "$P" 8a6cc48c8e6b82bf1cf99a1ec740dc8915a7a50b -- tests docs/loop-engineering/subjects | cut -d: -f2
+- set: bin-sites — status: 0 — lines: 9 — items: 9 — command: git grep -n -E -- "$P" 8a6cc48c8e6b82bf1cf99a1ec740dc8915a7a50b -- bin | cut -d: -f2,3
+- union: items: 160
+- bucket: bin-sites — items: 9
+  - bin/aggregate-verdicts.sh:227
+  - bin/check-board-headings.sh:120
+  - bin/check-board-headings.sh:130
+  - bin/check-codex-agents.sh:105
+  - bin/check-commit-identity.sh:137
+  - bin/check-fanout-instances.sh:290
+  - bin/check-pii-shapes.sh:626
+  - bin/check-review-input.sh:218
+  - bin/derive-populations.sh:301
+- bucket: tests-docs-files — items: 56
+  - docs/loop-engineering/subjects/subject-01/acceptance.sh
+  - tests/aggregate-verdicts/run.sh
+  - tests/bin-help/run.sh
+  - tests/check-acs/run.sh
+  - tests/check-adapter/run.sh
+  - tests/check-adopter-docs/run.sh
+  - tests/check-binding/run.sh
+  - tests/check-board-headings/run.sh
+  - tests/check-commit-identity/run.sh
+  - tests/check-count-claims/run.sh
+  - tests/check-durability/run.sh
+  - tests/check-entry-mode/run.sh
+  - tests/check-fanout-instances/run.sh
+  - tests/check-intent/run.sh
+  - tests/check-interventions/run.sh
+  - tests/check-invocation-path/run.sh
+  - tests/check-liveness/run.sh
+  - tests/check-model-pins/run.sh
+  - tests/check-oversight/run.sh
+  - tests/check-pii-shapes/run.sh
+  - tests/check-playbook/run.sh
+  - tests/check-prompt-sync/run.sh
+  - tests/check-provenance/run.sh
+  - tests/check-refreeze-class/run.sh
+  - tests/check-refreeze-grant/run.sh
+  - tests/check-retro/run.sh
+  - tests/check-review-input/run.sh
+  - tests/check-run/run.sh
+  - tests/check-spec-review/run.sh
+  - tests/close-out/run.sh
+  - tests/cluster-failures/run.sh
+  - tests/codex-agents/run.sh
+  - tests/codex-skeleton-hygiene/run.sh
+  - tests/consolidate-proposals/run.sh
+  - tests/derive-populations/run.sh
+  - tests/discover-work/run.sh
+  - tests/errexit-safe/run.sh
+  - tests/gen-loop-replay/run.sh
+  - tests/gen-playbook-blocks/run.sh
+  - tests/gitignore-raw-dumps/run.sh
+  - tests/goal-state/run.sh
+  - tests/install/run.sh
+  - tests/interventions-reminder/run.sh
+  - tests/land-worktree/run.sh
+  - tests/log-run/run.sh
+  - tests/loop-guard/run.sh
+  - tests/playbook-promote/run.sh
+  - tests/resolve-executor/run.sh
+  - tests/retro-inputs/invariants.sh
+  - tests/retro-inputs/run.sh
+  - tests/rework-digest/run.sh
+  - tests/rollup-runs/run.sh
+  - tests/rollup-track/run.sh
+  - tests/team-init/run.sh
+  - tests/team-paths/run.sh
+  - tests/trial-recipe/run.sh
+- bucket: tests-docs-sites — items: 95
+  - docs/loop-engineering/subjects/subject-01/acceptance.sh:64
+  - tests/aggregate-verdicts/run.sh:38
+  - tests/bin-help/run.sh:54
+  - tests/bin-help/run.sh:74
+  - tests/check-acs/run.sh:27
+  - tests/check-adapter/run.sh:137
+  - tests/check-adopter-docs/run.sh:97
+  - tests/check-binding/run.sh:142
+  - tests/check-board-headings/run.sh:29
+  - tests/check-commit-identity/run.sh:51
+  - tests/check-count-claims/run.sh:18
+  - tests/check-durability/run.sh:44
+  - tests/check-entry-mode/run.sh:19
+  - tests/check-fanout-instances/run.sh:29
+  - tests/check-intent/run.sh:431
+  - tests/check-intent/run.sh:70
+  - tests/check-intent/run.sh:77
+  - tests/check-intent/run.sh:813
+  - tests/check-intent/run.sh:827
+  - tests/check-interventions/run.sh:54
+  - tests/check-invocation-path/run.sh:31
+  - tests/check-liveness/run.sh:82
+  - tests/check-model-pins/run.sh:40
+  - tests/check-oversight/run.sh:20
+  - tests/check-pii-shapes/run.sh:73
+  - tests/check-playbook/run.sh:33
+  - tests/check-prompt-sync/run.sh:249
+  - tests/check-prompt-sync/run.sh:33
+  - tests/check-prompt-sync/run.sh:37
+  - tests/check-provenance/run.sh:602
+  - tests/check-provenance/run.sh:63
+  - tests/check-provenance/run.sh:657
+  - tests/check-provenance/run.sh:671
+  - tests/check-provenance/run.sh:70
+  - tests/check-refreeze-class/run.sh:87
+  - tests/check-refreeze-grant/run.sh:150
+  - tests/check-refreeze-grant/run.sh:155
+  - tests/check-refreeze-grant/run.sh:160
+  - tests/check-refreeze-grant/run.sh:168
+  - tests/check-refreeze-grant/run.sh:21
+  - tests/check-retro/run.sh:204
+  - tests/check-retro/run.sh:260
+  - tests/check-retro/run.sh:269
+  - tests/check-retro/run.sh:286
+  - tests/check-retro/run.sh:98
+  - tests/check-review-input/run.sh:215
+  - tests/check-review-input/run.sh:29
+  - tests/check-run/run.sh:31
+  - tests/check-spec-review/run.sh:28
+  - tests/close-out/run.sh:111
+  - tests/close-out/run.sh:141
+  - tests/close-out/run.sh:34
+  - tests/cluster-failures/run.sh:122
+  - tests/codex-agents/run.sh:30
+  - tests/codex-skeleton-hygiene/run.sh:255
+  - tests/consolidate-proposals/run.sh:24
+  - tests/derive-populations/run.sh:40
+  - tests/discover-work/run.sh:31
+  - tests/errexit-safe/run.sh:477
+  - tests/errexit-safe/run.sh:483
+  - tests/errexit-safe/run.sh:490
+  - tests/errexit-safe/run.sh:500
+  - tests/errexit-safe/run.sh:529
+  - tests/errexit-safe/run.sh:540
+  - tests/errexit-safe/run.sh:77
+  - tests/gen-loop-replay/run.sh:47
+  - tests/gen-playbook-blocks/run.sh:149
+  - tests/gen-playbook-blocks/run.sh:29
+  - tests/gen-playbook-blocks/run.sh:40
+  - tests/gen-playbook-blocks/run.sh:51
+  - tests/gitignore-raw-dumps/run.sh:45
+  - tests/goal-state/run.sh:25
+  - tests/install/run.sh:34
+  - tests/interventions-reminder/run.sh:62
+  - tests/land-worktree/run.sh:45
+  - tests/log-run/run.sh:132
+  - tests/log-run/run.sh:33
+  - tests/loop-guard/run.sh:14
+  - tests/loop-guard/run.sh:32
+  - tests/playbook-promote/run.sh:135
+  - tests/playbook-promote/run.sh:34
+  - tests/resolve-executor/run.sh:42
+  - tests/retro-inputs/invariants.sh:121
+  - tests/retro-inputs/invariants.sh:82
+  - tests/retro-inputs/invariants.sh:85
+  - tests/retro-inputs/run.sh:44
+  - tests/rework-digest/run.sh:62
+  - tests/rollup-runs/run.sh:106
+  - tests/rollup-runs/run.sh:137
+  - tests/rollup-track/run.sh:35
+  - tests/team-init/run.sh:60
+  - tests/team-paths/run.sh:28
+  - tests/trial-recipe/run.sh:149
+  - tests/trial-recipe/run.sh:153
+  - tests/trial-recipe/run.sh:55
+<!-- END derivation: t1165-base -->
 
 ## Blast radius
 
@@ -292,3 +466,9 @@ None blocking.
 - **`.shell-team/test-recipe.md`:** append a `T-1165` note naming `TMPDIR` that supersedes the `$HERE`-fallback idiom (`:552`–`:565`, `:593`–`:596`) and the `rm -r` advice (`:1539`–`:1631`) for new suites.
 - **Measured-at-ref command check:** not applicable. No deliverable prints a command labelled as measured at a git ref.
 - **Observation, out of scope:** `docs/loop-engineering/context-lifecycle.md:97` prints a reproduce command containing a recursive delete. It is a candidate follow-up issue for the coordinating session, not this task.
+
+## Notes from engineer
+
+- **Deviation (PII check order).** The pattern-based PII-shape check was not run on the spec, board and records at the spec's first commit, because `bin/check-pii-shapes.sh` itself contained a recursive delete until step 2a and the standing rule forbids running such a file. It was run after 2a, on the working tree, before the hand-off (result recorded on the board entry).
+- **Step 2a design.** The eight tools empty their own scratch directory with a non-recursive `rm -f "$DIR"/*` and then `rmdir "$DIR"`, both guarded with `|| true` and wrapped in an `if [ -n … ] && [ -d … ]` so an empty variable can never turn the glob into `/*`. `check-codex-agents.sh` does the same for `$SCRATCH/fresh` first and then for `$SCRATCH`. D1 was not taken for any tool.
+- **Merged-spec criteria expected to go red (read from text only, nothing run).** `T-1160-spec-review-round-cap.md` **AC5** (every base line of `tests/check-spec-review/run.sh` survives at HEAD: the trap line and the `$HERE` fallback arm are gone). The same class applies to any merged criterion that pins suite lines or counts recursive-delete strings or `$HERE` scratch roots; it is disclosed by class, not enumerated.
