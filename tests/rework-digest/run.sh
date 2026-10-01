@@ -53,13 +53,11 @@ if [ "${REWORK_DIGEST_RUN_CHILD:-0}" != "1" ]; then
   exit 0
 fi
 
-# Always under $HERE (never $TMPDIR): the relative-symlink launch-path case
-# below (linkdir/rework-digest-rel.sh -> ../../../../bin/rework-digest.sh)
-# depends on $TMP sitting at a FIXED depth under the repo root
-# (tests/rework-digest/<TMP>/linkdir, 4 levels up to REPO_ROOT) — an
-# out-of-tree $TMPDIR root would break that fixed hop count.
-TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
+# The scratch root is under ${TMPDIR:-/tmp} and is left there. The
+# relative-symlink launch-path case below does not depend on the root's depth
+# under the repository: it builds its own fixed-depth layout inside the root
+# (relroot/linkdir next to a copy of bin/ at relroot/bin).
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/rework-digest.XXXXXX")"
 
 # --- AC2: happy path — verbatim fixed skeleton (all-distinct classes) -------
 expected_distinct="$TMP/expected-distinct"
@@ -161,10 +159,14 @@ ln -s "$RD" "$linkdir/rework-digest.sh"
 out_symlink="$("$linkdir/rework-digest.sh" --round 1 --phase validate --class symlink-launch-check --stop-reason guard_error)"
 printf '%s\n' "$out_symlink" | grep -Fxq 'judgment: new-classes-each-round' \
   || fail "symlink invocation: sibling goal-state.sh not resolved through the link"
-# Relative symlink too — exercises the resolver's relative-target branch
-# (linkdir is 4 levels below the repo root: tests/rework-digest/tmp/linkdir).
-ln -s "../../../../bin/rework-digest.sh" "$linkdir/rework-digest-rel.sh"
-out_symlink_rel="$("$linkdir/rework-digest-rel.sh" --round 1 --phase validate --class symlink-rel-check --stop-reason guard_error)" \
+# Relative symlink too — exercises the resolver's relative-target branch.
+# relroot is a copy of bin/ at a fixed depth inside the scratch root:
+# relroot/linkdir/rework-digest-rel.sh -> ../bin/rework-digest.sh.
+relroot="$TMP/relroot"
+mkdir -p "$relroot/linkdir"
+cp -R "$REPO_ROOT/bin" "$relroot/bin"
+ln -s "../bin/rework-digest.sh" "$relroot/linkdir/rework-digest-rel.sh"
+out_symlink_rel="$("$relroot/linkdir/rework-digest-rel.sh" --round 1 --phase validate --class symlink-rel-check --stop-reason guard_error)" \
   || fail "relative symlink invocation failed"
 printf '%s\n' "$out_symlink_rel" | grep -Fxq 'judgment: new-classes-each-round' \
   || fail "relative symlink invocation: sibling not resolved"

@@ -287,7 +287,12 @@ fi
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/check-fanout-instances.XXXXXX")" || die 2 usage "cannot create a scratch directory under \${TMPDIR:-/tmp}"
 # shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below
-cleanup() { rm -rf "$WORKDIR" 2>/dev/null || true; }
+cleanup() {
+  if [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
+    rm -f "$WORKDIR"/* 2>/dev/null || true
+    rmdir "$WORKDIR" 2>/dev/null || true
+  fi
+}
 trap cleanup EXIT
 
 # ---------------------------------------------------------------------------

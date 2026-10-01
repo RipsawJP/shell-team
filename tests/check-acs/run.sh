@@ -22,9 +22,8 @@ pass() { printf 'PASS: %s\n' "$1"; }
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/check-acs-test.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"
 fi
-trap 'rm -rf "$TMP"' EXIT
 
 # assert_rc <desc> <expected_rc> <spec> [stdout_grep]
 assert_rc() {

@@ -31,8 +31,6 @@ mktmp_file() {
   mktemp "$WORK/install-tmp-XXXXXX"
 }
 
-trap 'rm -rf "$WORK" 2>/dev/null || true' EXIT
-
 fail() {
   printf 'FAIL: %s\n' "$1" >&2
   exit 1

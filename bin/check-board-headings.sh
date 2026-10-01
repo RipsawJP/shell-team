@@ -117,8 +117,9 @@ die() { printf '%s: %s\n' "${0##*/}" "$1" >&2 || true; exit 2; }
 # `t="$(new_tmp)"` call runs the entire function body in a subshell, so any
 # `TMP_FILES+=(...)` done there is invisible to the parent's array; that
 # earlier design left the EXIT trap always walking an empty array and never
-# deleting anything, round-1 Minor finding). A single `rm -rf "$WORKDIR"`
-# needs no cross-subshell bookkeeping at all.
+# deleting anything, round-1 Minor finding). Removing the files inside
+# "$WORKDIR" with one non-recursive glob, then the directory itself with
+# `rmdir`, needs no cross-subshell bookkeeping at all.
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/check-board-headings.XXXXXX")"
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
 cleanup() {
@@ -127,7 +128,8 @@ cleanup() {
   # bug this task fixed (`[ -n "$f" ] && rm -f "$f"` clobbering exit 0 into
   # exit 1 when $f was empty). Do not regress that fix.
   if [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
-    rm -rf "$WORKDIR"
+    rm -f "$WORKDIR"/* 2>/dev/null || true
+    rmdir "$WORKDIR" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT

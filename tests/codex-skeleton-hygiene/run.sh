@@ -252,7 +252,6 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/codex-skeleton-hygiene-test.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
 # Canonicalize TMP to its PHYSICAL path (pwd -P) right away: `$TMPDIR` itself
 # is a symlink on macOS (`/tmp` -> `/private/tmp`), and bin/codex-capture.sh
 # now canonicalizes the reviews dir the same way (T-107 round1 Codex review

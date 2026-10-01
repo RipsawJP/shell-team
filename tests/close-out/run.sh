@@ -14,7 +14,7 @@
 #
 # Temp roots live under $TMPDIR when set (sandboxed runs deny writes to any
 # nested .git/ inside the repo tree, and these fixtures need `git init`),
-# falling back to $HERE/tmp-roots on plain CI runners. Cleaned via trap.
+# falling back to ${TMPDIR:-/tmp}/tmp-roots on plain CI runners. Left under TMPDIR (nothing is removed).
 
 set -euo pipefail
 
@@ -25,13 +25,12 @@ GENSTATUS="$REPO_ROOT/bin/gen-project-status.sh"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/close-out-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 # Build a legacy-layout root (tasks/ + docs/specs) with a board, markers'd
 # project_status, the sibling-resolvable bin scripts, and a tiny git history.
@@ -108,7 +107,7 @@ pass "AC4: telemetry span recorded via log-run.sh (legacy layout)"
 
 L2="$TMP/legacy-telemetry-broken"
 make_legacy_root "$L2"
-rm -rf "$L2/tasks/runs"
+[ ! -e "$L2/tasks/runs" ] || mv "$L2/tasks/runs" "$L2/tasks/runs.aside"
 : > "$L2/tasks/runs"   # a FILE where the runs dir must go => log-run mkdir fails
 ( cd "$L2" && bash "$CLOSEOUT" --task T-100 --date 2026-07-06 ) >/dev/null \
   || fail "AC4: close-out must still exit 0 when telemetry cannot be written"
@@ -138,7 +137,17 @@ before="$L3/board-before"
 cp "$L3/tasks/todo.md" "$before"
 
 set +e
-( cd "$L3" && bash "$CLOSEOUT" --task 'T-1;rm -rf /' --date 2026-07-06 ) >/dev/null 2>&1
+# Attack payload: if the task id were ever executed by a shell, it would create
+# the canary file (it can delete nothing); the canary must stay absent.
+# The canary path is double-quoted inside the payload, so a TMPDIR with spaces
+# cannot hide an execution. Positive control first: evaluated as shell text the
+# payload really creates its canary.
+payload_for() { printf 'T-1;touch "%s"' "$1"; }
+CANARY_CTL="$TMP/injected-canary-control"
+( eval "true $(payload_for "$CANARY_CTL")" ) >/dev/null 2>&1
+[ -e "$CANARY_CTL" ] || fail "T-1165: the task-id payload cannot create its canary when evaluated, so the non-execution assertion would be vacuous"
+CANARY="$TMP/injected-canary"
+( cd "$L3" && bash "$CLOSEOUT" --task "$(payload_for "$CANARY")" --date 2026-07-06 ) >/dev/null 2>&1
 rc_task=$?
 ( cd "$L3" && bash "$CLOSEOUT" --task T-100 --date 2026-07-06 --note "$(printf 'line1\nline2')" ) >/dev/null 2>&1
 rc_note=$?
@@ -157,6 +166,8 @@ set -e
 cmp -s "$before" "$L3/tasks/todo.md" \
   || fail "AC6: rejected input must leave the board byte-identical"
 pass "AC6: malformed task id / note / date / meta-note / zero issue rejected, board untouched"
+[ ! -e "$CANARY" ] || fail "AC6: the injected command in the task id was executed (canary exists)"
+pass "T-1165: injected command was not executed"
 
 # --- AC7: already-Done and missing tasks fail without duplicates --------------
 set +e

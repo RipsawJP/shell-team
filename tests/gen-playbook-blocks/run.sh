@@ -9,7 +9,7 @@
 #   AC8  shellcheck clean (soft-skip when unavailable)
 #
 # Temp roots live under $TMPDIR when set (restricted sandboxes), falling back
-# to $HERE/tmp-roots on plain CI runners. Cleaned via trap.
+# to ${TMPDIR:-/tmp}/tmp-roots on plain CI runners. Left under TMPDIR (nothing is removed).
 
 set -euo pipefail
 
@@ -20,13 +20,12 @@ FIX="$HERE/fixtures/root"
 if [ -n "${TMPDIR:-}" ]; then
   TMP="$(mktemp -d "${TMPDIR%/}/gen-playbook-blocks-test-roots.XXXXXX")"
 else
-  TMP="$(mktemp -d "$HERE/tmp-roots.XXXXXX")"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/tmp-roots.XXXXXX")"
 fi
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-trap 'rm -rf "$TMP"' EXIT
 
 clone_fixture() {  # $1 = destination
   # T-1006 DP-6: the fixture tree carries tasks/lessons.md but NO
@@ -37,7 +36,7 @@ clone_fixture() {  # $1 = destination
   # .shell-team/test-recipe.md's T-1006 entry) -- so every bare `--root`
   # invocation below keeps resolving to tasks/lessons.md exactly as it did
   # before the consumer was wired to the resolver.
-  rm -rf "$1"
+  [ ! -e "$1" ] || fail "clone_fixture: $1 already exists (every case needs a fresh directory)"
   cp -R "$FIX" "$1"
   mkdir -p "$1/tasks/loops"
   : > "$1/tasks/loops/shell-team.contract.yaml"
@@ -48,7 +47,7 @@ clone_fixture() {  # $1 = destination
 # and the corpus moved to .shell-team/lessons.md (the resolver's canonical
 # default-layout path). Derived at runtime, same reasoning as clone_fixture().
 clone_fixture_default_layout() {  # $1 = destination
-  rm -rf "$1"
+  [ ! -e "$1" ] || fail "clone_fixture: $1 already exists (every case needs a fresh directory)"
   cp -R "$FIX" "$1"
   mkdir -p "$1/.shell-team"
   mv "$1/tasks/lessons.md" "$1/.shell-team/lessons.md"
@@ -146,7 +145,6 @@ esac
   || fail "T-1006: an invalid \$TEAM_RUN_BASE must not generate anything"
 
 STUB_BIN="$TMP/t1006-stub-bin"
-rm -rf "$STUB_BIN"
 cp -R "$REPO_ROOT/bin" "$STUB_BIN"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_BIN/team-paths.sh"
 chmod 755 "$STUB_BIN/team-paths.sh"

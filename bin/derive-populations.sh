@@ -298,7 +298,12 @@ done
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/derive-populations.XXXXXX")" || die_usage "cannot create a scratch directory under \${TMPDIR:-/tmp}"
 # shellcheck disable=SC2329 # invoked indirectly, via the EXIT trap below
-cleanup() { rm -rf "$WORKDIR" 2>/dev/null || true; }
+cleanup() {
+  if [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
+    rm -f "$WORKDIR"/* 2>/dev/null || true
+    rmdir "$WORKDIR" 2>/dev/null || true
+  fi
+}
 trap cleanup EXIT
 
 # accepted_statuses <name> — prints the accept-list for <name>: "0" plus

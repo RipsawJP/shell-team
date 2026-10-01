@@ -61,7 +61,7 @@ scratch="$(mktemp -d "${TMPDIR:-/tmp}/subject01-acc.XXXXXX")" || {
   printf 'error: mktemp failed\n' >&2
   exit 1
 }
-trap 'rm -rf "$scratch"' EXIT
+# The scratch directory is left under TMPDIR (no recursive delete is used).
 
 passed=0
 failed=0
