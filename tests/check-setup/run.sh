@@ -212,6 +212,53 @@ i=0; for d in "${dirs[@]}"; do
   if cmp -s "$T/b$i" "$T/a$i"; then pass "read-only: listing $i byte-identical after every run"; else fail "read-only: listing $i changed"; fi
 done
 
+# --- starting directory and read-only root (T-1164 v2, AC18) -----------------
+# The comparator chain runs with its cwd in a scratch directory under $TMPDIR and
+# the operating base pinned, so the result is the same from the repository root,
+# a subdirectory or a read-only root, with or without a host binding.
+DB="$REPO_ROOT/templates/binding-default.conf"
+for n in rw ro hb hr; do
+  R="$T/sd-$n"; mk "$R"; sr "$R" codex-cli; mkdir -p "$R/sub/d"
+  if [ -d "$R/.codex/agents" ] && [ -d "$R/.shell-team" ]; then pass "start-dir $n: fixture is set up for the Codex CLI host"; else fail "start-dir $n: fixture setup failed"; fi
+done
+R="$T/sd-rw"
+ls -A "$R" > "$T/sd-b1"; ls -A "$R/sub/d" > "$T/sd-b2"
+check "start-dir writable: root exits 0" 0 "$(ck "$SP" "$R" --host codex-cli)"
+check "start-dir writable: sub/d exits 0" 0 "$(ck "$SP" "$R/sub/d" --host codex-cli)"
+ls -A "$R" > "$T/sd-a1"; ls -A "$R/sub/d" > "$T/sd-a2"
+if [ -s "$T/sd-b1" ] && cmp -s "$T/sd-b1" "$T/sd-a1" && cmp -s "$T/sd-b2" "$T/sd-a2"; then pass "start-dir writable: entry lists of root and sub/d unchanged"; else fail "start-dir writable: an entry appeared where the checker started"; fi
+R="$T/sd-ro"
+chmod 555 "$R/sub/d" "$R"
+if (: > "$R/probe") 2> /dev/null; then fail "start-dir read-only: precondition (the root refuses a new file) does not hold"; else pass "start-dir read-only: precondition, the root refuses a new file"; fi
+r1=$(ck "$SP" "$R" --host codex-cli); r2=$(ck "$SP" "$R/sub/d" --host codex-cli); r3=$(ck "$SP" "$R" --host claude-code)
+chmod 755 "$R" "$R/sub/d"
+check "start-dir read-only: root, codex-cli exits 0" 0 "$r1"
+check "start-dir read-only: sub/d, codex-cli exits 0" 0 "$r2"
+check "start-dir read-only: root, claude-code exits 0" 0 "$r3"
+if [ -e "$R/probe" ]; then fail "start-dir read-only: a probe file appeared"; else pass "start-dir read-only: no file appeared"; fi
+R="$T/sd-hb"; BC="$R/.shell-team/binding.conf"
+sed 's/^\(bind code-reviewer[[:space:]][[:space:]]*codex[[:space:]][[:space:]]*\)provider-configured/\1gpt-test/' "$DB" > "$BC"
+has "start-dir drifting binding: fixture binding sets the code-reviewer model" 'gpt-test' "$BC"
+h1=$(ck "$SP" "$R" --host codex-cli); lw "start-dir drifting binding: root names .codex/agents and update shell-team" .codex/agents 'update shell-team'
+h2=$(ck "$SP" "$R/sub/d" --host codex-cli); lw "start-dir drifting binding: sub/d names .codex/agents and update shell-team" .codex/agents 'update shell-team'
+check "start-dir drifting binding: root exits 1" 1 "$h1"
+check "start-dir drifting binding: sub/d exits the same as the root" "$h1" "$h2"
+R="$T/sd-hr"; mkdir "$R/.shell-team/binding.conf"
+f1=$(ck "$SP" "$R" --host codex-cli); f2=$(ck "$SP" "$R/sub/d" --host codex-cli)
+check "start-dir refusing binding: root exits 2" 2 "$f1"
+check "start-dir refusing binding: sub/d exits 2" 2 "$f2"
+R="$T/sd-rw"; mkdir -p "$R/sub/d/.shell-team/binding.conf"
+check "start-dir decoy: a binding.conf under sub/d is not read (exit 0)" 0 "$(ck "$SP" "$R/sub/d" --host codex-cli)"
+if [ -e "$R/.shell-team/binding.conf" ]; then fail "start-dir decoy: the real base gained a binding.conf"; else pass "start-dir decoy: the real base has no binding.conf"; fi
+R="$T/sd-rw"; mkdir -p "$T/tmpd"; ls -A "$T/tmpd" > "$T/sd-t0"
+x=0; (cd "$R" && TMPDIR="$T/tmpd" PATH="$SP" "$BASH" "$C" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
+ls -A "$T/tmpd" > "$T/sd-t1"
+check "scratch: an alternate TMPDIR still exits 0" 0 "$x"
+if cmp -s "$T/sd-t0" "$T/sd-t1"; then pass "scratch: the checker leaves nothing behind in TMPDIR"; else fail "scratch: TMPDIR gained entries"; fi
+x=0; (cd "$R" && TMPDIR="$T/no-such-dir" PATH="$SP" "$BASH" "$C" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
+check "scratch: an unusable TMPDIR is exit 2" 2 "$x"
+has "scratch: the message names the cause" 'scratch directory' "$T/e"
+
 # --- forbidden-token lock ------------------------------------------------------
 : > "$T/all"
 for h in codex-cli claude-code; do

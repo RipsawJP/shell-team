@@ -164,7 +164,9 @@ read-only で、ボード・specs dir・loop contract の有無、Codex CLI host
 チェッカー自身の出力とともに `BLOCKED` で止まり、plugin 側の対処としてプロンプト
 `set up shell-team`（または `update shell-team`）を案内します。host 側の条件は
 operator の判断として述べます。このチェックは別の dispatch 経路や executor へ
-差し替えず、host の設定も変更しません。
+差し替えず、host の設定も変更しません。`code-reviewer` を同系統の executor に
+再割り当てしていて相手側 provider の CLI を持たない host も、この CLI の行により
+Step 0 で止まります。
 
 **ループはセッションの root にある repository に対して動きます。** `run` は
 ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、

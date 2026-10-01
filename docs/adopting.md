@@ -159,7 +159,9 @@ stops `BLOCKED` with the checker's own output and names the prompt
 `set up shell-team` (or `update shell-team`) as the remedy for the plugin's
 part; a condition on the host's side is stated as the operator's decision. The
 check never substitutes another dispatch path or executor and never changes the
-host's configuration.
+host's configuration. A host that rebinds `code-reviewer` to a same-family
+executor and has no other-provider CLI is still stopped at Step 0 by the CLI
+line.
 
 **The loop operates on the repository your session is rooted in.** `run`
 resolves the board, specs and loop contract from the current working directory

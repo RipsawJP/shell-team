@@ -17,9 +17,12 @@
 #      gets a `- note:` line (never changes the exit status).
 #
 # Write set: none. Nothing in the repository (including .git), the plugin root,
-# $HOME or $CODEX_HOME is written; the only scratch is the unchanged
-# check-codex-agents.sh regeneration under $TMPDIR. It never chooses, asks for
-# or suggests a grant, a permission or a host setting.
+# $HOME or $CODEX_HOME is written; the only scratch is under $TMPDIR: the
+# unchanged check-codex-agents.sh regeneration, and this script's own scratch
+# directory, which is the comparator chain's cwd (it holds one symlink to the
+# resolved base and is removed by named file plus rmdir). The result does not
+# depend on the directory the checker is started from. It never chooses, asks
+# for or suggests a grant, a permission or a host setting.
 #
 # Usage:
 #   bin/check-setup.sh [--host claude-code|codex-cli]
@@ -184,8 +187,24 @@ CONTRACT_REL="$LOOPS_DIR/shell-team.contract.yaml"
 if [ "$HOST" = "codex-cli" ]; then
   AG="$ROOT/.codex/agents"
   if [ -d "$AG" ]; then
+    # The comparator chain (check-codex-agents.sh and what it calls) runs with
+    # its cwd in a scratch directory under $TMPDIR, never in the repository: a
+    # bash 3.2 here-string or here-document creates its temp file in the cwd, so
+    # a repository cwd would be written to (or fail on a read-only root). The
+    # chain's resolver (resolve-executor.sh) looks the host binding up as
+    # <base>/binding.conf relative to that cwd, and team-paths.sh refuses an
+    # absolute TEAM_RUN_BASE; so the scratch directory holds a relative-named
+    # symlink to the repository's resolved base, and TEAM_RUN_BASE names it. The
+    # chain then reads the same binding.conf (absent, a file, or a refusing
+    # occupant) that a run started at the repository root reads.
+    scratch="$(mktemp -d "${TMPDIR:-/tmp}/check-setup.XXXXXX" 2>&1)" \
+      || die "cannot create the scratch directory for the comparator under ${TMPDIR:-/tmp}: $scratch"
+    ln -s "$(abs "$BASE")" "$scratch/base-link" \
+      || die "cannot create the base link in the scratch directory $scratch"
     c_rc=0
-    c_out="$(bash "$SCRIPT_DIR/check-codex-agents.sh" --root "$PLUGIN_ROOT" --out-dir "$AG" 2>&1)" || c_rc=$?
+    c_out="$(cd "$scratch" && TEAM_RUN_BASE=base-link bash "$SCRIPT_DIR/check-codex-agents.sh" --root "$PLUGIN_ROOT" --out-dir "$AG" 2>&1)" || c_rc=$?
+    rm -f "$scratch/base-link"
+    rmdir "$scratch" 2>/dev/null || true
     case "$c_rc" in
       0) : ;;
       1)
