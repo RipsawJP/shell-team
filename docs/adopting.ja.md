@@ -156,6 +156,16 @@ FAIL を報告する。
 ボード（`<base>/todo.md`）の status flag を進め、マージ/プッシュの前に人間のために
 一時停止します。
 
+**最初の dispatch の前に、run は setup が揃っていることを確認します。** Step 0 が
+どちらの host でも `bash "<plugin root>/bin/check-setup.sh"` を 1 回実行します。
+read-only で、ボード・specs dir・loop contract の有無、Codex CLI host では
+`.codex/agents` がインストール済み plugin と同期しているか、そして `command -v`
+のみで相手側 provider の CLI の有無を調べます。満たされないものがあれば、run は
+チェッカー自身の出力とともに `BLOCKED` で止まり、plugin 側の対処としてプロンプト
+`set up shell-team`（または `update shell-team`）を案内します。host 側の条件は
+operator の判断として述べます。このチェックは別の dispatch 経路や executor へ
+差し替えず、host の設定も変更しません。
+
 **ループはセッションの root にある repository に対して動きます。** `run` は
 ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、
 起動される sub-agent もその同じツリーを読み・編集し・テストします。別の checkout を
@@ -412,7 +422,9 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
 Claude Code CLI が存在するかは `command -v claude` で確認する（実行は
 しない）。最後に `Done:`・`Already in place:`・`Remains the operator's
 decision:` の 3 部構成で報告する。plugin の upgrade 後は `update shell-team`
-と入力する——同じフローの再実行で冪等、2 回目は何も変えない。同じプロンプトは
+と入力する——同じフローの再実行で冪等、2 回目は何も変えない。run の開始時には
+`bash "<plugin root>/bin/check-setup.sh"` が同じ前提条件を read-only で確認し、
+欠けているか古い場合はこのプロンプトを案内して `BLOCKED` で止まる。同じプロンプトは
 Claude Code host でも（`.codex` の部分を除いて）同じフローを走らせる。
 setup はこれらの成果物の外には何も書かず、Codex や Claude Code の設定を
 書き込まず、承認ルールも追加しない。Codex の sandbox が書き込みを拒否した
@@ -437,8 +449,9 @@ operator の判断に残るものは報告されるだけで、変更されな�
   0.159.3 の両方の実行で export しており、必要かどうかは切り分けられて
   いない。
 - **レビュー転送**: レビュー pass はリポジトリの内容を相手側 provider
-  （Claude）へ送る。この転送を承認するかは operator の判断であり、setup
-  は承認しない。
+  （Claude、提供元は Anthropic）へ Claude Code CLI 経由で送る。承認の要求は
+  送る内容（base ref との diff・spec・ハンドオフ）と送信先を明示する。この転送
+  を承認するかは operator の判断であり、setup も run も承認しない。
 - **`.shell-team/` を git で追跡するか。**
 
 以下の番号付き手順は手動のフォールバックであり、host 側の各条件が何で、

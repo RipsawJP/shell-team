@@ -150,6 +150,17 @@ The loop runs Plan → Specify → Implement → Validate → Review, advancing 
 flag in the board (`<base>/todo.md`) at each phase gate, and pauses for a human
 before merge/push.
 
+**Before the first dispatch, the run checks that setup is in place.** Step 0
+runs `bash "<plugin root>/bin/check-setup.sh"` once, on either host. It is
+read-only: it looks for the board, the specs dir and the loop contract, on the
+Codex CLI host for `.codex/agents` in sync with the installed plugin, and, with
+`command -v` only, for the other provider's CLI. When something is unmet the run
+stops `BLOCKED` with the checker's own output and names the prompt
+`set up shell-team` (or `update shell-team`) as the remedy for the plugin's
+part; a condition on the host's side is stated as the operator's decision. The
+check never substitutes another dispatch path or executor and never changes the
+host's configuration.
+
 **The loop operates on the repository your session is rooted in.** `run`
 resolves the board, specs and loop contract from the current working directory
 (the skill's Step 0), and the sub-agents it dispatches read, edit and test that
@@ -405,7 +416,9 @@ is edited. It checks with `command -v claude` that the Claude Code CLI is
 present, without running it. And it ends with a three-part report: `Done:`,
 `Already in place:` and `Remains the operator's decision:`. After a plugin
 upgrade, type `update shell-team`: the same flow re-run, idempotent, so a
-second run changes nothing. The same prompt runs the same flow on a Claude
+second run changes nothing. At the start of every run, `bash "<plugin root>/bin/check-setup.sh"`
+checks the same prerequisites read-only and stops the run `BLOCKED`, naming this
+prompt, when one is missing or out of date. The same prompt runs the same flow on a Claude
 Code host, without the `.codex` part. Setup writes nothing outside those
 artifacts, never writes your Codex or Claude Code configuration, and never
 adds an approval rule. When the Codex sandbox refuses one of its writes (it
@@ -430,8 +443,10 @@ re-measured by it; each item below says which kind of evidence it rests on:
   exported it in both 0.159.3 runs, so whether it is necessary was not
   separated out.
 - **The review transfer**: the review pass sends repository content to
-  Claude, the other provider. Approving that transfer is the operator's
-  decision, and setup does not authorize it.
+  Claude (Anthropic), the other provider, through the Claude Code CLI. The
+  approval request names the payload (the diff against the base ref, the spec
+  and the hand-offs) and the destination. Approving that transfer is the
+  operator's decision, and neither setup nor the run authorizes it.
 - **Whether to track `.shell-team/` in git.**
 
 The numbered steps below are the manual fallback, and the record of what each
