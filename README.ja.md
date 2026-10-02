@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.7.8-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.8.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.ja.md#codex-cli-から-shell-team-を使う)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
@@ -46,7 +46,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 - Codex CLI。
 - Claude Code CLI のインストールと認証（レビュー pass 用）— 詳細は [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 7 を参照。
 
-**サンドボックス有効なセッションでは、どちらの host でも追加設定が必要**。Claude Code host では、Codex レビュー経路の sandbox 除外（`sandbox.excludedCommands`）と permission の設定を [docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) で参照。Codex CLI host では、sandbox 自身の writable-root 付与（`.git`、generator をセッション内で走らせる場合は `.codex` も）と `claude -p` レビュー pass に必要な network access を [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 6・8 で参照。
+**host 側の条件は、どちらの host でも operator の判断**。shell-team があなたの sandbox・trust・permission・network の設定を変更することはありません。セットアップ（[インストール](#インストール)）はプラグイン自身の担当分だけを行い、最後に、ループが host 側に求める条件を、何のために必要かとともに `Remains the operator's decision:` の下へ並べて報告します。Claude Code host で測定済みなのは、Codex レビュー呼び出しがセッションの sandbox の外で動くこと（関わる設定は `sandbox.excludedCommands`。[docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照）。Codex CLI host では、リポジトリの trust・コミットのための git ディレクトリへの書き込み・`claude -p` レビュー pass のための network・`<plugin root>/bin` の `PATH` 上の存在で、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に測定状況つきで書かれています。
 
 ## インストール
 
@@ -59,27 +59,35 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 /plugin install shell-team@ripsawjp
 ```
 
-上の 2 コマンドはマシンごとに 1 回だけのプラグインインストール。その後、適用先リポの per-repo データを 1 回初期化（単一 base dir `.shell-team/` にボード＋既定 Loop 契約を scaffold。host root の `CLAUDE.md` / `.gitignore` は改変しない。冪等。詳細は [docs/adopting.md](docs/adopting.md)）：
-
-```text
-/shell-team:team-init
-```
-
 **Codex CLI:**
 
 ```text
 codex plugin marketplace add RipsawJP/shell-team
 codex plugin add shell-team@ripsawjp
-bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 ```
 
-上の最初の 2 コマンドはマシンごとに 1 回だけのプラグインインストール。3 行目の generator は、適用先リポジトリそのものの root から、そのリポジトリごとに実行する — 下の `team-init.sh` の手順と同じスコープ。その後、適用先リポの per-repo データを 1 回初期化する（上の Claude Code ブロックがスラッシュコマンド経由で叩いているのと同じ host-neutral な scaffolder）：
+各ブロックの 2 コマンドはマシンごとに 1 回だけのプラグインインストール。その後、shell-team を適用するリポジトリごとに、セッション内で次のプロンプトを入力する（どちらの host でも同じプロンプト）:
 
 ```text
+set up shell-team
+```
+
+このプロンプトで setup スキル（[`skills/setup/SKILL.md`](skills/setup/SKILL.md)）が起動し、リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行する。単一 base dir `.shell-team/`（ボードと既定のループ契約）を scaffold し（host root の `CLAUDE.md` / `.gitignore` は改変しない。既存ファイルは書き換えない）、Codex CLI host ではさらに `.codex/agents/` を生成して git ディレクトリの `info/exclude` で無視するため、tracked ファイルは変わらない。これ以外は何も書かず、host の設定には触れず、最後に「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を短く報告する。host が書き込みを拒否した場合、報告には承認または自分で実行するための正確なコマンドが 1 つ出る。冪等。
+
+プロンプトが自動化している手動の手順は、Claude Code host では次のスラッシュコマンド:
+
+```text
+/shell-team:team-init
+```
+
+Codex CLI host では generator と scaffolder を、リポジトリそのものの root から実行する:
+
+```text
+bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 bash "<plugin root>/bin/team-init.sh" .
 ```
 
-この 3 行だけが手順の全てではない: インストール済み plugin root の特定・生成されたエージェントの `.gitignore` 登録・リポジトリの trust・sandbox の writable roots・Claude Code CLI という前提・ネットワークアクセス・`PATH` の export は、それぞれ [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
+インストール済み plugin root の特定・生成されたエージェントの無視・host 側の各条件（リポジトリの trust・コミットのための書き込み・Claude Code CLI という前提・レビュー pass のための network・`PATH` の export）は、測定状況とともに [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に手順として書かれている。
 
 Codex CLI の orchestrator がどの instruction 面を自動で読み込むかは、**このリポジトリからは測定**できていません。拠り所にするのは上でリンクした runbook の手順です。ループ自身の停止点はどちらの host でも同じで、**マージ**と **push** はあなたの判断のまま、独立レビュアーに到達できない場合は同一ファミリーへ黙って切り替えず `BLOCKED` を返します。
 
@@ -104,7 +112,15 @@ Codex CLI の orchestrator がどの instruction 面を自動で読み込むか�
 codex plugin marketplace upgrade ripsawjp
 ```
 
-upgrade の後は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従うこと。そのうえで、shell-team を使っている適用先リポジトリごとに、そのリポジトリそのものの root から generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
+upgrade の後は、shell-team を使っている適用先リポジトリごとに、セッション内で次のプロンプトを入力する（どちらの host でも同じプロンプト）:
+
+```text
+update shell-team
+```
+
+`set up shell-team` と同じフローの再実行で、Codex CLI host ではずれた `.codex/agents/` を再生成し、新しいテンプレートと内容が異なる scaffold ファイルは書き換えずに一覧し、「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を報告する。2 回目の実行では何も変わらない。
+
+Codex CLI host での手動の手順は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従い、そのうえでリポジトリそのものの root から generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
 
 更新の全体像・バージョン方針・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
@@ -117,6 +133,8 @@ build sha と uptime を返す /healthz を shell-team で追加して
 ```
 
 メインの Claude セッションが非自明な依頼を認識し、チームのループ（Plan → Specify → Implement → Validate → Review）を回して、マージ前には必ず一時停止してあなたを待ちます。スラッシュコマンドを打たずに Codex による別プロバイダレビューが得られるのと同じ経路です。会話モデルの詳細・追加の会話例・チャットから**フルループ**を確実に発火させるための唯一の opt-in ステップは [docs/usage-conversational.md](docs/usage-conversational.md) を参照。
+
+最初の役割を dispatch する前に、run はどちらの host でも、setup が存在すること（Codex CLI host では `.codex/agents` に role ファイルがあること）を `bash "<plugin root>/bin/check-setup.sh"` で（read-only で）確認します。足りないものがあれば、そのチェック自身の出力とともに `BLOCKED` で止まり、plugin 側の対処として `set up shell-team`（または `update shell-team`）を案内します。host 側の条件はあなたの判断として報告するだけで、何も変更せず、代替もしません。
 
 Claude Code host では、明示的に使いたいときにエージェントやスキルを単体でも起動できます — 以下はいずれも Claude Code のスラッシュコマンドとエージェント指名です。Codex CLI host に同じ形のスラッシュコマンドはなく、[runbook](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 自身の dispatch が上の 5 役割を直接駆動します:
 
@@ -177,6 +195,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 │   ├── review/SKILL.md              # /shell-team:review
 │   ├── review-response/SKILL.md     # /shell-team:review-response（受領レビュー指摘のトリアージ）
 │   ├── team-init/SKILL.md           # /shell-team:team-init（リポを scaffold）
+│   ├── setup/SKILL.md               # "set up shell-team" / "update shell-team"（両 host 共通）
 │   └── loop-triage/SKILL.md         # /shell-team:loop-triage（作業を発見）
 ├── bin/                             # `bash "<plugin root>/bin/<script>"` として起動
 │   ├── check-handoff.sh             # tasks/todo.md ハンドオフ linter
@@ -186,6 +205,8 @@ Claude Code host では、明示的に使いたいときにエージェントや
 │   ├── gen-loop-replay.sh           # run のテレメトリを HTML リプレイページに描画
 │   ├── discover-work.sh             # read-only triage 発見エンジン
 │   ├── team-init.sh                 # 適用先リポ scaffolder
+│   ├── team-setup.sh                # setup プロンプトのスクリプト（scaffold・Codex エージェント・報告）
+│   ├── check-setup.sh               # read-only の run 開始時チェック（この host 向けに setup が存在するか）
 │   └── install                      # 旧 vendoring フォールバック
 ├── templates/                       # team-init が使う generic scaffold
 ├── docs/

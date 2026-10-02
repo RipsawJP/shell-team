@@ -35,19 +35,27 @@ codex plugin marketplace add RipsawJP/shell-team
 codex plugin add shell-team@ripsawjp
 ```
 
-そのうえで、リポジトリそのものの root から、Codex が dispatch するカスタムエージェントを生成します — **リポジトリごと**であり、マシンごとではありません:
+そのうえで、shell-team を適用するリポジトリごとに — **リポジトリごと**であり、マシンごとではありません — セッション内で `set up shell-team` と入力します（下の `## ターゲットリポジトリへの導入` を参照）。Codex CLI host では、setup が Codex の dispatch するカスタムエージェントを `.codex/agents` に生成します。手で行うなら、リポジトリそのものの root から次の手順です:
 
 ```
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 ```
 
-リポジトリの trust・sandbox の writable roots・network 許可など、ここでは触れないセットアップの残りは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
+リポジトリの trust・sandbox の書き込みポリシー・レビュー pass のための network・`PATH` など、host 側の条件はここでは触れません。いずれも operator の判断であり、何が測定されているかは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照してください。
 
 **Claude Code** では、プラグインの各エージェントは `/shell-team:<agent>`、スキルは `/shell-team:<skill>`（例: `/shell-team:run`）として解決されます。**Codex CLI** では、代わりに role の生成済みカスタムエージェントが Codex 自身の `spawn_agent` tool で dispatch されます — 詳細は [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) を参照。どちらの host でも、`bin/` スクリプトは `bash "<plugin root>/bin/<script>"` として起動します——プラグインが有効でも `PATH` に載るとは限りません。`<plugin root>` は自ホストの報告値から読んでください（[adopting.ja.md](adopting.ja.md) の "Locate the installed plugin root" 手順を参照）。
 
 ## ターゲットリポジトリへの導入
 
-インストール後、リポジトリのプロジェクトごとのデータを 1 回初期化します。すべては単一のベースディレクトリ配下に作られます（デフォルトは `.shell-team/`。`TEAM_RUN_BASE` で上書き可。既存のレガシー `tasks/`+`docs/specs/` レイアウトは検出され再利用される）: `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` に加えて自己完結した `.shell-team/.gitignore`。ホストルートには手を触れません — `CLAUDE.md` の編集も**無し**、ルート `.gitignore` の変更も**無し**（[adopting.ja.md](adopting.ja.md) 参照）:
+インストール後、導入したいリポジトリでセッション内に次のプロンプトを入力します。どちらの host でも同じプロンプトです:
+
+```text
+set up shell-team
+```
+
+setup スキルがリポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行します。プロジェクトごとのデータを初期化し（下の scaffold を `team-init.sh` 経由で。既存ファイルは書き換えません）、Codex CLI host ではさらに `.codex/agents` を生成して git ディレクトリの `info/exclude` で無視します。これ以外は何も書かず、host の設定には触れません。最後に「何をしたか・すでに済んでいたもの・operator の判断に残るもの」を報告します。プラグインの更新後は、導入済みのリポジトリごとに `update shell-team` と入力します——同じフローの再実行で、冪等です。
+
+scaffold の中身: すべては単一のベースディレクトリ配下に作られます（デフォルトは `.shell-team/`。`TEAM_RUN_BASE` で上書き可。既存のレガシー `tasks/`+`docs/specs/` レイアウトは検出され再利用される）: `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` に加えて自己完結した `.shell-team/.gitignore`。ホストルートには手を触れません — `CLAUDE.md` の編集も**無し**、ルート `.gitignore` の変更も**無し**（[adopting.ja.md](adopting.ja.md) 参照）。Claude Code host で手で行うなら:
 
 ```text
 /shell-team:team-init
@@ -80,7 +88,7 @@ Claude Code セッションが **sandbox 有効**で動いているとき、Code
 
 **一致のルールは Claude Code 2.1.278 で変わりました。** それ以前は `sandbox.excludedCommands` のパターンはコマンドラインの先頭トークンだけに一致していたため、行末にシェルのリダイレクトが付いていても `codex exec …` 行は除外対象のままでした。Claude Code 2.1.278 はこれを変更し、コマンドの**すべての部分**が一致したときだけ除外されるようになりました（先頭トークンだけではありません。計測日 2026-09-24、Claude Code **2.1.281**、codex-cli **0.156.1**）。このプラグインが出荷していた `codex exec` ブロックはどれも `> "<jsonl の生パス>" 2>&1` で終わっていたため、2.1.278 以降ではこのリダイレクトが一致しない 2 つめの部分となり、呼び出し全体が sandbox の**内側**で走っていました——うるさく失敗する形（`workspace routing discovery failed` → `turn.failed`、exit 1、最終メッセージのファイルは書かれない）か、静かに失敗する形（exit 0、`Unable to determine.` のような判断不能文、イベントストリームに `sandbox_apply` エラー）のいずれかです。リダイレクトを持たない裸の形は、2.1.278 以降でも、それより前のどのバージョンでも sandbox の外側で走り、正常に完了します。出荷される `codex exec` ブロックは今はすべて、自分自身の `-o` キャプチャだけを書く単一の裸コマンドです——リダイレクトも、標準入力のリダイレクトも、コマンド置換も、connector もありません。これにより `"codex *"` の除外パターンが呼び出し全体に再び一致します。
 
-`.claude/settings.local.json` に `sandbox.excludedCommands` の形を追加すると、直接 `codex` を呼ぶ経路がカバーされます。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です:
+Codex の経路を sandbox の外に置くかどうかは operator の判断であり、shell-team があなたの設定ファイルを書き込むことはありません。operator 自身の `.claude/settings.local.json` にある次の形が、直接 `codex` を呼ぶ経路をカバーするものです。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です。setup は Claude Code host で、この条件を `Remains the operator's decision:` の下に報告します:
 
 ```json
 {
@@ -121,7 +129,7 @@ Codex CLI host 側でも同様に、cross-provider レビューの `claude -p` �
 codex plugin marketplace upgrade ripsawjp
 ```
 
-`codex plugin list` に載っていることは最新であることを意味しません: スキップする前に、その `VERSION` 列を実行したいリリースと比較してください。古ければ `codex plugin add shell-team@ripsawjp` を再実行します。いずれの場合も、リポジトリそのものの root から、適用先リポジトリごとに generator を再実行して確認します（checker は `--out-dir` しか読まないため）:
+どちらの更新の後も、導入済みのリポジトリごとに `update shell-team` と入力します。Codex CLI host ではずれた `.codex/agents` を再生成し、新しいテンプレートと内容が異なる scaffold ファイルは書き換えずに一覧し、operator の判断に残るものを報告します。`codex plugin list` に載っていることは最新であることを意味しません: スキップする前に、その `VERSION` 列を実行したいリリースと比較してください。古ければ `codex plugin add shell-team@ripsawjp` を再実行します。手で行うなら、リポジトリそのものの root から、適用先リポジトリごとに generator を再実行して確認します（checker は `--out-dir` しか読まないため）:
 
 ```
 bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents

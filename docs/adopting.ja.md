@@ -156,6 +156,18 @@ FAIL を報告する。
 ボード（`<base>/todo.md`）の status flag を進め、マージ/プッシュの前に人間のために
 一時停止します。
 
+**最初の dispatch の前に、run は setup が揃っていることを確認します。** Step 0 が
+どちらの host でも `bash "<plugin root>/bin/check-setup.sh"` を 1 回実行します。
+read-only で、ボード・specs dir・loop contract の有無、Codex CLI host では
+`.codex/agents` と生成された 5 つの role ファイルの有無（存在のみ・内容は比較
+しません）、そして `command -v` のみで相手側 provider の CLI の有無を調べます。満たされないものがあれば、run は
+チェッカー自身の出力とともに `BLOCKED` で止まり、plugin 側の対処としてプロンプト
+`set up shell-team`（または `update shell-team`）を案内します。host 側の条件は
+operator の判断として述べます。このチェックは別の dispatch 経路や executor へ
+差し替えず、host の設定も変更しません。`code-reviewer` を同系統の executor に
+再割り当てしていて相手側 provider の CLI を持たない host も、この CLI の行により
+Step 0 で止まります。
+
 **ループはセッションの root にある repository に対して動きます。** `run` は
 ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、
 起動される sub-agent もその同じツリーを読み・編集し・テストします。別の checkout を
@@ -404,6 +416,48 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
 役割名 `code-reviewer` は両 host で変わらない——ここでは歴史的な名前に
 過ぎず、実際にレビューするのは Codex ではなく Claude である（手順 10 参照）。
 
+**近道: セッション内で `set up shell-team` と入力する。** setup スキルが
+リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行し、plugin
+自身の担当分を行う。`team-init.sh` で `.shell-team/` を scaffold し（既存
+ファイルは書き換えない）、`.codex/agents/` を生成または更新して git
+ディレクトリの `info/exclude` で無視する（tracked ファイルは編集しない）。
+Claude Code CLI が存在するかは `command -v claude` で確認する（実行は
+しない）。最後に `Done:`・`Already in place:`・`Remains the operator's
+decision:` の 3 部構成で報告する。plugin の upgrade 後は `update shell-team`
+と入力する——同じフローの再実行で冪等、2 回目は何も変えない。run の開始時には
+`bash "<plugin root>/bin/check-setup.sh"` が同じ前提条件を read-only で確認し、
+欠けている場合はこのプロンプトを案内して `BLOCKED` で止まる（存在のみの確認で、内容が古い role ファイルは run 開始時チェックを通り、`update shell-team` が報告する）。同じプロンプトは
+Claude Code host でも（`.codex` の部分を除いて）同じフローを走らせる。
+setup はこれらの成果物の外には何も書かず、Codex や Claude Code の設定を
+書き込まず、承認ルールも追加しない。Codex の sandbox が書き込みを拒否した
+場合（既定で `.codex/` の作成と `.git/` への書き込みを拒否する）、報告に
+は、書き込み先がその plugin 成果物 1 つに限られる正確なコマンドが 1 つ
+出力されるので、host のコマンド単位の承認で通すか、自分で実行する。
+
+operator の判断に残るものは報告されるだけで、変更されない。2026-10-01 の
+`codex-cli 0.159.3` での実行はこのリポジトリに伝達されたもので、ここで
+再測定したものではない。各項目に証拠の種類を付す:
+
+- **リポジトリの trust**（手順 5）: `.codex/agents/` のプロジェクト agent は
+  trusted なリポジトリでのみ発見される。0.159.3 での伝達: host 自身の
+  初回起動時 trust プロンプトで足りた。
+- **commit のための git ディレクトリへの書き込み**（手順 6）: 0.154.0 で
+  実測、sandbox は既定で `.git/` 配下への書き込みを拒否する。
+- **Claude 側レビュー pass のための network**（手順 8）: 0.159.3 での伝達:
+  レビューの `claude -p` 呼び出しは host 自身のコマンド単位の承認のもとで
+  sandbox の外で走ったため、そのための network 設定は不要だった。0.154.0 の
+  network 実測はこの経路では stale である。
+- **`<plugin root>/bin` の `PATH` 上の存在**（手順 9）: 未確定。operator は
+  0.159.3 の両方の実行で export しており、必要かどうかは切り分けられて
+  いない。
+- **レビュー転送**: レビュー pass はリポジトリの内容を相手側 provider
+  （Claude）へ送る。この転送を承認するかは operator の判断であり、setup
+  は承認しない。
+- **`.shell-team/` を git で追跡するか。**
+
+以下の番号付き手順は手動のフォールバックであり、host 側の各条件が何で、
+それについて何が測定されているかの記録である。
+
 1. **Codex CLI にこの plugin をインストールする**（まだの場合）。
    `codex plugin list` が `shell-team` を厳密に `installed, enabled` と
    報告していても、まだこの手順を終えたと思わないこと: `codex plugin
@@ -461,8 +515,8 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
    直前に既に挙げたもう一つの代替——この repository の checkout を
    `<plugin root>` として使う——を選んでもよい。こちらはインストールも
    upgrade も一切不要。
-3. **自分自身のシェルから generator を実行する**——adopt した
-   repository 自身の root で:
+3. **setup が generator を実行してくれる。手で実行するなら自分自身の
+   シェルから**——adopt した repository 自身の root で:
 
    ```
    bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
@@ -483,28 +537,28 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
    単純な経路。Codex 自身にこのコマンドをセッション内で実行させたい場合は
    手順 6 を見ること——`.git/` への書き込みを拒否するのと同じ sandbox が、
    `.codex/` 自体の作成も拒否する。
-4. **自分自身の repository の `.gitignore` に `.codex/agents` を追加し、
-   ループを開始する前にその変更を commit する**（この repository
-   自身のエントリを踏襲する）——あるいは、tracked file に一切触れたく
-   なければ代わりに `.git/info/exclude` にエントリを追加してもよい
-   （commit 不要）。生成された TOML は再現可能でコミット対象ではなく、
-   un-ignore のまま放置した `.codex/agents/`、あるいは commit されない
-   ままの `.gitignore` の変更は、どちらも `git status --short` を
-   非空にし、ループ自身の T-073 clean-tree チェックを
+4. **`.codex/agents` を無視する。setup は `.git/info/exclude` で行い、
+   commit は不要で tracked file も編集しない。** 手で行うなら、同様に
+   `.git/info/exclude` にエントリを追加するか、自分自身の repository の
+   `.gitignore` に追加して（この repository 自身のエントリを踏襲する）、
+   ループを開始する前にその変更を commit する。生成された TOML は再現可能で
+   コミット対象ではなく、un-ignore のまま放置した `.codex/agents/`、あるいは
+   commit されないままの `.gitignore` の変更は、どちらも
+   `git status --short` を非空にし、ループ自身の T-073 clean-tree チェックを
    Implement-to-Validate の継ぎ目で引っかける。
-5. **セッションを開始する前に、その repository へ Codex trust を付与する。**
-   Codex がプロジェクトレベルの custom agent を `<repo>/.codex/agents/` から
-   発見するのは、repository が trusted な場合に限る——untrusted な状態や
-   `--skip-git-repo-check` での実行では、手順 3 が既に何を
-   書き出していても、これらの agent は一切見えない。
-   `-c 'projects."<repo>".trust_level="trusted"'` を `codex` の invocation
-   に付けて付与する（`<repo>` はここでも adopt した repository 自身の
-   **絶対パス**——下の手順 6 の writable-roots オーバーライドと同じ
-   placeholder）。あるいは Codex の `config.toml` に同等の
-   `[projects."<repo>"]` `trust_level = "trusted"` エントリを設定してもよい。
-6. **`.git` への sandbox 書き込みを許可する——さらに、Codex 自身が
-   手順 3 の generator をセッション内で実行する場合に限り `.codex` も。**
-   実測（codex-cli 0.154.0）:
+5. **リポジトリの trust は operator の判断である。** Codex がプロジェクト
+   レベルの custom agent を `<repo>/.codex/agents/` から発見するのは、
+   repository が trusted な場合に限る——untrusted な状態や
+   `--skip-git-repo-check` での実行では、手順 3 が既に何を書き出していても、
+   これらの agent は一切見えない。host はこの判断を自身の設定の
+   `projects."<repo>".trust_level` キーに記録するか、`codex` の invocation の
+   `-c` オーバーライドとして受け取る（`<repo>` はここでも adopt した
+   repository 自身の**絶対パス**）。setup がこれを設定することはない。
+   証拠: 発見の規則は 0.154.0 での実測のとおり。0.159.3 での伝達: host
+   自身の初回起動時 trust プロンプトで足りた。
+6. **`.git` への、そして Codex 自身が手順 3 の generator をセッション内で
+   実行する場合は `.codex` への、sandbox の書き込みポリシーは operator の
+   判断である。** 実測（codex-cli 0.154.0）:
    `codex exec --sandbox workspace-write` は実際のファイルシステム権限に
    関係なく `.git/` 配下へのあらゆる書き込みを拒否し
    （`Operation not permitted`、exit 128）——これは `engineer` が
@@ -514,26 +568,25 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
    （`mkdir: .codex: Operation not permitted`）——これは Codex が手順 3 を
    自分自身のシェルからではなくセッション内で実行しようとしたときに
    `gen-codex-agents.sh` 自身の `--out-dir` への `mkdir -p` を止める。
-   `check-codex-agents.sh`（手順 11）は `--out-dir` を一切作成しない——
-   スクラッチ再生成と比較読み取りするだけなので、セッション内で実行しても
-   この付与は不要。手順 3 を（既定として書いているとおり）自分自身の
-   シェルから実行すれば、`.codex` の拒否は一切発生しない——役割自身の
-   commit だけが `.git` への書き込みを必要とするため。該当する方を
-   invocation の sandbox writable roots に追加する——commit だけなら
-   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git"]'`、
-   Codex 自身が手順 3 をセッション内で実行するなら
-   `-c 'sandbox_workspace_write.writable_roots=["<repo>/.git","<repo>/.codex"]'`
-   ——または Codex の `config.toml` の `[sandbox_workspace_write]` に
-   同じキーを設定する。`--sandbox danger-full-access` でも通るが、
-   sandbox 全体を失う代償を伴う。（Codex 自身のもう一つの設定
-   ディレクトリ `.agents` も同様に拒否されるが、このループはそこには
-   何も書き込まない。）
+   これを支配する host の設定は `sandbox_workspace_write` テーブルで、その
+   `writable_roots` キーが sandbox の書き込める先を列挙する。setup がこれを
+   書き込むことはない。setup 自身がセッション内で走って sandbox に書き込みを
+   拒否された場合も、より広いポリシーを求めることはしない: 出力された
+   1 つのコマンドについて host 自身のコマンド単位の承認に委ねるか、その
+   コマンドをあなたが実行するよう残す。`check-codex-agents.sh`（手順 11）は
+   `--out-dir` を一切作成しない——スクラッチ再生成と比較読み取りするだけ
+   なので、セッション内で実行しても `.codex` への書き込み権限は不要。手順 3
+   を（既定として書いているとおり）自分自身のシェルから実行すれば、`.codex`
+   の拒否は一切発生しない——役割自身の commit だけが `.git` への書き込みを
+   必要とするため。（Codex 自身のもう一つの設定ディレクトリ `.agents` も
+   同様に拒否されるが、このループはそこには何も書き込まない。）
 7. **この host に Claude Code CLI が既にインストール・認証済みであることを
    ——Codex セッションの外で、それを内側で当てにする前に——確認する
    （T-1135）。** レビュー pass（手順 8 と 10）は実際に `claude -p` の
    **子プロセス**を走らせるが、「インストールされていない」と「認証され
    ていない」は別の失敗モードで症状も別——まずバイナリの有無を
-   `command -v claude` で確認する。何も返らなければ（exit 1）CLI 自体が
+   `command -v claude` で確認する（setup が行うのはこの確認だけで、`claude`
+   自体は実行しない）。何も返らなければ（exit 1）CLI 自体が
    無いということで、シェルはアプリ側のメッセージが出る前に
    `command not found` で失敗する——先にインストールする。
    `command -v claude` が見つけたのに未認証なら、`claude -p` の
@@ -543,39 +596,39 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
    シェルで確認する: `claude -p "reply with the single word ok"` は `ok`
    を出力し exit `0` になるはず。もしログインプロンプトや認証エラーが
    出るなら、まずそれを解決する（`claude /login`、あるいは自組織の
-   Claude Code provisioning 手順）——手順 8 の network 許可はこの
-   どちらの前提条件の代わりにもならず、それを許可してもバイナリ不在や
+   Claude Code provisioning 手順）——手順 8 の network 設定はこの
+   どちらの前提条件の代わりにもならず、それを変えてもバイナリ不在や
    認証の失敗は直らない。
-8. **Claude 側のレビュー pass が必要とする sandbox network access を
-   許可する（T-1135）——そしてその `Not logged in` を手順 7 のものと
-   区別する。** 実測（codex-cli 0.154.0、Claude Code CLI 2.1.268）:
+8. **Claude 側のレビュー pass のための network は operator の判断であり、
+   その `Not logged in` は手順 7 のものと区別する（T-1135）。** 実測
+   （codex-cli 0.154.0、Claude Code CLI 2.1.268）:
    sandbox の既定値 `sandbox_workspace_write.network_access = false` の
    もとでは、手順 10 のレビュー pass が実行する `claude -p` の invocation
    は、手順 7 自身の認証失敗が出すのと同一の `Not logged in · Please run
    /login` というメッセージで失敗する——しかし原因は別であり、対処法も
    異なる。両者を区別するには、手順 7 自身の Codex 外での sanity call が
    どうだったかを見る: その呼び出しが Codex セッションの**外**で既に
-   失敗していたなら、原因は認証であり——`/login` が対処法で、この
-   network 許可は役に立たない。同じ呼び出しが Codex セッションの外では
+   失敗していたなら、原因は認証であり——`/login` が対処法で、sandbox の
+   network 設定は関係しない。同じ呼び出しが Codex セッションの外では
    **通っていた**のに、セッションの**内側**でレビュー pass が同一の
    メッセージで失敗するなら、原因はこの sandbox 自身の network 拒否で
-   あり、ここでは `/login` は何も直さない。network を許可するには
-   `codex` の invocation に `-c
-   'sandbox_workspace_write.network_access=true'` を付けるか、Codex の
-   `config.toml` の `[sandbox_workspace_write]` に同等の
-   `network_access = true` エントリを設定する。`--sandbox
-   danger-full-access` でも通るが、sandbox 全体を失う代償を伴い、他に
-   必要な場面はない。
-9. **`codex` を起動する前に `<plugin root>/bin` を `PATH` に export する
-   （T-1135）。** spawn された Codex custom agent は親プロセス自身の
-   `PATH` を継承するので、`codex` を起動するシェルで（セッション内から
-   ではなく、起動する**前に**）`export PATH="<plugin root>/bin:$PATH"`
-   を実行しておくことが、spawn された役割の裸の名前による `bin/*.sh`
-   呼び出し（`team-paths.sh`・`check-acs.sh`・`check-handoff.sh` など、
-   役割プロースが実際に呼んでいるとおりの名前）をセッション内で実際に
-   解決可能にする。この手順を省略しても役割プロースの内容自体は変わらない
-   ——変わるのは、それらの呼び出しがスクリプトを見つけられるかどうかで
-   ある。
+   あり、ここでは `/login` は何も直さない。その sandbox の network 設定は
+   `sandbox_workspace_write` テーブルの `network_access` キーで、setup が
+   これを書き込むことはない。証拠は一様ではない: 上の実測は、このリポジトリに
+   伝達された 0.159.3 の実行については stale である——そこではレビューの
+   `claude -p` 呼び出しが host 自身のコマンド単位の承認のもとで sandbox の
+   外で走ったため、network 設定は不要だった。
+9. **`codex` を起動するときに `<plugin root>/bin` が `PATH` 上にあるかは
+   operator の判断であり、その必要性は未確定である（T-1135）。** spawn された
+   Codex custom agent は親プロセス自身の `PATH` を継承するので、`codex` を
+   起動するシェルで（セッション内からではなく、起動する**前に**）
+   `export PATH="<plugin root>/bin:$PATH"` を実行しておけば、spawn された
+   役割の裸の名前による `bin/*.sh` 呼び出し（`team-paths.sh`・
+   `check-acs.sh`・`check-handoff.sh` など、役割プロースが実際に呼んでいる
+   とおりの名前）をセッション内で解決可能にできる。これが無くても役割
+   プロースの内容自体は変わらない——変わるのは、それらの呼び出しがスクリプトを
+   見つけられるかどうかである。証拠: operator は伝達された 0.159.3 の両方の
+   実行で export しており、そこで必要だったかどうかは未確定である。
 10. その repository で Codex CLI セッションを開始し、Codex 自身の
     `spawn_agent` ツールで生成済み agent（`shell-team-tech-lead`・
     `shell-team-pm-spec`・`shell-team-engineer`・`shell-team-qa-verifier`・
@@ -608,8 +661,8 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
     push し、スペックが指定する base に対してプルリクエストを開き、
     マージ——そしてマージの GO——は人間のものであり続ける。
 11. **役割ファイルを編集した後、プラグインをアップグレードした後、または
-    自分自身の `binding.conf` や `TEAM_RUN_BASE` を変更した後は、手順 3 と
-    同じコマンドを再実行する。** 生成された TOML は解決済みの binding row
+    自分自身の `binding.conf` や `TEAM_RUN_BASE` を変更した後は、
+    `update shell-team` と入力するか、手順 3 と同じコマンドを手で再実行する。** 生成された TOML は解決済みの binding row
     （各役割がどの provider・model・effort・adapter に bind されるか）にも
     依存するため、役割ファイルが変わっていなくても rebind によって手順 3 が
     生成すべき内容は変わる——そして `bin/check-codex-agents.sh` は drift を
@@ -620,7 +673,7 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
     現在のソースとの drift を報告するので、再実行が必要かを機械的に
     確認できる。これは自分自身のシェルから実行しても、Codex にセッション内
     で実行させても構わない——`--out-dir` を比較のために読み取るだけで、
-    作成も書き込みもしないため、`.codex` の writable-root 付与は不要。
+    作成も書き込みもしないため、`.codex` への書き込み権限は不要。
 
 **誠実な限界を、発見させるのではなく明示する。** 生成された各 agent の
 `sandbox_mode` は、その役割の `agents/<role>.md` frontmatter `tools:` リストから
@@ -647,12 +700,12 @@ invocation 自体が Codex の sandbox の内側で走る時に初期化に失�
 is disabled for the rest of this session`）——これが起きても、この pass
 を実際に閉じ込めているものは変わらない。`--sandbox workspace-write` 自身が `.git/` への書き込みを拒否するのも、
 この plugin 側で抑制できるものではない——Codex CLI 自身のポリシーであり、
-上記の writable-roots の手順でのみ回避できる。同じ sandbox のポリシーは
+変えられるのは operator だけである（手順 6）。同じ sandbox のポリシーは
 `.codex/` 自体の作成・書き込みも拒否し、これは Codex が手順 3 の
 generator を自分自身のシェルからではなくセッション内で実行することを
-妨げる——`.codex` にも及ぶ同じ writable-roots の対処法は手順 6 を見ること。
+妨げる——手順 6 を見ること。
 手順 11 の checker は `--out-dir` を作成も書き込みもせず読むだけなので、
-セッション内で実行してもこの付与は不要。spawn された役割が実際にどの
+セッション内で実行してもこの書き込み権限は不要。spawn された役割が実際にどの
 model・reasoning effort で走るか: 出荷時の既定 binding では、5 つの役割
 いずれについても `model` も `model_reasoning_effort` も emit されないため、
 それぞれが親の Codex セッション自身の設定を継承する——`binding.conf` の

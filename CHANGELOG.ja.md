@@ -6,6 +6,10 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.8.0**
+  - **セッションの中で「set up shell-team」（または「update shell-team」）と頼むだけで、どちらのホストでも今の repository のセットアップが済む。** 新しい `setup` skill（Claude Code と Codex CLI で同じファイル）が `bin/team-setup.sh` を実行する。スクリプトは変更のない `team-init` で board を用意し、Codex CLI ホストではさらに `.codex/agents/` を生成して `.git/info/exclude` に ignore 行を足す。最後に、行ったこと・すでにあったこと・operator が決めることを報告する。どちらのホストでも sandbox・trust・permission・network の設定は書かず、許可も求めない。ホストに書き込みを拒否されたときは、自分で実行するコマンドを 1 つ示す。書き込み先が repository の外に解決されるとき（symlink 経由を含む）は、何も書く前に止まる。アップグレード後にもう一度実行すれば更新になる。README と adopting ガイドは、手作業の手順書ではなくこのプロンプトを先頭に書き直した。（#640）
+  - **run skill は最初の dispatch の前に、セットアップが済んでいるかを読むだけで確かめる。** `bin/check-setup.sh` は、scaffold の欠落、Codex CLI ホストでの `.codex/agents` の role ファイルの欠落、相手 provider の CLI の欠落（`command -v` で確かめ、実行はしない）を報告する。そのとき run skill は検査の出力をそのまま付けて `BLOCKED` で止まり、直し方として setup のプロンプトを示し、ホスト側の条件は operator が決めることとして伝える。何も書かず、どのディレクトリから実行しても結果は同じ。role ファイルの中身が古いかは run 開始時には見ない。それは `update shell-team` が報告する。（#640）
+  - **ループのロール向けの教訓を 2 つ追加。** コマンドを拒否されたら、拒否の文をそのまま付けて `BLOCKED` で報告する。別の形で再試行したり、黙って飛ばしたりしない。「起きないこと」を確かめる検査には、同じ経路で実際に発火する canary を陽性対照として使う。
 - **v2.7.8**
   - **shell-team からエージェントが実行するものは、再帰的に削除しない。** 一時ディレクトリを再帰削除で後始末していた `bin/` の 8 ツール（`aggregate-verdicts.sh`・`check-board-headings.sh`・`check-codex-agents.sh`・`check-commit-identity.sh`・`check-fanout-instances.sh`・`check-pii-shapes.sh`・`check-review-input.sh`・`derive-populations.sh`）は、自分が作ったファイルだけを名前で消し、最後にディレクトリを `rmdir` する（空でないディレクトリは消せない）。後始末が失敗しても、ツールの終了ステータスは変わらない。（#641）
 - **v2.7.7**
