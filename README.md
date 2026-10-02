@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.8.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.8.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.md#using-shell-team-from-codex-cli)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
@@ -72,7 +72,7 @@ Both commands in each block above are the once-per-machine plugin install. Then,
 set up shell-team
 ```
 
-The prompt triggers the setup skill ([`skills/setup/SKILL.md`](skills/setup/SKILL.md)), which runs `bash "<plugin root>/bin/team-setup.sh"` from the repository. It scaffolds the single `.shell-team/` base dir (the board and the default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; existing files are never rewritten). On a Codex CLI host it also generates `.codex/agents/` and ignores it through the git directory's `info/exclude`, so no tracked file changes. It writes nothing else, never touches a host setting, and ends with a short report: what was done, what was already in place, and what remains your decision. Where your host refuses one of its writes, the report prints the one exact command to approve or run yourself. It is idempotent.
+The prompt triggers the setup skill ([`skills/setup/SKILL.md`](skills/setup/SKILL.md)), which runs `bash "<plugin root>/bin/team-setup.sh"` from the repository. It scaffolds the single `.shell-team/` base dir (the board and the default loop contract; host root files like `CLAUDE.md` and `.gitignore` are left untouched; existing files are never rewritten). On a Codex CLI host it also generates `.codex/agents/` and ignores it through the git directory's `info/exclude`, so no tracked file changes. It writes nothing else, never touches a host setting, and ends with a short report: what was done, what was already in place, and what remains your decision. Where your host refuses one of its writes, the report prints the one exact command to approve or run yourself. On a Codex CLI host, agents that setup generated or changed take effect in a new Codex session started in this repository, so start the loop there. It is idempotent.
 
 The manual path, which the prompt automates, is this slash command on a Claude Code host:
 

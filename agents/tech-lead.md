@@ -63,7 +63,7 @@ Return a markdown block in this exact shape:
 
 ### Hand-off artifacts
 - `tasks/todo.md` entry: T-XXX
-- Spec: `docs/specs/<slug>.md` (if non-trivial)
+- Spec: `docs/specs/<slug>.md`
 - Status flags: READY_FOR_ARCH → READY_FOR_ENG → READY_FOR_QA → READY_FOR_REVIEW → READY_FOR_MERGE
 
 ### Dispatch
@@ -79,7 +79,7 @@ Return a markdown block in this exact shape:
 ## Rules
 
 - Sub-agents cannot call other sub-agents directly — the **main session** must invoke each step in order. Your map is what the main session follows.
-- If the change is trivial (single typo, one-line fix), say so and recommend skipping the team workflow.
+- If the change is trivial (single typo, one-line fix), say so and route it to `pm-spec` in trivial mode (a minimal board entry and spec) so the records the loop's seams need still exist.
 - If the request is ambiguous, route step 1 to `pm-spec` to clarify before anything else.
 - Include `ui-designer` **only** when the task involves UI work (see the detection rules above). Non-UI tasks must not route to `ui-designer`.
 - Never write files. Never run mutating commands. If you find yourself wanting to, stop and add it as a step in the map.

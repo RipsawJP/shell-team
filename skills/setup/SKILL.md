@@ -64,6 +64,15 @@ Do this:
    tool, as `docs/adopting.md`'s "Using shell-team from Codex CLI" section
    describes.
 
+   On the Codex CLI, tell the operator to start a new Codex session in this
+   repository and start the loop there (roles generated during a running
+   session are not selectable until the next one) whenever any setup report in
+   this session printed the `- new Codex session:` line, or this session ran a
+   `- run yourself:` command for `gen-codex-agents.sh` itself, even when the
+   final re-run reports `.codex/agents` in sync. Only when neither happened is
+   `.codex/agents` unchanged and no new session needed. On Claude Code nothing
+   here applies.
+
    After exit `2`, report the refusal and its `- run yourself:` line (when the
    report prints one) to the operator and stop; do not work around the refusal
    by writing the artifact yourself or by another route.

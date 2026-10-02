@@ -6,6 +6,9 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.8.1**
+  - **Codex CLI ホストでは、セットアップが生成または変更した agent は新しい Codex セッションから有効になると報告する。** Codex は実行中のセッションで生成された project agent を選べないため、セットアップと同じセッションで run を頼むと Plan で `BLOCKED` になっていた。セットアップが `.codex/agents` を生成・再生成したとき、またはそのためのコマンドを表示したときは、報告に `- new Codex session:` の行が 1 行入る。setup skill の最後の手順も、後の再実行が `.codex/agents` を in sync と報告した場合を含めて、新しいセッションで始めるよう案内する。`.codex/agents` が変わらなかった場合は何も足さない。導入ガイドと README にも、その事実と根拠を書いた。
+  - **`tech-lead` が trivial と判定した run にも最小の board エントリと spec を作るので、`READY_FOR_QA` まで届く。** trivial の省略経路は board タスクなしで Implement へ進んでいたが、記録の関門（provenance・durability）は設計上タスクのない run を拒否するため、その run は Validate の前で `BLOCKED` になっていた。run skill はまず `pm-spec` を trivial mode で呼び、本物の task id を持つ board エントリと、検査付きの受け入れ条件を 1 つ以上持つ最小の spec を作る。以降の関門はそのまま通り、どの checker も新しい形を受け付けない。Codex CLI ホストでは、変わった role を取り込むために `update shell-team` を実行する。
 - **v2.8.0**
   - **セッションの中で「set up shell-team」（または「update shell-team」）と頼むだけで、どちらのホストでも今の repository のセットアップが済む。** 新しい `setup` skill（Claude Code と Codex CLI で同じファイル）が `bin/team-setup.sh` を実行する。スクリプトは変更のない `team-init` で board を用意し、Codex CLI ホストではさらに `.codex/agents/` を生成して `.git/info/exclude` に ignore 行を足す。最後に、行ったこと・すでにあったこと・operator が決めることを報告する。どちらのホストでも sandbox・trust・permission・network の設定は書かず、許可も求めない。ホストに書き込みを拒否されたときは、自分で実行するコマンドを 1 つ示す。書き込み先が repository の外に解決されるとき（symlink 経由を含む）は、何も書く前に止まる。アップグレード後にもう一度実行すれば更新になる。README と adopting ガイドは、手作業の手順書ではなくこのプロンプトを先頭に書き直した。（#640）
   - **run skill は最初の dispatch の前に、セットアップが済んでいるかを読むだけで確かめる。** `bin/check-setup.sh` は、scaffold の欠落、Codex CLI ホストでの `.codex/agents` の role ファイルの欠落、相手 provider の CLI の欠落（`command -v` で確かめ、実行はしない）を報告する。そのとき run skill は検査の出力をそのまま付けて `BLOCKED` で止まり、直し方として setup のプロンプトを示し、ホスト側の条件は operator が決めることとして伝える。何も書かず、どのディレクトリから実行しても結果は同じ。role ファイルの中身が古いかは run 開始時には見ない。それは `update shell-team` が報告する。（#640）
