@@ -429,6 +429,22 @@ refuses creating `.codex/` and writing `.git/` by default), the report prints
 the one exact command, whose write set is that single plugin artifact, for you
 to approve per command in the host or to run yourself.
 
+The roles generated or changed by setup take effect in a new Codex session
+started in this repository: Codex does not select project agents that were
+generated during a running session. When a run generates or regenerates
+`.codex/agents/`, or prints the command that does, the report carries one
+`- new Codex session:` line saying so; start the loop in the new session, even
+if you approved or ran that command yourself and a re-run then reports
+`.codex/agents` in sync. A report whose `.codex/agents` was already in sync
+says nothing extra. The evidence was relayed to this repository and not
+re-measured by it: on `codex-cli 0.159.3` with shell-team 2.8.0, the run request
+typed in the same session as the setup that generated `.codex/agents/` stopped
+at Plan `BLOCKED` because `spawn_agent` could not select `shell-team-tech-lead`;
+a new session in the same repository spawned `shell-team-tech-lead` and
+`shell-team-engineer`, and so did a baseline where `.codex/agents/` existed
+before the session started (both recorded as `agent_role` on the subagent
+threads), with the same model, multi-agent mode and collaboration mode.
+
 What remains the operator's decision is only reported, never changed. Runs on
 `codex-cli 0.159.3` on 2026-10-01 were relayed to this repository and not
 re-measured by it; each item below says which kind of evidence it rests on:

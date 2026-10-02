@@ -367,6 +367,7 @@ if [ "$HOST" = "codex-cli" ]; then
     fi
   fi
 
+  NEWSESS=0
   regen_cmd="bash $(q "$SCRIPT_DIR/gen-codex-agents.sh") --out-dir $(q "$AG")"
   if [ -e "$AG" ] || [ -L "$AG" ]; then
     c_rc=0
@@ -381,12 +382,14 @@ if [ "$HOST" = "codex-cli" ]; then
         bash "$SCRIPT_DIR/check-codex-agents.sh" --root "$PLUGIN_ROOT" --out-dir "$AG" >/dev/null 2>&1 || r_rc=$?
         if [ "$r_rc" -eq 0 ]; then
           add_done "regenerated .codex/agents (it had drifted from the installed plugin's agents)"
+          NEWSESS=1
         else
           err "team-setup: .codex/agents still differs after regeneration (check exit $r_rc)"
           EC2=1
         fi
       elif [ -d "$AG" ] && [ ! -w "$AG" ]; then
         refused "$regen_cmd"
+        NEWSESS=1
       else
         err "team-setup: gen-codex-agents.sh failed (exit $g_rc): $g_err"
         EC2=1
@@ -405,6 +408,7 @@ if [ "$HOST" = "codex-cli" ]; then
       g_err="$(bash "$SCRIPT_DIR/gen-codex-agents.sh" --root "$PLUGIN_ROOT" --out-dir "$AG" 2>&1 >/dev/null)" || g_rc=$?
       if [ "$g_rc" -eq 0 ]; then
         add_done "generated .codex/agents from the installed plugin's agents"
+        NEWSESS=1
       else
         # Nothing was written by the generator on a refusal: take back the
         # empty directories this run created, so no half-state is left.
@@ -417,7 +421,14 @@ if [ "$HOST" = "codex-cli" ]; then
       fi
     else
       refused "$regen_cmd"
+      NEWSESS=1
     fi
+  fi
+  # Codex does not pick up project agents generated during a running session
+  # (relayed evidence: docs/adopting.md). Printed once, only when this run
+  # generated, regenerated or printed the generator command for .codex/agents.
+  if [ "$NEWSESS" -eq 1 ]; then
+    add_remains "new Codex session: the roles in .codex/agents take effect in a new Codex session started in this repository (Codex does not pick up agents generated during a running session); start the loop there"
   fi
 fi
 
