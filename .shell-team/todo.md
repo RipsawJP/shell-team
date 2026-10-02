@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1166** On the Codex CLI host, setup says that generated or changed agents take effect in a new Codex session (issue #654) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1166-codex-new-session.md
+- [ ] **T-1166** On the Codex CLI host, setup says that generated or changed agents take effect in a new Codex session (issue #654) — `READY_FOR_QA` — spec: .shell-team/specs/T-1166-codex-new-session.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #654 (the task's own tracker item; Problem and Expected relayed verbatim by the coordinating session and quoted in the spec). Not stacked: cut from `develop` at `9d3e4ced`. Refusal-path decision (note also on a refused generator write; the setup skill carries it forward across an in-sync re-run) is the coordinating session's, from the measured run, and is recorded in the spec's Problem section.
