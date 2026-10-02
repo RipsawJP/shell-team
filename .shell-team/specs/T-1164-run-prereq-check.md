@@ -1,4 +1,4 @@
-# The run skill checks, read-only, that setup is present and current before the first dispatch, and the review's approval request names what it sends and where
+# The run skill checks, read-only, that setup is present before the first dispatch
 
 **Status**: READY_FOR_ARCH
 **Owner**: pm-spec
