@@ -134,7 +134,7 @@ build sha と uptime を返す /healthz を shell-team で追加して
 
 メインの Claude セッションが非自明な依頼を認識し、チームのループ（Plan → Specify → Implement → Validate → Review）を回して、マージ前には必ず一時停止してあなたを待ちます。スラッシュコマンドを打たずに Codex による別プロバイダレビューが得られるのと同じ経路です。会話モデルの詳細・追加の会話例・チャットから**フルループ**を確実に発火させるための唯一の opt-in ステップは [docs/usage-conversational.md](docs/usage-conversational.md) を参照。
 
-最初の役割を dispatch する前に、run はどちらの host でも、setup が存在し最新であることを `bash "<plugin root>/bin/check-setup.sh"` で（read-only で）確認します。足りないものがあれば、そのチェック自身の出力とともに `BLOCKED` で止まり、plugin 側の対処として `set up shell-team`（または `update shell-team`）を案内します。host 側の条件はあなたの判断として報告するだけで、何も変更せず、代替もしません。
+最初の役割を dispatch する前に、run はどちらの host でも、setup が存在すること（Codex CLI host では `.codex/agents` に role ファイルがあること）を `bash "<plugin root>/bin/check-setup.sh"` で（read-only で）確認します。足りないものがあれば、そのチェック自身の出力とともに `BLOCKED` で止まり、plugin 側の対処として `set up shell-team`（または `update shell-team`）を案内します。host 側の条件はあなたの判断として報告するだけで、何も変更せず、代替もしません。
 
 Claude Code host では、明示的に使いたいときにエージェントやスキルを単体でも起動できます — 以下はいずれも Claude Code のスラッシュコマンドとエージェント指名です。Codex CLI host に同じ形のスラッシュコマンドはなく、[runbook](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 自身の dispatch が上の 5 役割を直接駆動します:
 
@@ -206,7 +206,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 │   ├── discover-work.sh             # read-only triage 発見エンジン
 │   ├── team-init.sh                 # 適用先リポ scaffolder
 │   ├── team-setup.sh                # setup プロンプトのスクリプト（scaffold・Codex エージェント・報告）
-│   ├── check-setup.sh               # read-only の run 開始時チェック（この host 向けに setup が存在し最新か）
+│   ├── check-setup.sh               # read-only の run 開始時チェック（この host 向けに setup が存在するか）
 │   └── install                      # 旧 vendoring フォールバック
 ├── templates/                       # team-init が使う generic scaffold
 ├── docs/

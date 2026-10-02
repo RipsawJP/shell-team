@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # run.sh — fixture suite for bin/check-setup.sh (T-1164, issue #640), the
 # read-only run-start check. Six cases on each host: complete,
-# scaffold-missing, codex-agents-missing, drift, cli-absent, cannot-evaluate.
-# On the Claude Code host the codex-agents-missing and drift cases assert that
-# `.codex` is not required. Plus: help/usage, read-only checksums, the
-# forbidden-token lock, the template note and the three launch shapes.
+# scaffold-missing, codex-agents-missing, role-file-missing, cli-absent,
+# cannot-evaluate. On the Claude Code host the codex-agents-missing and
+# role-file-missing cases assert that `.codex` is not required. The Codex-host
+# check is presence only: a changed role file still passes, a missing one is
+# reported. Plus: help/usage, read-only checksums, the starting-directory and
+# read-only-root cases, the forbidden-token lock, the template note and the
+# three launch shapes.
 #
 # Every fixture repository is prepared by the shipped bin/team-setup.sh with a
 # temp HOME/CODEX_HOME, GIT_CONFIG_GLOBAL=/dev/null and stub CLIs. The scratch
 # root stays under ${TMPDIR:-/tmp}; nothing is deleted recursively.
 #
 # Mutation self-check (run by whoever changes this file, in a scratch copy,
-# never against the tracked tree): insert a write into the checker, or make it
-# report success when check-codex-agents.sh exits 2, and this suite must fail.
+# never against the tracked tree): re-add a comparator call to the checker, or
+# make it create a file under TMPDIR, and this suite must fail.
 
 set -euo pipefail
 
@@ -41,7 +44,7 @@ T="$(cd "$T" && pwd -P)"
 export HOME="$T/home" CODEX_HOME="$T/ch" XDG_CONFIG_HOME="$T/home/.config"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset TEAM_RUN_BASE CODEX_THREAD_ID
-mkdir -p "$HOME" "$CODEX_HOME" "$T/s" "$T/e0" "$T/ng" "$T/p"
+mkdir -p "$HOME" "$CODEX_HOME" "$T/s" "$T/e0" "$T/ng" "$T/p" "$T/tmpd"
 for b in claude codex; do
   printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$T/s/$b"
   chmod +x "$T/s/$b"
@@ -56,7 +59,8 @@ fi
 mk() { mkdir -p "$1" && git -C "$1" init -q && printf 'x\n' > "$1/README" && git -C "$1" add README && git -C "$1" -c user.email=t@example.com -c user.name=t commit -q -m i; }
 sr() { (cd "$1" && PATH="$SP" bash "$S" --host "$2" < /dev/null > "$T/so" 2> "$T/se"); }
 # ck <path> <dir> [args...] -> prints exit status; stdout in $T/o, stderr in $T/e
-ck() { local p="$1" d="$2"; shift 2; (cd "$d" && PATH="$p" "$BASH" "$C" "$@" < /dev/null > "$T/o" 2> "$T/e") && printf '0' || printf '%s' "$?"; }
+# Every ck run has TMPDIR pointing at one fresh empty directory, asserted empty at the end.
+ck() { local p="$1" d="$2"; shift 2; (cd "$d" && TMPDIR="$T/tmpd" PATH="$p" "$BASH" "$C" "$@" < /dev/null > "$T/o" 2> "$T/e") && printf '0' || printf '%s' "$?"; }
 nlines() { grep -c '^- ' "$T/o" || true; }
 
 check() { # <label> <expected> <actual>
@@ -102,21 +106,25 @@ for H in claude-code codex-cli; do
     if [ -e "$R/.codex" ]; then fail "$H codex-agents-missing: .codex appeared"; else pass "$H codex-agents-missing: .codex untouched"; fi
   fi
 
-  # --- drift ----------------------------------------------------------------
-  R="$T/drift-$H"; mk "$R"; sr "$R" codex-cli
-  printf 'drift\n' >> "$R/.codex/agents/shell-team-engineer.toml"
-  if [ "$H" = codex-cli ]; then
-    check "$H drift: exits 1" 1 "$(ck "$SP" "$R" --host "$H")"
-    check "$H drift: exactly one line" 1 "$(nlines)"
-    lw "$H drift: names .codex/agents and update shell-team" .codex/agents 'update shell-team'
-    sr "$R" codex-cli
-    check "$H drift: re-running setup brings it back to 0" 0 "$(ck "$SP" "$R" --host "$H")"
-    rm -f "$R/.codex/agents/shell-team-pm-spec.toml"
-    check "$H drift: a deleted role file exits 1" 1 "$(ck "$SP" "$R" --host "$H")"
-    lw "$H drift: deleted role file names update shell-team" .codex/agents 'update shell-team'
-  else
-    check "$H drift: drifted .codex/agents is not inspected (exit 0)" 0 "$(ck "$SP" "$R" --host "$H")"
-  fi
+  # --- role-file-missing ------------------------------------------------------
+  R="$T/rfm-$H"; mk "$R"; sr "$R" codex-cli
+  printf 'changed\n' >> "$R/.codex/agents/shell-team-engineer.toml"
+  check "$H role-file-missing: an appended line in a role file still exits 0 (contents are not compared)" 0 "$(ck "$SP" "$R" --host "$H")"
+  check "$H role-file-missing: an appended line gives no '- ' line" 0 "$(nlines)"
+  for r in tech-lead pm-spec engineer qa-verifier code-reviewer; do
+    F="$R/.codex/agents/shell-team-$r.toml"
+    if [ -f "$F" ]; then pass "$H role-file-missing: $r role file exists before deletion"; else fail "$H role-file-missing: $r role file absent from fixture"; fi
+    cp "$F" "$T/keep"; rm -f "$F"
+    if [ "$H" = codex-cli ]; then
+      check "$H role-file-missing: deleting $r exits 1" 1 "$(ck "$SP" "$R" --host "$H")"
+      check "$H role-file-missing: deleting $r gives exactly one line" 1 "$(nlines)"
+      lw "$H role-file-missing: line names shell-team-$r.toml and update shell-team" "shell-team-$r.toml" 'update shell-team'
+    else
+      check "$H role-file-missing: deleting $r is not inspected off the Codex host (exit 0)" 0 "$(ck "$SP" "$R" --host "$H")"
+    fi
+    cp "$T/keep" "$F"
+    check "$H role-file-missing: with $r restored exits 0" 0 "$(ck "$SP" "$R" --host "$H")"
+  done
 
   # --- cli-absent -----------------------------------------------------------
   R="$T/cli-$H"; mk "$R"; sr "$R" "$H"
@@ -132,19 +140,22 @@ for H in claude-code codex-cli; do
 done
 
 # --- cannot-evaluate (both hosts) -------------------------------------------
-# A plugin root with bin/ and templates/ but no agents/: check-codex-agents.sh
-# exits 2 on a Codex-set-up repository.
+# A plugin root with bin/ and templates/ but no agents/: the checker calls no
+# comparator, so a Codex-set-up repository still passes.
 mkdir -p "$T/pr" && cp -R "$REPO_ROOT/bin" "$REPO_ROOT/templates" "$T/pr/"
+if [ -e "$T/pr/agents" ]; then fail "precondition: the copied plugin root has no agents/"; else pass "precondition: the copied plugin root has no agents/"; fi
 R="$T/ce"; mk "$R"; sr "$R" codex-cli
-x=0; (cd "$R" && bash "$T/pr/bin/check-codex-agents.sh" --root "$T/pr" --out-dir "$R/.codex/agents" >/dev/null 2>&1) || x=$?
-check "precondition: that plugin root makes check-codex-agents.sh exit 2" 2 "$x"
+x=0; (cd "$R" && TMPDIR="$T/tmpd" PATH="$SP" bash "$T/pr/bin/check-setup.sh" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
+check "codex-cli cannot-evaluate: a plugin root without agents/ still exits 0 (no comparator)" 0 "$x"
+# a resolver refusal (absolute TEAM_RUN_BASE) is exit 2 on both hosts and wins over a missing board
 rm -f "$R/.shell-team/todo.md"
-x=0; (cd "$R" && PATH="$SP" bash "$T/pr/bin/check-setup.sh" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
-check "codex-cli cannot-evaluate: exit 2 wins over the missing board" 2 "$x"
-cat "$T/o" "$T/e" > "$T/oe"
-has "codex-cli cannot-evaluate: output names check-codex-agents" check-codex-agents "$T/oe"
-x=0; (cd "$R" && PATH="$SP" bash "$T/pr/bin/check-setup.sh" --host claude-code < /dev/null > "$T/o" 2> "$T/e") || x=$?
-check "claude-code cannot-evaluate: that plugin root does not matter off the Codex host (exit 1)" 1 "$x"
+check "codex-cli cannot-evaluate: missing board exits 1 before the refusal" 1 "$(ck "$SP" "$R" --host codex-cli)"
+for H in codex-cli claude-code; do
+  x=0; (cd "$R" && TMPDIR="$T/tmpd" TEAM_RUN_BASE="$T/abs" PATH="$SP" bash "$C" --host "$H" < /dev/null > "$T/o" 2> "$T/e") || x=$?
+  check "$H cannot-evaluate: resolver refusal (absolute TEAM_RUN_BASE) exits 2" 2 "$x"
+  has "$H cannot-evaluate: stderr relays the resolver's message (team-paths:)" 'team-paths:' "$T/e"
+  has "$H cannot-evaluate: stderr names TEAM_RUN_BASE" TEAM_RUN_BASE "$T/e"
+done
 x=$(ck "$SP" "$T/ng" --host claude-code)
 check "claude-code cannot-evaluate: outside a git work tree exits 2" 2 "$x"
 x=$(ck "$SP" "$T/ng" --host codex-cli)
@@ -155,9 +166,6 @@ for a in '--bogus' '--host bogus' '--host'; do
   # shellcheck disable=SC2086
   check "cannot-evaluate: '$a' exits 2" 2 "$(ck "$SP" "$R" $a)"
 done
-# a resolver refusal (invalid TEAM_RUN_BASE) is exit 2, not a pass
-x=0; (cd "$R" && TEAM_RUN_BASE=/abs PATH="$SP" bash "$C" --host claude-code < /dev/null > "$T/o" 2> "$T/e") || x=$?
-check "cannot-evaluate: resolver refusal (absolute TEAM_RUN_BASE) exits 2" 2 "$x"
 
 # --- help / host selection / subdirectory / launch shapes --------------------
 for a in --help -h; do
@@ -212,12 +220,10 @@ i=0; for d in "${dirs[@]}"; do
   if cmp -s "$T/b$i" "$T/a$i"; then pass "read-only: listing $i byte-identical after every run"; else fail "read-only: listing $i changed"; fi
 done
 
-# --- starting directory and read-only root (T-1164 v2, AC18) -----------------
-# The comparator chain runs with its cwd in a scratch directory under $TMPDIR and
-# the operating base pinned, so the result is the same from the repository root,
-# a subdirectory or a read-only root, with or without a host binding.
-DB="$REPO_ROOT/templates/binding-default.conf"
-for n in rw ro hb hr; do
+# --- starting directory and read-only root (T-1164 v3, AC18) ------------------
+# The checker calls no comparator and creates nothing, so the result is the same
+# from the repository root, a subdirectory or a read-only root, whatever TMPDIR.
+for n in rw ro m; do
   R="$T/sd-$n"; mk "$R"; sr "$R" codex-cli; mkdir -p "$R/sub/d"
   if [ -d "$R/.codex/agents" ] && [ -d "$R/.shell-team" ]; then pass "start-dir $n: fixture is set up for the Codex CLI host"; else fail "start-dir $n: fixture setup failed"; fi
 done
@@ -225,6 +231,9 @@ R="$T/sd-rw"
 ls -A "$R" > "$T/sd-b1"; ls -A "$R/sub/d" > "$T/sd-b2"
 check "start-dir writable: root exits 0" 0 "$(ck "$SP" "$R" --host codex-cli)"
 check "start-dir writable: sub/d exits 0" 0 "$(ck "$SP" "$R/sub/d" --host codex-cli)"
+x=0; (cd "$R" && TMPDIR=reltmp PATH="$SP" "$BASH" "$C" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
+check "start-dir writable: a relative TMPDIR (reltmp) still exits 0" 0 "$x"
+if [ -e "$R/reltmp" ]; then fail "start-dir writable: reltmp was created"; else pass "start-dir writable: no reltmp was created"; fi
 ls -A "$R" > "$T/sd-a1"; ls -A "$R/sub/d" > "$T/sd-a2"
 if [ -s "$T/sd-b1" ] && cmp -s "$T/sd-b1" "$T/sd-a1" && cmp -s "$T/sd-b2" "$T/sd-a2"; then pass "start-dir writable: entry lists of root and sub/d unchanged"; else fail "start-dir writable: an entry appeared where the checker started"; fi
 R="$T/sd-ro"
@@ -236,37 +245,34 @@ check "start-dir read-only: root, codex-cli exits 0" 0 "$r1"
 check "start-dir read-only: sub/d, codex-cli exits 0" 0 "$r2"
 check "start-dir read-only: root, claude-code exits 0" 0 "$r3"
 if [ -e "$R/probe" ]; then fail "start-dir read-only: a probe file appeared"; else pass "start-dir read-only: no file appeared"; fi
-R="$T/sd-hb"; BC="$R/.shell-team/binding.conf"
-sed 's/^\(bind code-reviewer[[:space:]][[:space:]]*codex[[:space:]][[:space:]]*\)provider-configured/\1gpt-test/' "$DB" > "$BC"
-has "start-dir drifting binding: fixture binding sets the code-reviewer model" 'gpt-test' "$BC"
-h1=$(ck "$SP" "$R" --host codex-cli); lw "start-dir drifting binding: root names .codex/agents and update shell-team" .codex/agents 'update shell-team'
-h2=$(ck "$SP" "$R/sub/d" --host codex-cli); lw "start-dir drifting binding: sub/d names .codex/agents and update shell-team" .codex/agents 'update shell-team'
-check "start-dir drifting binding: root exits 1" 1 "$h1"
-check "start-dir drifting binding: sub/d exits the same as the root" "$h1" "$h2"
-R="$T/sd-hr"; mkdir "$R/.shell-team/binding.conf"
-f1=$(ck "$SP" "$R" --host codex-cli); f2=$(ck "$SP" "$R/sub/d" --host codex-cli)
-check "start-dir refusing binding: root exits 2" 2 "$f1"
-check "start-dir refusing binding: sub/d exits 2" 2 "$f2"
-R="$T/sd-rw"; mkdir -p "$R/sub/d/.shell-team/binding.conf"
-check "start-dir decoy: a binding.conf under sub/d is not read (exit 0)" 0 "$(ck "$SP" "$R/sub/d" --host codex-cli)"
-if [ -e "$R/.shell-team/binding.conf" ]; then fail "start-dir decoy: the real base gained a binding.conf"; else pass "start-dir decoy: the real base has no binding.conf"; fi
-R="$T/sd-rw"; mkdir -p "$T/tmpd"; ls -A "$T/tmpd" > "$T/sd-t0"
-x=0; (cd "$R" && TMPDIR="$T/tmpd" PATH="$SP" "$BASH" "$C" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
-ls -A "$T/tmpd" > "$T/sd-t1"
-check "scratch: an alternate TMPDIR still exits 0" 0 "$x"
-if cmp -s "$T/sd-t0" "$T/sd-t1"; then pass "scratch: the checker leaves nothing behind in TMPDIR"; else fail "scratch: TMPDIR gained entries"; fi
-x=0; (cd "$R" && TMPDIR="$T/no-such-dir" PATH="$SP" "$BASH" "$C" --host codex-cli < /dev/null > "$T/o" 2> "$T/e") || x=$?
-check "scratch: an unusable TMPDIR is exit 2" 2 "$x"
-has "scratch: the message names the cause" 'scratch directory' "$T/e"
+# a role file missing: same exit and same '- ' lines from root and sub/d, writable and mode 555
+R="$T/sd-m"
+if [ -f "$R/.codex/agents/shell-team-qa-verifier.toml" ]; then pass "start-dir missing: qa-verifier role file exists before deletion"; else fail "start-dir missing: qa-verifier role file absent from fixture"; fi
+rm -f "$R/.codex/agents/shell-team-qa-verifier.toml"
+i=0
+for d in "$R" "$R/sub/d"; do i=$((i+1)); check "start-dir missing writable $i: exits 1" 1 "$(ck "$SP" "$d" --host codex-cli)"; grep '^- ' "$T/o" > "$T/ml$i"; done
+chmod 555 "$R/sub/d" "$R"
+for d in "$R" "$R/sub/d"; do i=$((i+1)); check "start-dir missing read-only $i: exits 1" 1 "$(ck "$SP" "$d" --host codex-cli)"; grep '^- ' "$T/o" > "$T/ml$i"; done
+chmod 755 "$R" "$R/sub/d"
+if [ -s "$T/ml1" ]; then pass "start-dir missing: the '- ' lines are non-empty"; else fail "start-dir missing: no '- ' line"; fi
+for j in 2 3 4; do
+  if cmp -s "$T/ml1" "$T/ml$j"; then pass "start-dir missing: '- ' lines of run $j are byte-identical to run 1"; else fail "start-dir missing: '- ' lines of run $j differ from run 1"; fi
+done
+# the fresh TMPDIR used by every ck run is still empty: the checker created no scratch
+if [ -z "$(find "$T/tmpd" -mindepth 1 -print)" ]; then pass "scratch: the TMPDIR given to every checker run is still empty"; else fail "scratch: the checker created an entry under TMPDIR"; fi
 
 # --- forbidden-token lock ------------------------------------------------------
 : > "$T/all"
 for h in codex-cli claude-code; do
   for r in "$T/fresh-$h" "$T/complete-$h"; do ck "$SP" "$r" --host "$h" >/dev/null; cat "$T/o" "$T/e" >> "$T/all"; done
 done
-ck "$SP" "$T/drift-codex-cli" --host codex-cli >/dev/null; cat "$T/o" "$T/e" >> "$T/all"
+ck "$SP" "$T/rfm-codex-cli" --host codex-cli >/dev/null; cat "$T/o" "$T/e" >> "$T/all"
 has "tokens: positive control (output names set up shell-team)" 'set up shell-team' "$T/all"
-has "tokens: positive control (script names check-codex-agents.sh)" check-codex-agents.sh "$C"
+has "tokens: positive control (script names team-paths.sh)" team-paths.sh "$C"
+for t in check-codex-agents gen-codex-agents resolve-executor; do
+  g=0; grep -qF -- "$t" "$C" || g=$?
+  if [ "$g" -eq 1 ]; then pass "no comparator: '$t' is not named in bin/check-setup.sh"; else fail "no comparator: '$t' present or unreadable in bin/check-setup.sh (grep exit $g)"; fi
+done
 for t in trust_level writable_roots network_access sandbox_workspace_write danger-full-access excludedCommands dangerously bypassPermissions --full-auto --yolo approval_policy permissions.allow config.toml settings.json settings.local.json; do
   for f in "$C" "$T/all"; do
     g=0; grep -qF -- "$t" "$f" || g=$?

@@ -159,8 +159,8 @@ FAIL を報告する。
 **最初の dispatch の前に、run は setup が揃っていることを確認します。** Step 0 が
 どちらの host でも `bash "<plugin root>/bin/check-setup.sh"` を 1 回実行します。
 read-only で、ボード・specs dir・loop contract の有無、Codex CLI host では
-`.codex/agents` がインストール済み plugin と同期しているか、そして `command -v`
-のみで相手側 provider の CLI の有無を調べます。満たされないものがあれば、run は
+`.codex/agents` と生成された 5 つの role ファイルの有無（存在のみ・内容は比較
+しません）、そして `command -v` のみで相手側 provider の CLI の有無を調べます。満たされないものがあれば、run は
 チェッカー自身の出力とともに `BLOCKED` で止まり、plugin 側の対処としてプロンプト
 `set up shell-team`（または `update shell-team`）を案内します。host 側の条件は
 operator の判断として述べます。このチェックは別の dispatch 経路や executor へ
@@ -451,9 +451,8 @@ operator の判断に残るものは報告されるだけで、変更されな�
   0.159.3 の両方の実行で export しており、必要かどうかは切り分けられて
   いない。
 - **レビュー転送**: レビュー pass はリポジトリの内容を相手側 provider
-  （Claude、提供元は Anthropic）へ Claude Code CLI 経由で送る。承認の要求は
-  送る内容（base ref との diff・spec・ハンドオフ）と送信先を明示する。この転送
-  を承認するかは operator の判断であり、setup も run も承認しない。
+  （Claude）へ送る。この転送を承認するかは operator の判断であり、setup
+  は承認しない。
 - **`.shell-team/` を git で追跡するか。**
 
 以下の番号付き手順は手動のフォールバックであり、host 側の各条件が何で、

@@ -153,8 +153,9 @@ before merge/push.
 **Before the first dispatch, the run checks that setup is in place.** Step 0
 runs `bash "<plugin root>/bin/check-setup.sh"` once, on either host. It is
 read-only: it looks for the board, the specs dir and the loop contract, on the
-Codex CLI host for `.codex/agents` in sync with the installed plugin, and, with
-`command -v` only, for the other provider's CLI. When something is unmet the run
+Codex CLI host for `.codex/agents` and the five generated role files (presence
+only, contents are not compared), and, with `command -v` only, for the other
+provider's CLI. When something is unmet the run
 stops `BLOCKED` with the checker's own output and names the prompt
 `set up shell-team` (or `update shell-team`) as the remedy for the plugin's
 part; a condition on the host's side is stated as the operator's decision. The
@@ -445,10 +446,8 @@ re-measured by it; each item below says which kind of evidence it rests on:
   exported it in both 0.159.3 runs, so whether it is necessary was not
   separated out.
 - **The review transfer**: the review pass sends repository content to
-  Claude (Anthropic), the other provider, through the Claude Code CLI. The
-  approval request names the payload (the diff against the base ref, the spec
-  and the hand-offs) and the destination. Approving that transfer is the
-  operator's decision, and neither setup nor the run authorizes it.
+  Claude, the other provider. Approving that transfer is the operator's
+  decision, and setup does not authorize it.
 - **Whether to track `.shell-team/` in git.**
 
 The numbered steps below are the manual fallback, and the record of what each

@@ -8,21 +8,23 @@
 # What it checks, from inside the current git work tree:
 #   1. both hosts: the board, the specs dir and the loop contract exist, each
 #      resolved through bin/team-paths.sh --get (one raw value per key);
-#   2. the Codex CLI host only: <repo>/.codex/agents exists and is in sync with
-#      the installed plugin's agents (bin/check-codex-agents.sh, check-only);
+#   2. the Codex CLI host only, presence only (no content comparison):
+#      <repo>/.codex/agents is a directory holding the five role files a setup
+#      writes (shell-team-<role>.toml); each missing one gets its own line;
 #   3. by `command -v` only, that the other provider's CLI is on PATH (it is
 #      never run, installed or probed); a missing one is reported as the
 #      operator's decision and names neither setup prompt;
 #   4. a scaffold file whose bytes differ from the installed plugin's template
 #      gets a `- note:` line (never changes the exit status).
 #
-# Write set: none. Nothing in the repository (including .git), the plugin root,
-# $HOME or $CODEX_HOME is written; the only scratch is under $TMPDIR: the
-# unchanged check-codex-agents.sh regeneration, and this script's own scratch
-# directory, which is the comparator chain's cwd (it holds one symlink to the
-# resolved base and is removed by named file plus rmdir). The result does not
-# depend on the directory the checker is started from. It never chooses, asks
-# for or suggests a grant, a permission or a host setting.
+# Write set: none. Nothing is written anywhere: not in the repository
+# (including .git), the plugin root, $HOME or $CODEX_HOME, and no scratch file
+# or directory is created under $TMPDIR either. The result does not depend on
+# the directory the checker is started from, nor on the value of TMPDIR. It
+# never chooses, asks for or suggests a grant, a permission or a host setting.
+# Keep the non-help path free of here-strings and here-documents: bash 3.2
+# creates their temp file in the current directory, which fails on a read-only
+# root.
 #
 # Usage:
 #   bin/check-setup.sh [--host claude-code|codex-cli]
@@ -36,7 +38,7 @@
 #   0  nothing is unmet (only `- note:` lines may appear)
 #   1  at least one item is unmet
 #   2  the checker cannot evaluate: not in a git work tree, an unknown argument
-#      or --host value, a resolver refusal, or check-codex-agents.sh exit 2
+#      or --host value, or a resolver refusal
 #
 # External dependencies: bash 3.2+ and standard POSIX tools plus git.
 
@@ -66,12 +68,13 @@ print_help() {
 Usage: bin/check-setup.sh [--host claude-code|codex-cli]
        bin/check-setup.sh --help | -h
 
-Read-only run-start check: is shell-team set up, and current, for this host?
+Read-only run-start check: is shell-team set up for this host?
 It writes nothing anywhere and never runs the other provider's CLI.
 
 Checks: the board, the specs dir and the loop contract (both hosts); on the
-Codex CLI host also .codex/agents (present and in sync with the installed
-plugin's agents); and, by `command -v` only, the other provider's CLI.
+Codex CLI host also .codex/agents (a directory holding the five role files;
+presence only, contents are not compared); and, by `command -v` only, the other
+provider's CLI.
 
 Options:
   --host <host>   claude-code or codex-cli. Default: codex-cli when
@@ -80,7 +83,7 @@ Options:
 
 Stdout: one header line, then one "- " line per unmet item (and "- note:"
 lines for scaffold files that differ from the plugin's templates). Diagnostics
-and the relayed output of check-codex-agents.sh go to stderr.
+go to stderr.
 
 Exit codes (precedence 2 > 1 > 0):
   0  nothing is unmet
@@ -88,7 +91,7 @@ Exit codes (precedence 2 > 1 > 0):
      "set up shell-team" / "update shell-team", a host-side condition is the
      operator's decision
   2  cannot evaluate: not in a git work tree, an unknown argument or --host
-     value, a resolver refusal, or check-codex-agents.sh could not evaluate
+     value, or a resolver refusal
 EOF
 }
 
@@ -187,37 +190,10 @@ CONTRACT_REL="$LOOPS_DIR/shell-team.contract.yaml"
 if [ "$HOST" = "codex-cli" ]; then
   AG="$ROOT/.codex/agents"
   if [ -d "$AG" ]; then
-    # The comparator chain (check-codex-agents.sh and what it calls) runs with
-    # its cwd in a scratch directory under $TMPDIR, never in the repository: a
-    # bash 3.2 here-string or here-document creates its temp file in the cwd, so
-    # a repository cwd would be written to (or fail on a read-only root). The
-    # chain's resolver (resolve-executor.sh) looks the host binding up as
-    # <base>/binding.conf relative to that cwd, and team-paths.sh refuses an
-    # absolute TEAM_RUN_BASE; so the scratch directory holds a relative-named
-    # symlink to the repository's resolved base, and TEAM_RUN_BASE names it. The
-    # chain then reads the same binding.conf (absent, a file, or a refusing
-    # occupant) that a run started at the repository root reads.
-    scratch="$(mktemp -d "${TMPDIR:-/tmp}/check-setup.XXXXXX" 2>&1)" \
-      || die "cannot create the scratch directory for the comparator under ${TMPDIR:-/tmp}: $scratch"
-    ln -s "$(abs "$BASE")" "$scratch/base-link" \
-      || die "cannot create the base link in the scratch directory $scratch"
-    c_rc=0
-    c_out="$(cd "$scratch" && TEAM_RUN_BASE=base-link bash "$SCRIPT_DIR/check-codex-agents.sh" --root "$PLUGIN_ROOT" --out-dir "$AG" 2>&1)" || c_rc=$?
-    rm -f "$scratch/base-link"
-    rmdir "$scratch" 2>/dev/null || true
-    case "$c_rc" in
-      0) : ;;
-      1)
-        add_unmet ".codex/agents has drifted from the installed plugin's agents (or is missing a role file): the plugin's part; run the prompt \`update shell-team\`"
-        err "check-setup: check-codex-agents.sh reported drift in .codex/agents (exit 1):"
-        err "$c_out"
-        ;;
-      *)
-        err "check-setup: check-codex-agents.sh could not evaluate .codex/agents (exit $c_rc):"
-        err "$c_out"
-        EC2=1
-        ;;
-    esac
+    for role in tech-lead pm-spec engineer qa-verifier code-reviewer; do
+      [ -f "$AG/shell-team-$role.toml" ] \
+        || add_unmet ".codex/agents/shell-team-$role.toml is missing: the plugin's part; run the prompt \`update shell-team\`"
+    done
   else
     add_unmet ".codex/agents is missing: the plugin's part; run the prompt \`set up shell-team\`"
   fi
