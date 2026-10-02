@@ -43,7 +43,7 @@ The setup is one prompt on either host, `set up shell-team`, which does the plug
 
 | Situation | Allowed shortcut |
 |-----------|------------------|
-| Single-line typo or comment fix | `tech-lead` may skip directly to `engineer` |
+| Single-line typo or comment fix | `tech-lead` routes it to `pm-spec`'s trivial mode (a minimal board entry and spec), then `engineer` |
 | Non-UI task (CI/bash/backend/docs/config, or non-visual frontend edits) | `ui-designer` does not participate — no `[Design]` phase |
 | Test-only change (adding a missing test) | Skip `pm-spec`; `engineer` + `qa-verifier` + `code-reviewer` |
 | Reviewing someone else's PR | Use `/review` — only `code-reviewer` runs |
