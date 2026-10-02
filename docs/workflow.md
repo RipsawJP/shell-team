@@ -26,7 +26,7 @@ What differs is how a role is dispatched. On **Claude Code** the orchestrator di
 
 The review pass is the other asymmetry, and it is deliberate: on a Claude Code host `code-reviewer` runs through Codex CLI, and on a Codex CLI host it runs a `claude -p` pass instead, so under the shipped default binding the review comes from the provider the host is not. That binding is the shipped default, not an unconditional invariant: a host may rebind `code-reviewer` to a same-family executor in its own `binding.conf`, and once such a rebind exists the loop no longer guarantees this. This is a different thing from the `## Codex CLI quick-reference` section below, which lists the reviewer's own Codex invocations on a Claude Code host.
 
-The full setup — installing the plugin into Codex CLI, generating the agents, repository trust, the sandbox grants and the `PATH` export — is in [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
+The setup is one prompt on either host, `set up shell-team`, which does the plugin's own part: scaffolding, and on Codex CLI generating the agents. The host-side conditions — repository trust, the sandbox's write policy, network for the review pass and the `PATH` export — are the operator's decisions, reported by setup and covered, with what has been measured about each, in [Using shell-team from Codex CLI](adopting.md#using-shell-team-from-codex-cli).
 
 ## Task aptitude — When the full loop fits
 

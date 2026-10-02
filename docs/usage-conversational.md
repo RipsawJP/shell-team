@@ -100,7 +100,7 @@ running the *whole* gated loop is more reliable when CLAUDE.md says to.
 
 - You want to be explicit / scripted: `/shell-team:run <request>`.
 - A quick review without the full pipeline: `/shell-team:review`.
-- Adopting the loop in a new repo: `/shell-team:team-init`.
+- Adopting the loop in a new repo: type `set up shell-team` (the same prompt on both hosts; it runs the scaffold, `/shell-team:team-init`'s part, and on Codex CLI the agent generation).
 
 Conversational routing and explicit slash commands compose freely — use whichever
 fits the moment.

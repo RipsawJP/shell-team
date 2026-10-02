@@ -101,7 +101,7 @@ shell-team は、毎回 `/shell-team:run …` と打ち込んで操作する必�
 
 - 明示的に / スクリプト的にやりたい: `/shell-team:run <request>`。
 - フルパイプライン無しのクイックレビュー: `/shell-team:review`。
-- 新しいリポジトリにループを導入する: `/shell-team:team-init`。
+- 新しいリポジトリにループを導入する: `set up shell-team` と入力する（どちらの host でも同じプロンプト。scaffold——`/shell-team:team-init` の担当分——と、Codex CLI ではエージェントの生成を行う）。
 
 会話駆動ルーティングと明示的なスラッシュコマンドは自由に併用できます — その場に
 合うほうを使ってください。

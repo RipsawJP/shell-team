@@ -34,6 +34,9 @@ jobs:
       - name: shellcheck (T-1157 additions)
         run: shellcheck tests/bin-help/run.sh
 
+      - name: shellcheck (T-1163 additions)
+        run: shellcheck bin/team-setup.sh tests/setup/run.sh
+
       - name: Run check-adopter-docs fixture suite
         run: bash tests/check-adopter-docs/run.sh
 
@@ -377,3 +380,6 @@ jobs:
 
       - name: Run bin-help suite
         run: bash tests/bin-help/run.sh
+
+      - name: Run setup fixture suite
+        run: bash tests/setup/run.sh
