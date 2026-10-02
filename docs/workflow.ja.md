@@ -43,7 +43,7 @@ review pass がもう 1 つの非対称性で、これは意図的なもので�
 
 | 状況 | 許容されるショートカット |
 |-----------|------------------|
-| 1 行のタイポ修正やコメント修正 | `tech-lead` は直接 `engineer` へスキップしてよい |
+| 1 行のタイポ修正やコメント修正 | `tech-lead` は `pm-spec` の trivial mode（最小の board エントリと spec）へ回し、その後 `engineer` へ進む |
 | 非 UI タスク（CI/bash/バックエンド/docs/config、または非視覚的なフロントエンド編集） | `ui-designer` は参加しない — `[Design]` フェーズ無し |
 | テストのみの変更（不足テストの追加） | `pm-spec` をスキップ。`engineer` + `qa-verifier` + `code-reviewer` |
 | 他人の PR をレビューする | `/review` を使う — `code-reviewer` のみが走る |

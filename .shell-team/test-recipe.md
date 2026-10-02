@@ -2637,3 +2637,10 @@ suite + dogfood step that must pass, run in that file's order."
   `bash tests/check-setup/run.sh`, then `CHECK_ACS_TIMEOUT=600 bash
   bin/check-acs.sh <spec>`; AC9's check derives and runs every suite naming
   `team-setup`, `skills/setup`, the adopting guides or the READMEs.
+- T-1167: after editing `skills/run/SKILL.md`, `agents/pm-spec.md`, `agents/tech-lead.md`
+  or `docs/workflow*.md`, grep each derived suite for recursive delete first, then run
+  `bash bin/check-prompt-sync.sh`, `bash tests/codex-agents/run.sh`, and every
+  `tests/*/run.sh` that `git grep -lE 'skills/run/SKILL\.md|agents/pm-spec\.md|agents/tech-lead\.md|docs/workflow(\.ja)?\.md' -- 'tests/*/run.sh'`
+  returns, then `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh <spec>` (AC13 SKIP is expected).
+  A `check:` absence read for a phrase (e.g. `skipping the team workflow`) matches
+  substrings, so replacement prose must not re-spell the retired phrase.
