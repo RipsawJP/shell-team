@@ -432,6 +432,68 @@ ln -s "$D" "$R"'/.p$q'
 x="$(eb "$R" '.p$q/inner' claude-code)"
 { [ "$x" = 2 ] && [ -z "$(ls -A "$D")" ]; } && pass "containment: an outward symlink at a parent of the base exits 2, nothing written" || fail "containment: parent symlink (rc=$x)"
 
+# ---------------------------------------------------------------------------
+# T-1166 — the new-session note on the Codex CLI host (issue #654).
+# ---------------------------------------------------------------------------
+nn() { grep -c '^- new Codex session: ' "$1" || true; }
+R="$T/repo-ns1"; mk "$R"
+x="$(st "$R" --host codex-cli)"
+sec "$RM" "$T/o" > "$T/m"
+grep '^- new Codex session: ' "$T/m" > "$T/n" || true
+{ [ "$x" = 0 ] && sec Done: "$T/o" | grep -qF 'generated .codex/agents' && [ "$(nn "$T/o")" = 1 ] && [ "$(nn "$T/m")" = 1 ] \
+  && grep -qF .codex/agents "$T/n" && grep -qF 'this repository' "$T/n" && ! grep -qF decision "$T/n"; } \
+  && pass "T-1166 generated: one note line under the operator section, naming .codex/agents and this repository, free of the word decision" || fail "T-1166 generated: note (rc=$x)"
+snap "$R" > "$T/ns1"; cp "$T/o" "$T/o1"
+x="$(st "$R" --host codex-cli)"; cp "$T/o" "$T/o2"; snap "$R" > "$T/ns2"
+{ [ "$x" = 0 ] && cmp -s "$T/ns1" "$T/ns2" && [ "$(sec Done: "$T/o2")" = '- none' ] && sec 'Already in place:' "$T/o2" | grep -qF '.codex/agents is in sync' && ! grep -qF 'new Codex session' "$T/o2"; } \
+  && pass "T-1166 in-sync: a second run prints no note, leaves the tree byte-identical and Done: none" || fail "T-1166 in-sync: second run (rc=$x)"
+x="$(st "$R" --host codex-cli)"
+{ [ "$x" = 0 ] && cmp -s "$T/o" "$T/o2"; } && pass "T-1166 in-sync: a third run's stdout is byte-identical to the second's" || fail "T-1166 in-sync: third run differs (rc=$x)"
+R="$T/repo-ns2"; mk "$R"
+x="$( (export CODEX_THREAD_ID=t; st "$R") )"
+{ [ "$x" = 0 ] && [ "$(nn "$T/o")" = 1 ]; } && pass "T-1166 generated: CODEX_THREAD_ID with no --host also prints one note" || fail "T-1166 generated: CODEX_THREAD_ID (rc=$x)"
+R="$T/repo-ns3"; mk "$R"; st "$R" --host codex-cli > /dev/null
+printf 'drift\n' >> "$R/.codex/agents/shell-team-engineer.toml"
+x="$(st "$R" --host codex-cli)"
+{ [ "$x" = 0 ] && sec Done: "$T/o" | grep -qF 'regenerated .codex/agents' && [ "$(nn "$T/o")" = 1 ] && [ "$(sec "$RM" "$T/o" | grep -c '^- new Codex session: ')" = 1 ]; } \
+  && pass "T-1166 regenerated: a drifted file prints one note under the operator section" || fail "T-1166 regenerated: appended drift (rc=$x)"
+F="$R/.codex/agents/shell-team-pm-spec.toml"; rm -f "$F"
+x="$(st "$R" --host codex-cli)"
+{ [ "$x" = 0 ] && [ -f "$F" ] && [ "$(nn "$T/o")" = 1 ]; } && pass "T-1166 regenerated: a deleted role file is restored and prints one note" || fail "T-1166 regenerated: deleted file (rc=$x)"
+R="$T/repo-ns4"; mk "$R"; : > "$T/all"
+for i in 1 2; do
+  x="$(st "$R" --host claude-code)"; cat "$T/o" "$T/e" >> "$T/all"
+  [ "$x" = 0 ] || fail "T-1166 claude-code: run $i exit $x"
+done
+{ [ ! -e "$R/.codex" ] && grep -qxF "$RM" "$T/all" && ! grep -qF 'new Codex session' "$T/all"; } \
+  && pass "T-1166 claude-code: two runs print no note and create no .codex" || fail "T-1166 claude-code: note or .codex present"
+if [ "$is_root" -eq 1 ]; then
+  printf 'SKIP: T-1166 refused cases (running as root: a permission fixture is meaningless)\n'
+else
+  R="$T/repo-ns5"; mk "$R"; mkdir -p "$R/.codex"; chmod 555 "$R/.codex"
+  x="$(st "$R" --host codex-cli)"; chmod 755 "$R/.codex"
+  sec "$RM" "$T/o" > "$T/m"; grep '^- run yourself: ' "$T/m" > "$T/c" || true
+  { [ "$x" = 3 ] && [ "$(grep -c . "$T/c")" = 1 ] && grep -qF gen-codex-agents.sh "$T/c" && [ "$(nn "$T/m")" = 1 ] && [ "$(nn "$T/o")" = 1 ]; } \
+    && pass "T-1166 refused: a refused generator write (fresh) prints one run-yourself line and one note" || fail "T-1166 refused: fresh read-only .codex (rc=$x)"
+  C="$(sed 's/^- run yourself: //' "$T/c")"
+  (cd "$R" && bash -c "$C") > /dev/null 2>&1
+  x="$(st "$R" --host codex-cli)"
+  { [ "$x" = 0 ] && grep -qF 'in sync' "$T/o" && [ "$(nn "$T/o")" = 0 ]; } \
+    && pass "T-1166 refused: after the printed command ran, the re-run is in sync with no note" || fail "T-1166 refused: re-run (rc=$x)"
+  R="$T/repo-ns6"; mk "$R"; st "$R" --host codex-cli > /dev/null
+  rm -f "$R/.codex/agents/shell-team-pm-spec.toml"; chmod 555 "$R/.codex/agents"
+  x="$(st "$R" --host codex-cli)"; chmod 755 "$R/.codex/agents"
+  sec "$RM" "$T/o" > "$T/m"; grep '^- run yourself: ' "$T/m" > "$T/c" || true
+  { [ "$x" = 3 ] && [ "$(grep -c . "$T/c")" = 1 ] && grep -qF gen-codex-agents.sh "$T/c" && [ "$(nn "$T/m")" = 1 ]; } \
+    && pass "T-1166 refused: a drifted, non-writable agents dir prints one run-yourself line and one note" || fail "T-1166 refused: drifted read-only agents (rc=$x)"
+  R="$T/repo-ns7"; mk "$R"; st "$R" --host codex-cli > /dev/null
+  X="$R/.git/info/exclude"; printf '# keep\n' > "$X"; chmod 444 "$X"; chmod 555 "$R/.git/info"
+  x="$(st "$R" --host codex-cli)"; chmod 755 "$R/.git/info"; chmod 644 "$X"
+  sec "$RM" "$T/o" > "$T/m"; grep '^- run yourself: ' "$T/m" > "$T/c" || true
+  { [ "$x" = 3 ] && [ "$(grep -c . "$T/c")" = 1 ] && grep -qF exclude "$T/c" && ! grep -qF gen-codex-agents.sh "$T/c" && [ "$(nn "$T/o")" = 0 ]; } \
+    && pass "T-1166 refused: a refused exclude write alone prints no note" || fail "T-1166 refused: exclude only (rc=$x)"
+fi
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'setup suite: all assertions passed\n'

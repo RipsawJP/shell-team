@@ -434,6 +434,20 @@ setup はこれらの成果物の外には何も書かず、Codex や Claude Cod
 は、書き込み先がその plugin 成果物 1 つに限られる正確なコマンドが 1 つ
 出力されるので、host のコマンド単位の承認で通すか、自分で実行する。
 
+setup が生成または変更した role は、このリポジトリで開始した新しい Codex セッション
+で有効になる。実行中のセッションで生成された project agent を Codex は選択しない。
+実行が `.codex/agents/` を生成・再生成した場合、またはそのコマンドを出力した場合、
+報告には `- new Codex session:` の行が 1 行付き、その旨を述べる。ループは新しい
+セッションで始める。そのコマンドを自分で承認・実行し、再実行が `.codex/agents` を
+in sync と報告した場合でも同じである。`.codex/agents` が元から in sync だった報告は
+何も付け足さない。根拠はこのリポジトリに伝達されたもので、ここで再測定したものではない。
+`codex-cli 0.159.3`・shell-team 2.8.0 で、`.codex/agents/` を生成した setup と同じ
+セッションで入力した run の依頼は、`spawn_agent` が `shell-team-tech-lead` を選択
+できず Plan `BLOCKED` で止まった。同じリポジトリの新しいセッションは
+`shell-team-tech-lead` と `shell-team-engineer` を起動し、`.codex/agents/` が
+セッション開始前から存在した baseline も同様だった（いずれも subagent スレッドの
+`agent_role` として記録。model・multi-agent mode・collaboration mode は同一）。
+
 operator の判断に残るものは報告されるだけで、変更されない。2026-10-01 の
 `codex-cli 0.159.3` での実行はこのリポジトリに伝達されたもので、ここで
 再測定したものではない。各項目に証拠の種類を付す:
