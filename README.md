@@ -134,6 +134,8 @@ shell-team a /healthz endpoint that returns build sha + uptime
 
 The main Claude session recognizes a non-trivial request and routes it through the team (Plan → Specify → Implement → Validate → Review), pausing for you before any merge — the same way you already get a cross-provider code review without typing a slash command. See [docs/usage-conversational.md](docs/usage-conversational.md) for the full model, more example conversations, and the one opt-in step that makes the *full* loop fire reliably from chat.
 
+Before the first role is dispatched, the run checks — read-only, on either host — that setup is present for this host (on a Codex CLI host, that `.codex/agents` holds its role files), through `bash "<plugin root>/bin/check-setup.sh"`. If something is missing it stops `BLOCKED` with that check's own output and names the prompt `set up shell-team` (or `update shell-team`) as the remedy for the plugin's part; anything on your host's side is reported as your decision, and nothing is changed or substituted.
+
 On a Claude Code host, it also works standalone, one agent or skill at a time, when you want to be explicit — these are Claude Code slash commands and agent mentions; a Codex CLI host drives the same five roles directly through [the runbook](docs/adopting.md#using-shell-team-from-codex-cli)'s own dispatch, with no equivalent slash-command surface of its own:
 
 ```text
@@ -204,6 +206,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 │   ├── discover-work.sh             # read-only triage discovery engine
 │   ├── team-init.sh                 # adopting-repo scaffolder
 │   ├── team-setup.sh                # the setup prompt's script (scaffold, Codex agents, report)
+│   ├── check-setup.sh               # read-only run-start check: setup present for this host
 │   └── install                      # legacy vendoring fallback
 ├── templates/                       # generic scaffolds used by team-init
 ├── docs/

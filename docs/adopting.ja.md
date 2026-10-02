@@ -156,6 +156,18 @@ FAIL を報告する。
 ボード（`<base>/todo.md`）の status flag を進め、マージ/プッシュの前に人間のために
 一時停止します。
 
+**最初の dispatch の前に、run は setup が揃っていることを確認します。** Step 0 が
+どちらの host でも `bash "<plugin root>/bin/check-setup.sh"` を 1 回実行します。
+read-only で、ボード・specs dir・loop contract の有無、Codex CLI host では
+`.codex/agents` と生成された 5 つの role ファイルの有無（存在のみ・内容は比較
+しません）、そして `command -v` のみで相手側 provider の CLI の有無を調べます。満たされないものがあれば、run は
+チェッカー自身の出力とともに `BLOCKED` で止まり、plugin 側の対処としてプロンプト
+`set up shell-team`（または `update shell-team`）を案内します。host 側の条件は
+operator の判断として述べます。このチェックは別の dispatch 経路や executor へ
+差し替えず、host の設定も変更しません。`code-reviewer` を同系統の executor に
+再割り当てしていて相手側 provider の CLI を持たない host も、この CLI の行により
+Step 0 で止まります。
+
 **ループはセッションの root にある repository に対して動きます。** `run` は
 ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、
 起動される sub-agent もその同じツリーを読み・編集し・テストします。別の checkout を
@@ -412,7 +424,9 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
 Claude Code CLI が存在するかは `command -v claude` で確認する（実行は
 しない）。最後に `Done:`・`Already in place:`・`Remains the operator's
 decision:` の 3 部構成で報告する。plugin の upgrade 後は `update shell-team`
-と入力する——同じフローの再実行で冪等、2 回目は何も変えない。同じプロンプトは
+と入力する——同じフローの再実行で冪等、2 回目は何も変えない。run の開始時には
+`bash "<plugin root>/bin/check-setup.sh"` が同じ前提条件を read-only で確認し、
+欠けている場合はこのプロンプトを案内して `BLOCKED` で止まる（存在のみの確認で、内容が古い role ファイルは run 開始時チェックを通り、`update shell-team` が報告する）。同じプロンプトは
 Claude Code host でも（`.codex` の部分を除いて）同じフローを走らせる。
 setup はこれらの成果物の外には何も書かず、Codex や Claude Code の設定を
 書き込まず、承認ルールも追加しない。Codex の sandbox が書き込みを拒否した

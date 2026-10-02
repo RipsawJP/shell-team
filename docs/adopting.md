@@ -150,6 +150,20 @@ The loop runs Plan → Specify → Implement → Validate → Review, advancing 
 flag in the board (`<base>/todo.md`) at each phase gate, and pauses for a human
 before merge/push.
 
+**Before the first dispatch, the run checks that setup is in place.** Step 0
+runs `bash "<plugin root>/bin/check-setup.sh"` once, on either host. It is
+read-only: it looks for the board, the specs dir and the loop contract, on the
+Codex CLI host for `.codex/agents` and the five generated role files (presence
+only, contents are not compared), and, with `command -v` only, for the other
+provider's CLI. When something is unmet the run
+stops `BLOCKED` with the checker's own output and names the prompt
+`set up shell-team` (or `update shell-team`) as the remedy for the plugin's
+part; a condition on the host's side is stated as the operator's decision. The
+check never substitutes another dispatch path or executor and never changes the
+host's configuration. A host that rebinds `code-reviewer` to a same-family
+executor and has no other-provider CLI is still stopped at Step 0 by the CLI
+line.
+
 **The loop operates on the repository your session is rooted in.** `run`
 resolves the board, specs and loop contract from the current working directory
 (the skill's Step 0), and the sub-agents it dispatches read, edit and test that
@@ -405,7 +419,9 @@ is edited. It checks with `command -v claude` that the Claude Code CLI is
 present, without running it. And it ends with a three-part report: `Done:`,
 `Already in place:` and `Remains the operator's decision:`. After a plugin
 upgrade, type `update shell-team`: the same flow re-run, idempotent, so a
-second run changes nothing. The same prompt runs the same flow on a Claude
+second run changes nothing. At the start of every run, `bash "<plugin root>/bin/check-setup.sh"`
+checks the same prerequisites read-only and stops the run `BLOCKED`, naming this
+prompt, when one is missing (presence only: a role file with stale contents passes the run-start check and is reported by `update shell-team`). The same prompt runs the same flow on a Claude
 Code host, without the `.codex` part. Setup writes nothing outside those
 artifacts, never writes your Codex or Claude Code configuration, and never
 adds an approval rule. When the Codex sandbox refuses one of its writes (it
