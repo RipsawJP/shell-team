@@ -426,7 +426,7 @@ Claude Code CLI が存在するかは `command -v claude` で確認する（実�
 decision:` の 3 部構成で報告する。plugin の upgrade 後は `update shell-team`
 と入力する——同じフローの再実行で冪等、2 回目は何も変えない。run の開始時には
 `bash "<plugin root>/bin/check-setup.sh"` が同じ前提条件を read-only で確認し、
-欠けているか古い場合はこのプロンプトを案内して `BLOCKED` で止まる。同じプロンプトは
+欠けている場合はこのプロンプトを案内して `BLOCKED` で止まる（存在のみの確認で、内容が古い role ファイルは run 開始時チェックを通り、`update shell-team` が報告する）。同じプロンプトは
 Claude Code host でも（`.codex` の部分を除いて）同じフローを走らせる。
 setup はこれらの成果物の外には何も書かず、Codex や Claude Code の設定を
 書き込まず、承認ルールも追加しない。Codex の sandbox が書き込みを拒否した

@@ -421,7 +421,7 @@ present, without running it. And it ends with a three-part report: `Done:`,
 upgrade, type `update shell-team`: the same flow re-run, idempotent, so a
 second run changes nothing. At the start of every run, `bash "<plugin root>/bin/check-setup.sh"`
 checks the same prerequisites read-only and stops the run `BLOCKED`, naming this
-prompt, when one is missing or out of date. The same prompt runs the same flow on a Claude
+prompt, when one is missing (presence only: a role file with stale contents passes the run-start check and is reported by `update shell-team`). The same prompt runs the same flow on a Claude
 Code host, without the `.codex` part. Setup writes nothing outside those
 artifacts, never writes your Codex or Claude Code configuration, and never
 adds an approval rule. When the Codex sandbox refuses one of its writes (it
