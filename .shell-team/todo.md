@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1167** The trivial path creates a minimal board entry and spec, so a trivial run passes the Implement-to-Validate seams and reaches READY_FOR_QA (issue #655) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1167-trivial-path-record-gates.md
+- [ ] **T-1167** The trivial path creates a minimal board entry and spec, so a trivial run passes the Implement-to-Validate seams and reaches READY_FOR_QA (issue #655) — `READY_FOR_QA` — spec: .shell-team/specs/T-1167-trivial-path-record-gates.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #655 (the task's own tracker item; Problem and Expected relayed verbatim by the coordinating session and quoted in the spec; no separate issue filed). Design decision (recommendation A: a minimal entry and spec on the trivial path, no `bin/` change) and the pre-commitment (never-dropped decisions 1–6; droppable workflow-guide wording, then tech-lead wording) are the coordinating session's, relayed. Stacked on `feature/654-codex-new-session` at `90a131a6` (T-1166, PR #656 open); AC9 reads the base through the two-arm base-ref-discriminator. The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once — AC1 and AC2 run the unchanged checkers and must be green at the freeze, or the pre-commitment's stop-and-return-to-planning applies.
