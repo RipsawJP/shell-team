@@ -87,7 +87,7 @@ snap() {
   local r="$1" h
   h="$(git -C "$r" rev-parse -q --verify HEAD 2> /dev/null || printf 'unborn')"
   printf 'HEAD=%s\nSTAGED=%s\nSTATUS=%s\n' "$h" \
-    "$(git -C "$r" diff --cached --name-only)" \
+    "$(git -C "$r" -c diff.ignoreSubmodules=none diff --cached --raw --ignore-submodules=none --no-renames)" \
     "$(git -C "$r" status --porcelain)"
 }
 
@@ -121,6 +121,21 @@ assert_ref_env() {
   shift 4
   before="$(snap "$r")"
   run_in "$r" "$e" "$@"
+  after="$(snap "$r")"
+  ref_check "$id" "$before" "$after" "$class"
+}
+# assert_ref_envs <id> <repo> <class> <env assignment>... -- <args...>
+assert_ref_envs() {
+  local id="$1" r="$2" class="$3" before after
+  local envs=()
+  shift 3
+  while [ "$1" != "--" ]; do envs+=("$1"); shift; done
+  shift
+  before="$(snap "$r")"
+  RC=0
+  (cd "$r" && env "${envs[@]}" bash "$SCRIPT" "$@" < /dev/null > "$T/o" 2> "$T/e") || RC=$?
+  OUT="$(cat "$T/o")"
+  ERR="$(cat "$T/e")"
   after="$(snap "$r")"
   ref_check "$id" "$before" "$after" "$class"
 }
@@ -390,7 +405,7 @@ git -C "$r" update-index --add --cacheinfo "160000,$(git -C "$r" rev-parse HEAD)
 git -C "$r" commit -q -m gitlink
 mkdir -p "$r/gl"; printf 'y\n' >> "$r/README"
 mkdir -p "$r/nested"; git -C "$r/nested" init -q; printf 'n\n' > "$r/nested/f.txt"
-if path_case ref-path-gitlink gl "path|not a regular file" && path_case ref-path-gitlink gl/inside.txt "path|does not exist" && path_case ref-path-gitlink nested/f.txt "path|nested repository"; then
+if path_case ref-path-gitlink gl "path|not a regular file" && path_case ref-path-gitlink gl/inside.txt "path|non-tree entry" && path_case ref-path-gitlink nested/f.txt "path|nested repository"; then
   pass "ref-path-gitlink a gitlink path, a path beneath it and a path inside a nested repository"
 fi
 
@@ -431,6 +446,122 @@ if assert_ref ref-index-staged-removal "$r" "index|staged change" --message-file
   pass "ref-index-staged-removal a staged removal (the state an all-staging form would carry)"
 fi
 
+# A directory replacing a tracked file, and the same under a tracked symlink.
+new_repo; r="$R"; printf 'a\n' > "$r/a"; git -C "$r" add a; git -C "$r" commit -q -m afile
+mkdir -p "$T/moved-a$CASE"; mv "$r/a" "$T/moved-a$CASE/a"; mkdir -p "$r/a"; printf 'b\n' > "$r/a/b.txt"
+if assert_ref ref-path-parent-tracked-file "$r" "path|non-tree entry" --message-file "$MSG" -- a/b.txt; then
+  pass "ref-path-parent-tracked-file a directory replacing a tracked file (the request would stage the file's removal)"
+fi
+new_repo; r="$R"; ln -s README "$r/lk"; git -C "$r" add lk; git -C "$r" commit -q -m symlink2
+mkdir -p "$T/moved-lk$CASE"; mv "$r/lk" "$T/moved-lk$CASE/lk"; mkdir -p "$r/lk"; printf 'b\n' > "$r/lk/b.txt"
+if assert_ref ref-path-parent-tracked-symlink "$r" "path|non-tree entry" --message-file "$MSG" -- lk/b.txt; then
+  pass "ref-path-parent-tracked-symlink a directory replacing a tracked symlink"
+fi
+# The reverse shape: a file replacing a tracked directory is a type change.
+new_repo; r="$R"; mkdir -p "$T/moved-sub$CASE"; mv "$r/sub" "$T/moved-sub$CASE/sub"; printf 'f\n' > "$r/sub"
+if assert_ref ref-path-type-change-dir "$r" "path|tracked in HEAD as mode 040000" --message-file "$MSG" -- sub; then
+  pass "ref-path-type-change-dir a regular file replacing a tracked directory"
+fi
+
+# A gitlink staged by hand and hidden from a plain diff by configuration.
+new_repo; r="$R"
+git -C "$r" config diff.ignoreSubmodules all
+git -C "$r" update-index --add --cacheinfo "160000,$(git -C "$r" rev-parse HEAD),sub2"
+printf 'y\n' >> "$r/README"
+if git -C "$r" diff --cached --quiet \
+  && assert_ref ref-index-hidden-gitlink "$r" "index|staged change" --message-file "$MSG" -- README \
+  && git -C "$r" -c diff.ignoreSubmodules=none diff --cached --raw --ignore-submodules=none | grep -qF 'sub2'; then
+  pass "ref-index-hidden-gitlink a staged gitlink hidden by diff.ignoreSubmodules=all is still refused and still staged (control: a plain diff reports nothing)"
+else
+  fail "ref-index-hidden-gitlink: control or refusal failed (stderr: $ERR)"
+fi
+new_repo; r="$R"
+printf '[submodule "sub2"]\n\tpath = sub2\n\turl = ./nowhere\n\tignore = all\n' > "$r/.gitmodules"
+git -C "$r" add .gitmodules; git -C "$r" commit -q -m gitmodules
+git -C "$r" update-index --add --cacheinfo "160000,$(git -C "$r" rev-parse HEAD),sub2"
+printf 'y\n' >> "$r/README"
+if git -C "$r" diff --cached --quiet \
+  && assert_ref ref-index-hidden-gitlink-gitmodules "$r" "index|staged change" --message-file "$MSG" -- README \
+  && git -C "$r" -c diff.ignoreSubmodules=none diff --cached --raw --ignore-submodules=none | grep -qF 'sub2'; then
+  pass "ref-index-hidden-gitlink-gitmodules a staged gitlink hidden by a .gitmodules ignore=all is still refused and still staged"
+else
+  fail "ref-index-hidden-gitlink-gitmodules: control or refusal failed (stderr: $ERR)"
+fi
+
+# The invariant itself: the leading-directory refusal is disabled in a scratch
+# copy, so the directory-replaces-a-file request reaches git add, which stages
+# the file's removal beside the requested addition. Exit 4, no commit, the
+# index left as it is, the extra entry named.
+new_repo; r="$R"; printf 'a\n' > "$r/a"; git -C "$r" add a; git -C "$r" commit -q -m afile
+mkdir -p "$T/moved-a$CASE"; mv "$r/a" "$T/moved-a$CASE/a"; mkdir -p "$r/a"; printf 'b\n' > "$r/a/b.txt"
+COPY="$T/copy-no-leading-dir/team-commit.sh"
+mkdir -p "$T/copy-no-leading-dir"
+sed '/leading-dir-refusal/s/refuse path/true path/' "$SCRIPT" > "$COPY"
+chmod +x "$COPY"
+if [ "$(grep -c 'leading-dir-refusal' "$COPY")" = 1 ] && ! cmp -s "$SCRIPT" "$COPY"; then
+  SAVE_SCRIPT="$SCRIPT"; SCRIPT="$COPY"
+  base="$(git -C "$r" rev-parse HEAD)"
+  run_in "$r" "$NOENV" --message-file "$MSG" -- a/b.txt
+  SCRIPT="$SAVE_SCRIPT"
+  staged="$(git -C "$r" -c diff.ignoreSubmodules=none diff --cached --raw --ignore-submodules=none --no-renames)"
+  if [ "$RC" -eq 4 ] && [ "$(git -C "$r" rev-parse HEAD)" = "$base" ] && [ -z "$OUT" ] \
+    && printf '%s' "$staged" | grep -q "D${TAB}a\$" && printf '%s' "$staged" | grep -q "A${TAB}a/b.txt\$" \
+    && printf '%s' "$ERR" | grep -qF 'D 100644 000000 a' && printf '%s' "$ERR" | grep -qF 'pre-commit invariant' \
+    && printf '%s' "$ERR" | grep -qF 'staged beyond the requested set: a'; then
+    pass "pre-invariant-extra-staged with the preflight disabled the invariant stops the commit: exit 4, HEAD unchanged, the staged removal kept and named"
+  else
+    fail "pre-invariant-extra-staged: rc=$RC out=$OUT err=$ERR staged=$staged"
+  fi
+else
+  fail "pre-invariant-extra-staged: the scratch copy did not disable exactly the leading-directory refusal"
+fi
+
+# The invariant's two judgments each stop a commit on their own. Scratch copies
+# disable one preflight refusal at a time (marker comment on its line): a mode
+# change reaches git add and the invariant judges the entry (kind), a request
+# for an unchanged file reaches it and the invariant judges the set.
+disable_marker() {
+  local marker="$1" want="$2" out="$T/copy-$1/team-commit.sh"
+  mkdir -p "$T/copy-$1"
+  sed "/$marker/s/refuse path/true path/" "$SCRIPT" > "$out"
+  chmod +x "$out"
+  if [ "$(grep -c "$marker" "$out")" = "$want" ] && ! cmp -s "$SCRIPT" "$out"; then
+    printf '%s' "$out"
+  else
+    printf ''
+  fi
+}
+new_repo; r="$R"; chmod +x "$r/c.txt"; printf 'more\n' >> "$r/c.txt"
+COPY="$(disable_marker mode-change-refusal 1)"
+if [ -n "$COPY" ]; then
+  SAVE_SCRIPT="$SCRIPT"; SCRIPT="$COPY"; base="$(git -C "$r" rev-parse HEAD)"
+  run_in "$r" "$NOENV" --message-file "$MSG" -- c.txt
+  SCRIPT="$SAVE_SCRIPT"
+  if [ "$RC" -eq 4 ] && [ "$(git -C "$r" rev-parse HEAD)" = "$base" ] && [ "$(git -C "$r" diff --cached --name-only)" = "c.txt" ] \
+    && printf '%s' "$ERR" | grep -qF 'M 100644 100755 c.txt' && printf '%s' "$ERR" | grep -qF 'not a plain addition or modification'; then
+    pass "pre-invariant-mode-change a mode change that reaches git add is stopped by the invariant's kind judgment: exit 4, nothing committed, still staged"
+  else
+    fail "pre-invariant-mode-change: rc=$RC err=$ERR"
+  fi
+else
+  fail "pre-invariant-mode-change: the scratch copy did not disable exactly the mode-change refusal"
+fi
+new_repo; r="$R"; printf 'y\n' >> "$r/README"
+COPY="$(disable_marker unchanged-refusal 1)"
+if [ -n "$COPY" ]; then
+  SAVE_SCRIPT="$SCRIPT"; SCRIPT="$COPY"; base="$(git -C "$r" rev-parse HEAD)"
+  run_in "$r" "$NOENV" --message-file "$MSG" -- README c.txt
+  SCRIPT="$SAVE_SCRIPT"
+  if [ "$RC" -eq 4 ] && [ "$(git -C "$r" rev-parse HEAD)" = "$base" ] && [ "$(git -C "$r" diff --cached --name-only)" = "README" ] \
+    && printf '%s' "$ERR" | grep -qF 'differ from the requested paths'; then
+    pass "pre-invariant-missing-requested a requested path that staged nothing is stopped by the invariant's set judgment: exit 4, nothing committed"
+  else
+    fail "pre-invariant-missing-requested: rc=$RC err=$ERR"
+  fi
+else
+  fail "pre-invariant-missing-requested: the scratch copy did not disable exactly the unchanged refusal"
+fi
+
 # --- ref-env -----------------------------------------------------------------
 
 new_repo; r="$R"; printf 'y\n' >> "$r/README"
@@ -443,7 +574,29 @@ if assert_ref_env ref-env-index-file "$r" "environment|GIT_INDEX_FILE is set" "G
 if assert_ref_env ref-env-literal-pathspecs "$r" "environment|GIT_LITERAL_PATHSPECS is set" "GIT_LITERAL_PATHSPECS=1" --message-file "$MSG" -- README; then pass "ref-env-literal-pathspecs GIT_LITERAL_PATHSPECS set"; fi
 if assert_ref_env ref-env-glob-pathspecs "$r" "environment|GIT_GLOB_PATHSPECS is set" "GIT_GLOB_PATHSPECS=1" --message-file "$MSG" -- README; then pass "ref-env-glob-pathspecs GIT_GLOB_PATHSPECS set"; fi
 if assert_ref_env ref-env-config-parameters "$r" "environment|GIT_CONFIG_PARAMETERS is set" "GIT_CONFIG_PARAMETERS='core.x'='y'" --message-file "$MSG" -- README; then pass "ref-env-config-parameters GIT_CONFIG_PARAMETERS set"; fi
-if assert_ref_env ref-env-config-count "$r" "environment|GIT_CONFIG_COUNT is set" "GIT_CONFIG_COUNT=0" --message-file "$MSG" -- README; then pass "ref-env-config-count GIT_CONFIG_COUNT set"; fi
+if assert_ref_envs ref-env-config-count-other "$r" "environment|GIT_CONFIG_COUNT" \
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null -- --message-file "$MSG" -- README \
+  && printf '%s' "$ERR" | grep -qF 'unset' \
+  && assert_ref_envs ref-env-config-count-other "$r" "environment|GIT_CONFIG_COUNT" \
+    GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*' GIT_CONFIG_KEY_1=safe.directory.x GIT_CONFIG_VALUE_1=y -- --message-file "$MSG" -- README \
+  && printf '%s' "$ERR" | grep -qF 'unset'; then
+  pass "ref-env-config-count-other a GIT_CONFIG_COUNT key other than safe.directory is refused, with the unset remedy"
+else
+  fail "ref-env-config-count-other: refusal text must name GIT_CONFIG_COUNT and unset (stderr: $ERR)"
+fi
+ok=1
+SD='*'
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=x -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT= -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=-1 -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=99999999999 -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=99999999999999999999999999 -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=1 -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=safe.directory "GIT_CONFIG_VALUE_0=$SD" -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=1 "GIT_CONFIG_KEY_0=safe.directory " "GIT_CONFIG_VALUE_0=$SD" -- --message-file "$MSG" -- README || ok=0
+assert_ref_envs ref-env-config-count-malformed "$r" "environment|GIT_CONFIG_COUNT" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directoryx "GIT_CONFIG_VALUE_0=$SD" -- --message-file "$MSG" -- README || ok=0
+[ "$ok" -eq 1 ] && pass "ref-env-config-count-malformed a non-numeric, empty, negative or huge count, a missing key or value, a near-miss key"
 ok=1
 for v in GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE GIT_NOGLOB_PATHSPECS GIT_ICASE_PATHSPECS; do
   assert_ref_env ref-env-others "$r" "environment|$v is set" "$v=$r/.git" --message-file "$MSG" -- README || ok=0
@@ -570,6 +723,19 @@ else
   fail "post-mismatch-symlink-new: rc=$RC out=$OUT err=$ERR"
 fi
 
+# A hook that sets a requested file's executable bit: the path set matches, the
+# modification changes mode (v2: exit 3, the commit kept).
+new_repo; r="$R"; printf 'y\n' >> "$r/README"
+mk_hook "$r" 'git update-index --chmod=+x README' pre-commit
+base="$(git -C "$r" rev-parse HEAD)"
+run_in "$r" "$NOENV" --message-file "$MSG" -- README
+if [ "$RC" -eq 3 ] && [ -z "$OUT" ] && [ "$(git -C "$r" rev-parse HEAD~1)" = "$base" ] \
+  && git -C "$r" diff-tree --no-commit-id --raw -r --no-renames HEAD | grep -qE "^:100644 100755 [0-9a-f]+ [0-9a-f]+ M${TAB}README\$"; then
+  pass "post-mismatch-mode a hook changed a requested file's mode: exit 3, the commit kept"
+else
+  fail "post-mismatch-mode: rc=$RC out=$OUT err=$ERR"
+fi
+
 # A failing git add (the index is locked): exit 1, nothing reset, nothing committed.
 new_repo; r="$R"; printf 'y\n' >> "$r/README"
 : > "$r/.git/index.lock"
@@ -593,6 +759,19 @@ if [ "$RC" -eq 3 ] && [ "$(git -C "$r" rev-parse HEAD~2)" = "$base" ] && [ -z "$
   pass "post-parent-moved a post-commit hook that adds a commit on the same path: exit 3, nothing reset"
 else
   fail "post-parent-moved: rc=$RC out=$OUT err=$ERR"
+fi
+
+# GIT_CONFIG_COUNT with only safe.directory keys (any letter case) is accepted;
+# a pair at or above the count is ignored, as git ignores it.
+new_repo; r="$R"; printf 'y\n' >> "$r/README"
+base="$(git -C "$r" rev-parse HEAD)"
+RC=0
+(cd "$r" && env GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=safe.directory "GIT_CONFIG_VALUE_0=*" GIT_CONFIG_KEY_1=Safe.Directory "GIT_CONFIG_VALUE_1=$r" \
+  GIT_CONFIG_KEY_2=core.hooksPath GIT_CONFIG_VALUE_2=/dev/null bash "$SCRIPT" --message-file "$MSG" -- README < /dev/null > "$T/o" 2> "$T/e") || RC=$?
+if [ "$RC" -eq 0 ] && [ "$(git -C "$r" rev-parse HEAD~1)" = "$base" ] && [ "$(cat "$T/o")" = "$(git -C "$r" rev-parse HEAD)" ]; then
+  pass "ok-env-config-count-safe-directory GIT_CONFIG_COUNT with safe.directory keys in two letter cases is accepted"
+else
+  fail "ok-env-config-count-safe-directory: rc=$RC stderr=$(cat "$T/e")"
 fi
 
 # --- help --------------------------------------------------------------------

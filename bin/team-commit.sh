@@ -29,9 +29,16 @@
 # file (no symlink, directory or nested repository on the way), not ignored,
 # that is new or differs from HEAD in content with its mode unchanged.
 #
-# After the commit it verifies that the commit holds exactly the requested
-# paths, each added or modified, no deletion, symlink or gitlink; a mismatch is
-# reported and the commit is kept (nothing is reset, undone or amended).
+# After `git add` and immediately before `git commit` it checks that the staged
+# tree differs from HEAD only by the requested paths, each added (regular-file
+# mode) or modified (mode unchanged); otherwise it stops with exit 4 without
+# committing and leaves the index as it is. After the commit it verifies the same
+# of the new commit; a mismatch is reported and the commit is kept (nothing is
+# reset, undone or amended). Both comparisons are config-independent: no rename
+# detection, submodules never ignored, no external diff driver or textconv.
+# Accepted risks, stated in the adopting guides: a repository's own hook may
+# change the commit after the invariant (exit 3 reports it); a concurrent
+# writer in the work tree is not guarded against.
 #
 # Exit codes:
 #   0  committed and verified; stdout is the new commit's full SHA
@@ -39,6 +46,8 @@
 #   2  refused before any write (usage, environment, repository, message file,
 #      path)
 #   3  committed, but verification found a mismatch; the commit is kept
+#   4  the pre-commit invariant failed after git add: no commit was made, HEAD
+#      is unchanged, the staged index is left as it is
 #
 # External dependencies: bash 3.2+ and standard POSIX tools plus git.
 
@@ -81,16 +90,23 @@ Refused before any write: a git-redirecting environment variable set
 (GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY,
 GIT_ALTERNATE_OBJECT_DIRECTORIES, GIT_COMMON_DIR, GIT_NAMESPACE,
 GIT_LITERAL_PATHSPECS, GIT_GLOB_PATHSPECS, GIT_NOGLOB_PATHSPECS,
-GIT_ICASE_PATHSPECS, GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT); not run from the
-top level of a work tree; a detached or unborn HEAD; a merge, cherry-pick,
+GIT_ICASE_PATHSPECS, GIT_CONFIG_PARAMETERS); GIT_CONFIG_COUNT unless every key
+is safe.directory (then unset GIT_CONFIG_COUNT and its key/value pairs, or move
+the setting into your own git config); not run from the top level of a work tree; a detached or unborn HEAD; a merge, cherry-pick,
 revert or rebase in progress; anything already staged; a message file that is
 missing, a symlink, empty, inside the work tree or spelled with characters
 outside [A-Za-z0-9._/-]; a path that is absolute, climbs out, names .git,
 uses characters outside [A-Za-z0-9._/-], repeats, is a symlink or directory,
+sits under a leading directory that HEAD tracks as a file, symlink or gitlink,
 is missing (a removal), is ignored, is unchanged, or changes only its mode.
 
-After the commit it checks that the commit holds exactly the requested paths,
-each added or modified. A mismatch is reported and the commit is kept.
+After staging and before committing it checks that the staged tree differs from
+HEAD only by the requested paths, each added or modified with an unchanged
+mode; otherwise it stops without committing and leaves the index as it is.
+After the commit it checks the same of the new commit. A mismatch there is
+reported and the commit is kept. A repository's own hook may change the commit
+after the first check, and a concurrent writer in the work tree is not guarded
+against.
 
 Stdout on success: the new commit's full SHA. Diagnostics go to stderr.
 
@@ -99,6 +115,8 @@ Exit codes:
   1  a git add or git commit run by this script failed; nothing is reset
   2  refused before any write
   3  committed, but verification found a mismatch; the commit is kept
+  4  the pre-commit invariant failed: no commit was made, the staged index is
+     left as it is
 EOF
 }
 
@@ -146,11 +164,36 @@ done
 for v in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE \
   GIT_LITERAL_PATHSPECS GIT_GLOB_PATHSPECS GIT_NOGLOB_PATHSPECS \
-  GIT_ICASE_PATHSPECS GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT; do
+  GIT_ICASE_PATHSPECS GIT_CONFIG_PARAMETERS; do
   if [ -n "${!v+x}" ]; then
     refuse environment "$v is set; it redirects the repository, index or pathspec semantics"
   fi
 done
+# GIT_CONFIG_COUNT is accepted only when it is a short non-negative decimal
+# integer and every key below it (with its value) is safe.directory in any
+# letter case — the shape a sandbox exports. Keys at or above the count are
+# ignored, as git ignores them.
+if [ -n "${GIT_CONFIG_COUNT+x}" ]; then
+  COUNT_REMEDY="unset GIT_CONFIG_COUNT and its GIT_CONFIG_KEY_<n>/GIT_CONFIG_VALUE_<n> pairs (or move the setting into your own git config) and re-run"
+  case "$GIT_CONFIG_COUNT" in
+    ''|*[!0-9]*) refuse environment "GIT_CONFIG_COUNT is not a non-negative decimal integer; $COUNT_REMEDY" ;;
+  esac
+  [ "${#GIT_CONFIG_COUNT}" -le 4 ] || refuse environment "GIT_CONFIG_COUNT is too large; $COUNT_REMEDY"
+  cfg_n=0
+  cfg_total=$((10#$GIT_CONFIG_COUNT))
+  while [ "$cfg_n" -lt "$cfg_total" ]; do
+    cfg_k="GIT_CONFIG_KEY_$cfg_n"
+    cfg_v="GIT_CONFIG_VALUE_$cfg_n"
+    if [ -z "${!cfg_k+x}" ] || [ -z "${!cfg_v+x}" ]; then
+      refuse environment "GIT_CONFIG_COUNT names pair $cfg_n but $cfg_k or $cfg_v is not set; $COUNT_REMEDY"
+    fi
+    case "${!cfg_k}" in
+      [sS][aA][fF][eE].[dD][iI][rR][eE][cC][tT][oO][rR][yY]) : ;;
+      *) refuse environment "GIT_CONFIG_COUNT carries a setting other than safe.directory ($cfg_k); $COUNT_REMEDY" ;;
+    esac
+    cfg_n=$((cfg_n + 1))
+  done
+fi
 command -v git > /dev/null 2>&1 || refuse environment "git is not on PATH"
 
 # ---------------------------------------------------------------------------
@@ -170,13 +213,15 @@ done
 
 export GIT_LITERAL_PATHSPECS=1
 
-idx_rc=0
-git diff --cached --quiet --no-renames > /dev/null 2>&1 || idx_rc=$?
-case "$idx_rc" in
-  0) : ;;
-  1) refuse index "the index already holds a staged change" ;;
-  *) refuse index "cannot read the index state (git diff exit $idx_rc)" ;;
-esac
+# Every comparison of the index or of a commit with HEAD is config-independent:
+# submodules never ignored (a staged gitlink is always seen, whatever
+# diff.ignoreSubmodules or a .gitmodules ignore setting says), no rename
+# detection, no external diff driver, no textconv.
+NEUTRAL=(-c diff.ignoreSubmodules=none -c core.quotepath=false)
+DIFFOPTS=(--no-renames --ignore-submodules=none --no-ext-diff --no-textconv --no-abbrev)
+
+IDX="$(git "${NEUTRAL[@]}" diff-index --cached --raw "${DIFFOPTS[@]}" HEAD 2> /dev/null)" || refuse index "cannot read the index state (git diff-index failed)"
+[ -z "$IDX" ] || refuse index "the index already holds a staged change"
 
 # ---------------------------------------------------------------------------
 # 4. Message file.
@@ -199,7 +244,7 @@ esac
 # 5. Paths.
 # ---------------------------------------------------------------------------
 check_path() {
-  local p="$1" dir rest comp ls_out head_mode raw meta om nm st rc
+  local p="$1" dir rest comp lead ls_out head_mode raw meta om nm st rc
   [ -n "$p" ] || refuse path "empty path"
   case "$p" in
     *[!A-Za-z0-9._/-]*) refuse path "$p: characters outside [A-Za-z0-9._/-]" ;;
@@ -226,6 +271,8 @@ check_path() {
     dir="${dir:+$dir/}$comp"
     [ ! -L "$dir" ] || refuse path "$p: $dir is a symlink"
     [ ! -e "$dir/.git" ] || refuse path "$p: $dir is a nested repository"
+    lead="$(git ls-tree HEAD -- "$dir")" || refuse path "$p: cannot read HEAD (git ls-tree failed)"
+    case "${lead%% *}" in 040000|'') : ;; *) refuse path "$p: leading directory $dir is tracked in HEAD as a non-tree entry (mode ${lead%% *})" ;; esac # leading-dir-refusal
   done
 
   [ ! -L "$p" ] || refuse path "$p: is a symlink"
@@ -245,23 +292,26 @@ check_path() {
   esac
 
   ls_out="$(git ls-tree HEAD -- "$p")" || refuse path "$p: cannot read HEAD (git ls-tree failed)"
-  raw="$(git diff --raw --no-renames --no-abbrev --no-ext-diff -- "$p")" || refuse path "$p: cannot compare with the index (git diff failed)"
+  raw="$(git "${NEUTRAL[@]}" diff --raw "${DIFFOPTS[@]}" -- "$p")" || refuse path "$p: cannot compare with the index (git diff failed)"
   if [ -n "$ls_out" ]; then
     head_mode="${ls_out%% *}"
     case "$head_mode" in
       100644|100755) : ;;
       *) refuse path "$p: tracked in HEAD as mode $head_mode, not a regular file" ;;
     esac
-    [ -n "$raw" ] || refuse path "$p: unchanged from HEAD"
-    meta="${raw%%$'\t'*}"
-    om="${meta%% *}"
-    om="${om#:}"
-    nm="${meta#* }"
-    nm="${nm%% *}"
-    st="${meta##* }"
-    [ "$st" = "M" ] || refuse path "$p: change kind $st is not a modification"
-    [ "$om" = "$nm" ] || refuse path "$p: mode change ($om to $nm); a mode change is not committed through this script"
-    [ "$om" = "$head_mode" ] || refuse path "$p: mode differs from HEAD"
+    if [ -z "$raw" ]; then
+      refuse path "$p: unchanged from HEAD" # unchanged-refusal
+    else
+      meta="${raw%%$'\t'*}"
+      om="${meta%% *}"
+      om="${om#:}"
+      nm="${meta#* }"
+      nm="${nm%% *}"
+      st="${meta##* }"
+      [ "$st" = "M" ] || refuse path "$p: change kind $st is not a modification"
+      [ "$om" = "$nm" ] || refuse path "$p: mode change ($om to $nm); a mode change is not committed through this script" # mode-change-refusal
+      [ "$om" = "$head_mode" ] || refuse path "$p: mode differs from HEAD"
+    fi
   else
     [ -z "$raw" ] || refuse path "$p: unexpected tracked state"
   fi
@@ -283,11 +333,67 @@ for p in "${PATHS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 6. The two writes.
+# 6. Entry scanning shared by the pre-commit invariant and the post-commit
+#    verification.
+# ---------------------------------------------------------------------------
+REQ="$(printf '%s\n' "${PATHS[@]}" | sort)"
+
+# scan_raw <raw diff output>: sets ACT (changed paths, one per line), ENTRIES
+# (one printable "<status> <old mode> <new mode> <path>" line per entry) and BAD
+# (what is not a plain addition with a regular-file mode, or a modification
+# whose old and new modes are equal regular-file modes).
+scan_raw() {
+  local raw="$1" line meta fpath om nm rest st save_ifs
+  ACT=""
+  BAD=""
+  ENTRIES=""
+  save_ifs="$IFS"
+  IFS=$'\n'
+  set -f
+  for line in $raw; do
+    case "$line" in
+      *$'\t'*) : ;;
+      *) BAD="$BAD unparseable-entry"; continue ;;
+    esac
+    meta="${line%%$'\t'*}"
+    fpath="${line#*$'\t'}"
+    om="${meta%% *}"
+    om="${om#:}"
+    rest="${meta#* }"
+    nm="${rest%% *}"
+    rest="${rest#* }"
+    rest="${rest#* }"
+    rest="${rest#* }"
+    st="$rest"
+    case "$st" in
+      A)
+        case "$nm" in
+          100644|100755) : ;;
+          *) BAD="$BAD A-mode-$nm:$fpath" ;;
+        esac
+        ;;
+      M)
+        case "$nm" in
+          100644|100755) : ;;
+          *) BAD="$BAD M-mode-$nm:$fpath" ;;
+        esac
+        [ "$om" = "$nm" ] || BAD="$BAD M-mode-change-$om-to-$nm:$fpath"
+        ;;
+      *) BAD="$BAD $st:$fpath" ;;
+    esac
+    ENTRIES="$ENTRIES$st $om $nm $fpath"$'\n'
+    ACT="$ACT$fpath"$'\n'
+  done
+  set +f
+  IFS="$save_ifs"
+}
+
+# ---------------------------------------------------------------------------
+# 7. The two writes, with the pre-commit invariant between them.
 # ---------------------------------------------------------------------------
 staged_now() {
   local s
-  s="$(git diff --cached --name-only 2> /dev/null || true)"
+  s="$(git "${NEUTRAL[@]}" diff-index --cached --name-only "${DIFFOPTS[@]}" HEAD 2> /dev/null || true)"
   if [ -n "$s" ]; then
     printf '%s\n' "$s"
   else
@@ -295,11 +401,40 @@ staged_now() {
   fi
 }
 
+# invariant_fail <why>: exit 4, no commit, the index left as it is.
+invariant_fail() {
+  local why="$1" extra="" l
+  err "team-commit: pre-commit invariant failed ($why); no commit was made, HEAD is unchanged and the staged index is left as it is (nothing is reset)."
+  err "requested paths:"
+  printf '%s\n' "$REQ" >&2 || true
+  err "staged entries (status, old mode, new mode, path):"
+  printf '%s' "$ENTRIES" >&2 || true
+  local save_ifs="$IFS"
+  IFS=$'\n'
+  set -f
+  for l in $ACT; do
+    if ! printf '%s\n' "$REQ" | grep -qxF -- "$l"; then
+      extra="$extra $l"
+    fi
+  done
+  set +f
+  IFS="$save_ifs"
+  err "staged beyond the requested set:${extra:- (none; a requested path is missing or an entry has the wrong kind)}"
+  exit 4
+}
+
 if ! git add -- "${PATHS[@]}" 1>&2; then
   err "team-commit: failed step: git add; nothing was reset. Staged paths now:"
   staged_now >&2 || true
   exit 1
 fi
+
+PRE_RAW="$(git "${NEUTRAL[@]}" diff-index --cached --raw "${DIFFOPTS[@]}" HEAD 2> /dev/null)" || { ACT=""; ENTRIES=""; invariant_fail "the staged tree cannot be listed"; }
+scan_raw "$PRE_RAW"
+PRE_SORTED="$(printf '%s' "$ACT" | sort)"
+[ -z "$BAD" ] || invariant_fail "an entry is not a plain addition or modification:$BAD"
+[ "$PRE_SORTED" = "$REQ" ] || invariant_fail "the staged paths differ from the requested paths"
+
 if ! git commit -q -F "$MSG_ABS" 1>&2; then
   err "team-commit: failed step: git commit; nothing was reset. Staged paths now:"
   staged_now >&2 || true
@@ -307,7 +442,7 @@ if ! git commit -q -F "$MSG_ABS" 1>&2; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Post-commit verification; a mismatch keeps the commit.
+# 8. Post-commit verification; a mismatch keeps the commit.
 # ---------------------------------------------------------------------------
 mismatch() {
   local requested="$1" actual="$2" why="$3"
@@ -319,51 +454,14 @@ mismatch() {
   exit 3
 }
 
-REQ="$(printf '%s\n' "${PATHS[@]}" | sort)"
 NEW="$(git rev-parse --verify 'HEAD^{commit}' 2> /dev/null)" || mismatch "$REQ" "(unreadable)" "HEAD cannot be read after the commit"
 PARENT="$(git rev-parse --verify -q 'HEAD^' 2> /dev/null || true)"
 [ "$PARENT" = "$BASE" ] || mismatch "$REQ" "(unknown)" "the new commit's parent is not the commit HEAD was at before"
-RAW="$(git -c core.quotepath=false diff-tree --no-commit-id --no-renames -r --raw --no-abbrev HEAD 2> /dev/null)" || mismatch "$REQ" "(unreadable)" "the new commit cannot be listed"
+RAW="$(git "${NEUTRAL[@]}" diff-tree --no-commit-id -r --raw "${DIFFOPTS[@]}" HEAD 2> /dev/null)" || mismatch "$REQ" "(unreadable)" "the new commit cannot be listed"
 
-ACT=""
-BAD=""
-SAVE_IFS="$IFS"
-IFS=$'\n'
-set -f
-for line in $RAW; do
-  case "$line" in
-    *$'\t'*) : ;;
-    *) BAD="$BAD unparseable-entry"; continue ;;
-  esac
-  meta="${line%%$'\t'*}"
-  fpath="${line#*$'\t'}"
-  om="${meta%% *}"
-  om="${om#:}"
-  rest="${meta#* }"
-  nm="${rest%% *}"
-  rest="${rest#* }"
-  rest="${rest#* }"
-  rest="${rest#* }"
-  st="$rest"
-  case "$st" in
-    A|M) : ;;
-    *) BAD="$BAD $st:$fpath" ;;
-  esac
-  case "$nm" in
-    100644|100755) : ;;
-    *) BAD="$BAD mode-$nm:$fpath" ;;
-  esac
-  case "$om" in
-    100644|100755|000000) : ;;
-    *) BAD="$BAD oldmode-$om:$fpath" ;;
-  esac
-  ACT="$ACT$fpath"$'\n'
-done
-set +f
-IFS="$SAVE_IFS"
-
+scan_raw "$RAW"
 ACT_SORTED="$(printf '%s' "$ACT" | sort)"
-[ -z "$BAD" ] || mismatch "$REQ" "$ACT_SORTED" "an entry is not a plain addition or modification:$BAD"
+[ -z "$BAD" ] || mismatch "$REQ" "$ACT_SORTED" "an entry is not a plain addition or modification with an unchanged mode:$BAD"
 [ "$ACT_SORTED" = "$REQ" ] || mismatch "$REQ" "$ACT_SORTED" "the commit's paths differ from the requested paths"
 
 printf '%s\n' "$NEW"
