@@ -591,13 +591,15 @@ host condition is and what was measured about it.
    regeneration — so it needs no such write access even when Codex runs it
    in-session. Running step 3 from your own shell avoids the `.codex`
    refusal entirely, since only a role's own commit needs `.git` write
-   access. When the sandbox refuses a role's own commit, the run may ask
-   you to approve that commit as one concrete command at a time through
-   the host's ordinary per-command approval prompt; the approval covers
+   access. A role's own commit is each git command that commit needs,
+   staging first and then the commit itself. When the sandbox refuses one
+   of them, the role whose command was refused requests your approval of
+   that exact command, one concrete command at a time, through the host's
+   ordinary per-command approval prompt; the approval covers
    only the command shown, and no boundary is widened. Where the host
    offers no such prompt or you decline, the role stops `BLOCKED`,
-   reporting the exact refusal and the one commit command for you to run,
-   and never retries the commit in another form. (Codex's own
+   reporting the exact refusal and every git command still to be run, in
+   order, for you to run, and never retries any of them in another form. (Codex's own
    configuration directory, `.agents`, is refused the same way; nothing in
    this loop writes to it.)
 7. **Confirm Claude Code CLI is installed and authenticated on this host
