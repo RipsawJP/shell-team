@@ -593,7 +593,20 @@ operator の判断に残るものは報告されるだけで、変更されな�
    を（既定として書いているとおり）自分自身のシェルから実行すれば、`.codex`
    の拒否は一切発生しない——役割自身の commit だけが `.git` への書き込みを
    必要とするため。（Codex 自身のもう一つの設定ディレクトリ `.agents` も
-   同様に拒否されるが、このループはそこには何も書き込まない。）
+   同様に拒否されるが、このループはそこには何も書き込まない。）この host
+   では、run が行う commit——dispatch された役割自身のものも、orchestrator の
+   記録用 commit も——はすべて `bin/team-commit.sh` の 1 回の呼び出しで行う。
+   引数はシングルクォートのリテラルとする:
+   `bash "<plugin root>/bin/team-commit.sh" --message-file '<file>' -- '<path>' ...`
+   （plugin root は手順 2 で特定した値）。sandbox がその呼び出しを拒否した場合、
+   run は同一の呼び出しをそのまま host の通常のコマンド単位の承認にかける。
+   プロンプトが出ないか、あなたが承認しない場合は、正確な拒否内容と、あなたが
+   実行するコマンドをそのまま添えて `BLOCKED` で止まり、形を変えて再試行する
+   ことはない。承認は push には及ばない。また run が、sandbox・trust・書き込み
+   可能な root を広げる grant を求めることもない。このスクリプトは渡された
+   path だけを stage して commit する。削除（`git rm`・`git clean`・`rm`）は
+   スクリプトが stage せず、あなた自身の commit として残る。一括・amend・
+   hook 回避の形もすべて拒否される。
 7. **この host に Claude Code CLI が既にインストール・認証済みであることを
    ——Codex セッションの外で、それを内側で当てにする前に——確認する
    （T-1135）。** レビュー pass（手順 8 と 10）は実際に `claude -p` の

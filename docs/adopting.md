@@ -590,7 +590,21 @@ host condition is and what was measured about it.
    in-session. Running step 3 from your own shell avoids the `.codex`
    refusal entirely, since only a role's own commit needs `.git` write
    access. (Codex's own configuration directory, `.agents`, is refused the
-   same way; nothing in this loop writes to it.)
+   same way; nothing in this loop writes to it.) On this host every commit
+   the run makes — a dispatched role's own or the orchestrator's record
+   commit — goes through one invocation of `bin/team-commit.sh`, with
+   single-quoted literal arguments: `bash "<plugin root>/bin/team-commit.sh"
+   --message-file '<file>' -- '<path>' ...` (the plugin root being the
+   value step 2 locates). When the sandbox refuses that invocation, the run
+   asks for the host's ordinary per-command approval of the
+   identical invocation, unchanged; where no prompt appears or you decline,
+   it stops `BLOCKED` with the exact refusal and the exact command for you
+   to run, never retried in another form. The approval is never extended to a push,
+   and the run never requests a grant that widens the session's sandbox,
+   trust or writable roots. The script stages only the paths it is given
+   and commits them; it refuses a removal — a deletion (`git rm`,
+   `git clean`, `rm`) is never staged by it and stays your commit to make —
+   and every bulk, amend or hook-bypass form.
 7. **Confirm Claude Code CLI is installed and authenticated on this host
    — outside any Codex session, before you rely on it inside one
    (T-1135).** The review pass (steps 8 and 10) runs a real `claude -p`

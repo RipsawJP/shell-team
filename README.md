@@ -207,6 +207,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 │   ├── team-init.sh                 # adopting-repo scaffolder
 │   ├── team-setup.sh                # the setup prompt's script (scaffold, Codex agents, report)
 │   ├── check-setup.sh               # read-only run-start check: setup present for this host
+│   ├── team-commit.sh               # commits exactly the named paths; the one commit command on the Codex CLI host
 │   └── install                      # legacy vendoring fallback
 ├── templates/                       # generic scaffolds used by team-init
 ├── docs/
