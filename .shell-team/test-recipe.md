@@ -2644,3 +2644,31 @@ suite + dogfood step that must pass, run in that file's order."
   returns, then `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh <spec>` (AC13 SKIP is expected).
   A `check:` absence read for a phrase (e.g. `skipping the team workflow`) matches
   substrings, so replacement prose must not re-spell the retired phrase.
+- T-1169: `bash tests/team-commit/run.sh` is `bin/team-commit.sh`'s fixture suite
+  (pure bash + git, ~25 s; every case builds a throwaway repository under a
+  `${TMPDIR:-/tmp}` scratch root, which is never removed). Two environment
+  facts it depends on. (1) The suite exports `HOME`/`XDG_CONFIG_HOME` into the
+  scratch root and `GIT_CONFIG_GLOBAL=/dev/null` / `GIT_CONFIG_NOSYSTEM=1`, and
+  unsets the `GIT_*` variables the script refuses. This coding sandbox itself
+  exports `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT` and `GIT_CONFIG_KEY_n` /
+  `GIT_CONFIG_VALUE_n` (safe-directory entries): a hand-run
+  `bash bin/team-commit.sh ...` in this sandbox is refused with
+  `refused (environment): GIT_CONFIG_PARAMETERS is set` until they are unset in
+  that shell — the suite and every spec `check:` line unset them first.
+  (2) `git check-ignore` rejects `GIT_LITERAL_PATHSPECS` (exit 128), so the
+  script runs that one call without it. Mutation self-check (scratch copy,
+  never the tracked tree): copy `bin/team-commit.sh` under `$TMPDIR`, neuter one
+  refusal (replace a `refuse <class> "..."` call with `:`), insert
+  `(sleep 12; kill -9 $$) > /dev/null 2>&1 &` after `set -euo pipefail` (a
+  mutant that stops consuming arguments loops forever; there is no `timeout`
+  on this machine), and run `TEAM_COMMIT_SCRIPT=<copy> bash tests/team-commit/run.sh`
+  — it must print a `FAIL:` line. Surviving mutants are the fail-closed
+  branches no fixture can reach (git itself failing) and checks another check
+  subsumes.
+- T-1169 (v2): `GIT_CONFIG_COUNT` carrying only `safe.directory` pairs (the shape this
+  sandbox exports) is now accepted by `bin/team-commit.sh`; `GIT_CONFIG_PARAMETERS`
+  (also exported here) is still refused, so a hand-run still needs
+  `unset GIT_CONFIG_PARAMETERS`. The suite's disabled-preflight cases copy the
+  script to a scratch path and `sed` one marked line (`leading-dir-refusal`,
+  `mode-change-refusal`, `unchanged-refusal`) — keep those marker comments when
+  editing the script.

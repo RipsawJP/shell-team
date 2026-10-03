@@ -207,6 +207,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 │   ├── team-init.sh                 # 適用先リポ scaffolder
 │   ├── team-setup.sh                # setup プロンプトのスクリプト（scaffold・Codex エージェント・報告）
 │   ├── check-setup.sh               # read-only の run 開始時チェック（この host 向けに setup が存在するか）
+│   ├── team-commit.sh               # 指定した path だけを commit する。Codex CLI host での唯一の commit コマンド
 │   └── install                      # 旧 vendoring フォールバック
 ├── templates/                       # team-init が使う generic scaffold
 ├── docs/

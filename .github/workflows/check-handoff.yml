@@ -40,6 +40,9 @@ jobs:
       - name: shellcheck (T-1164 additions)
         run: shellcheck bin/check-setup.sh tests/check-setup/run.sh
 
+      - name: shellcheck (T-1169 additions)
+        run: shellcheck bin/team-commit.sh tests/team-commit/run.sh
+
       - name: Run check-adopter-docs fixture suite
         run: bash tests/check-adopter-docs/run.sh
 
@@ -389,3 +392,6 @@ jobs:
 
       - name: Run check-setup fixture suite
         run: bash tests/check-setup/run.sh
+
+      - name: Run team-commit fixture suite
+        run: bash tests/team-commit/run.sh
