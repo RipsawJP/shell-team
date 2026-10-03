@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_QA` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
+- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1167 — repeat — T-1167's recorded value is `serial`; one prompt block, its contain-mode consumer and the EN/JA adopting guides land in lockstep, no balanced disjoint partition
@@ -12592,3 +12592,19 @@ _(none)_
 - Edge cases tried: AC1's negative controls (a spec whose check fails → check-acs rc=1; a board line with no spec path → check-handoff rc=1) and AC2's `no-task` provenance/durability/interventions refusals ran via check-acs; test-edit: none.
 - Risk notes for reviewer: (1) the step-4 Dispatch-record paragraph still says the transcription happens "once pm-spec has created that entry in step 2" and tech-lead still prints `### Dispatch`; step 1 says transcription does not run on the trivial path and check-handoff does not require the rows (AC1 passes without them) — a wording seam, not a failure; (2) qa-verifier and code-reviewer no-intent-block fallbacks and AC13 are unverified on a real host; (3) prose seams judged by reading only; (4) `git status --short` was clean before this board append.
 - shape-scan: rc=1 — 1 record path written this round — 0 finding(s) on it at lines >= 12560, 0 classified accepted noise — command: PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all
+
+### QA verdict — T-1168 (qa-verifier, mode A2)
+
+### QA verdict: PASS
+- Task: T-1168 → READY_FOR_REVIEW (HEAD 7ac708bb)
+- Delete gate: the AC10 check line itself greps each derived suite for a recursive delete before running it (a match fails the criterion); it passed. No other spec's check lines run.
+- Tests / acceptance criteria: `bash bin/check-acs.sh .shell-team/specs/T-1168-codex-commit-approval.md` → `check-acs: 12 passed, 0 failed, 1 skipped, 0 unrecognized` (AC1–AC11 and AC13 PASS, including AC10's derived suites with 0 FAIL lines; AC12 SKIP, runtime).
+- Verification ceiling: unit-and-static — verifies every criterion at or below that level (AC1–AC11, AC13); AC12 (behaviour on a real Codex CLI session after release) stays human-owned: `environmentally-unverified: AC12`; not a FAIL by itself.
+- Checkers: `check-intent.sh` rc=0 aligned (T-1168 v1); `check-prompt-sync.sh` rc=0; `check-handoff.sh .shell-team/todo.md` rc=0; `check-provenance.sh .shell-team/provenance/T-1168.md` rc=0 (2 decision entries); `check-interventions.sh --task T-1168` rc=0 (0 entries, 1 sentinel). CI parity: the diff touches no `bin/` or `tests/` file, so no shellcheck step is reached; suites reached are those AC10 derives.
+- Runtime-criteria audit (AC12 only): items — (i) approval-prompt path reaching READY_FOR_QA; (ii) BLOCKED path with exact refusal and one command; (iii) no widening request — the hand-off claims none (owner = operator re-measurement after release, recorded by the coordinating session); `environmentally-unverified: AC12` for all three; ownership is recorded in the spec's `above-ceiling:` bullet.
+- Summarized sources: issue #662 — relayed by the coordinating session, tracker not readable here: `environmentally-unverified: issue #662`. `templates/prompt-blocks/host-dispatch.md` / `skills/run/SKILL.md` (diff read): the two Codex lines are byte-identical (AC1 cmp) and keep the not-requested vs allowed split. `skills/setup/SKILL.md` unchanged (AC8).
+- Text read against Goal: (a) the dispatch line and the Step 0 line say the run never requests a grant widening sandbox, trust or writable roots; no approval-policy value named (AC3). (b) per-command approval of a role's own commit, one command at a time, covering only the shown command, no boundary widened. (c) missing prompt or decline -> BLOCKED with exact refusal and the one commit command, never retried in another form. EN (`docs/adopting.md` step 6 and list item) and JA (`docs/adopting.ja.md` step 6 and list item) state the same three points.
+- Judgement on the extra clause: "never extended to a push" appears only on the dispatch line (both copies), not in the two adopting guides. It matches the spec's Non-goal "Push and merge stay human gates" (AC1, review-judged) and adds no allowance, so it is not a violation; the guides' omission leaves no contradiction, only a lighter statement. Flagged for the reviewer, not a failure.
+- Edge cases tried: AC2's positive control plus `neither asks for nor adds` absence (grep rc=1, completed read); AC4's absence reads for T-1164's fifteen forbidden tokens on the Step 0 line; AC7/AC8 base-ref checks; test-edit: none.
+- Risk notes for reviewer: (1) prose-only deliverable, so the fixture-synthesis checklist does not apply beyond the check lines; (2) AC7/AC8 are merge-point-scoped and go stale once later edits land on develop; (3) the dispatch wording says the run "may ask", and how a model reads it on a real host is exactly what AC12 measures.
+- shape-scan: rc=1 — 1 record path written this round — 0 finding(s) on it at lines after 12594 (pre-existing hits are earlier), 0 classified accepted noise — command: PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all
