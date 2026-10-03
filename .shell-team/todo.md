@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
+- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1167 — repeat — T-1167's recorded value is `serial`; one prompt block, its contain-mode consumer and the EN/JA adopting guides land in lockstep, no balanced disjoint partition
@@ -28,6 +28,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-03): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH, approved at the sprint re-plan on 2026-10-03 (one wording PATCH to the run skill, then v2.8.2 and a Codex-only re-measure) — grounds: user-visible yes is the trigger, not the verdict; the change clarifies an existing behaviour and makes nothing new possible
   - intent-hash (v1): dc55de2300524c8c69a46c3dbc9e3b1f51a4a282
   - codex-reviewer (T-1168, round 1): `REQUEST_CHANGES` — 0 blockers, 1 major: the per-command approval wording names only "the commit", not each git command a role's own commit needs (staging writes `.git/index` before the commit), and does not say that the role itself asks for the approval of its refused command, so the fallback naming "the one commit command" under-reports; pre-commitment not triggered (stateable without naming a setting). Class `approval-scope-incomplete`, first occurrence. Record `.shell-team/reviews/T-1168.md`. Routed back to engineer (loop-guard iteration 1: CONTINUE).
+  - codex-reviewer (T-1168, round 2): `REQUEST_CHANGES` — 0 blockers, 1 major: `agents/engineer.md:150` (a refused command stops `BLOCKED`, never retried in another form) can pre-empt the new instruction that the refused role itself requests per-command approval of that exact command, so the run can still stop before `READY_FOR_QA`; round 1's staging gap is closed. Same class as round 1 (`approval-scope-incomplete`, narrowed to the role-contract conflict) — same-class-2 reached. The only complete fixes touch `agents/` (excluded by AC8) or change who runs the approved command (outside decision 6): stopped and escalated to the operator for a planning decision instead of a further rework round. Record `.shell-team/reviews/T-1168.md` (round 2, 35b4f05f).
 - [ ] **T-1161** A QA round after a rework verifies what the rework changed and carries the rest forward by an explicit label list (issue #639) — `BLOCKED` — spec: .shell-team/specs/T-1161-rework-qa-scope.md
   - entry-mode: pm-authored
   - spec-review: none
