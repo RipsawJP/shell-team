@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_QA` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
+- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1167 — repeat — T-1167's recorded value is `serial`; one prompt block, its contain-mode consumer and the EN/JA adopting guides land in lockstep, no balanced disjoint partition
@@ -12609,3 +12609,17 @@ _(none)_
 - Edge cases tried: AC2's positive control plus `neither asks for nor adds` absence (grep rc=1, completed read); AC4's absence reads for T-1164's fifteen forbidden tokens on the Step 0 line; AC7/AC8 base-ref checks; test-edit: none.
 - Risk notes for reviewer: (1) prose-only deliverable, so the fixture-synthesis checklist does not apply beyond the check lines; (2) AC7/AC8 are merge-point-scoped and go stale once later edits land on develop; (3) the dispatch wording says the run "may ask", and how a model reads it on a real host is exactly what AC12 measures.
 - shape-scan: rc=1 — 1 record path written this round — 0 finding(s) on it at lines after 12594 (pre-existing hits are earlier), 0 classified accepted noise — command: PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all
+
+### QA verdict — T-1168 round 2 (qa-verifier, mode A2)
+
+### QA verdict: PASS
+- Task: T-1168 → READY_FOR_REVIEW (HEAD af1283b1, rework diff `git diff 92d2c7ca..af1283b1`: dispatch line in `host-dispatch.md` and `skills/run/SKILL.md`, step 6 and JA 手順 6, provenance, board)
+- Delete gate: AC10's own check line greps each derived suite for a recursive delete before running it; it passed. No other spec's check lines run.
+- Whole spec re-run (no subset option): `bash bin/check-acs.sh .shell-team/specs/T-1168-codex-commit-approval.md` → `check-acs: 12 passed, 0 failed, 1 skipped, 0 unrecognized` (AC1–AC11, AC13 PASS; AC12 SKIP, runtime). Carried forward unchanged: AC12 `environmentally-unverified` (operator re-measurement after release; ownership recorded in the spec's `above-ceiling:` bullet; items: approval path to READY_FOR_QA, BLOCKED path, no widening request).
+- Verification ceiling: unit-and-static — verifies every criterion at or below that level (AC1–AC11, AC13); AC12 stays human-owned: `environmentally-unverified: AC12`; not a FAIL by itself.
+- Checkers rc=0: `check-intent.sh` aligned (T-1168 v1); `check-prompt-sync.sh`; `check-handoff.sh .shell-team/todo.md`; `check-provenance.sh` (3 decision entries); `check-interventions.sh --task T-1168` (0 entries, 1 sentinel).
+- Reworked text against the Codex major (rows 1 and 2: no continuation path, staging not covered): the dispatch line (both byte-identical copies, AC1 cmp), EN step 6 and JA 手順 6 now define a role's own commit as each git command it needs, staging first then the commit; the role whose command was refused requests approval of that exact command; the fallback reports the exact refusal and every git command still to be run, in order, and none is retried in another form. Goal (a): never requests a widening grant, no approval-policy value named (AC3). (b): one concrete command at a time, covers only the command shown, no push (dispatch line only, as in round 1). (c): BLOCKED with exact refusal. EN and JA state the same four points (definition, who requests, covers-only-shown, ordered fallback with no retry).
+- Observation, agents out of scope (AC8): `agents/engineer.md:150` (playbook line from the 2026-10-01 lesson) says a refused command is reported BLOCKED and never retried in another form. A model could read that as conflicting with "request approval of the refused command", since both concern the same refused command. The two can be reconciled: the approval request is for the identical command through the host's prompt, not a rewording, and the new text names BLOCKED only after the prompt is absent or declined. But engineer.md has no allowance clause, so an engineer that sees only its own definition may stop without asking. This is a real residual risk for AC12; no change made here.
+- Edge cases tried: AC2 absence of `neither asks for nor adds` (grep rc=1) with positive control; AC5 region still names `own commit`; AC7/AC8 base-ref checks; test-edit: none.
+- Risk notes for reviewer: prose-only deliverable (fixture-synthesis checklist not applicable beyond check lines); `environmentally-unverified: issue #662` (tracker not readable here); AC7/AC8 merge-point-scoped.
+- shape-scan: rc=1 — 1 record path written this round — 0 finding(s) on my appended lines, 0 classified accepted noise — command: PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all
