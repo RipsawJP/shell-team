@@ -205,6 +205,24 @@ if ok_commit ok-message-verbatim "$r" "M${TAB}README" --message-file "$T/msgs/mu
   fi
 fi
 
+# Paths the call did not name stay exactly as they were: an unrelated modified
+# tracked file and an unrelated untracked file are neither staged nor committed.
+new_repo; r="$R"; printf 'y\n' >> "$r/README"; printf 'other\n' >> "$r/c.txt"; printf 'u\n' > "$r/untracked.txt"
+if ok_commit ok-leaves-others "$r" "M${TAB}README" --message-file "$MSG" -- README \
+  && [ "$(git -C "$r" status --porcelain | sort)" = "$(printf ' M c.txt\n?? untracked.txt')" ]; then
+  pass "ok-leaves-others an unnamed modified file and an unnamed untracked file stay unstaged and uncommitted"
+else
+  fail "ok-leaves-others: unnamed paths were touched"
+fi
+
+# The top-level test is physical: a repository entered through a symlinked path
+# is still the top level.
+new_repo; r="$R"; printf 'y\n' >> "$r/README"
+ln -s "$r" "$T/symlinked-repo"
+if ok_commit ok-symlinked-cwd "$T/symlinked-repo" "M${TAB}README" --message-file "$MSG" -- README; then
+  pass "ok-symlinked-cwd run from a symlinked path to the top level"
+fi
+
 # Launch shapes: direct execution and a bare name reached through a PATH symlink.
 new_repo; r="$R"; printf 'y\n' >> "$r/README"
 base="$(git -C "$r" rev-parse HEAD)"
@@ -515,6 +533,43 @@ else
   fail "post-commit-hook-fails: rc=$RC out=$OUT err=$ERR"
 fi
 
+# A hook that stages the removal of a requested path: the path set matches, the
+# entry is a deletion.
+new_repo; r="$R"; printf 'y\n' >> "$r/README"
+mk_hook "$r" 'git update-index --force-remove -- README' pre-commit
+run_in "$r" "$NOENV" --message-file "$MSG" -- README
+if [ "$RC" -eq 3 ] && [ -z "$OUT" ] \
+  && git -C "$r" diff-tree --no-commit-id --name-status -r --no-renames HEAD | grep -qx "D${TAB}README"; then
+  pass "post-mismatch-removal-requested a hook staged the removal of a requested path: exit 3"
+else
+  fail "post-mismatch-removal-requested: rc=$RC out=$OUT err=$ERR"
+fi
+
+# A hook that swaps a requested path for a symlink entry: the path set matches,
+# the entry is a symlink.
+new_repo; r="$R"; printf 'y\n' >> "$r/README"
+# shellcheck disable=SC2016  # the hook text expands inside the hook, not here
+mk_hook "$r" 'b=$(printf "target" | git hash-object -w --stdin); git update-index --cacheinfo "120000,$b,README"' pre-commit
+run_in "$r" "$NOENV" --message-file "$MSG" -- README
+if [ "$RC" -eq 3 ] && [ -z "$OUT" ] \
+  && [ "$(git -C "$r" ls-tree HEAD -- README | cut -c1-6)" = "120000" ]; then
+  pass "post-mismatch-symlink a hook swapped a requested path for a symlink entry: exit 3"
+else
+  fail "post-mismatch-symlink: rc=$RC out=$OUT err=$ERR"
+fi
+
+# The same for a new path: an addition whose mode is a symlink.
+new_repo; r="$R"; printf 'a\n' > "$r/a.txt"
+# shellcheck disable=SC2016  # the hook text expands inside the hook, not here
+mk_hook "$r" 'b=$(printf "target" | git hash-object -w --stdin); git update-index --cacheinfo "120000,$b,a.txt"' pre-commit
+run_in "$r" "$NOENV" --message-file "$MSG" -- a.txt
+if [ "$RC" -eq 3 ] && [ -z "$OUT" ] \
+  && [ "$(git -C "$r" ls-tree HEAD -- a.txt | cut -c1-6)" = "120000" ]; then
+  pass "post-mismatch-symlink-new a hook swapped a requested new path for a symlink addition: exit 3"
+else
+  fail "post-mismatch-symlink-new: rc=$RC out=$OUT err=$ERR"
+fi
+
 # A failing git add (the index is locked): exit 1, nothing reset, nothing committed.
 new_repo; r="$R"; printf 'y\n' >> "$r/README"
 : > "$r/.git/index.lock"
@@ -527,14 +582,15 @@ else
   fail "post-add-fails: rc=$RC out=$OUT err=$ERR"
 fi
 
-# A post-commit hook that moves HEAD to a new commit: the new commit's parent is
-# no longer the commit HEAD was at, so it is a mismatch (exit 3), kept.
+# A post-commit hook that adds a second commit touching the same path: HEAD's
+# paths match the request but its parent is no longer the commit HEAD was at, so
+# it is a mismatch (exit 3), kept.
 new_repo; r="$R"; printf 'y\n' >> "$r/README"
-mk_hook "$r" "[ -e \"$T/once\" ] && exit 0; : > \"$T/once\"; git commit -q --allow-empty -m moved" post-commit
+mk_hook "$r" "[ -e \"$T/once\" ] && exit 0; : > \"$T/once\"; printf 'z\\n' >> README; git add -- README; git commit -q -m moved" post-commit
 base="$(git -C "$r" rev-parse HEAD)"
 run_in "$r" "$NOENV" --message-file "$MSG" -- README
 if [ "$RC" -eq 3 ] && [ "$(git -C "$r" rev-parse HEAD~2)" = "$base" ] && [ -z "$OUT" ]; then
-  pass "post-parent-moved a post-commit hook that adds a commit: exit 3, nothing reset"
+  pass "post-parent-moved a post-commit hook that adds a commit on the same path: exit 3, nothing reset"
 else
   fail "post-parent-moved: rc=$RC out=$OUT err=$ERR"
 fi
