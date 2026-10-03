@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_QA` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
+- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1167 — repeat — T-1167's recorded value is `serial`; one prompt block, its contain-mode consumer and the EN/JA adopting guides land in lockstep, no balanced disjoint partition
@@ -12629,3 +12629,16 @@ _(none)_
 - Edge cases tried: AC2 absence of `neither asks for nor adds` (grep rc=1) with positive control; AC5 region still names `own commit`; AC7/AC8 base-ref checks; test-edit: none.
 - Risk notes for reviewer: prose-only deliverable (fixture-synthesis checklist not applicable beyond check lines); `environmentally-unverified: issue #662` (tracker not readable here); AC7/AC8 merge-point-scoped.
 - shape-scan: rc=1 — 1 record path written this round — 0 finding(s) on my appended lines, 0 classified accepted noise — command: PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all
+
+### QA verdict — T-1168 round 3, spec v2 (qa-verifier, mode A2)
+
+### QA verdict: PASS
+- Task: T-1168 → READY_FOR_REVIEW (HEAD 64181e5e; implementation `git diff 8e7d629f..64181e5e`: one sentence appended to the Rule of the 2026-10-01 refused-command lesson in `.shell-team/lessons.md`, regenerated into four playbook blocks and four agents' marker regions)
+- Delete gate: re-derived AC10's suite set with its own `git grep` form (21 suites, `wc -l < $TMPDIR/s3u.txt`) and ran `xargs grep -nE 'rm -[a-zA-Z]*[rR]|find .*-dele[t]e'` over them first: no match (rc=1). No other spec's check lines run.
+- Whole spec: `bash bin/check-acs.sh .shell-team/specs/T-1168-codex-commit-approval.md` → `check-acs: 15 passed, 0 failed, 1 skipped, 0 unrecognized` (AC1–AC11, AC13–AC16 PASS; AC12 SKIP, runtime).
+- Verification ceiling: unit-and-static — verifies every criterion at or below that level (AC1–AC11, AC13–AC16); AC12 (real Codex CLI session after release) stays human-owned: `environmentally-unverified: AC12` (three items: approval path to READY_FOR_QA, BLOCKED path, no widening request; operator re-measurement, ownership in the spec's `above-ceiling:` bullet).
+- Checkers rc=0: `check-intent.sh` aligned (T-1168 v2); `check-prompt-sync.sh`; `check-playbook.sh .shell-team/lessons.md`; `check-handoff.sh`; `check-provenance.sh` (4 decision entries); `check-interventions.sh --task T-1168` (0 entries, 1 sentinel).
+- New sentence read against the existing clauses: "Requesting the host's ordinary per-command approval for the identical refused command, unchanged, is not a retry in another form; rewording, relocating, wrapping or dropping a refused command stays forbidden." It resolves the conflict I raised in round 2: the approval request is carved out only for the identical, unchanged command, and the Rule's remaining text (stop and report BLOCKED with the refusal verbatim, no subshell/script/different command/different location, no dropping as optional) is byte-unchanged (diff shows only the appended sentence). Rewording, relocating, wrapping and dropping are all re-named as forbidden. No deletion rule is touched (the diff touches no recursive-delete text). Reading caveat for the reviewer: the carve-out is generic to every refused command (permission rule, sandbox, classifier), not commit-specific; a classifier refusal normally offers no per-command prompt, in which case the BLOCKED path still applies — a judgement, not a failure.
+- Shape-scan: `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` rc=1; the two tracker-key hits the engineer named are `agents/code-reviewer.md` line 3 and `agents/qa-verifier.md` line 81. Both are outside this diff: `git diff 8e7d629f..64181e5e -U0 -- agents/qa-verifier.md` shows one hunk at line 168 only, and `agents/code-reviewer.md` is not in the diff stat. No hit on `.shell-team/lessons.md`, the playbook blocks or my appended lines.
+- Edge cases tried: AC8/AC10 widened scope checks via check-acs; recursive-delete re-grep above; test-edit: none. Prose and generated-block deliverable, so the fixture-synthesis checklist does not apply beyond the check lines.
+- Risk notes for reviewer: `environmentally-unverified: issue #662` (tracker unreadable here); AC7/AC8 merge-point-scoped; whether a model applies the carve-out only to the identical command is exactly what AC12 measures.
