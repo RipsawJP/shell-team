@@ -2665,3 +2665,10 @@ suite + dogfood step that must pass, run in that file's order."
   — it must print a `FAIL:` line. Surviving mutants are the fail-closed
   branches no fixture can reach (git itself failing) and checks another check
   subsumes.
+- T-1169 (v2): `GIT_CONFIG_COUNT` carrying only `safe.directory` pairs (the shape this
+  sandbox exports) is now accepted by `bin/team-commit.sh`; `GIT_CONFIG_PARAMETERS`
+  (also exported here) is still refused, so a hand-run still needs
+  `unset GIT_CONFIG_PARAMETERS`. The suite's disabled-preflight cases copy the
+  script to a scratch path and `sed` one marked line (`leading-dir-refusal`,
+  `mode-change-refusal`, `unchanged-refusal`) — keep those marker comments when
+  editing the script.
