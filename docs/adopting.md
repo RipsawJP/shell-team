@@ -453,7 +453,9 @@ re-measured by it; each item below says which kind of evidence it rests on:
   discovered only in a trusted repository. Relayed on 0.159.3: the host's own
   first-launch trust prompt sufficed.
 - **Write access to the git directory, for commits** (step 6): measured on
-  0.154.0, the sandbox refuses writes under `.git/` by default.
+  0.154.0, the sandbox refuses writes under `.git/` by default. Without that
+  grant, a role's own commit can still be approved per-command, one command
+  at a time (step 6).
 - **Network for the Claude-side review pass** (step 8): relayed on 0.159.3, the
   review's `claude -p` call ran outside the sandbox under the host's own
   per-command approval, so no network setting was needed for it. The 0.154.0
@@ -589,8 +591,15 @@ host condition is and what was measured about it.
    regeneration — so it needs no such write access even when Codex runs it
    in-session. Running step 3 from your own shell avoids the `.codex`
    refusal entirely, since only a role's own commit needs `.git` write
-   access. (Codex's own configuration directory, `.agents`, is refused the
-   same way; nothing in this loop writes to it.)
+   access. When the sandbox refuses a role's own commit, the run may ask
+   you to approve that commit as one concrete command at a time through
+   the host's ordinary per-command approval prompt; the approval covers
+   only the command shown, and no boundary is widened. Where the host
+   offers no such prompt or you decline, the role stops `BLOCKED`,
+   reporting the exact refusal and the one commit command for you to run,
+   and never retries the commit in another form. (Codex's own
+   configuration directory, `.agents`, is refused the same way; nothing in
+   this loop writes to it.)
 7. **Confirm Claude Code CLI is installed and authenticated on this host
    — outside any Codex session, before you rely on it inside one
    (T-1135).** The review pass (steps 8 and 10) runs a real `claude -p`
