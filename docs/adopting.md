@@ -591,11 +591,13 @@ host condition is and what was measured about it.
    regeneration — so it needs no such write access even when Codex runs it
    in-session. Running step 3 from your own shell avoids the `.codex`
    refusal entirely, since only a role's own commit needs `.git` write
-   access. A role's own commit is each git command that commit needs,
-   staging first and then the commit itself, and never a deletion
-   (`git rm`, `git clean`, `rm`), which stays stop and report `BLOCKED`.
-   When the sandbox refuses one
-   of them, the role whose command was refused requests your approval of
+   access. For this path a role's own commit is exactly two command
+   shapes, `git add -- <path>` for a path the role itself created or
+   modified and `git commit -m <message>`; the forms `-A`, `-a` and
+   `--amend`, an already-removed path, any deletion (`git rm`,
+   `git clean`, `rm`), every other git form and every other command stay
+   stop and report `BLOCKED`. When the sandbox refuses one of the two,
+   the role whose command was refused requests your approval of
    that exact command, one concrete command at a time, through the host's
    ordinary per-command approval prompt; the approval covers
    only the command shown, and no boundary is widened. Where the host
