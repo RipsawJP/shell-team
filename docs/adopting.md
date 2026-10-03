@@ -592,7 +592,9 @@ host condition is and what was measured about it.
    in-session. Running step 3 from your own shell avoids the `.codex`
    refusal entirely, since only a role's own commit needs `.git` write
    access. A role's own commit is each git command that commit needs,
-   staging first and then the commit itself. When the sandbox refuses one
+   staging first and then the commit itself, and never a deletion
+   (`git rm`, `git clean`, `rm`), which stays stop and report `BLOCKED`.
+   When the sandbox refuses one
    of them, the role whose command was refused requests your approval of
    that exact command, one concrete command at a time, through the host's
    ordinary per-command approval prompt; the approval covers

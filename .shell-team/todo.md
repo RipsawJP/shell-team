@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
+- [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `READY_FOR_QA` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1167 — repeat — T-1167's recorded value is `serial`; one prompt block, its contain-mode consumer and the EN/JA adopting guides land in lockstep, no balanced disjoint partition
