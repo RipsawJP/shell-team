@@ -119,6 +119,7 @@ All four are bundled here because three of them edit `skills/run/SKILL.md`, and 
   - `--help` is a heredoc (`:78`–`:123`). Its `GIT_CONFIG_PARAMETERS` remedy sits at `:94`–`:96`, ahead of the `GIT_CONFIG_COUNT` clause.
   - No `GIT_CONFIG_PARAMETERS` occurs before `:94`.
 - `tests/team-commit/run.sh` `:576`–`:581` (read). Distinction: the suite requires the literal `unset GIT_CONFIG_PARAMETERS` in the refusal's stderr, so that literal is kept.
+- `tests/codex-skeleton-hygiene/run.sh` `:1466`–`:1473` (read). Distinction: case `agentmd-block-verbatim: reviewer-specreview` compares the third `codex` block of `agents/code-reviewer.md` (the spec-review block) byte-for-byte with `tests/codex-skeleton-hygiene/fixtures/agentmd-block-code-reviewer-specreview.txt`. So editing that block requires updating the fixture in the same change (T-1159 precedent, `26fb5b7d`, as relayed by the coordinating session; the engineer found this).
 - `templates/prompt-blocks/host-dispatch.md` `:5` (read). Distinction: on the Codex CLI host every commit goes through **one invocation** of `bin/team-commit.sh` with single-quoted literal arguments, approved for **that identical invocation, unchanged**, and is "never retried in another form". An `env -u` prefix is another form, so decision 1 rejects it.
 - `docs/adopting.md` `:620`–`:626` and `docs/adopting.ja.md` `:620`–`:626` (read). Distinction: the EN text says "clears it for that one invocation" and the JA text says `その 1 回の呼び出しについて解除できる`. The `GIT_CONFIG_COUNT` sentence follows in both.
 - `skills/run/SKILL.md` (read `:28`–`:58`, `:100`–`:117`, `:315`–`:323`). Distinctions:
@@ -225,9 +226,9 @@ All four are bundled here because three of them edit `skills/run/SKILL.md`, and 
 
 - **No `env -u` (or any other per-invocation wrapper) form of the remedy.** (decision 1; **AC1**, **AC2**)
 - **No change to what `bin/team-commit.sh` refuses, commits or exits with.** Only two strings change: the refusal text and the `--help` text. (**AC1**, **AC14**)
-- **No change to any file outside the five deliverables and this task's records.** This includes:
+- **No change to any file outside the five deliverables, the one fixture below, and this task's records.** This includes:
   - nothing else under `bin/`: `bin/rework-digest.sh` and `bin/check-spec-review.sh` are untouched;
-  - nothing under `tests/`: `tests/team-commit/run.sh`'s `unset GIT_CONFIG_PARAMETERS` literal stays;
+  - nothing under `tests/` except `tests/codex-skeleton-hygiene/fixtures/agentmd-block-code-reviewer-specreview.txt`, which is the frozen copy of the spec-review `codex exec` block decision 3 edits. It changes only to stay byte-identical to the live block after that edit (operator ruling, 2026-10-04; precedent T-1159). `tests/team-commit/run.sh`'s `unset GIT_CONFIG_PARAMETERS` literal stays;
   - nothing under `templates/`: the `dispatch-record` and `host-dispatch` blocks are untouched;
   - `skills/goal/SKILL.md`, `docs/loop-engineering/`, `.github/`, `README.md` / `README.ja.md`, `CHANGELOG.md` / `CHANGELOG.ja.md`, `.claude-plugin/plugin.json` and the lessons corpus.
   
@@ -374,7 +375,7 @@ Region and term names used below:
   - check: rc=0; export LC_ALL=C; T=$(mktemp -d "${TMPDIR:-/tmp}/t1173-ac14.XXXXXX") || exit 1; for s in tests/team-commit/run.sh tests/rework-digest/run.sh tests/check-spec-review/run.sh tests/check-interventions/run.sh tests/check-prompt-sync/run.sh tests/bin-help/run.sh tests/codex-skeleton-hygiene/run.sh tests/check-adopter-docs/run.sh tests/check-invocation-path/run.sh tests/check-oversight/run.sh tests/check-refreeze-grant/run.sh tests/team-init/run.sh tests/trial-recipe/run.sh tests/install/run.sh; do test -s "$s" || { rc=1; continue; }; grep -qE 'rm -[a-zA-Z]*[rR]|find .*-dele[t]e' "$s"; g=$?; if [ "$g" -ne 1 ]; then rc=1; continue; fi; ( ulimit -f 200000; set -o pipefail; bash "$s" < /dev/null 2>&1 | head -c 20000000 > "$T/log" ) || rc=1; test "$(grep -c '^FAIL' "$T/log" || true)" = 0 || rc=1; done; test "$rc" -eq 0
   - stale-at: a task adds, removes or renames a `tests/*/run.sh` that reads one of the five edited paths, at which point this named list no longer equals the reverse map it was measured as.
 
-- [ ] **AC15** The change set stays inside the deliverables and this task's records (Non-goals). The measured set is the union of four reads:
+- [ ] **AC15** The change set stays inside the deliverables, the one allowed fixture and this task's records (Non-goals). The measured set is the union of four reads:
   - `git diff --no-renames --name-only <base>...HEAD`;
   - `git diff --no-renames --cached --name-only`;
   - `git diff --no-renames --name-only`;
@@ -382,12 +383,15 @@ Region and term names used below:
   
   No read may fail. The union names this spec (positive control). Every path in it is one of:
   - `bin/team-commit.sh`, `skills/run/SKILL.md`, `agents/code-reviewer.md`, `docs/adopting.md`, `docs/adopting.ja.md`;
+  - `tests/codex-skeleton-hygiene/fixtures/agentmd-block-code-reviewer-specreview.txt`, the only path under `tests/` allowed;
   - `.shell-team/todo.md`, `.shell-team/interventions/no-task.md`;
   - a `T-1173`-named file under `.shell-team/specs`, `reviews`, `provenance` or `interventions`;
   - a file directly under `.shell-team/retros` or `.shell-team/rollups`.
   
+  This criterion does not check the fixture's content. **AC14** does: its `tests/codex-skeleton-hygiene` suite (`agentmd-block-verbatim: reviewer-specreview`, `run.sh` `:1469`–`:1471`) fails unless the live spec-review `codex exec` block in `agents/code-reviewer.md` is byte-identical to that fixture.
+
   Green at base: it is an invariant. This criterion is merge-point-scoped and is expected to go stale once later tasks' files land on `develop`. Do not merge-range it.
-  - check: rc=0; export LC_ALL=C; if git show-ref --verify --quiet refs/heads/develop; then B=$(git merge-base develop HEAD) || exit 1; elif git show-ref --verify --quiet refs/remotes/origin/develop; then B=$(git merge-base refs/remotes/origin/develop HEAD) || exit 1; else exit 1; fi; test -n "$B" || exit 1; T=$(mktemp -d "${TMPDIR:-/tmp}/t1173-ac15.XXXXXX") || exit 1; { git diff --no-renames --name-only "$B...HEAD" || echo __ERR__; git diff --no-renames --cached --name-only || echo __ERR__; git diff --no-renames --name-only || echo __ERR__; git ls-files --others --exclude-standard || echo __ERR__; } > "$T/u"; grep -qxF __ERR__ "$T/u"; g=$?; test "$g" -eq 1 || exit 1; grep -qxF .shell-team/specs/T-1173-wording-followups.md "$T/u" || exit 1; sort -u "$T/u" | grep -vE '^(bin/team-commit\.sh|skills/run/SKILL\.md|agents/code-reviewer\.md|docs/adopting\.md|docs/adopting\.ja\.md|\.shell-team/todo\.md|\.shell-team/interventions/no-task\.md|\.shell-team/(specs|reviews|provenance|interventions)/T-1173[-.][^/]*|\.shell-team/(retros|rollups)/[^/]*)$' > "$T/bad"; test ! -s "$T/bad" || rc=1; test "$rc" -eq 0
+  - check: rc=0; export LC_ALL=C; if git show-ref --verify --quiet refs/heads/develop; then B=$(git merge-base develop HEAD) || exit 1; elif git show-ref --verify --quiet refs/remotes/origin/develop; then B=$(git merge-base refs/remotes/origin/develop HEAD) || exit 1; else exit 1; fi; test -n "$B" || exit 1; T=$(mktemp -d "${TMPDIR:-/tmp}/t1173-ac15.XXXXXX") || exit 1; { git diff --no-renames --name-only "$B...HEAD" || echo __ERR__; git diff --no-renames --cached --name-only || echo __ERR__; git diff --no-renames --name-only || echo __ERR__; git ls-files --others --exclude-standard || echo __ERR__; } > "$T/u"; grep -qxF __ERR__ "$T/u"; g=$?; test "$g" -eq 1 || exit 1; grep -qxF .shell-team/specs/T-1173-wording-followups.md "$T/u" || exit 1; sort -u "$T/u" | grep -vE '^(bin/team-commit\.sh|skills/run/SKILL\.md|agents/code-reviewer\.md|docs/adopting\.md|docs/adopting\.ja\.md|tests/codex-skeleton-hygiene/fixtures/agentmd-block-code-reviewer-specreview\.txt|\.shell-team/todo\.md|\.shell-team/interventions/no-task\.md|\.shell-team/(specs|reviews|provenance|interventions)/T-1173[-.][^/]*|\.shell-team/(retros|rollups)/[^/]*)$' > "$T/bad"; test ! -s "$T/bad" || rc=1; test "$rc" -eq 0
 
 - [ ] **AC16** This spec's own declarations are conformant, and so is the board. `bash bin/check-adopter-docs.sh` on this spec exits `0` with zero bytes on both streams. `bin/check-handoff.sh` exits `0` on the board resolved through `bin/team-paths.sh --get todo`.
   - check: rc=0; export LC_ALL=C; D=bin/check-adopter-docs.sh; SPEC=.shell-team/specs/T-1173-wording-followups.md; test -s "$D" || exit 1; test -s "$SPEC" || exit 1; T=$(mktemp -d "${TMPDIR:-/tmp}/t1173-ac16.XXXXXX") || exit 1; bash "$D" "$SPEC" > "$T/do" 2> "$T/de"; r=$?; test "$r" -eq 0 || rc=1; test ! -s "$T/do" || rc=1; test ! -s "$T/de" || rc=1; BD=$(bash bin/team-paths.sh --get todo) || rc=1; test -s "$BD" || rc=1; bash bin/check-handoff.sh "$BD" > /dev/null 2>&1 || rc=1; test "$rc" -eq 0
@@ -450,7 +454,7 @@ Region and term names used below:
 | 15 | Guides carry the matching clause (decision 8) | **AC11** |
 | 16 | Generated and synchronized files consistent | **AC13** |
 | 17 | Suites the edited files reach stay green; none with a recursive delete run | **AC14** |
-| 18 | No change outside the deliverables and records (Non-goals) | **AC15** |
+| 18 | No change outside the deliverables, the one spec-review block fixture, and records (Non-goals) | **AC15** (path), **AC14** (the fixture equals the live block) |
 | 19 | Spec declarations and board conformant | **AC16** |
 | 20 | No retroactive application (Non-goals) | info-only (not promoted to AC) — concerns records this task does not touch, and **AC15** already keeps them untouched |
 | 21 | No claim of live obedience (Non-goals) | info-only (not promoted to AC) — a disclosure of the ceiling, not a property of the diff |
@@ -563,7 +567,7 @@ The sentence names T-1172's check by description rather than by its bullet name,
   - **AC4**, the Codex prompt:
     - Wrap the sentence over continuation lines, each ending ` \`, with no backtick, no `$` and no `"` except the opening and closing quotes.
     - Keep `Still report every finding you judge` and the class definition, and keep the closing `Return findings as a JSON array …"` line last.
-    - `tests/codex-skeleton-hygiene` (**AC14**) also locks this block's shape.
+    - `tests/codex-skeleton-hygiene` (**AC14**) also locks this block's shape, and compares it byte-for-byte with `tests/codex-skeleton-hygiene/fixtures/agentmd-block-code-reviewer-specreview.txt`. In the same commit as the block edit, update that fixture so it is byte-identical to the new live block (the block's lines between its opening and closing fences, exactly as the suite's `verify_block_verbatim` extracts them; compare with the current fixture's own extent). This is the only file under `tests/` you may change.
   - **AC5**, JA: tokens `判断した severity のまま`, `downgrade 行は書かれない`, `non-gating`, `下げられた ledger 行の check`, `blocker または major`, `vacuous`. Keep `何も伏せず` and `敵対的な網羅性`, and drop `fast-follow として報告`. Suggested JA: `較正の対象となる class の finding も、reviewer が判断した severity のまま報告・記録され、Synthesis audit ledger に downgrade 行は書かれない（較正は verdict の範囲を決めるもので、severity を下げない）。verdict はその finding を、それがその check 行自身の criterion を vacuous にしない限り non-gating として扱う。severity が下がっていないので、run skill の step 6 にある下げられた ledger 行の check（T-1172）はこれに適用されず、その check の下で残った blocker または major としても数えない。`
   - **AC6**: do not touch `skills/run/SKILL.md` `:104` or `agents/code-reviewer.md` `:106`–`:108`. **No new line in `skills/run/SKILL.md` may contain `Downgrade-ground check`.** Refer to that check only as the canonical sentence does ("the run skill's step-6 check of lowered ledger rows (T-1172)"). **AC6** fails if the literal appears on a second line, and so would T-1172's **AC4**.
   - **AC7**/**AC8**: `full path`, `trivial path`, `no dispatch rows`, and `step 2` (plus `step 4` at `:46`). Suggested insertion at `:46`: "… at the Specify-to-Implement seam below — on the full path once `pm-spec` has created that entry in step 2 and before `engineer` is invoked in step 4; on the trivial path (step 1's trivial mode) no dispatch rows are transcribed — see …". Mirror it at `:323`.
@@ -573,7 +577,7 @@ The sentence names T-1172's check by description rather than by its bullet name,
     - For example: "a refusal (any other exit status, or no stdout) is a stop for its own reason: do not re-invoke the review, escalate by running `bash "<plugin root>/bin/rework-digest.sh" --stop-reason guard_error` with the same per-round records, quote the guard's stderr verbatim in the escalation, and never read it as `CONTINUE`."
     - The clause ends where `Each `SAME_CLASS_2:` begins.
   - **AC11**: add to each round-bound paragraph, after its refusal sentence, a clause naming `--stop-reason guard_error` and `stderr` (EN example: "A refusal from the guard itself also stops the review: the loop does not invoke it again, escalates through the rework digest with `--stop-reason guard_error`, and quotes the guard's stderr verbatim."). Keep `CONTINUE` and `spec_review_rounds_reached` in the paragraph.
-- **Do not edit** `templates/` (including `dispatch-record.md` and `host-dispatch.md`), `tests/` (`tests/team-commit/run.sh` `:577` must keep finding `unset GIT_CONFIG_PARAMETERS`), `skills/goal/SKILL.md`, `docs/loop-engineering/`, any other `bin/` script, README, CHANGELOG or `plugin.json` (**AC15**).
+- **Do not edit** `templates/` (including `dispatch-record.md` and `host-dispatch.md`), `tests/` other than the one fixture named above (`tests/team-commit/run.sh` `:577` must keep finding `unset GIT_CONFIG_PARAMETERS`), `skills/goal/SKILL.md`, `docs/loop-engineering/`, any other `bin/` script, README, CHANGELOG or `plugin.json` (**AC15**).
 - **Not run in any check line:** `tests/codex-agents/run.sh` (CI covers it; **AC13** runs `gen-codex-agents.sh`/`check-codex-agents.sh` directly).
 - **Mutation self-check (optional):** confirm that deleting `rest of the shell` from the refusal reddens **AC1**, that removing the backslash from one Codex-prompt continuation line reddens **AC4**, and that restoring `escalate the same way` reddens **AC10**. Run each under `ulimit -f` with capped output, scratch in `$TMPDIR`, and restore every file afterwards.
 - Measured-at-ref command check: not applicable. No deliverable prints a command beside a `measured at <ref>` label.
