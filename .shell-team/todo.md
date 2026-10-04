@@ -13,7 +13,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1172** A review synthesis never lowers a finding's severity on the reviewed text's own frozen or ratified status, and the orchestrator checks each downgrade's ground before transcribing (issue #681) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1172-synthesis-downgrade-ground.md
+- [ ] **T-1172** A review synthesis never lowers a finding's severity on the reviewed text's own frozen or ratified status, and the orchestrator checks each downgrade's ground before transcribing (issue #681) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1172-synthesis-downgrade-ground.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1171 — repeat — T-1171's recorded value is `serial`; two prose edits plus one corpus supersede and its regenerated blocks land in lockstep, no balanced disjoint partition
@@ -46,6 +46,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Cross-file consistency (code-reviewer step 6, run-skill bullet, goal-skill line): same test, same reference severity (highest any pass assigned), same `out-of-input-space` carve-out; the goal line references the run bullet by path without restating it. Edge cases tried: AC3 and AC5 additive-only invariants hold (positive controls inside the checks); all `mktemp` scratch left under `$TMPDIR`.
     - Not exercised: the engineer's mutation self-check (refused by the harness, recorded work-deferred; not required by any criterion, not re-run in another form); no live reviewer or orchestrator applying the rule in a real round (outside the declared ceiling).
     - Risk notes for reviewer: the rule is a reading by the reviewer and orchestrator, no checker parses a ledger reason cell (Input space out-of-scope 1); row 1's residual-ground sufficiency is a merits call the rule leaves open.
+  - codex-reviewer (T-1172, round 1): `APPROVE` — 0 blockers, 0 major, 2 minor/nits; passes `primary` and `adversarial` (codex-cli 0.159.3, both rollouts published beside `.shell-team/reviews/T-1172.md`; `check-review-input.sh` rc=0); record commits 9d78ea0b, 825d7996
+  - fast-follow disposition (2026-10-04): a lowering never written as a ledger row is outside both the reviewer's test and the orchestrator's check (minor) — waived: decision 1 governs rows that exist, and the existing never-omit requirement covers an unwritten one; a restored finding below major is routed by no clause (nit) — waived: declared out of scope in the spec's Input space class 5, no verdict follows from it
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
