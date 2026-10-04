@@ -620,7 +620,9 @@ operator の判断に残るものは報告されるだけで、変更されな�
    `GIT_CONFIG_PARAMETERS` は値によらず拒否される。任意の git 設定（例:
    hooks path）を運べるためである。sandbox によってはこれを export する
    （Claude Code sandbox がそうで、この plugin 自身の repository で実測した）。
-   `unset GIT_CONFIG_PARAMETERS` でその 1 回の呼び出しについて解除できる。
+   `unset GIT_CONFIG_PARAMETERS` で解除できる。対話シェルでの `unset` は、
+実行したそのシェルが終わるまで有効で、1 回の呼び出しに限られるのは、
+sandbox のツール呼び出しのようにコマンドごとに別のシェルで動く場合だけである。
    `safe.directory` 以外を含む
    `GIT_CONFIG_COUNT` は拒否される。それと key・value 変数を unset するか、
    設定を自分の git config へ移す。
@@ -1184,8 +1186,14 @@ branch diff は決して読まない。freeze sweep の後・`- intent-hash (v1)
 測っているか、そして重大な instrument 欠陥（壊れたコマンド、誤った計算値）
 である。列挙式（enumerative）の check 行の敵対的な網羅性——その行がなお
 弾かない mutation がもう 1 つある、という類——は、その行自身の criterion を
-vacuous（空虚）にする穴でない限り、`Blocker` / `Major` ではなく note または
-fast-follow として報告される。reviewer の findings に対する独立性は変わらない:
+vacuous（空虚）にする穴でない限り、較正の対象となる class である。
+較正の対象となる class の finding も、reviewer が判断した severity のまま
+報告・記録され、Synthesis audit ledger に downgrade 行は書かれない（較正は
+verdict の範囲を決めるもので、severity を下げない）。verdict はその finding を、
+それがその check 行自身の criterion を vacuous にしない限り non-gating として
+扱う。severity が下がっていないので、run skill の step 6 にある下げられた
+ledger 行の check（T-1172）はこれに適用されず、その check の下で残った
+blocker または major としても数えない。reviewer の findings に対する独立性は変わらない:
 何も伏せず、reviewer が判断した severity を下げず、未検証の面も残さない。
 
 **保証すること・しないこと。** elect された spec review は loop の
@@ -1218,7 +1226,9 @@ spec_review_rounds_reached`）を通じて operator にエスカレーション�
 criterion が gate になった時に `SAME_CLASS_2:<key>` も出力し、loop は
 same-class-2 の early escalation を実行する。verdict の閉じた文法から外れた
 record 行や、読めない record / contract は数えずに拒否され、拒否が
-`CONTINUE` として扱われることはない。count は record が append-only で
+`CONTINUE` として扱われることはない。guard 自身の拒否も review を止める:
+loop は review を再度呼ばず、rework digest の `--stop-reason guard_error` で
+エスカレーションし、guard の stderr をそのまま引用する。count は record が append-only で
 ある範囲でしか正直でない: 過去の verdict 行の削除に対する耐性はここには無い。
 
 ## oversight profile を選ぶ

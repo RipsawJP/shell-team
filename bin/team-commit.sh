@@ -92,8 +92,10 @@ Refused before any write: a git-redirecting environment variable set
 GIT_ALTERNATE_OBJECT_DIRECTORIES, GIT_COMMON_DIR, GIT_NAMESPACE,
 GIT_LITERAL_PATHSPECS, GIT_GLOB_PATHSPECS, GIT_NOGLOB_PATHSPECS,
 GIT_ICASE_PATHSPECS, GIT_CONFIG_PARAMETERS; for GIT_CONFIG_PARAMETERS, which can
-carry arbitrary git configuration, run `unset GIT_CONFIG_PARAMETERS` for that
-invocation and re-run); GIT_CONFIG_COUNT unless every key is safe.directory (then unset GIT_CONFIG_COUNT and its key/value pairs, or move
+carry arbitrary git configuration, run `unset GIT_CONFIG_PARAMETERS` and re-run
+(in an interactive shell the unset lasts for the rest of the shell; it covers
+one invocation only where each command runs in its own shell, as in a sandboxed
+tool call)); GIT_CONFIG_COUNT unless every key is safe.directory (then unset GIT_CONFIG_COUNT and its key/value pairs, or move
 the setting into your own git config); not run from the top level of a work tree; a detached or unborn HEAD; a merge, cherry-pick,
 revert or rebase in progress; anything already staged; a message file that is
 missing, a symlink, empty, inside the work tree or spelled with characters
@@ -175,7 +177,7 @@ done
 # GIT_CONFIG_PARAMETERS stays refused (any value, even empty): it can carry
 # arbitrary git configuration. Its refusal is one line and names its own remedy.
 if [ -n "${GIT_CONFIG_PARAMETERS+x}" ]; then
-  refuse environment "GIT_CONFIG_PARAMETERS is set; it can carry arbitrary git configuration (for example a hooks path); run unset GIT_CONFIG_PARAMETERS for this invocation and re-run"
+  refuse environment "GIT_CONFIG_PARAMETERS is set; it can carry arbitrary git configuration (for example a hooks path); run unset GIT_CONFIG_PARAMETERS and re-run (in an interactive shell the unset lasts for the rest of the shell; it covers one invocation only where each command runs in its own shell, as in a sandboxed tool call)"
 fi
 # GIT_CONFIG_COUNT is accepted only when it is a short non-negative decimal
 # integer and every key below it (with its value) is safe.directory in any
