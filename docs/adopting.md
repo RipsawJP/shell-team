@@ -620,8 +620,10 @@ host condition is and what was measured about it.
    it. `GIT_CONFIG_PARAMETERS` is refused whatever its value, because it
    can carry arbitrary git configuration (for example a hooks path). Some
    sandboxes export it (the Claude Code sandbox does, measured in this
-   plugin's own repository); `unset GIT_CONFIG_PARAMETERS` clears it for
-   that one invocation. A `GIT_CONFIG_COUNT` carrying anything but
+   plugin's own repository); `unset GIT_CONFIG_PARAMETERS` clears it, and
+   in an interactive shell the unset lasts for the rest of the shell; it
+   covers one invocation only where each command runs in its own shell, as
+   in a sandboxed tool call. A `GIT_CONFIG_COUNT` carrying anything but
    `safe.directory` is refused; unset it and its key and value variables,
    or move the setting into your own git config.
 7. **Confirm Claude Code CLI is installed and authenticated on this host
@@ -1223,8 +1225,14 @@ premises, by whether each criterion's `- check:` line measures what that
 criterion's prose claims, and by material instrument defects (a broken
 command, a wrong computed value). The adversarial completeness of an
 enumerative check line — one more mutation the line does not reject — is
-reported as a note or a fast-follow, not as a `Blocker` or `Major`, unless
-the gap makes that line's own criterion vacuous. The reviewer's
+a calibrated class. A finding in a calibrated class is still reported at the
+severity the reviewer judges and recorded at that severity, with no
+Synthesis-audit-ledger downgrade row, because the calibration scopes the
+verdict and lowers no severity; the verdict treats that finding as
+non-gating unless it makes that check line's own criterion vacuous, and
+because no severity is lowered, the run skill's step-6 check of lowered
+ledger rows (T-1172) does not apply to it, and it does not count as a
+blocker or major standing under that check. The reviewer's
 independence over findings is untouched: nothing is withheld, no severity
 it judges is lowered, and no surface is left unexamined.
 
@@ -1270,7 +1278,9 @@ prints `SAME_CLASS_2:<key>` for a criterion that gates two distinct
 rounds, and the loop then runs the same-class-2 early escalation. A
 record line outside the closed verdict grammar, or an unreadable record
 or contract, is refused rather than counted, and a refusal is never
-read as `CONTINUE`. The count is only as honest as the record is
+read as `CONTINUE`. A refusal from the guard itself also stops the review:
+the loop does not invoke it again, escalates through the rework digest with
+`--stop-reason guard_error`, and quotes the guard's stderr verbatim. The count is only as honest as the record is
 append-only: nothing here resists deleting earlier verdict lines.
 
 ## Choosing an oversight profile
