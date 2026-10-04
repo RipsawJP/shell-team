@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.8.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.8.2-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.ja.md#codex-cli-から-shell-team-を使う)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
@@ -207,6 +207,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 │   ├── team-init.sh                 # 適用先リポ scaffolder
 │   ├── team-setup.sh                # setup プロンプトのスクリプト（scaffold・Codex エージェント・報告）
 │   ├── check-setup.sh               # read-only の run 開始時チェック（この host 向けに setup が存在するか）
+│   ├── team-commit.sh               # 指定した path だけを commit する。Codex CLI host での唯一の commit コマンド
 │   └── install                      # 旧 vendoring フォールバック
 ├── templates/                       # team-init が使う generic scaffold
 ├── docs/

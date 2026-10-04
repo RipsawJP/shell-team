@@ -483,7 +483,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$HOST" = "codex-cli" ]; then
   add_remains "repository trust: project agents in .codex/agents are discovered only when the host trusts this repository; whether to trust it is your decision (in the codex-cli 0.159.3 runs relayed to this plugin, the host's own first-launch trust prompt sufficed)"
-  add_remains "commits: the loop's roles commit inside this repository, which needs write access to the git common directory ${EXCL%/info/exclude}; what the session may write there is your decision"
+  add_remains "commits: the loop's roles commit inside this repository through one invocation of bin/team-commit.sh, which needs write access to the git common directory ${EXCL%/info/exclude}; the run asks for the host's per-command approval of that identical invocation, and what the session may write there is your decision"
   add_remains "network for the review pass: the review's claude -p call reaches the other provider over the network; in the codex-cli 0.159.3 runs relayed to this plugin it ran outside the sandbox under the host's own per-command approval, so no network change was needed for it; whether to allow it is your decision"
   add_remains "PATH: spawned roles call the plugin's scripts by bare name, which needs $PLUGIN_ROOT/bin on PATH; whether that is needed is unmeasured; it is your decision"
   review_to="Claude"

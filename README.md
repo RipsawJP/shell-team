@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.8.1-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.8.2-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.md#using-shell-team-from-codex-cli)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
@@ -207,6 +207,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 │   ├── team-init.sh                 # adopting-repo scaffolder
 │   ├── team-setup.sh                # the setup prompt's script (scaffold, Codex agents, report)
 │   ├── check-setup.sh               # read-only run-start check: setup present for this host
+│   ├── team-commit.sh               # commits exactly the named paths; the one commit command on the Codex CLI host
 │   └── install                      # legacy vendoring fallback
 ├── templates/                       # generic scaffolds used by team-init
 ├── docs/
