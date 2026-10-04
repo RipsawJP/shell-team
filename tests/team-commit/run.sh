@@ -573,7 +573,12 @@ if assert_ref_env ref-env-work-tree "$r" "environment|GIT_WORK_TREE is set" "GIT
 if assert_ref_env ref-env-index-file "$r" "environment|GIT_INDEX_FILE is set" "GIT_INDEX_FILE=$r/.git/index" --message-file "$MSG" -- README; then pass "ref-env-index-file GIT_INDEX_FILE set"; fi
 if assert_ref_env ref-env-literal-pathspecs "$r" "environment|GIT_LITERAL_PATHSPECS is set" "GIT_LITERAL_PATHSPECS=1" --message-file "$MSG" -- README; then pass "ref-env-literal-pathspecs GIT_LITERAL_PATHSPECS set"; fi
 if assert_ref_env ref-env-glob-pathspecs "$r" "environment|GIT_GLOB_PATHSPECS is set" "GIT_GLOB_PATHSPECS=1" --message-file "$MSG" -- README; then pass "ref-env-glob-pathspecs GIT_GLOB_PATHSPECS set"; fi
-if assert_ref_env ref-env-config-parameters "$r" "environment|GIT_CONFIG_PARAMETERS is set" "GIT_CONFIG_PARAMETERS='core.x'='y'" --message-file "$MSG" -- README; then pass "ref-env-config-parameters GIT_CONFIG_PARAMETERS set"; fi
+if assert_ref_env ref-env-config-parameters "$r" "environment|GIT_CONFIG_PARAMETERS is set" "GIT_CONFIG_PARAMETERS='core.x'='y'" --message-file "$MSG" -- README \
+  && printf '%s' "$ERR" | grep -qF 'unset GIT_CONFIG_PARAMETERS'; then
+  pass "ref-env-config-parameters GIT_CONFIG_PARAMETERS set, refused with its own unset remedy"
+else
+  fail "ref-env-config-parameters: refusal text must name GIT_CONFIG_PARAMETERS and unset GIT_CONFIG_PARAMETERS (stderr: $ERR)"
+fi
 if assert_ref_envs ref-env-config-count-other "$r" "environment|GIT_CONFIG_COUNT" \
   GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null -- --message-file "$MSG" -- README \
   && printf '%s' "$ERR" | grep -qF 'unset' \
