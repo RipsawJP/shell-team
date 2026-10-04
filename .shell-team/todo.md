@@ -13,7 +13,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1173** Four wording follow-ups: the GIT_CONFIG_PARAMETERS remedy's real scope, one review severity-calibration sentence, the trivial-path and no-task seams in the run skill, and a guard_error reason for a spec-review guard refusal (issues #678, #632, #658, #635) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1173-wording-followups.md
+- [ ] **T-1173** Four wording follow-ups: the GIT_CONFIG_PARAMETERS remedy's real scope, one review severity-calibration sentence, the trivial-path and no-task seams in the run skill, and a guard_error reason for a spec-review guard refusal (issues #678, #632, #658, #635) — `READY_FOR_QA` — spec: .shell-team/specs/T-1173-wording-followups.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1172 — repeat — T-1172's recorded value is `serial`; four wording fixes share `skills/run/SKILL.md` and the EN/JA guides and land in lockstep, no balanced disjoint partition
@@ -32,6 +32,12 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - freeze-attestation (v2, 2026-10-04): lines=16/16 sweep=mutual-satisfiability verdict=15P/1F owner=coordinating session
   - intent-hash (v2): 3c2d1679b538f1c9695324fa67388ec0c1407a15
   - freeze record v2 (2026-10-04, coordinating session): live run on the post-implementation tree (engineer commit 5be1be7c, fixture not yet updated): AC1–AC13, AC15, AC16 green, AC14 red only for `agentmd-block-verbatim: reviewer-specreview` (the fixture still holds the v1 block), which holds once the now-allowed fixture is updated; cross-join: AC15's allow-list adds only that path and AC14's suite proves its content, so the two can no longer contradict; oversight rc=0; version-derivation unchanged (PATCH, the delta adds a test fixture only)
+  - engineer hand-off (2026-10-04, 5-line form):
+    - Changed: `bin/team-commit.sh`, `skills/run/SKILL.md`, `agents/code-reviewer.md`, `docs/adopting.md`, `docs/adopting.ja.md` (commit 5be1be7c) plus the one allowed test path, `tests/codex-skeleton-hygiene/fixtures/agentmd-block-code-reviewer-specreview.txt`, regenerated with the suite's own extraction rule; provenance in `.shell-team/provenance/T-1173.md`.
+    - Verified: `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1173-wording-followups.md` ended `check-acs: 16 passed, 0 failed, 0 skipped, 0 unrecognized`; `bash tests/codex-skeleton-hygiene/run.sh` printed 0 FAIL lines (`grep -c '^FAIL' <log>`); `shellcheck bin/team-commit.sh` clean.
+    - Shape scan: `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` rc=1 from pre-existing paths, 0 findings on the files written this round.
+    - Note for QA: the Codex prompt wraps the canonical sentence over ` \` continuation lines (AC4 shell-safety read passes); T-1172's lines are byte-identical (AC6).
+    - Not run by the engineer: the other CI-wired suites beyond AC14's list, and the mutation self-check.
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
