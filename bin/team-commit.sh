@@ -36,9 +36,10 @@
 # of the new commit; a mismatch is reported and the commit is kept (nothing is
 # reset, undone or amended). Both comparisons are config-independent: no rename
 # detection, submodules never ignored, no external diff driver or textconv.
-# Accepted risks, stated in the adopting guides: a repository's own hook may
-# change the commit after the invariant (exit 3 reports it); a concurrent
-# writer in the work tree is not guarded against.
+# Accepted risks, stated in the adopting guides: a repository's own hook or
+# attribute filter may change what is committed (exit 3 reports a changed set
+# of paths or modes only; a content or commit-message change is not detected);
+# a concurrent writer in the work tree is not guarded against.
 #
 # Exit codes:
 #   0  committed and verified; stdout is the new commit's full SHA
@@ -90,8 +91,9 @@ Refused before any write: a git-redirecting environment variable set
 (GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY,
 GIT_ALTERNATE_OBJECT_DIRECTORIES, GIT_COMMON_DIR, GIT_NAMESPACE,
 GIT_LITERAL_PATHSPECS, GIT_GLOB_PATHSPECS, GIT_NOGLOB_PATHSPECS,
-GIT_ICASE_PATHSPECS, GIT_CONFIG_PARAMETERS); GIT_CONFIG_COUNT unless every key
-is safe.directory (then unset GIT_CONFIG_COUNT and its key/value pairs, or move
+GIT_ICASE_PATHSPECS, GIT_CONFIG_PARAMETERS; for GIT_CONFIG_PARAMETERS, which can
+carry arbitrary git configuration, run `unset GIT_CONFIG_PARAMETERS` for that
+invocation and re-run); GIT_CONFIG_COUNT unless every key is safe.directory (then unset GIT_CONFIG_COUNT and its key/value pairs, or move
 the setting into your own git config); not run from the top level of a work tree; a detached or unborn HEAD; a merge, cherry-pick,
 revert or rebase in progress; anything already staged; a message file that is
 missing, a symlink, empty, inside the work tree or spelled with characters
@@ -104,9 +106,10 @@ After staging and before committing it checks that the staged tree differs from
 HEAD only by the requested paths, each added or modified with an unchanged
 mode; otherwise it stops without committing and leaves the index as it is.
 After the commit it checks the same of the new commit. A mismatch there is
-reported and the commit is kept. A repository's own hook may change the commit
-after the first check, and a concurrent writer in the work tree is not guarded
-against.
+reported and the commit is kept. The check compares changed paths and modes
+only: a repository's own hook or attribute filter that changes a file's content,
+or the commit message, is not detected. A concurrent writer in the work tree is
+not guarded against.
 
 Stdout on success: the new commit's full SHA. Diagnostics go to stderr.
 
@@ -164,11 +167,16 @@ done
 for v in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE \
   GIT_LITERAL_PATHSPECS GIT_GLOB_PATHSPECS GIT_NOGLOB_PATHSPECS \
-  GIT_ICASE_PATHSPECS GIT_CONFIG_PARAMETERS; do
+  GIT_ICASE_PATHSPECS; do
   if [ -n "${!v+x}" ]; then
     refuse environment "$v is set; it redirects the repository, index or pathspec semantics"
   fi
 done
+# GIT_CONFIG_PARAMETERS stays refused (any value, even empty): it can carry
+# arbitrary git configuration. Its refusal is one line and names its own remedy.
+if [ -n "${GIT_CONFIG_PARAMETERS+x}" ]; then
+  refuse environment "GIT_CONFIG_PARAMETERS is set; it can carry arbitrary git configuration (for example a hooks path); run unset GIT_CONFIG_PARAMETERS for this invocation and re-run"
+fi
 # GIT_CONFIG_COUNT is accepted only when it is a short non-negative decimal
 # integer and every key below it (with its value) is safe.directory in any
 # letter case — the shape a sandbox exports. Keys at or above the count are
