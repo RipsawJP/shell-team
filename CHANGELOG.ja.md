@@ -6,6 +6,8 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.8.2**
+  - **Codex CLI ホストでは、ロールが自分の作業を `bin/team-commit.sh` で commit するので、run が `READY_FOR_QA` まで届く。** workspace-write の sandbox はロール自身の `git commit` を拒否するため、run は `READY_FOR_QA` の前で `BLOCKED` になっていた。新しいスクリプトは、新規または変更された通常ファイルの明示リストを、メッセージファイルから commit する（`--message-file <file> -- <path>...`）。何も書く前に、単純な相対パスの文法から外れるパス・symlink・ディレクトリ・削除・rename・mode 変更・gitlink・すでに staged の変更がある index・merge／rebase／detached HEAD／unborn の状態・git の動作を変える環境変数を拒否する（exit 2）。stage した後、staged tree と HEAD の差が指定したパスちょうどでなければ commit せずに止まる（exit 4）。commit hook が加えた差は報告し（exit 3）、commit はそのまま残す。拒否されたコマンドの教訓は、Codex CLI ホストに限って例外を 1 つだけ認める: ロールは、その同一の `bash "<plugin root>/bin/team-commit.sh" …` 呼び出しについて、ホストのコマンド単位の承認を求めてよい。それ以外のコマンド・それ以外の git コマンド・削除はすべて `BLOCKED` で止まり、セッション全体への許可は一切求めない。Claude Code ホストは変わらない。Codex CLI ホストでは、変わった role を取り込むために `update shell-team` を実行する。（#662）
 - **v2.8.1**
   - **Codex CLI ホストでは、セットアップが生成または変更した agent は新しい Codex セッションから有効になると報告する。** Codex は実行中のセッションで生成された project agent を選べないため、セットアップと同じセッションで run を頼むと Plan で `BLOCKED` になっていた。セットアップが `.codex/agents` を生成・再生成したとき、またはそのためのコマンドを表示したときは、報告に `- new Codex session:` の行が 1 行入る。setup skill の最後の手順も、後の再実行が `.codex/agents` を in sync と報告した場合を含めて、新しいセッションで始めるよう案内する。`.codex/agents` が変わらなかった場合は何も足さない。導入ガイドと README にも、その事実と根拠を書いた。
   - **`tech-lead` が trivial と判定した run にも最小の board エントリと spec を作るので、`READY_FOR_QA` まで届く。** trivial の省略経路は board タスクなしで Implement へ進んでいたが、記録の関門（provenance・durability）は設計上タスクのない run を拒否するため、その run は Validate の前で `BLOCKED` になっていた。run skill はまず `pm-spec` を trivial mode で呼び、本物の task id を持つ board エントリと、検査付きの受け入れ条件を 1 つ以上持つ最小の spec を作る。以降の関門はそのまま通り、どの checker も新しい形を受け付けない。Codex CLI ホストでは、変わった role を取り込むために `update shell-team` を実行する。
