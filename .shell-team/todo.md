@@ -12,7 +12,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 ## Active
 
 
-- [ ] **T-1171** bin/team-commit.sh follow-ups: a remedy line for the GIT_CONFIG_PARAMETERS refusal, and step 6 / step 10 wording fixes in both adopting guides (issues #664, #665, #666, #672) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1171-team-commit-followups.md
+- [ ] **T-1171** bin/team-commit.sh follow-ups: a remedy line for the GIT_CONFIG_PARAMETERS refusal, and step 6 / step 10 wording fixes in both adopting guides (issues #664, #665, #666, #672) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1171-team-commit-followups.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1170 — repeat — T-1170's recorded value is `serial`; one refusal string, its help text, one suite case and the EN/JA guides land in lockstep, no balanced disjoint partition
@@ -41,6 +41,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - #666 re-measured in a `$TMPDIR` scratch repo on this case-insensitive filesystem (`core.ignorecase=true`, HEAD tracks `a`, `a` moved away with `mv`, `A/b.txt` created): the script exits 0, the commit adds exactly `A/b.txt`, `git ls-tree -r --name-only HEAD` lists both `A/b.txt` and `a`, no deletion committed; the guides' sentence matches.
     - Edge cases: `GIT_CONFIG_PARAMETERS` with a value and with an empty value both exit 2 with the one-line own remedy. Help line `...GIT_CONFIG_COUNT unless every key is safe.directory...` is 137 bytes, the same class as a pre-existing 130-byte help line in the base; cosmetic, AC9's 80-byte rule covers only `docs/adopting.md`.
     - Risk notes: not run — suites outside the derived set (a destructive-pattern grep text was blocked by the harness check; no recursive delete was attempted); CI itself (primary evidence) not yet observed. Working tree clean before this append.
+  - codex-reviewer (T-1171, round 1): `APPROVE` — 0 blockers, 0 major, 1 minor, 2 nits; passes `primary` and `adversarial` (codex-cli 0.159.3, both rollouts published beside `.shell-team/reviews/T-1171.md`; `check-review-input.sh` rc=0); record commit fa198d16
+  - fast-follow disposition (2026-10-04): remedy wording "for this invocation" while a bare `unset` lasts for the rest of the shell (Minor; `bin/team-commit.sh`, both guides' step 6) — filed as issue #678 (wording only, no behavioural effect; the wording is frozen decision 2, so a change here would be a class-B re-freeze); 137-byte `--help` line and the short wrapped line in EN step 10 (nits) — waived: cosmetic only, no wrap rule covers the help text and the guide line is within 80 bytes
 
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
