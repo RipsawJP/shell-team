@@ -588,9 +588,10 @@ host condition is and what was measured about it.
    creates `--out-dir` — it only reads it, comparing it against a scratch
    regeneration — so it needs no such write access even when Codex runs it
    in-session. Running step 3 from your own shell avoids the `.codex`
-   refusal entirely, since a role's or the orchestrator's own commit needs `.git` write
-   access. (Codex's own configuration directory, `.agents`, is refused the
-   same way; nothing in this loop writes to it.) On this host every commit
+   refusal entirely. Only a role's or the orchestrator's own commit needs
+   `.git` write access. (Codex's own configuration directory, `.agents`,
+   is refused the same way; nothing in this loop writes to it.) On this
+   host every commit
    the run makes — a dispatched role's own or the orchestrator's record
    commit — goes through one invocation of `bin/team-commit.sh`, with
    single-quoted literal arguments: `bash "<plugin root>/bin/team-commit.sh"
@@ -608,9 +609,19 @@ host condition is and what was measured about it.
    that the staged tree differs from HEAD only by the paths it was given,
    and otherwise stops with `exit 4` and no commit, leaving the index as it
    is. Two risks are accepted and not guarded against: a repository's own
-   hook may change the commit after that check (`exit 3` reports it and the
-   commit is kept), and a concurrent writer in the work tree between the
-   checks and the writes. A `GIT_CONFIG_COUNT` carrying anything but
+   hook or attribute filter may change what is committed (`exit 3` reports
+   a changed set of paths or modes and the commit is kept, but a change to
+   a file's content or to the commit message is not detected), and a
+   concurrent writer in the work tree between the checks and the writes.
+   On a case-insensitive filesystem, a requested path whose leading
+   directory differs only in letter case from a file HEAD tracks (for
+   example `A/b.txt` beside a tracked `a`) is committed as requested: no
+   deletion, both entries stay in the tree, and the script does not refuse
+   it. `GIT_CONFIG_PARAMETERS` is refused whatever its value, because it
+   can carry arbitrary git configuration (for example a hooks path). Some
+   sandboxes export it (the Claude Code sandbox does, measured in this
+   plugin's own repository); `unset GIT_CONFIG_PARAMETERS` clears it for
+   that one invocation. A `GIT_CONFIG_COUNT` carrying anything but
    `safe.directory` is refused; unset it and its key and value variables,
    or move the setting into your own git config.
 7. **Confirm Claude Code CLI is installed and authenticated on this host
@@ -685,11 +696,12 @@ host condition is and what was measured about it.
     including one waiting on a per-command approval from you: on this
     host a child's completion message does not wake a parent whose turn
     has ended, so ending the turn stalls the run until you type. If the
-    turn ends anyway, its final message names the roles
-    still running; send any message to resume once the pending
-    approvals are done, and the run is not finished until then. Its `APPROVE` reaches
-    `READY_FOR_MERGE` — both gates green — without either host ever
-    leaving the Codex CLI session. When `pm-spec` writes the spec file, it
+    turn ends anyway, its final message names the roles still running;
+    send any message to resume once the pending approvals are done, and
+    the run is not finished until then. The `code-reviewer`'s `APPROVE`
+    reaches `READY_FOR_MERGE` — both gates green — without either host
+    ever leaving the Codex CLI session. When `pm-spec` writes the spec
+    file, it
     names it `<specs dir>/<task-id>-<slug>.md` — a rule, not a precedent:
     `bin/check-durability.sh`'s `specs` registry row depends on the
     task-id prefix to resolve a task's own spec unambiguously, and a spec

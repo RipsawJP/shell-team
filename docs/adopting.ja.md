@@ -591,8 +591,8 @@ operator の判断に残るものは報告されるだけで、変更されな�
    `--out-dir` を一切作成しない——スクラッチ再生成と比較読み取りするだけ
    なので、セッション内で実行しても `.codex` への書き込み権限は不要。手順 3
    を（既定として書いているとおり）自分自身のシェルから実行すれば、`.codex`
-   の拒否は一切発生しない——役割自身の commit や
-   orchestrator 自身の commit が `.git` への書き込みを必要とするため。（Codex 自身のもう一つの設定ディレクトリ `.agents` も
+   の拒否は一切発生しない。`.git` への書き込みを必要とするのは、
+   役割自身の commit や orchestrator 自身の commit だけである。（Codex 自身のもう一つの設定ディレクトリ `.agents` も
    同様に拒否されるが、このループはそこには何も書き込まない。）この host
    では、run が行う commit——dispatch された役割自身のものも、orchestrator の
    記録用 commit も——はすべて `bin/team-commit.sh` の 1 回の呼び出しで行う。
@@ -609,9 +609,19 @@ operator の判断に残るものは報告されるだけで、変更されな�
    hook 回避の形もすべて拒否される。commit の前に、stage 済みの tree が
    渡された path だけで HEAD と異なることを確認し、そうでなければ commit
    せず `exit 4` で止まり、index はそのまま残す。次の 2 つのリスクは受容して
-   おり防止しない: リポジトリ自身の hook がその確認の後に commit を変える
-   ことがある（`exit 3` で報告され、commit は残る）。また、確認と書き込みの
-   間の、work tree への同時書き込みも防がない。`safe.directory` 以外を含む
+   おり防止しない: リポジトリ自身の hook や attribute の filter が、
+   commit される内容を変えることがある（`exit 3` が報告するのは path または
+   mode の変更だけで commit は残るが、ファイルの内容や commit メッセージの
+   変更は検出されない）。また、確認と書き込みの間の、work tree への同時書き込み
+   も防がない。大文字と小文字を区別しない filesystem では、HEAD が追跡する
+   ファイルと先頭ディレクトリの大文字小文字だけが異なる path（例: 追跡済みの
+   `a` に対する `A/b.txt`）は、要求どおり commit される。削除は起きず、両方の
+   エントリが tree に残り、スクリプトはこれを拒否しない。
+   `GIT_CONFIG_PARAMETERS` は値によらず拒否される。任意の git 設定（例:
+   hooks path）を運べるためである。sandbox によってはこれを export する
+   （Claude Code sandbox がそうで、この plugin 自身の repository で実測した）。
+   `unset GIT_CONFIG_PARAMETERS` でその 1 回の呼び出しについて解除できる。
+   `safe.directory` 以外を含む
    `GIT_CONFIG_COUNT` は拒否される。それと key・value 変数を unset するか、
    設定を自分の git config へ移す。
 7. **この host に Claude Code CLI が既にインストール・認証済みであることを
@@ -684,7 +694,7 @@ operator の判断に残るものは報告されるだけで、変更されな�
     run が止まる。それでもターンが終わった場合、最終メッセージに実行中の
     役割が列挙される。保留中の承認を済ませたら任意のメッセージを送って
     再開すること。それまで run は完了していない。
-    その `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
+    `code-reviewer` の `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
     host も Codex CLI セッションを一度も離れない。`pm-spec` がスペック
     ファイルを書き出すときは `<specs dir>/<task-id>-<slug>.md` という
     名前にする——これは precedent ではなく規則である:
