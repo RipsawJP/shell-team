@@ -4,6 +4,9 @@ codex exec --sandbox read-only --cd <repo> --json -o "<RAW_OUT>" \
 Read the file yourself — do not expect its text in this prompt. \
 Judge (1) whether its correctness rests on a fact this repository can verify rather than an unverifiable assumption about deployment order, a rollback precondition, or a system outside this repository's reach, and (2) whether its acceptance criteria test the right thing rather than merely testable things. \
 The verdict is gated by those two and by any material instrument defect in a check line, such as a broken command or a wrong computed value. \
-Report the adversarial completeness of an enumerative check line, meaning one more mutation it does not reject, as a note or fast-follow and not as a Blocker or Major, unless the gap makes that line's own criterion vacuous. \
+Treat the adversarial completeness of an enumerative check line, meaning one more mutation it does not reject, as a calibrated class. A finding in a calibrated class is still reported at the severity \
+the reviewer judges and recorded at that severity, with no Synthesis-audit-ledger downgrade row, because the calibration scopes the verdict and lowers no severity; the verdict treats that finding as \
+non-gating unless it makes that check line's own criterion vacuous, and because no severity is lowered, the run skill's step-6 check of lowered ledger rows (T-1172) does not apply to it, and it does \
+not count as a blocker or major standing under that check. \
 Still report every finding you judge and leave no surface unexamined. \
 Return findings as a JSON array of {severity, criterion, issue, suggestion}."
