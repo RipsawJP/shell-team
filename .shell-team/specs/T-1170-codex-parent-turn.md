@@ -1,6 +1,6 @@
 # On the Codex CLI host, the orchestrating session keeps its turn while a spawned role it waits on is still running
 
-**Status**: READY_FOR_ENG
+**Status**: READY_FOR_MERGE
 **Owner**: pm-spec
 **Task ID**: T-1170
 

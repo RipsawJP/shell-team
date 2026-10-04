@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1170** On the Codex CLI host, the orchestrating session keeps its turn while a spawned role it waits on is still running (issue #670) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1170-codex-parent-turn.md
+- [ ] **T-1170** On the Codex CLI host, the orchestrating session keeps its turn while a spawned role it waits on is still running (issue #670) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1170-codex-parent-turn.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1169 — repeat — T-1169's recorded value is `serial`; one prompt block, its contain-mode consumer and the EN/JA adopting guides land in lockstep, no balanced disjoint partition
@@ -39,6 +39,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Finding (non-blocking, prose-only, not a FAIL): in `docs/adopting.md` the next sentence "Its `APPROVE` reaches" and in `docs/adopting.ja.md` 「その `APPROVE` は」 now follow "the run is not finished until then" / 「それまで run は完了していない」, so the pronoun can read as the run's rather than the review role's `APPROVE`. Its antecedent was already implicit before this task (step 10 never names the reviewer's verdict before that sentence), so it is a mild readability drift, not a changed meaning; a future editorial pass could write "The review's `APPROVE`". Also cosmetic: the EN insertion has an uneven hard-wrap (a short line then an over-long line). The guides' fallback sentence does not repeat "may be waiting on an approval" (the run-skill line carries it; the guide's AC5-judged content — final message says roles are running, send any message to resume once approvals are done, not finished until then — holds in both languages).
     - Edge cases: no executable artifact (prose + docs only), so the adversarial-fixture checklist is not applicable; AC3/AC7 base-blob comparison and AC1's forbidden-token (`trigger_turn` etc.) negative reads were the boundary probes. Claude Code host text confirmed unchanged by AC3 cmp. Working tree clean before this append.
     - Notes: first AC5 run failed because the English guide lacked the literal `end its turn`; reworded and re-run green. CHANGELOG untouched (release step).
+  - codex-reviewer (T-1170, round 1): `APPROVE` — 0 blockers, 0 major, 1 minor; passes `primary` and `adversarial` (codex-cli 0.159.3, both rollouts published beside `.shell-team/reviews/T-1170.md`; `check-review-input.sh` rc=0); record commit c2d14116
+  - fast-follow disposition (2026-10-04): guide step 10 pronoun antecedent ("Its `APPROVE`" / 「その `APPROVE` は」) and uneven EN wrap (Minor) — filed as issue #672 (wording only, no behavioural effect; adjacent to #665's step-6 wording fixes)
 
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
