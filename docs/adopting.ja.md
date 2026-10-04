@@ -677,6 +677,13 @@ operator の判断に残るものは報告されるだけで、変更されな�
     前には必ず再測定を行う。経過時間だけを理由に abort してはならない。
     詳細な規則（この host での class-B re-freeze gate を含む）は
     `templates/prompt-blocks/host-dispatch.md` の dispatch 文言を参照。
+    orchestrating セッションは、待っている spawn 済みの役割が 1 つでも
+    実行中である間——operator のコマンド単位の承認待ちの役割も含む——
+    自分のターンを終えない。この host では子の完了メッセージが、ターンを
+    終えた親を起こさないため、ターンを終えるとあなたが入力するまで
+    run が止まる。それでもターンが終わった場合、最終メッセージに実行中の
+    役割が列挙される。保留中の承認を済ませたら任意のメッセージを送って
+    再開すること。それまで run は完了していない。
     その `APPROVE` は `READY_FOR_MERGE`——両ゲート green——に届く。どちらの
     host も Codex CLI セッションを一度も離れない。`pm-spec` がスペック
     ファイルを書き出すときは `<specs dir>/<task-id>-<slug>.md` という

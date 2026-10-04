@@ -680,7 +680,14 @@ host condition is and what was measured about it.
     re-measurement before recording any abort, since elapsed time alone
     never justifies one; see `templates/prompt-blocks/host-dispatch.md`'s
     dispatch text for the full rule, including the class-B re-freeze
-    gate it restates for this host. Its `APPROVE` reaches
+    gate it restates for this host. The orchestrating session does not
+    end its turn while any spawned role it waits on is still running,
+    including one waiting on a per-command approval from you: on this
+    host a child's completion message does not wake a parent whose turn
+    has ended, so ending the turn stalls the run until you type. If the
+    turn ends anyway, its final message names the roles
+    still running; send any message to resume once the pending
+    approvals are done, and the run is not finished until then. Its `APPROVE` reaches
     `READY_FOR_MERGE` — both gates green — without either host ever
     leaving the Codex CLI session. When `pm-spec` writes the spec file, it
     names it `<specs dir>/<task-id>-<slug>.md` — a rule, not a precedent:
