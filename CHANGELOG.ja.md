@@ -6,6 +6,8 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.8.3**
+  - **Codex CLI ホストでは、親セッションが spawn した各ロールの戻りまでターンを保つので、run は追加のメッセージなしで `READY_FOR_MERGE` まで進む。** このホストでは、ロールの完了メッセージはターンを終えたセッションを起こさない。QA とレビューがコマンド単位の承認を待っている間にセッションがターンを終えると、operator が何か入力するまで run が止まっていた。run skill は、待っているロールが 1 つでも動いている間（承認待ちのロールを含む）はターンを終えず、待ちの呼び出しがタイムアウトしたらもう一度待つよう指示する。それでもターンが終わった場合、最終メッセージはまだ動いているロールの名前を挙げ、承認を済ませたら任意のメッセージを送って再開するよう案内し、run を完了とは報告しない。Claude Code ホストは変わらない。導入ガイドにも同じことを書いた。（#670）
 - **v2.8.2**
   - **Codex CLI ホストでは、ロールが自分の作業を `bin/team-commit.sh` で commit するので、run が `READY_FOR_QA` まで届く。** workspace-write の sandbox はロール自身の `git commit` を拒否するため、run は `READY_FOR_QA` の前で `BLOCKED` になっていた。新しいスクリプトは、新規または変更された通常ファイルの明示リストを、メッセージファイルから commit する（`--message-file <file> -- <path>...`）。何も書く前に、単純な相対パスの文法から外れるパス・symlink・ディレクトリ・削除・rename・mode 変更・gitlink・すでに staged の変更がある index・merge／rebase／detached HEAD／unborn の状態・git の動作を変える環境変数を拒否する（exit 2）。stage した後、staged tree と HEAD の差が指定したパスちょうどでなければ commit せずに止まる（exit 4）。commit hook が加えた差は報告し（exit 3）、commit はそのまま残す。拒否されたコマンドの教訓は、Codex CLI ホストに限って例外を 1 つだけ認める: ロールは、その同一の `bash "<plugin root>/bin/team-commit.sh" …` 呼び出しについて、ホストのコマンド単位の承認を求めてよい。それ以外のコマンド・それ以外の git コマンド・削除はすべて `BLOCKED` で止まり、セッション全体への許可は一切求めない。Claude Code ホストは変わらない。Codex CLI ホストでは、変わった role を取り込むために `update shell-team` を実行する。（#662）
 - **v2.8.1**
