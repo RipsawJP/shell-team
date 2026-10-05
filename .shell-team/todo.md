@@ -13,6 +13,19 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
+- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
+  - entry-mode: pm-authored
+  - spec-review: cross-provider
+  - dispatch-reflection: implement — T-1173 — repeat — one script, its suite, the skill and EN/JA docs land in lockstep, as T-1173's wording edits did
+  - dispatch-reflection: verify — T-1173 — repeat — one spec's check-acs plus the setup suites; below the fan-out threshold
+  - dispatch-reflection: specify — T-1173 — repeat — the issue body, its comment and the measured inventory hand over as text
+  - dispatch-reflection: spec-review — T-1173 — differs — T-1173's premises were measurable here; T-1174 rests on Claude Code settings-scope and sandbox semantics (P1–P4) that are not
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — one script, its suite, the skill and EN/JA docs land in lockstep; no balanced disjoint partition; tier2 does not apply
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs plus the setup and check-setup suites, shellcheck and the docs checkers; below the fan-out threshold
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
+  - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count — the report's Already-in-place correctness rests on Claude Code settings-scope merge semantics, excludedCommands pattern coverage and readable sandbox writability, none measurable here
+  - source: issue #689 Expected 1, 3, 4 and comment 5990322504 (the task's own tracker item, relayed verbatim by the coordinating session in the Routing Map; no separate issue filed). Expected 2 (self-review path) is T-1175. Not stacked: cut from `develop` after T-1173's PR #685 merged; base-side reads resolve `git merge-base develop HEAD`. Supersedes T-1163 decision 8 (T-1163 AC8 and AC10 go red by design, disclosed in the spec's Blast radius). The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once. Pre-commitment (AI self-discipline): never-dropped R1 notice (AC1), R3 base-dir required action (AC3–AC6), the honesty rule (AC8, AC10); droppable first and only D1, the settings reader (AC7). Release premise: v2.8.7 PATCH.
+
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
