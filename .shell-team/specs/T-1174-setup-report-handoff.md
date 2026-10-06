@@ -333,7 +333,7 @@ Record: `.shell-team/reviews/T-1174.md` (ce4c253a). The spec was not yet frozen,
   - `ends by listing each condition the loop needs from your host under` — `README.md` (1)
   - `の下へ並べて報告します` — `README.ja.md` (1)
   - `Setup reports this condition under` — `docs/distribution.md` (1)
-  - `setup は Claude Code host で、この条件を` — `docs/distribution.ja.md` (measured by the freeze run; this role counted the longer line it belongs to as 1)
+  - `setup は Claude Code host で、この条件を` — `docs/distribution.ja.md` (1 — measured by the freeze run at 92a991ef, 2026-10-06; every other token in this list re-measured there as 1)
   - `- **The review transfer**:` and ``- **Whether to track `.shell-team/` in git.**`` — `docs/adopting.md` (1 each)
   - `- **レビュー転送**:` and ``- **`.shell-team/` を git で追跡するか。**`` — `docs/adopting.ja.md` (1 each)
   - `Remains the operator's decision:` and the fifteen T-1163 tokens — borrowed from T-1163; `sends repository content to` — borrowed from `bin/team-setup.sh:496`.
