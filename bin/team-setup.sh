@@ -647,6 +647,11 @@ sandbox_entry_in() {
   n_all="$(wc -c < "$f" 2>/dev/null | tr -d ' ')" || return 1
   n_nonul="$(tr -d '\000' < "$f" 2>/dev/null | wc -c | tr -d ' ')" || return 1
   [ -n "$n_all" ] && [ "$n_all" = "$n_nonul" ] || return 1
+  # A text encoding a real JSON parser would refuse is not read (checked when
+  # iconv is available; the strict grammar below is the primary guard).
+  if command -v iconv > /dev/null 2>&1; then
+    iconv -f UTF-8 -t UTF-8 < "$f" > /dev/null 2>&1 || return 1
+  fi
   out="$(awk "$SBX_AWK" < "$f" 2>/dev/null)" || return 1
   [ "$out" = "YES" ]
 }
@@ -686,20 +691,44 @@ add_notice "the review pass sends repository content to $review_to, the other pr
 #     anchor must be committed. Read-only: check-ignore, ls-tree, config and
 #     rev-parse only.
 PROBE_MD="setup-probe.md"
-REQ_DIRS=("$BASE")
-REQ_ANCHOR=("$TODO_FILE")
-case "$SPECS_DIR" in
-  "$BASE"|"$BASE"/*) : ;;
-  *) REQ_DIRS[1]="$SPECS_DIR"; REQ_ANCHOR[1]="$SPECS_DIR/.gitkeep" ;;
+# np <path>: collapse repeated slashes and drop a trailing one (the resolver
+# echoes TEAM_RUN_BASE as given, so `.custom/` arrives as `.custom//todo.md`).
+np() {
+  local p="$1" sl="/" dsl="//"
+  while [ "${p//$dsl/$sl}" != "$p" ]; do p="${p//$dsl/$sl}"; done
+  printf '%s' "${p%/}"
+}
+N_BASE="$(np "$BASE")"
+N_SPECS="$(np "$SPECS_DIR")"
+REQ_DIRS=("$N_BASE")
+REQ_ANCHOR=("$(np "$TODO_FILE")")
+case "$N_SPECS" in
+  "$N_BASE"|"$N_BASE"/*) : ;;
+  *) REQ_DIRS[1]="$N_SPECS"; REQ_ANCHOR[1]="$N_SPECS/.gitkeep" ;;
 esac
 probes=()
+# Every other directory the loop commits records into, when it sits under the
+# base (specs, retros, reviews, provenance, interventions), is probed with the
+# directory itself and a not-yet-existing .md path; so are the lessons file and
+# the root .gitignore the printed command may stage. runs/ is ignored by design.
+for rel in "$SPECS_DIR" "$RETROS_DIR" "$REVIEWS_DIR" "$PROV_DIR" "$INTERV_DIR"; do
+  rel="$(np "$rel")"
+  case "$rel" in
+    "$N_BASE"/*) probes[${#probes[@]}]="$rel"; probes[${#probes[@]}]="$rel/$PROBE_MD" ;;
+  esac
+done
+rel="$(np "$LESSONS_FILE")"
+case "$rel" in
+  "$N_BASE"/*) probes[${#probes[@]}]="$rel" ;;
+esac
+probes[${#probes[@]}]=".gitignore"
 for ((ri = 0; ri < ${#REQ_DIRS[@]}; ri++)); do
   rd="${REQ_DIRS[$ri]}"
   probes[${#probes[@]}]="$rd"
   probes[${#probes[@]}]="${REQ_ANCHOR[$ri]}"
   probes[${#probes[@]}]="$rd/$PROBE_MD"
   if [ "$ri" -eq 0 ]; then
-    probes[${#probes[@]}]="$LOOPS_DIR/shell-team.contract.yaml"
+    probes[${#probes[@]}]="$(np "$LOOPS_DIR")/shell-team.contract.yaml"
   fi
   acc=""
   rest="$rd"
@@ -767,9 +796,23 @@ fmt_rule() { # <report index>: "<source>:<line>" (never the pattern)
 in_head() { # <path>: the path is in HEAD's tree (an unborn HEAD or a staged-only path is not)
   local o
   o="$(git -C "$ROOT" ls-tree HEAD -- "$1" 2>/dev/null)" || return 1
-  [ -n "$o" ]
+  case "$o" in
+    [0-7][0-7][0-7][0-7][0-7][0-7]" blob "*) return 0 ;;
+  esac
+  return 1
 }
 
+# A report whose pattern starts with `!` is a re-include git matched, so that
+# path is NOT ignored; such reports are skipped everywhere below.
+RG_IDX=-1
+i=0
+while [ "$i" -lt "$nrep" ]; do
+  case "${r_pat[$i]}" in
+    '!'*) : ;;
+    *) if [ "${r_path[$i]}" = ".gitignore" ]; then RG_IDX="$i"; fi ;;
+  esac
+  i=$((i + 1))
+done
 BASE_OK=1
 BASE_SEGS=""
 BASE_PATHS=""
@@ -788,16 +831,19 @@ else
     a_anc=-1
     a_closed=1
     a_exist=""
-    a_new=-1
+    a_new=""
     i=0
     while [ "$i" -lt "$nrep" ]; do
       rp="${r_path[$i]}"
+      case "${r_pat[$i]}" in
+        '!'*) i=$((i + 1)); continue ;;
+      esac
       if under "$rp" "$rd"; then
         a_any=1
         if [ "$rp" = "$rd" ]; then
           a_dir="$i"
-        elif [ "$rp" = "$rd/$PROBE_MD" ]; then
-          a_new="$i"
+        elif [ "${rp##*/}" = "$PROBE_MD" ]; then
+          a_new="${a_new:+$a_new, }${rp%/*}/ by $(fmt_rule "$i")"
         else
           a_exist="${a_exist:+$a_exist, }$rp by $(fmt_rule "$i")"
         fi
@@ -831,8 +877,8 @@ else
       seg="$seg is ignored by $(fmt_rule "$a_dir")"
     elif [ -n "$a_exist" ]; then
       seg="$seg holds ignored files ($a_exist)"
-    elif [ "$a_new" -ge 0 ]; then
-      seg="$seg would ignore new .md files by $(fmt_rule "$a_new")"
+    elif [ -n "$a_new" ]; then
+      seg="$seg would ignore new .md files in $a_new"
     elif [ "$a_anc" -ge 0 ]; then
       seg="$seg sits under an ignored parent, ignored by $(fmt_rule "$a_anc")"
     else
@@ -869,7 +915,10 @@ if [ "$ci_rc" -le 1 ] && [ "$BASE_OK" -eq 0 ]; then
   if [ "$BASE_BADPATH" -eq 1 ]; then
     msg="$msg A path above cannot be quoted safely, so setup prints no command for it."
   else
-    if [ -n "$BASE_REINC" ]; then
+    if [ -n "$BASE_REINC" ] && [ "$RG_IDX" -ge 0 ]; then
+      msg="$msg The repository's root .gitignore is itself ignored by $(fmt_rule "$RG_IDX"), so a re-include line could not be committed there and setup prints none; make that file trackable first."
+      BASE_NOREINC=1
+    elif [ -n "$BASE_REINC" ]; then
       msg="$msg Add $BASE_REINC to the repository's root .gitignore (setup never edits it)."
       BASE_PATHS="${BASE_PATHS:+$BASE_PATHS }'.gitignore'"
     fi

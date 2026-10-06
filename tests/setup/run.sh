@@ -596,7 +596,7 @@ R="$T/repo-sb-nlh"; mk "$R"; x="$( (export HOME="$NLH"; st "$R" --host claude-co
 sec "$RM" "$T/o" | grep '^- sandbox: ' > "$T/sl" || true
 { [ "$x" = 0 ] && grep -qF 'could not determine' "$T/sl" && ! sec 'Already in place:' "$T/o" | grep -q '^- sandbox'; } && pass "T-1174 honesty: a settings path with a control character is not read" || fail "T-1174 honesty: control-character HOME (rc=$x)"
 # Base directory: a tracked board under a later *.md rule leaves only the not-yet-existing probe ignored.
-gcf m2 '*.md'; R="$T/repo-bd-newmd"; mk "$R"; st "$R" --host claude-code > /dev/null; git -C "$R" add -- .shell-team; cm "$R"
+gcf m2 'setup-probe.md'; R="$T/repo-bd-newmd"; mk "$R"; st "$R" --host claude-code > /dev/null; git -C "$R" add -- .shell-team; cm "$R"
 x="$(stg "$T/gc-m2" "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
 { req_line "$x" "$T/gx-m2:1" && printf '%s\n' "$L" | grep -qF 'would ignore new .md files' && ! printf '%s\n' "$L" | grep -qF 'holds ignored files' && [ -z "$(printf '%s\n' "$L" | ga)" ] && [ -z "$(printf '%s\n' "$L" | rl)" ]; } \
   && pass "T-1174: only the not-yet-existing probe ignored: named as new .md files, no command, no re-include" || fail "T-1174: new-.md-only line (rc=$x)"
@@ -612,6 +612,45 @@ mkdir -p "$T/gm"; printf '%s\n' '#!/usr/bin/env bash' 'for a in "$@"; do if [ "$
 R="$T/repo-bd-mal"; mk "$R"
 x="$( (cd "$R" && PATH="$T/gm:$SP" bash "$S" --host claude-code < /dev/null > "$T/o" 2> "$T/e"); printf '%s' "$?")"
 { [ "$x" = 2 ] && grep -qF 'could not read' "$T/e" && ! grep -q '^- base directory in git: ' "$T/o"; } && pass "T-1174: a malformed check-ignore report exits 2 and prints no base line" || fail "T-1174: malformed report (rc=$x)"
+# Review round 1: a re-include git matched is not an ignoring rule; every required path class is probed; the printed command's inputs are checked.
+R="$T/repo-bd-neg"; mk "$R"; st "$R" --host claude-code > /dev/null; printf '%s\n' '!.shell-team/' > "$R/.gitignore"
+x="$(stg "$T/gc-a" "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF 'is not committed yet' && no 'is ignored by' <(printf '%s\n' "$L") && no 'change or remove the rule' <(printf '%s\n' "$L") && no '.gitignore:1' <(printf '%s\n' "$L"); } \
+  && pass "T-1174: an uncommitted re-include is not narrated as the ignoring rule and no advice undoes it" || fail "T-1174: negated report misread (rc=$x)"
+git -C "$R" add -- .shell-team .gitignore; (export GIT_CONFIG_GLOBAL="$T/gc-a"; cm "$R"); x="$(stg "$T/gc-a" "$R" --host claude-code)"
+{ [ "$x" = 0 ] && [ "$(sec Required: "$T/o")" = '- none' ]; } && pass "T-1174: once the re-include and board are committed Required is - none" || fail "T-1174: re-include committed (rc=$x)"
+for d in specs provenance reviews retros interventions; do
+  R="$T/repo-bd-in-$d"; mk "$R"; st "$R" --host claude-code > /dev/null; git -C "$R" add -- .shell-team; cm "$R"
+  printf '.shell-team/%s/\n' "$d" >> "$R/.git/info/exclude"
+  x="$(st "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+  { [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF ".shell-team/$d" && printf '%s\n' "$L" | grep -qF '.git/info/exclude:' && [ -z "$(printf '%s\n' "$L" | rl)" ] && ! sec 'Already in place:' "$T/o" | bl | grep -q .; } \
+    && pass "T-1174: an ignored in-base $d directory is named under Required, no re-include" || fail "T-1174: in-base $d (rc=$x)"
+done
+R="$T/repo-bd-in-lessons"; mk "$R"; st "$R" --host claude-code > /dev/null; git -C "$R" add -- .shell-team; cm "$R"
+printf '.shell-team/lessons.md\n' >> "$R/.git/info/exclude"; : > "$R/.shell-team/lessons.md"
+x="$(st "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF '.shell-team/lessons.md'; } && pass "T-1174: an ignored lessons file is named under Required" || fail "T-1174: lessons file (rc=$x)"
+printf '.shell-team/\n/.gitignore\n' > "$T/gx-rg"; printf '[core]\n\texcludesFile = %s\n' "$T/gx-rg" > "$T/gc-rg"
+R="$T/repo-bd-rg2"; mk "$R"; x="$(stg "$T/gc-rg" "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF 'root .gitignore is itself ignored by' && [ -z "$(printf '%s\n' "$L" | rl)" ] && ! printf '%s\n' "$L" | ga | grep -qF .gitignore && printf '%s\n' "$L" | grep -qF "$T/gx-rg:2"; } \
+  && pass "T-1174: an ignored root .gitignore: no re-include and no failing command naming it" || fail "T-1174: ignored root .gitignore (rc=$x)"
+printf '.shell-team/\n/.gitignore\n!/.gitignore\n' > "$T/gx-rn"; printf '[core]\n\texcludesFile = %s\n' "$T/gx-rn" > "$T/gc-rn"
+R="$T/repo-bd-rgneg"; mk "$R"; x="$(stg "$T/gc-rn" "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && [ "$(printf '%s\n' "$L" | rl)" = '!.shell-team/' ] && printf '%s\n' "$L" | ga | grep -qF "'.gitignore'" && no 'itself ignored' <(printf '%s\n' "$L"); } \
+  && pass "T-1174: a root .gitignore re-included by a later rule is not reported as ignored" || fail "T-1174: negated root .gitignore (rc=$x)"
+R="$T/repo-bd-blob"; mkdir -p "$R"; git -C "$R" init -q; mkdir -p "$R/.shell-team/todo.md"; printf 'x\n' > "$R/.shell-team/todo.md/entry"; git -C "$R" add .; git -C "$R" -c user.email=t@example.com -c user.name=t commit -q -m i
+x="$(st "$R" --host claude-code)"
+{ sec Required: "$T/o" | bl | grep -qF '.shell-team/'; } && pass "T-1174: a committed tree at the board path is not a committed board" || fail "T-1174: tree counted as committed (rc=$x)"
+gcf tr '.custom/'; R="$T/repo-bd-tr"; mk "$R"; x="$( (export TEAM_RUN_BASE=.custom/; stg "$T/gc-tr" "$R" --host claude-code) )"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && [ "$(printf '%s\n' "$L" | rl)" = '!.custom/' ] && no '//' <(printf '%s\n' "$L") && printf '%s\n' "$L" | ga | grep -qxF "git add -- '.custom' '.gitignore'"; } && pass "T-1174: a trailing-slash TEAM_RUN_BASE is normalised" || fail "T-1174: trailing-slash base (rc=$x)"
+R="$T/repo-bd-tr2"; mk "$R"; (export TEAM_RUN_BASE=.custom/; st "$R" --host claude-code > /dev/null); git -C "$R" add -- .custom; cm "$R"
+x="$( (export TEAM_RUN_BASE=.custom/; st "$R" --host claude-code) )"
+{ [ "$x" = 0 ] && [ "$(sec Required: "$T/o")" = '- none' ] && sec 'Already in place:' "$T/o" | bl | grep -qF '.custom/' && sec 'Already in place:' "$T/o" | bl | no '//' /dev/stdin; } \
+  && pass "T-1174: a committed trailing-slash base is Already in place with no doubled slash" || fail "T-1174: trailing-slash base committed (rc=$x)"
+R="$T/repo-bd-tr3"; mk "$R"; (export TEAM_RUN_BASE=.custom/; st "$R" --host claude-code > /dev/null); git -C "$R" add -- .custom; cm "$R"; printf '.custom/lessons.md\n' >> "$R/.git/info/exclude"; : > "$R/.custom/lessons.md"
+x="$( (export TEAM_RUN_BASE=.custom/; st "$R" --host claude-code) )"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF '.custom/lessons.md by' && no '//' <(printf '%s\n' "$L"); } && pass "T-1174: a path named under a trailing-slash base has no doubled slash" || fail "T-1174: doubled slash in a named path (rc=$x)"
+und badutf8 "$(printf '{"sandbox":{"excludedCommands":["codex *"]},"k":"\377"}')"
 
 # ---------------------------------------------------------------------------
 # T-1174 — the write set is unchanged by settings files and a hidden base dir.
