@@ -529,7 +529,12 @@ fi
 #     comma, no duplicate or nested look-alike key), has exactly one "sandbox"
 #     key (at top level, an object) holding exactly one "excludedCommands" key
 #     (a direct member, an array) with the exact string element "codex *".
-#     Anything it cannot classify with certainty is NO.
+#     Anything it cannot classify with certainty is NO. The final conjuncts
+#     topsb, sbobj, direx and exarr (and the top-level "{" test) are
+#     defence-in-depth: each is implied by `found` together with the nsb and
+#     nex counts, because `found` is only set on the role path top-level
+#     sandbox object -> direct excludedCommands array. Their removal mutants
+#     are equivalent, so no fixture can tell them apart.
 # shellcheck disable=SC2016 # an awk program: nothing in it is meant to expand
 SBX_AWK='
 function skipws(   c) {
@@ -804,6 +809,10 @@ else
         fi
         [ "$okp" -eq 1 ] || a_closed=0
       else
+        # Defence-in-depth: a reported ancestor also reports every probe under
+        # the directory (a_any, with the ancestor's rule as pattern, so
+        # a_closed is already 0); no reachable input reaches this branch with
+        # a_any unset, so removing it is an equivalent mutant.
         case "$rd/" in
           "$rp"/*) a_anc="$i" ;;
         esac

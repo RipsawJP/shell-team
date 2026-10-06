@@ -397,7 +397,7 @@ gcf a '.shell-team/'
 R="$T/repo-bd-a"; mk "$R"
 x="$(stg "$T/gc-a" "$R" --host claude-code)"
 L="$(sec Required: "$T/o" | bl)"; C="$(printf '%s\n' "$L" | ga)"
-{ req_line "$x" "$T/gx-a:1" && [ "$(printf '%s\n' "$L" | rl)" = '!.shell-team/' ] && gv "$C" && printf '%s\n' "$C" | grep -qF "'.gitignore'"; } \
+{ req_line "$x" "$T/gx-a:1" && [ "$(printf '%s\n' "$L" | rl)" = '!.shell-team/' ] && gv "$C" && printf '%s\n' "$C" | grep -qF "'.gitignore'" && printf '%s\n' "$L" | grep -qF 'is ignored by' && printf '%s\n' "$L" | grep -qF 'not in HEAD' && ! printf '%s\n' "$L" | grep -qF 'change or remove the rule'; } \
   && pass "T-1174: a global rule naming the directory prints !.shell-team/, the rule as <source>:<line> only, and a command staging .gitignore" || fail "T-1174: adopter-case line (rc=$x)"
 g1=0; (export GIT_CONFIG_GLOBAL="$T/gc-a"; cd "$R" && git check-ignore -q -- .shell-team/todo.md) || g1=$?
 printf '%s\n' '!.shell-team/' >> "$R/.gitignore"
@@ -430,7 +430,7 @@ x="$(st "$W" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
 # Outside the closed set: the rule is named, never its pattern, and no re-include is printed.
 nore() { # <label> <rule-needle> <fixture setup done, rc>
   local x="$3"
-  { req_line "$x" "$2" && [ -z "$(printf '%s\n' "$L" | rl)" ]; } && pass "T-1174: $1 — Required names the rule, no re-include" || fail "T-1174: $1 (rc=$x)"
+  { req_line "$x" "$2" && [ -z "$(printf '%s\n' "$L" | rl)" ] && printf '%s\n' "$L" | grep -qF 'change or remove the rule'; } && pass "T-1174: $1 — Required names the rule, no re-include" || fail "T-1174: $1 (rc=$x)"
 }
 gcf p 'work/'
 R="$T/repo-bd-p"; mk "$R"; x="$( (export TEAM_RUN_BASE=work/st; stg "$T/gc-p" "$R" --host claude-code) )"
@@ -514,6 +514,11 @@ R="$T/repo-sb-x"; mk "$R"; x="$( (export HOME="$T/h-adopter"; st "$R" --host cod
 und() { # <tag> <json> [env assignment...]
   local tag="$1" json="$2" ccd="${3:-}" x R="$T/repo-sb-u-$1"
   hm "$tag" "$json"; mk "$R"
+  und_run "$tag" "$ccd" "$R"
+}
+# und_run <tag> <ccd> <repo>: the settings file of <tag> is already written; assert "could not determine"
+und_run() {
+  local tag="$1" ccd="$2" R="$3" x
   x="$( (export HOME="$T/h-$tag"; if [ -n "$ccd" ]; then export CLAUDE_CONFIG_DIR="$ccd"; fi; st "$R" --host claude-code) )"
   sec 'Already in place:' "$T/o" > "$T/ip"
   sec "$RM" "$T/o" | grep '^- sandbox: ' > "$T/sl" || true
@@ -557,6 +562,56 @@ und_ok() { local R="$T/repo-sb-ok-$1"; hm "$1" "$2"; mk "$R"; local x; x="$(sx "
   { [ "$x" = 0 ] && sec 'Already in place:' "$T/o" | grep -q '^- sandbox: '; } && pass "T-1174 reader: $1 is recognised" || fail "T-1174 reader: $1 (rc=$x)"; }
 und_ok numbers '{"n":[-1.5e+3,0,true,false,null],"sandbox":{"a":{"b":[]},"excludedCommands":["xA","codex *"]}}'
 und_ok crlf "$(printf '{\r\n"sandbox":{\r\n"excludedCommands":["codex *"]\r\n}\r\n}')"
+
+# Guard-by-guard fixtures: each is the recognised shape plus ONE defect, so only the guard under test can reject it.
+nulw() { # <tag> <printf-format>: write a settings file holding the valid shape plus NUL bytes
+  hm "$1"; printf '%b' "$2" > "$T/h-$1/.claude/settings.json"
+  local R="$T/repo-sb-u-$1"; mk "$R"; und_run "$1" "" "$R"
+}
+nulw nultrail '{"sandbox":{"excludedCommands":["codex *"]}}\0\n'
+nulw nulead '\0{"sandbox":{"excludedCommands":["codex *"]}}\n'
+nulw nulmid '{"sandbox":{"excludedCommands":["codex *"]}\0}\n'
+nulw nulin '{"sandbox":{"excludedCommands":["codex *"],\0"a":1}}\n'
+und badu '{"a":"\u12G4","sandbox":{"excludedCommands":["codex *"]}}'
+und nocolon '{"a" 1,"sandbox":{"excludedCommands":["codex *"]}}'
+und nocomma '{"a":1 "b":2,"sandbox":{"excludedCommands":["codex *"]}}'
+und arrnocomma '{"sandbox":{"excludedCommands":["x" "codex *"]}}'
+und badlit '{"a":tru,"sandbox":{"excludedCommands":["codex *"]}}'
+und baremin '{"a":-,"sandbox":{"excludedCommands":["codex *"]}}'
+und unterm '{"sandbox":{"excludedCommands":["codex *"]},"k":"abc'
+und nestedsb '{"x":{"sandbox":{"excludedCommands":["codex *"]}}}'
+und otherarr '{"sandbox":{"excludedCommands":["x"],"other":["codex *"]}}'
+und nocolon2 '{"a"x1,"sandbox":{"excludedCommands":["codex *"]}}'
+und badlit2 '{"a":trux,"sandbox":{"excludedCommands":["codex *"]}}'
+und nestsbextra '{"sandbox":{"excludedCommands":["codex *"]},"x":{"sandbox":1}}'
+und deep "{\"d\":$(printf '[%.0s' $(seq 1 50))$(printf ']%.0s' $(seq 1 50)),\"sandbox\":{\"excludedCommands\":[\"codex *\"]}}"
+und_ok depth30 "{\"d\":$(printf '[%.0s' $(seq 1 30))$(printf ']%.0s' $(seq 1 30)),\"sandbox\":{\"excludedCommands\":[\"codex *\"]}}"
+# With HOME unset the user scope is skipped (no unbound-variable abort) and the result is undetermined.
+R="$T/repo-sb-nohome"; mk "$R"; x="$( (unset HOME; st "$R" --host claude-code) )"
+sec "$RM" "$T/o" | grep '^- sandbox: ' > "$T/sl" || true
+{ [ "$x" = 0 ] && grep -qF 'could not determine' "$T/sl" && ! sec 'Already in place:' "$T/o" | grep -q '^- sandbox'; } && pass "T-1174 honesty: an unset HOME skips the user scope without aborting" || fail "T-1174 honesty: unset HOME (rc=$x)"
+# A settings path with a control character is never read, even holding the valid shape.
+NLH="$T/h-nl"$'\n'"x"; mkdir -p "$NLH/.claude"; printf '%s\n' "$V" > "$NLH/.claude/settings.json"
+R="$T/repo-sb-nlh"; mk "$R"; x="$( (export HOME="$NLH"; st "$R" --host claude-code) )"
+sec "$RM" "$T/o" | grep '^- sandbox: ' > "$T/sl" || true
+{ [ "$x" = 0 ] && grep -qF 'could not determine' "$T/sl" && ! sec 'Already in place:' "$T/o" | grep -q '^- sandbox'; } && pass "T-1174 honesty: a settings path with a control character is not read" || fail "T-1174 honesty: control-character HOME (rc=$x)"
+# Base directory: a tracked board under a later *.md rule leaves only the not-yet-existing probe ignored.
+gcf m2 '*.md'; R="$T/repo-bd-newmd"; mk "$R"; st "$R" --host claude-code > /dev/null; git -C "$R" add -- .shell-team; cm "$R"
+x="$(stg "$T/gc-m2" "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+{ req_line "$x" "$T/gx-m2:1" && printf '%s\n' "$L" | grep -qF 'would ignore new .md files' && ! printf '%s\n' "$L" | grep -qF 'holds ignored files' && [ -z "$(printf '%s\n' "$L" | ga)" ] && [ -z "$(printf '%s\n' "$L" | rl)" ]; } \
+  && pass "T-1174: only the not-yet-existing probe ignored: named as new .md files, no command, no re-include" || fail "T-1174: new-.md-only line (rc=$x)"
+# A source path with a backtick is printed as <unprintable source>.
+mkdir -p "$T/b${BQ}t"; printf '.shell-team/\n' > "$T/b${BQ}t/gx"; printf '[core]\n\texcludesFile = %s\n' "$T/b${BQ}t/gx" > "$T/gc-bt"
+R="$T/repo-bd-bt"; mk "$R"; x="$(stg "$T/gc-bt" "$R" --host claude-code)"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF '<unprintable source>:1' && [ "$(printf '%s\n' "$L" | rl)" = '!.shell-team/' ]; } && pass "T-1174: a backtick in the source path is printed as <unprintable source>" || fail "T-1174: backtick source (rc=$x)"
+# A base directory outside the safe character set gets no command and no re-include.
+R="$T/repo-bd-bad"; mk "$R"; x="$( (export TEAM_RUN_BASE='.a$b'; st "$R" --host claude-code) )"; L="$(sec Required: "$T/o" | bl)"
+{ [ "$x" = 0 ] && printf '%s\n' "$L" | grep -qF 'cannot be quoted safely' && [ -z "$(printf '%s\n' "$L" | ga)" ] && [ -z "$(printf '%s\n' "$L" | rl)" ]; } && pass "T-1174: an unsafe base path prints no command and no re-include" || fail "T-1174: unsafe base path (rc=$x)"
+# A malformed check-ignore report (field count not a multiple of four) is an error, not a quiet pass.
+mkdir -p "$T/gm"; printf '%s\n' '#!/usr/bin/env bash' 'for a in "$@"; do if [ "$a" = check-ignore ]; then cat > /dev/null; printf "a\0b\0c\0"; exit 0; fi; done' "exec $(command -v git) \"\$@\"" > "$T/gm/git"; chmod +x "$T/gm/git"
+R="$T/repo-bd-mal"; mk "$R"
+x="$( (cd "$R" && PATH="$T/gm:$SP" bash "$S" --host claude-code < /dev/null > "$T/o" 2> "$T/e"); printf '%s' "$?")"
+{ [ "$x" = 2 ] && grep -qF 'could not read' "$T/e" && ! grep -q '^- base directory in git: ' "$T/o"; } && pass "T-1174: a malformed check-ignore report exits 2 and prints no base line" || fail "T-1174: malformed report (rc=$x)"
 
 # ---------------------------------------------------------------------------
 # T-1174 — the write set is unchanged by settings files and a hidden base dir.
