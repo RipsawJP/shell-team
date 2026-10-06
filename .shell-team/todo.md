@@ -14,6 +14,20 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
+- [ ] **T-1176** Legacy-layout specs resolve to tasks/specs when that is where they live, setup adds nothing outside the base for such an adopter, and the contract templates name no layout path (issues #693, #589, #696) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1176-legacy-layout-paths.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - dispatch-reflection: implement — T-1174 — repeat — resolver, setup/init, templates and EN/JA docs land in lockstep around one case table, as T-1174's script, suite and docs did
+  - dispatch-reflection: verify — T-1174 — repeat — one spec's check-acs plus the reached suites; below the fan-out threshold
+  - dispatch-reflection: specify — T-1174 — repeat — issue bodies and the measured inventory hand over as text
+  - dispatch-reflection: spec-review — T-1174 — differs — T-1174 rested on Claude Code settings/sandbox semantics not measurable here; T-1176's premises (file existence, git ignore/status, cmp) are reproduced in local fixtures
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — resolver, setup/init, templates and EN/JA docs land in lockstep around one case table; no balanced disjoint partition; tier2 does not apply
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs plus the team-paths, team-init, setup, check-setup, close-out and check-contract suites; below the fan-out threshold
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined, does not fire: every premise is reproduced in AC2's fixtures
+  - source: issues #693, #589 and #696 (the task's own tracker items; bodies relayed verbatim by the coordinating session and restated in the spec's `## Summarized sources`; no separate issue filed). #689 Expected 2 is T-1175's and out of scope. The Routing Map's working name "T-1175" was re-numbered T-1176 because T-1175 is already reserved for the self-review path.
+  - stacked-on: feature/689-setup-handoff (T-1174, PR #698 open against develop), cut at its close-out tip 715e376d; base-ref-discriminator `not-applicable` — no criterion reads a branch-point or merge-base blob (the only historical reads name the release tag v2.8.6). This role read `.git/refs/heads/feature/689-setup-handoff` and `.git/refs/heads/feature/693-legacy-layout-paths` directly: both hold 715e376d.
+  - pre-commitment (AI self-discipline, never operator-ratified): never-dropped N1 (the five-row resolver table with backward compatibility, AC1) and N2 (the legacy adopter end to end, AC2) — a defeat returns the task to planning; droppable in order D1 (v2.8.6 drift allowance, AC4), D2 (the `- specs dir:` report line, AC3), D3 (the template lock, AC6); trigger: two consecutive rounds with a new same-class Blocker or Major against one droppable component. The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
