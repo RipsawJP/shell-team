@@ -114,5 +114,19 @@ assert "T-1160 a commented-out key is not read" 0 "$CAPF"
 assert "T-1160 this repo's own contract lints clean" 0 "$REPO_ROOT/.shell-team/loops/shell-team.contract.yaml"
 rm -f "$CAPF"
 
+# T-1176 (decision 6): the three shipped contract templates name operating paths
+# only through team-paths.sh, never as legacy-layout literals (`tasks/` or
+# `docs/specs`). Each read carries a positive control (the file is non-empty and
+# carries a budget: line), and grep's exit status is checked explicitly: 1 is the
+# only passing status, so an unreadable file (2) cannot read as "no literal".
+for tpl in shell-team.contract.yaml goal.contract.yaml loop-contract-template.yaml; do
+  tf="$REPO_ROOT/templates/$tpl"
+  [ -s "$tf" ] || fail "T-1176 lock: $tpl is missing or empty"
+  grep -q '^budget:' "$tf" || fail "T-1176 lock: $tpl carries no budget: line (positive control)"
+  g=0
+  grep -qE 'tasks/|docs/specs' "$tf" || g=$?
+  [ "$g" -eq 1 ] || fail "T-1176 lock: $tpl names a layout path literal (tasks/ or docs/specs) or could not be read (grep exit $g)"
+done
+
 printf 'OK\n'
 exit 0

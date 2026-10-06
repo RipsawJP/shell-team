@@ -217,19 +217,27 @@ fi
 # 6. Template drift (note only, never changes the exit status). The board and
 #    the test recipe are never compared. The set mirrors bin/team-setup.sh.
 # ---------------------------------------------------------------------------
-tpl_note() { # <repo-relative scaffold path> <template path>
-  local rel="$1" tpl="$2" f r
+tpl_note() { # <repo-relative scaffold path> <template path> [<previous release's template>]
+  local rel="$1" tpl="$2" prior="${3:-}" f r
   f="$(abs "$rel")"
   [ -f "$f" ] || return 0
   r=0
   cmp -s "$f" "$tpl" || r=$?
+  # T-1176: a copy byte-identical to the previous release's template is not
+  # drift either (only the contract gets this allowance, and only that one
+  # prior byte sequence: when the template changes again, the file below is
+  # replaced by the then-previous release's bytes, never accumulated).
+  if [ "$r" -eq 1 ] && [ -n "$prior" ] && [ -f "$prior" ]; then
+    r=0
+    cmp -s "$f" "$prior" || r=$?
+  fi
   case "$r" in
     0) : ;;
     1) add_note "$rel differs from the installed plugin's template; the prompt \`update shell-team\` lists it (a scaffold file is never rewritten)" ;;
     *) err "check-setup: cannot compare $rel with $tpl"; EC2=1 ;;
   esac
 }
-tpl_note "$CONTRACT_REL"              "$TEMPLATES_DIR/shell-team.contract.yaml"
+tpl_note "$CONTRACT_REL"              "$TEMPLATES_DIR/shell-team.contract.yaml" "$TEMPLATES_DIR/prior/shell-team.contract.v2.8.6.txt"
 tpl_note "$BASE/AGENTS.md"            "$TEMPLATES_DIR/AGENTS.md"
 tpl_note "$BASE/.gitignore"           "$TEMPLATES_DIR/shell-team.gitignore"
 tpl_note "$BASE/binding.conf.example" "$TEMPLATES_DIR/binding-template.conf"

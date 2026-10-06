@@ -89,7 +89,8 @@ override with $TEAM_RUN_BASE; an existing tasks/ layout is detected and reused):
   <base>/runs/.gitkeep
   <base>/retros/.gitkeep
   <base>/reviews/.gitkeep
-  <base>/specs/.gitkeep                 (docs/specs/ in a legacy layout)
+  <base>/specs/.gitkeep                 (legacy layout: tasks/specs/ when it exists and docs/specs/
+                                         is absent or holds only .gitkeep, else docs/specs/)
   <base>/provenance/.gitkeep
   <base>/interventions/.gitkeep
   <base>/AGENTS.md                      (from templates/AGENTS.md; cross-tool pointer doc)
@@ -374,9 +375,9 @@ copy_template "$BINDING_TPL" "$TEAM_RUN_BASE/binding.conf.example"
 # ---------------------------------------------------------------------------
 printf '\nteam-init: %d created/updated, %d skipped in %s\n' "$created" "$skipped" "$TARGET"
 printf 'Operating files live under: %s/ (host root left untouched).\n' "$TEAM_RUN_BASE"
-# In a legacy layout the specs dir sits outside the base dir (the historical
-# split-root quirk: docs/specs/), so call it out rather than implying it is
-# under the base.
+# In a legacy layout the specs dir may sit outside the base dir (docs/specs/,
+# when team-paths.sh resolves it there), so call it out rather than implying it
+# is under the base. With specs at tasks/specs this condition is false.
 if [ "$TEAM_SPECS_DIR" != "$TEAM_RUN_BASE/specs" ]; then
   printf 'Specs live under: %s/ (legacy split-root layout).\n' "$TEAM_SPECS_DIR"
 fi

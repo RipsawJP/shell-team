@@ -13,7 +13,7 @@
 #   1. $TEAM_RUN_BASE env  — explicit operator/CI/host override (repo-relative).
 #   2. legacy layout       — if ROOT/tasks/loops/shell-team.contract.yaml
 #                            exists, use the historical split layout
-#                            (base=tasks, specs=docs/specs). The marker is
+#                            (base=tasks; specs per the five-row table below). The marker is
 #                            the contract file itself (plugin-unique), NOT a
 #                            bare `tasks/loops/` directory or a bare
 #                            `tasks/todo.md`, so an unrelated host `tasks/`
@@ -25,9 +25,17 @@
 #   TEAM_REVIEWS_DIR  TEAM_SPECS_DIR  TEAM_PROVENANCE_DIR  TEAM_INTERVENTIONS_DIR
 #   TEAM_LESSONS
 #
-# `docs/specs` is the ONE path the legacy layout keeps OUTSIDE the base dir
-# (historically specs lived under docs/, everything else under tasks/). That
-# split-root quirk is encoded here and nowhere else.
+# Legacy specs directory (T-1176). Historically specs lived under docs/specs
+# while everything else lived under tasks/. The legacy branch now answers from
+# a closed five-row table of two directory tests and one listing:
+#   R1 neither tasks/specs nor docs/specs is a directory     -> docs/specs
+#   R2 only docs/specs is a directory                        -> docs/specs
+#   R3 only tasks/specs is a directory                       -> tasks/specs
+#   R4 both; docs/specs holds nothing but .gitkeep (or is empty) -> tasks/specs
+#   R5 both; docs/specs holds any other entry, or cannot be listed -> docs/specs
+# A regular file at either path counts as absent. The answer never depends on
+# a preference: tasks/specs wins only when docs/specs provably holds no spec.
+# The table is encoded here and nowhere else.
 #
 # External dependencies: bash + standard POSIX tools only (per the framework's
 # external-dependency-zero rule). No JSON/YAML processors, no language runtimes.
@@ -60,7 +68,9 @@ Resolve where the shell-team loop's per-repo operating files live.
 
 Precedence (highest first), against ROOT (default: current directory):
   1. $TEAM_RUN_BASE env   explicit override (repo-relative)
-  2. legacy layout        if ROOT/tasks/loops/shell-team.contract.yaml exists -> base=tasks, specs=docs/specs
+  2. legacy layout        if ROOT/tasks/loops/shell-team.contract.yaml exists -> base=tasks;
+                          specs=tasks/specs when that directory exists and docs/specs is
+                          absent or holds nothing but .gitkeep, else docs/specs
   3. default              base=.shell-team, specs=.shell-team/specs
 
 Modes:
@@ -147,8 +157,28 @@ if [ -n "${TEAM_RUN_BASE:-}" ]; then
   RULE="env (TEAM_RUN_BASE)"
 elif [ -f "$ROOT/tasks/loops/shell-team.contract.yaml" ]; then
   BASE="tasks"
-  SPECS="docs/specs"
-  RULE="legacy (tasks/loops/shell-team.contract.yaml present)"
+  # Closed five-row table (see the header). Nothing read from inside docs/specs
+  # is printed, and nothing reaches stderr.
+  if [ -d "$ROOT/tasks/specs" ]; then
+    if [ -d "$ROOT/docs/specs" ]; then
+      if _ents=$(ls -A -- "$ROOT/docs/specs" 2>/dev/null) && { [ -z "$_ents" ] || [ "$_ents" = ".gitkeep" ]; }; then
+        SPECS="tasks/specs"
+        RULE="legacy R4 (tasks/specs and a docs/specs holding only .gitkeep)"
+      else
+        SPECS="docs/specs"
+        RULE="legacy R5 (docs/specs holds other entries or is unreadable)"
+      fi
+    else
+      SPECS="tasks/specs"
+      RULE="legacy R3 (tasks/specs only)"
+    fi
+  elif [ -d "$ROOT/docs/specs" ]; then
+    SPECS="docs/specs"
+    RULE="legacy R2 (docs/specs only)"
+  else
+    SPECS="docs/specs"
+    RULE="legacy R1 (no specs directory yet)"
+  fi
 else
   BASE=".shell-team"
   SPECS=".shell-team/specs"

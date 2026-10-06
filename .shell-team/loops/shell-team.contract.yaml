@@ -3,7 +3,8 @@
 # PM -> Engineer -> QA -> Codex-Reviewer with status-flag gates and a bounded QA retry.
 # BUDGET and STOP are MANDATORY (runaway / billing guardrail); OWNER and EVIDENCE
 # are MANDATORY too (accountability / "unverified done" guardrail).
-# Lint with: bin/check-contract.sh tasks/loops/shell-team.contract.yaml
+# Lint with: bin/check-contract.sh "$(team-paths.sh --get loops)/shell-team.contract.yaml"
+# (operating paths below are named through team-paths.sh --get <key>, never as literals)
 #
 # This is the generic default dropped into an adopting repo by `team-init`.
 # Adapt the budget/scope/owner to your project; keep BUDGET/STOP/OWNER/EVIDENCE intact.
@@ -20,11 +21,11 @@ trigger:
 
 scope:
   - the single task/feature named in the invoking request
-  - tasks/todo.md status flags, docs/specs/*, the feature branch
+  - the board's status flags (team-paths.sh --get todo), the specs dir (team-paths.sh --get specs), the feature branch
   - must not merge or push without a human gate (see human_gate below)
 
 action:
-  description: one PM -> Engineer -> QA -> Codex-Reviewer pass over the task, advancing the tasks/todo.md status flag at each phase gate
+  description: one PM -> Engineer -> QA -> Codex-Reviewer pass over the task, advancing the board's status flag (team-paths.sh --get todo) at each phase gate
 
 budget:
   max_iterations: 6        # operator ruling 2026-09-11: 3 stopped a converging loop 5 times on T-1134; cap raised, STOP escalations carry the 3 convergence indicators (#491)
@@ -45,10 +46,10 @@ human_gate:
   - push
 
 report:
-  to: tasks/todo.md status flag, tasks/reviews/*, and the PR description
+  to: the board's status flag (team-paths.sh --get todo), the reviews dir (team-paths.sh --get reviews), and the PR description
 
 # EVIDENCE — the proof a /shell-team:run pass must produce to claim "done".
 evidence:
   - QA verification of the spec's acceptance criteria (check-acs PASS / test output)
-  - the Codex cross-provider review verdict in tasks/reviews/* (APPROVE)
+  - the Codex cross-provider review verdict in the reviews dir (team-paths.sh --get reviews) (APPROVE)
   - the feature-branch diff / PR for human review

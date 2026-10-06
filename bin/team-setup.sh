@@ -480,22 +480,41 @@ fi
 #    mirrors the template variables in bin/team-init.sh; tests/setup/run.sh
 #    locks it by comparing a fresh scaffold against these templates.
 # ---------------------------------------------------------------------------
-tpl_drift() {
-  local rel="$1" tpl="$2" f r
+tpl_drift() { # <repo-relative scaffold path> <template path> [<previous release's template>]
+  local rel="$1" tpl="$2" prior="${3:-}" f r
   f="$ROOT/$rel"
   [ -f "$f" ] || return 0
   r=0
   cmp -s "$f" "$tpl" || r=$?
+  # T-1176: a copy byte-identical to the previous release's template is not
+  # drift either (only the contract gets this allowance, and only that one
+  # prior byte sequence: when the template changes again, the file named by
+  # the caller is replaced by the then-previous release's bytes, never
+  # accumulated).
+  if [ "$r" -eq 1 ] && [ -n "$prior" ] && [ -f "$prior" ]; then
+    r=0
+    cmp -s "$f" "$prior" || r=$?
+  fi
   case "$r" in
     0) : ;;
     1) add_remains "$rel differs from the installed plugin's template; setup never rewrites an existing scaffold file, so keep or merge it as you decide" ;;
     *) err "team-setup: cannot compare $rel with $tpl"; EC2=1 ;;
   esac
 }
-tpl_drift "$LOOPS_DIR/shell-team.contract.yaml" "$TEMPLATES_DIR/shell-team.contract.yaml"
+tpl_drift "$LOOPS_DIR/shell-team.contract.yaml" "$TEMPLATES_DIR/shell-team.contract.yaml" "$TEMPLATES_DIR/prior/shell-team.contract.v2.8.6.txt"
 tpl_drift "$BASE/AGENTS.md"                     "$TEMPLATES_DIR/AGENTS.md"
 tpl_drift "$BASE/.gitignore"                    "$TEMPLATES_DIR/shell-team.gitignore"
 tpl_drift "$BASE/binding.conf.example"          "$TEMPLATES_DIR/binding-template.conf"
+
+# T-1176 D2: in legacy row R4 (tasks/specs, plus a docs/specs holding nothing
+# but .gitkeep) the specs dir resolves to tasks/specs; say once that the
+# leftover docs/specs/ is not read. Fixed text only: nothing read from inside
+# docs/specs is printed, and no command is proposed. The row comes from the
+# resolver's own rule text, so this never fires in another row or layout.
+_prt="$(bash "$SCRIPT_DIR/team-paths.sh" --root "$ROOT" --print)" || die "$RESOLVE_MSG"
+case "$_prt" in
+  *"(rule: legacy R4 "*) add_inplace "specs dir: specs are read from tasks/specs/; the docs/specs/ beside it holds only .gitkeep and is not read (setup leaves it as it is)" ;;
+esac
 
 # ---------------------------------------------------------------------------
 # 7. Prerequisites: presence only (`command -v`). The other provider's CLI is

@@ -17,6 +17,8 @@
 # never against the tracked tree): re-add a comparator call to the checker, or
 # make it create a file under TMPDIR, and this suite must fail.
 
+# The `A && pass || fail` assertion idiom is deliberate; pass/fail always exit 0.
+# shellcheck disable=SC2015
 set -euo pipefail
 
 export LC_ALL=C
@@ -279,6 +281,40 @@ for t in trust_level writable_roots network_access sandbox_workspace_write dange
     if [ "$g" -eq 1 ]; then pass "tokens: '$t' absent from $(basename "$f")"; else fail "tokens: '$t' present or unreadable in $(basename "$f") (grep exit $g)"; fi
   done
 done
+
+# --- T-1176: legacy specs resolution reaches Step 0, and D1 (the v2.8.6 -------
+# --- contract copy is not drift) reaches the check's template note. ----------
+mkdir -p "$T/empty-tpl"
+cm() { git -C "$1" -c user.email=t@example.com -c user.name=t commit -q -m "$2"; }
+mkl() {
+  mkdir -p "$1" && git -C "$1" init -q --template="$T/empty-tpl" && mkdir -p "$1/tasks/loops" "$1/tasks/specs" \
+    && cp "$REPO_ROOT/templates/shell-team.contract.yaml" "$1/tasks/loops/" \
+    && cp "$REPO_ROOT/templates/todo-template.md" "$1/tasks/todo.md" \
+    && printf '# spec\n' > "$1/tasks/specs/T-1-a.md" \
+    && git -C "$1" add -- tasks && cm "$1" i
+}
+LA="$T/t1176-a"; mkl "$LA"
+x="$(ck "$SP" "$LA" --host claude-code)"
+{ [ "$x" = 0 ] && ! grep -qF docs/specs "$T/o"; } && pass "T-1176: specs in tasks/specs, no docs/: the check passes and names no docs/specs" || fail "T-1176: tasks/specs adopter (rc=$x)"
+LB="$T/t1176-b"; mkl "$LB"; mkdir -p "$LB/docs/specs"; : > "$LB/docs/specs/.gitkeep"
+x="$(ck "$SP" "$LB" --host claude-code)"
+{ [ "$x" = 0 ] && ! grep -qF docs/specs "$T/o"; } && pass "T-1176: the .gitkeep-only leftover docs/specs does not change the result" || fail "T-1176: leftover (rc=$x)"
+LC="$T/t1176-c"; mkl "$LC"; mkdir -p "$LC/docs/specs"; printf '# o\n' > "$LC/docs/specs/T-2-b.md"
+x="$(ck "$SP" "$LC" --host claude-code)"
+{ [ "$x" = 0 ]; } && pass "T-1176: docs/specs holding a spec resolves docs/specs (present), so the check passes" || fail "T-1176: R5 (rc=$x)"
+LD="$T/t1176-d"; mkl "$LD"; mv "$LD/tasks/specs" "$LD/tasks/specs-gone"
+x="$(ck "$SP" "$LD" --host claude-code)"
+{ [ "$x" = 1 ] && grep -qF 'docs/specs (the specs dir) is missing' "$T/o"; } && pass "T-1176: neither specs directory: still unmet, naming the resolved docs/specs" || fail "T-1176: R1 unmet (rc=$x)"
+OLDC="$REPO_ROOT/templates/prior/shell-team.contract.v2.8.6.txt"
+LE="$T/t1176-e"; mk "$LE"; sr "$LE" claude-code
+KE="$LE/.shell-team/loops/shell-team.contract.yaml"
+cp "$OLDC" "$KE"; x="$(ck "$SP" "$LE" --host claude-code)"
+{ [ "$x" = 0 ] && ! grep -qF 'shell-team.contract.yaml differs' "$T/o" && cmp -s "$KE" "$OLDC"; } \
+  && pass "T-1176 D1: an untouched v2.8.6 contract copy gets no note and is not rewritten" || fail "T-1176 D1: v2.8.6 copy (rc=$x)"
+printf '# local edit\n' >> "$KE"; x="$(ck "$SP" "$LE" --host claude-code)"
+{ [ "$x" = 0 ] && grep -q '^- note: .*shell-team.contract.yaml differs' "$T/o"; } && pass "T-1176 D1: an edited v2.8.6 copy still gets the note" || fail "T-1176 D1: edited copy (rc=$x)"
+cp "$OLDC" "$LE/.shell-team/AGENTS.md"; x="$(ck "$SP" "$LE" --host claude-code)"
+{ [ "$x" = 0 ] && grep -q '^- note: .*AGENTS.md differs' "$T/o"; } && pass "T-1176 D1: the allowance is the contract's only" || fail "T-1176 D1: allowance leaked (rc=$x)"
 
 if [ "$fails" -gt 0 ]; then
   printf '\ncheck-setup suite: %d assertion(s) FAILED\n' "$fails" >&2
