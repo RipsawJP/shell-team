@@ -13,7 +13,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `REWORK` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
+- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `READY_FOR_QA` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
   - entry-mode: pm-authored
   - spec-review: cross-provider
   - dispatch-reflection: implement — T-1173 — repeat — one script, its suite, the skill and EN/JA docs land in lockstep, as T-1173's wording edits did
@@ -49,6 +49,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Verification ceiling: unit-and-static — verifies AC1–AC17 at or below that level; AC18 stays human-owned (the spec-review record and the operator's next adopter run: `environmentally-unverified`).
     - Edge cases tried: valid-shape settings with a trailing, mid-file and leading NUL byte (3); the adopter run applied end to end (1); codex-cli versus base script (1). Command for the count: the three bullets above, enumerated by hand.
     - Next step for the engineer: the two fixtures above (test-only); re-run `bash tests/setup/run.sh` and the nine mutants.
+  - engineer hand-off (rework 1, 2026-10-06, 5-line form):
+    - Changed: test-only plus comments — `tests/setup/run.sh` (NUL fixtures holding the valid shape: trailing, leading, mid, inside; per-guard fixtures for the reader and the base-dir check), comments in `bin/team-setup.sh` (no logic change), `.shell-team/provenance/T-1174.md` (equivalence decision).
+    - Verified: `grep -c '^PASS:' <log of bash tests/setup/run.sh>` → 208, `grep -c '^FAIL'` → 0; `bash bin/check-acs.sh .shell-team/specs/T-1174-setup-report-handoff.md | grep '^check-acs:'` → 17 passed, 0 failed, 1 skipped; shellcheck clean; check-provenance conformant.
+    - Mutants (python runner, one per tree copy under TMPDIR, process-group timeout, `ulimit`-style file limit, capped output; `python3 runmut.py`): 53 run; `nul_guard` now KILLED by `nultrail`. Survivors, all equivalent and documented as defence-in-depth: `a_anc`/`b_ancclose`/`b_continue` (an ancestor's report always also reports the probes under it with the ancestor's rule), `a_top`, `a_topsb`, `a_sbobj`, `a_direx`, `a_exarr` (each implied by `found` plus the nsb/nex counts). Every other guard's removal mutant is killed (full table in the hand-off message).
+    - Note: `r_isfile` was killed only incidentally (stderr leak); its `-f` half is an equivalent layer behind the redirect failure.
 
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
