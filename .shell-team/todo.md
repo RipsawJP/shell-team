@@ -13,7 +13,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `REWORK` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
+- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `READY_FOR_QA` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
   - entry-mode: pm-authored
   - spec-review: cross-provider
   - dispatch-reflection: implement — T-1173 — repeat — one script, its suite, the skill and EN/JA docs land in lockstep, as T-1173's wording edits did
@@ -62,6 +62,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Reader's end-of-parse guards: `direx == 1` removed and `exarr` removed both survive (208/0); accepted as equivalent — `found` is set only in an array parsed with role 2, which is reachable only as the direct `excludedCommands` member of an object that is the value of a depth-0 `sandbox` key, so with `nex == 1` and `nsb == 1` the removed conjuncts are implied. The top-level `{` test and `topsb`/`sbobj` follow the same way. No distinguishing input found.
     - `bash bin/check-acs.sh <spec>` (`CHECK_ACS_TIMEOUT=300`) → `17 passed, 0 failed, 1 skipped, 0 unrecognized` (`grep -c '^AC[0-9]*: PASS'` of the log → 17; AC18 SKIP — above the ceiling, unchanged from round 1). `bash tests/setup/run.sh` 208 PASS / 0 FAIL (`python3 run_mut.py` on the unmutated copy); shellcheck 0.11.0 clean on `bin/team-setup.sh tests/setup/run.sh`; `tests/check-spec-review` green; `tests/check-setup` and `tests/bin-help` green; check-adopter-docs, check-handoff rc 0; `check-pii-shapes.sh --base develop` clean; check-intent aligned; check-provenance conformant (6 entries); check-interventions conformant (12 entries). Rework diff to `bin/` is comments only; no recursive deletion in the rework diff of bin or tests (grep count 0).
     - Verification ceiling: unit-and-static — verifies AC1–AC17 at or below that level; AC18 stays human-owned (the recorded spec-review APPROVE at round 5 and the operator's next adopter run: `environmentally-unverified`). Round 1's other items (source audit, runtime-criteria audit, adopter run) stand unchanged.
+  - engineer hand-off (rework 2, code-review round 1, 2026-10-06, 5-line form):
+    - Changed: `bin/team-setup.sh` (negated check-ignore reports skipped; probes for the in-base specs, retros, reviews, provenance and interventions dirs, the lessons file and the root `.gitignore`; `'.gitignore'` dropped from the command with a stated reason when ignored; `in_head` requires a blob; base paths normalised; settings file must be valid UTF-8 when iconv exists), `tests/setup/run.sh` (fixtures per finding), provenance (2 entries).
+    - Verified: `grep -c '^PASS:' <log of bash tests/setup/run.sh>` → 223 with `grep -c '^FAIL'` → 0; `bash bin/check-acs.sh .shell-team/specs/T-1174-setup-report-handoff.md | grep '^check-acs:'` → 17 passed, 0 failed, 1 skipped; shellcheck clean; check-provenance conformant (8 entries).
+    - Mutants (python runner, scratch copy per mutant, process-group timeout, file-size limit, capped output): 20 new-guard mutants run; killed: n_neg, n_negrg, n_dir0-4, n_mdprobe, n_lessons, n_rgprobe, n_rgclr, n_blob, n_np1, n_np2, n_utf8; survivors `n_dirprobe` (directory probe is redundant with the `.md` probe for ignore state; it only affects naming) and `b_anc2` (equivalent, recorded earlier). Minors: blob, trailing slash and UTF-8 taken; ESC-in-base and unicode-escaped keys left as recorded (out of scope).
+    - Class tables are in the hand-off message (check-ignore readers; required path classes vs probes; printed-command inputs).
 
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
