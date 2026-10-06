@@ -55,7 +55,7 @@ set up shell-team
 
 setup スキルがリポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行します。プロジェクトごとのデータを初期化し（下の scaffold を `team-init.sh` 経由で。既存ファイルは書き換えません）、Codex CLI host ではさらに `.codex/agents` を生成して git ディレクトリの `info/exclude` で無視します。これ以外は何も書かず、host の設定には触れません。最後に 5 つのセクション `Done:`・`Already in place:`・`Remains the operator's decision:`・`Required:`（base dir を git が無視せずコミットすること。報告にそのコマンドが出ます）・`Notice:`（レビュー pass が相手側 provider へリポジトリの内容を送ること）で報告します。プラグインの更新後は、導入済みのリポジトリごとに `update shell-team` と入力します——同じフローの再実行で、冪等です。
 
-scaffold の中身: すべては単一のベースディレクトリ配下に作られます（デフォルトは `.shell-team/`。`TEAM_RUN_BASE` で上書き可。既存のレガシー `tasks/` レイアウトは検出され再利用される。specs ディレクトリは `tasks/specs/` があればそこ、無ければ `docs/specs/`）: `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` に加えて自己完結した `.shell-team/.gitignore`。ホストルートには手を触れません — `CLAUDE.md` の編集も**無し**、ルート `.gitignore` の変更も**無し**（[adopting.ja.md](adopting.ja.md) 参照）。Claude Code host で手で行うなら:
+scaffold の中身: すべては単一のベースディレクトリ配下に作られます（デフォルトは `.shell-team/`。`TEAM_RUN_BASE` で上書き可。既存のレガシー `tasks/` レイアウトは検出され再利用される。specs ディレクトリは、`tasks/specs/` が存在し、かつ `docs/specs/` が無いか `.gitkeep` だけの場合は `tasks/specs/`、それ以外は `docs/specs/`）: `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` に加えて自己完結した `.shell-team/.gitignore`。ホストルートには手を触れません — `CLAUDE.md` の編集も**無し**、ルート `.gitignore` の変更も**無し**（[adopting.ja.md](adopting.ja.md) 参照）。Claude Code host で手で行うなら:
 
 ```text
 /shell-team:team-init

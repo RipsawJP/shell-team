@@ -14,7 +14,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1176** Legacy-layout specs resolve to tasks/specs when that is where they live, setup adds nothing outside the base for such an adopter, and the contract templates name no layout path (issues #693, #589, #696) — `REWORK` — spec: .shell-team/specs/T-1176-legacy-layout-paths.md
+- [ ] **T-1176** Legacy-layout specs resolve to tasks/specs when that is where they live, setup adds nothing outside the base for such an adopter, and the contract templates name no layout path (issues #693, #589, #696) — `READY_FOR_QA` — spec: .shell-team/specs/T-1176-legacy-layout-paths.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1174 — repeat — resolver, setup/init, templates and EN/JA docs land in lockstep around one case table, as T-1174's script, suite and docs did
@@ -48,6 +48,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - AC11 (runtime, no `check:`): the only criterion without a `check:` line; its enumeration is the reporter's real repository (Step-0 pass, `--print` -> `tasks/specs`, `update shell-team` creating nothing outside `tasks/`, leftover and exclude line kept, no drift line for an untouched v2.8.6 copy). Hand-off claim: none (above the ceiling); QA could not exercise it -> `environmentally-unverified: AC11 / reporter's real repository` (the fixtures mirror each of its five items: Step-0 pass and `--print` in AC1/AC2 fixtures A/B, nothing outside `tasks/` and leftover kept in fixture B, no drift line for v2.8.6 bytes in AC4).
     - Verification ceiling: unit-and-static — verifies every criterion at or below that level; AC11 stays human-owned after this gate (operator, on the next run in that adopter repository after the release)
     - risk notes for review: the allowance ships the v2.8.6 bytes as `templates/prior/shell-team.contract.v2.8.6.txt` and compares with `cmp`, and an install missing that file degrades to reporting drift (conservative); R4 keys on `ls -A` of `docs/specs` (a name containing a newline is declared out of scope); `tasks/specs` counts only as a directory (symlinks follow the shell's test, out of scope); T-1174 AC12 stays red-by-design while stacked. Review-judged AC8 wording (no sentence tells an adopter to delete or move a directory) was not read by QA beyond the mechanical `check:`.
+  - engineer hand-off (T-1176 rework round 1, 5 lines):
+    - fixed: README.md:373, README.ja.md:378, docs/distribution.md:58, docs/distribution.ja.md:58 and templates/todo-template.md:27 now carry the full condition (tasks/specs/ when it exists and docs/specs/ is absent or holds only .gitkeep, otherwise docs/specs/), matching docs/adopting, skills/run and skills/team-init
+    - class closure: `git grep -n -E 'tasks/specs' -- README.md README.ja.md docs skills templates agents bin` re-read; remaining hits are bin/ (resolver, setup, init, all state the full rule), docs/adopting EN+JA (full condition), skills/team-init (full), skills/run (defers to the resolver); agents/* and the README phase diagram name only the illustrative `docs/specs/<slug>.md`, unchanged per the spec's inventory
+    - checks: AC1-AC10 PASS, AC11 SKIP via `PATH=<ps shim>:$PATH CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh .shell-team/specs/T-1176-legacy-layout-paths.md`; suites check-adopter-docs, check-readme-version, bin-help, trial-recipe, check-handoff each rc=0 with 0 FAIL lines (`grep -c '^FAIL' <log>`)
+    - docs-only rework: no bin or test file changed
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none

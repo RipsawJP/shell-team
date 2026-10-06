@@ -25,8 +25,8 @@ _(none)_
 ```
 
 `<specs-dir>` is `.shell-team/specs/` by default (in a legacy `tasks/` layout it is
-`tasks/specs/` when that directory exists, otherwise `docs/specs/`; `team-paths.sh
---get specs` prints it). The hand-off linter accepts any spec path ending in `.md`.
+`tasks/specs/` when that directory exists and `docs/specs/` is absent or holds only
+`.gitkeep`, otherwise `docs/specs/`; `team-paths.sh --get specs` prints it). The hand-off linter accepts any spec path ending in `.md`.
 
 A task entry runs from its top-level line to the next non-indented non-blank line,
 the next `##` heading, or the end of the file:
