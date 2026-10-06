@@ -423,7 +423,7 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
 ディレクトリの `info/exclude` で無視する（tracked ファイルは編集しない）。
 Claude Code CLI が存在するかは `command -v claude` で確認する（実行は
 しない）。最後に `Done:`・`Already in place:`・`Remains the operator's
-decision:` の 3 部構成で報告する。plugin の upgrade 後は `update shell-team`
+decision:`・`Required:`・`Notice:` の 5 部構成で報告する。plugin の upgrade 後は `update shell-team`
 と入力する——同じフローの再実行で冪等、2 回目は何も変えない。run の開始時には
 `bash "<plugin root>/bin/check-setup.sh"` が同じ前提条件を read-only で確認し、
 欠けている場合はこのプロンプトを案内して `BLOCKED` で止まる（存在のみの確認で、内容が古い role ファイルは run 開始時チェックを通り、`update shell-team` が報告する）。同じプロンプトは
@@ -464,10 +464,18 @@ operator の判断に残るものは報告されるだけで、変更されな�
 - **`<plugin root>/bin` の `PATH` 上の存在**（手順 9）: 未確定。operator は
   0.159.3 の両方の実行で export しており、必要かどうかは切り分けられて
   いない。
-- **レビュー転送**: レビュー pass はリポジトリの内容を相手側 provider
-  （Claude）へ送る。この転送を承認するかは operator の判断であり、setup
-  は承認しない。
-- **`.shell-team/` を git で追跡するか。**
+
+報告のうち 2 つは判断ではない。`Required:` の base dir（legacy レイアウトでは
+base の外にある specs dir も）は、git に無視されず、コミットされていなければ
+ならない。ループは一度もコミットされない運用ファイルを支えず、
+`bin/team-commit.sh` は無視されたパスを拒否するため、正解は 1 つである。setup は
+妨げているルールを `<source>:<line>` として示し（パターンの文字列は、信頼できない
+リポジトリ由来の可能性があるため出さない）、`git add` コマンドを 1 つ出す。ルールが
+グローバルの excludes ファイルか `info/exclude` にあり、ディレクトリ自身を名指しして
+いる場合に限り、ルート `.gitignore` に足す行（`!.shell-team/` など）を出す。setup は
+`.gitignore` を編集せず、stage もコミットもしない。`Notice:` は、レビュー pass が
+相手側 provider（この host では Claude）へリポジトリの内容を送るという、レビュー pass が
+行うことについての情報であり、setup があなたに承認を求めるものではない。
 
 以下の番号付き手順は手動のフォールバックであり、host 側の各条件が何で、
 それについて何が測定されているかの記録である。
