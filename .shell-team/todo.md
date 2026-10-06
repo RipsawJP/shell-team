@@ -13,7 +13,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
+- [ ] **T-1174** Setup's report hands off: the review transfer as a notice, settled host conditions as already in place, the base directory as a required action (issue #689) — `REWORK` — spec: .shell-team/specs/T-1174-setup-report-handoff.md
   - entry-mode: pm-authored
   - spec-review: cross-provider
   - dispatch-reflection: implement — T-1173 — repeat — one script, its suite, the skill and EN/JA docs land in lockstep, as T-1173's wording edits did
@@ -30,6 +30,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-06): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH, sprint setup-handoff planning approved 2026-10-05 and corrected by the operator the same day: the sprint fixes v2.8.0's shipped headline (setup completes inside a session) rather than adding a new one — grounds: the report change reaches every default setup run but makes nothing new possible; it corrects what v2.8.0's setup reports
   - fast-follow disposition (2026-10-06): spec-review round 5 minors 1–3 (AC4 tilde/non-ASCII assertions, AC16 SIGPIPE latent, inherited GIT_TEMPLATE_DIR) — waived: each fails closed or needs an unusual environment; the reviewer declared won't-fix intent
   - intent-hash (v1): 4fb760a819f3f3e88c8a0d50228e041b44f4ac82
+  - code-review round 1 (2026-10-06): REQUEST_CHANGES — 3 Major on R3's base-directory line (a negated re-include reported as the ignoring rule; an ignored in-base specs dir not probed; a printed `git add` naming an ignored root `.gitignore`) plus minors — record .shell-team/reviews/T-1174.md `## Code review (round 1)`; evidence-pass capture unpublished (classifier refused a relabel; not retried) → REWORK
   - source: issue #689 Expected 1, 3, 4 and comment 5990322504 (the task's own tracker item, relayed verbatim by the coordinating session in the Routing Map; no separate issue filed). Expected 2 (self-review path) is T-1175. Not stacked: cut from `develop` after T-1173's PR #685 merged; base-side reads resolve `git merge-base develop HEAD`. Supersedes T-1163 decision 8 (T-1163 AC8 and AC10 go red by design, disclosed in the spec's Blast radius). The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once. Pre-commitment (AI self-discipline): never-dropped R1 notice (AC1), R3 base-dir required action (AC3–AC6), the honesty rule (AC8, AC10); droppable first and only D1, the settings reader (AC7). Release premise: v2.8.7 PATCH.
   - engineer hand-off (2026-10-06, 5-line form):
     - Changed: `bin/team-setup.sh` (five-section report, settings reader, base-directory probes), `tests/setup/run.sh` (T-1163 AC8/AC10 narrowed in place; base-directory, reader and write-set cases added), `skills/setup/SKILL.md`, README.md/.ja.md, docs/adopting.md/.ja.md, docs/distribution.md/.ja.md; records `.shell-team/provenance/T-1174.md` and a `test-recipe.md` note. Commit eea0cc76.
