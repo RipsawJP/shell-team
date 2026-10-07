@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1179** drift-evaluator runs the reviewer-binding gate before its codex --version probe, and every gate site quotes the checker's own refusal token (issue #701) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1179-reviewer-gate-followups.md
+- [ ] **T-1179** drift-evaluator runs the reviewer-binding gate before its codex --version probe, and every gate site quotes the checker's own refusal token (issue #701) — `READY_FOR_QA` — spec: .shell-team/specs/T-1179-reviewer-gate-followups.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1178 — repeat — T-1178's recorded value is `serial`; six prose sites land with one shared token rule, no balanced disjoint partition
@@ -28,6 +28,12 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - source: issue #701 (the task's own tracker item: the T-1177 fast-follow; body relayed verbatim by the coordinating session and restated in the spec's `## Summarized sources`; no separate issue filed).
   - stacked-on: feature/695-reviewer-stdin-hang (T-1178, PR #707 open against develop), cut at its close-out tip 921161f6. The base-ref-discriminator is the two-arm form (predecessor feature/695-reviewer-stdin-hang, integration branch develop), because AC1, AC2, AC3 and AC4 read branch-point blobs. This role read `.git/refs/heads/feature/695-reviewer-stdin-hang`, `.git/refs/remotes/origin/feature/695-reviewer-stdin-hang` and `.git/refs/heads/feature/701-reviewer-gate-followups` directly: all hold 921161f6.
   - pre-commitment (AI self-discipline, never operator-ratified): never-dropped N1 (fail-closed: any non-zero checker exit dispatches nothing and runs no codex at every site, AC1–AC4) and N2 (the class fix: drift-evaluator gates before its probe, and all six sites quote the checker's own token with the neutral sentence, AC1–AC3). A defeat returns the task to planning. No droppable component. Disclosed: T-1177 AC2, AC3 and AC4 assert the literals #701 removes, so they go red by design (spec Blast radius). The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - engineer hand-off (2026-10-07, 5-line form):
+    - Changed: `agents/drift-evaluator.md` (gate is the new first Preconditions bullet; probe bullet byte-identical; step 3 reduced to a pointer), `agents/code-reviewer.md` (3 sites), `skills/{run,goal,review,review-response}/SKILL.md` (gate line quotes the checker's token, exit status when none; run/goal `--label <token>`/`exit-<N>`); provenance `.shell-team/provenance/T-1179.md` (3 decisions, conformant).
+    - Observed checker shape: `bash bin/check-review-provider.sh x` printed `check-review-provider: usage: takes no argument other than --help or -h`, exit 2.
+    - Verified: `CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh <spec>` printed `check-acs: 6 passed, 0 failed, 1 skipped, 0 unrecognized`; check-prompt-sync 0, check-handoff 0, check-provenance conformant; no change under bin/tests/templates/.github/README/docs/CLAUDE.md.
+    - Mutation probes (AC1 reorder, AC2 goal fixed label, AC3 old phrase, AC4 codex exec line) each went red, restored green; AC7 is above the ceiling (SKIP).
+    - Shape scan: two tracker-key findings on `agents/code-reviewer.md` line 3 and `skills/goal/SKILL.md` line 78 exist at the base too (stash-compared), none on records written this task.
 
 
 
