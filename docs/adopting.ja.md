@@ -1485,6 +1485,8 @@ derived tier が承認済み premise と一致しないということは、そ�
 `code-reviewer` を同一ファミリーの executor に自由に rebind できる。rebind した後も
 `codex-reviewer` と名乗り続けるロールは、自分自身の設定と矛盾することになる。
 
+**`code-reviewer` を Codex 以外の provider に rebind するとレビューは止まる。** Claude Code host では reviewer の指示が `codex exec` を実行するため、provider が `codex` でない `code-reviewer` の紐付けがあると、すべてのレビューモード・`review-response`・`drift-evaluator` の任意パスは、Codex を呼ぶ前に `reviewer-binding-not-codex` で `BLOCKED` となり、リポジトリの内容を黙って Codex に送ることはしない（判定は `bin/check-review-provider.sh`）。Codex CLI host は変わらない。そのような紐付けのもとで同一ファミリーによる実際のレビューを走らせるのは #689 の後続作業である。
+
 **alias が一リリースの間カバーするもの。** 改名前に書かれた `<base>/binding.conf`
 は編集なしでそのまま解決される: `bind codex-reviewer <provider> <model> <effort|-> <adapter>`
 は受理され、validation の前に `code-reviewer` へ正規化される。`bash
