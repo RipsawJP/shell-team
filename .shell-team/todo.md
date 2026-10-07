@@ -14,6 +14,21 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
+- [ ] **T-1177** Under a non-Codex code-reviewer binding, every reviewer mode, review-response, the orchestrators' reviewer dispatch and drift-evaluator stop BLOCKED instead of running Codex (issue #700) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1177-reviewer-binding-block.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - dispatch-reflection: implement — T-1176 — repeat — one checker, its suite, prose choke points and EN/JA docs land in lockstep, as T-1176's resolver table, templates and docs did
+  - dispatch-reflection: verify — T-1176 — repeat — one spec's check-acs plus the reached suites; below the fan-out threshold
+  - dispatch-reflection: specify — T-1176 — repeat — issue body and the measured site inventory hand over as text
+  - dispatch-reflection: spec-review — T-1176 — repeat — every premise is measurable in-repo and reproduced in AC1/AC2/AC6
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — checker, agent prose, skills and docs share one gate contract; no balanced disjoint partition; tier2 does not apply
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs plus the new, resolve-executor, check-invocation-path, codex-agents and check-binding suites; below the fan-out threshold
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined, does not fire
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined, does not fire: no premise depends on an external system; checker behaviour is reproduced in AC1's fixtures
+  - source: issue #700 (the task's own tracker item; body relayed verbatim by the coordinating session and restated in the spec's `## Summarized sources`; no separate issue filed). Added to sprint setup-handoff by the operator on 2026-10-07 as the minimal stop-the-bleed; an actual same-family review stays #689 Expected 2. T-1175 (the dropped self-review task) is not reused.
+  - stacked-on: feature/693-legacy-layout-paths (T-1176, PR #699 open against develop, itself stacked on T-1174's PR #698), cut at its close-out tip f5b523d7; base-ref-discriminator is the two-arm form (predecessor feature/693-legacy-layout-paths, integration branch develop) because AC2, AC5, AC6 and AC7 read branch-point blobs. This role read `.git/refs/heads/feature/693-legacy-layout-paths`, `.git/refs/remotes/origin/feature/693-legacy-layout-paths` and `.git/refs/heads/feature/700-reviewer-binding-block` directly: all hold f5b523d7.
+  - pre-commitment (AI self-discipline, never operator-ratified): never-dropped N1 (the fail-closed checker AC1 with its CI lock AC8, the agent-level gate in all three code-reviewer modes AC2, the review-response stop AC3) and N2 (the Codex CLI host and the resolution layer unchanged, AC6) — a defeat returns the task to planning; droppable in order D1 (orchestrator pre-dispatch, AC4), D2 (drift-evaluator gate, AC5), each dropped one leaving the frozen block by a re-freeze recorded against this disposition and its findings filed as one follow-up issue; trigger: two consecutive rounds with a new same-class Blocker or Major against one droppable component. The intent hash is not yet recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+
 - [ ] **T-1168** On the Codex CLI host, the run may ask for per-command approval of a role's own commit and never requests a sandbox, trust or writable-root grant (issue #662) — `BLOCKED` — spec: .shell-team/specs/T-1168-codex-commit-approval.md
   - entry-mode: pm-authored
   - spec-review: none
