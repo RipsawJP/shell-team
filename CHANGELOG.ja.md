@@ -6,6 +6,10 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.8.8**
+  - **サブエージェントから起動した Codex のレビューが、標準入力が閉じないパイプのときに無期限に待たなくなった。** `code-reviewer`（全モード）と `drift-evaluator` は、`codex exec` の各 pass をバックグラウンドで起動し、新設の `bin/codex-await.sh` で自分で回収する。120 秒以内に `thread.started` が出なければ、`BLOCKED — codex did not start` とトークン `no-thread-started`、捕捉した出力の末尾を添えて止まる。開始した pass は最大 63 分待ち、それを超えると `BLOCKED — codex did not finish` になる。素の `codex exec` の行は変えていないので、既存の `codex *` の sandbox 除外はそのまま当たり、設定の変更は要らない。（#695）
+  - **`drift-evaluator` は、`codex --version` の確認を含むどの `codex` コマンドよりも前に、レビュアーの binding を確かめるようになった。** 拒否されたときは、spec に intent block が無くても、レポートを書かずに `BLOCKED` を返す。（#701）
+  - **レビュアーの binding の確認が拒否されたとき、チェッカー自身のトークンで報告するようになった。** run・goal・review・review-response の各 skill、`code-reviewer`、`drift-evaluator` は、どの拒否も「binding が Codex でない」と書くのをやめ、`BLOCKED — reviewer-binding gate refused` にチェッカーが出した `reviewer-binding-not-codex`・`binding-unresolved`・`usage` のどれかを添える。run と goal の skill は、同じトークンを telemetry のラベルに記録する。（#701）
 - **v2.8.7**
   - **setup の報告は、運用者がやるべきことだけを示すようになった。** 見出しは 5 つになる。レビューのためにリポジトリの内容を他社のプロバイダへ送ることは、判断事項ではなく `Notice:` に情報として出る。Claude Code の設定から読み取れた sandbox の除外は、ファイル名を添えて `Already in place:` に出る（そのセッションで実際に適用されているかは判定していない、とあわせて書く）。読み取れないものは、どちらとも断定せずにそう書く。ゲートを通すにはベースディレクトリが commit されている必要があるので、`Required:` に正確な `git add` コマンドとともに出る。グローバルまたは `info/exclude` の規則がディレクトリそのものを指している場合は、ルートの `.gitignore` に足す `!<dir>/` の 1 行も示す。それ以外の規則は、ファイルと行番号だけで示し、規則の文字列は出さない。setup がホストの設定を書かないことは変わらない。（#689）
   - **specs を `tasks/specs/` に置いている旧レイアウトのリポジトリが止められなくなった。** specs の場所は、`tasks/specs/` があり、`docs/specs/` が無いか `.gitkeep` しか無いときは `tasks/specs/`、それ以外は従来どおり `docs/specs/` になる。run の Step 0 のチェックは通り、setup はそのようなリポジトリでベースディレクトリの外に何も作らない。既定のレイアウトと `TEAM_RUN_BASE` は変わらない。（#693、#589）
