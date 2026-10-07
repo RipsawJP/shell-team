@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1178** A Codex pass launched by code-reviewer or drift-evaluator stops BLOCKED within a bounded time when Codex never starts, instead of waiting on stdin forever (issue #695) — `READY_FOR_QA` — spec: .shell-team/specs/T-1178-codex-launch-bounded-wait.md
+- [ ] **T-1178** A Codex pass launched by code-reviewer or drift-evaluator stops BLOCKED within a bounded time when Codex never starts, instead of waiting on stdin forever (issue #695) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1178-codex-launch-bounded-wait.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1177 — repeat — T-1177's recorded value is `serial`; agent prose, a wait helper, its stub-codex fixture and EN/JA docs share one launch contract, no balanced disjoint partition
@@ -32,6 +32,15 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Verified: `CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh .shell-team/specs/T-1178-codex-launch-bounded-wait.md 2>&1 | tail -1` → `check-acs: 8 passed, 0 failed, 1 skipped, 0 unrecognized` (AC9 SKIP, above the ceiling); `bash tests/codex-await/run.sh | grep -c '^PASS:'` → 49; every CI-wired suite run in workflow order (`grep -cE '^ +run: bash tests/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.sh$' .github/workflows/check-handoff.yml` → 68, all exit 0 with no `FAIL` line, none skipped).
     - Shape scan: `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` rc=1, 0 findings on lines written this round (the 195 `tracker-key` findings in the board and 7 in `.shell-team/test-recipe.md` all sit on earlier lines; none in `.shell-team/provenance/T-1178.md`); the hit in `agents/code-reviewer.md` line 3 sits in an untouched line.
     - Note for QA: T-1144 line-90 criterion reads the tracked agent file for its positional part (3 blocks / 3 violations at the merge base, 0 after) and the gitignored `.codex/agents` for its second part (not forced); a mutation self-check of the suite (anchor removal, id-length, tail bound, exit flip) was run in a `$TMPDIR` copy and each variant turned the suite red.
+  - QA hand-off (2026-10-07): PASS -> `READY_FOR_REVIEW`
+    - Tests: `CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh .shell-team/specs/T-1178-codex-launch-bounded-wait.md` -> AC1-AC8 PASS, AC9 SKIP (above-ceiling), `check-acs: 8 passed, 0 failed, 1 skipped, 0 unrecognized`; `bash tests/codex-await/run.sh | grep -c '^PASS:'` -> 49, `grep -c '^FAIL'` -> 0.
+    - Gates: `bash bin/check-intent.sh <spec> .shell-team/todo.md` aligned (rc 0); `bash bin/check-provenance.sh .shell-team/provenance/T-1178.md` conformant (rc 0); `bash bin/check-pii-shapes.sh --base develop` clean; `shellcheck bin/codex-await.sh tests/codex-await/run.sh` rc 0 under 0.11.0 (the CI pin); `bash bin/check-prompt-sync.sh` rc 0; `bash bin/check-handoff.sh .shell-team/todo.md` rc 0.
+    - Verification ceiling: unit-and-static - verifies every criterion at or below that level; above-ceiling: AC9 (a live sub-agent hitting the real hang) `environmentally-unverified`, human-owned after this gate.
+    - Runtime criteria: AC9 (only criterion with no `check:`) - one item (live hang and healthy arms); hand-off claimed none (above ceiling); not exercisable here: `environmentally-unverified`.
+    - Own empirical probes: a real `codex exec ... "Reply with the single word ok."` launched with `run_in_background`; its returned output file carried `thread.started` -> `turn.completed`, `codex-await.sh --event start` printed the id and `--event end` printed `turn.completed` (the provenance claim reproduced); a never-closing-stdin stub in its own process group: `--event start --timeout 4` rc 1 after 4 s, `no-thread-started` plus the stdin line, group stopped, none left; healthy stub: id then `turn.completed`; an item message quoting `turn.completed` is not counted; `/bin/bash` (3.2.57) and default bash (also 3.2.57 here; bash 5 not exercised locally, CI covers it).
+    - pkill: `pkill -f -- "[-]o <path>"` in this sandbox -> `Cannot get process list`, rc 3 (engineer's claim confirmed); the prose requires one attempt, a verbatim outcome report, no retry in another form: judged honest.
+    - Agent prose / docs read against AC2's review-judged clause: code-reviewer (primary, evidence, spec-review, finding-evaluation) and drift-evaluator launch via `run_in_background`, never shell `&`, never end the turn on an unresolved pass, start call right after launch (stdout = `<THREAD_ID>`), stop identified only by `<RAW_OUT>`, drift reports a tooling-precondition failure; no sentence mandates a foreground synchronous codex call; docs EN/JA require no settings change.
+    - Risk notes: bash 5 not run locally; AC9 live arms unverified; T-1144 line-90 second clause reads the gitignored `.codex/agents` (not forced, as disclosed); git status clean at hand-off other than this board append.
 
 
 
