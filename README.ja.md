@@ -302,7 +302,7 @@ resolution が制御していない（`tech-lead` を除くいずれの役割に
 `tech-lead` の別経路だけは例外で、そこでは resolved row の model 列が
 そのまま実際に走ったものになる。reviewer 行自身の出荷時の既定とその
 理由は
-[設計上の選択](#設計上の選択) を参照。
+[設計上の選択](#設計上の選択) を参照。 第 1 軸の境界事例として、Claude Code host で `code-reviewer` を Codex 以外の provider に紐付けると、すべてのレビューモードが Codex を呼ぶ前に `BLOCKED`（`reviewer-binding-not-codex`）で停止する。Codex CLI host は変わらず、同一ファミリーによる実際のレビューは #689 で追う後続作業である。
 
 ## run のリプレイ
 
@@ -377,7 +377,7 @@ stderr に警告を出す（refuse は決してせず、exit status も変えな
 - **真実源はファイルのみ**：`tasks/todo.md` ＋ status flag がエージェント間の単一の真実源。
 - **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身も同じ既定レイアウトで動くので、自分の board・specs・retros も `.shell-team/` 配下にある。resolver は、base dir 集約より前にチームを導入したリポのために legacy な `tasks/` レイアウト（specs は、`tasks/specs/` が存在し、かつ `docs/specs/` が無いか `.gitkeep` だけの場合は `tasks/specs/`、それ以外は `docs/specs/`。`bin/team-paths.sh --get specs` が表示する）も今なお検出・対応する——本ドキュメント群が `tasks/…` / `docs/specs/…` と書いている箇所は、その legacy レイアウトでの同じ artifact を指す。[docs/adopting.md](docs/adopting.md) 参照。
 - **Engineer は既定で non-worktree**：編集は現在の feature ブランチに直接着地する。並列実装時のみ orchestrator が起動時に `isolation: worktree` を opt-in。
-- **別プロバイダレビューの紐付けは「出荷時の既定」・どちらの host でも**：`code-reviewer` は、ループを駆動している host とは別のプロバイダで走る——Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。独立レビュアーに到達できない場合は同一ファミリーへフォールバックせず `BLOCKED` を返す。
+- **別プロバイダレビューの紐付けは「出荷時の既定」・どちらの host でも**：`code-reviewer` は、ループを駆動している host とは別のプロバイダで走る——Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。独立レビュアーに到達できない場合は同一ファミリーへフォールバックせず `BLOCKED` を返す。 Claude Code host で Codex 以外の provider への rebind があると、レビューは実行されず `reviewer-binding-not-codex` で `BLOCKED` となる（Codex は呼ばれず、Claude のみの代替も行わない。`drift-evaluator` の任意パスも同様に停止する）。Codex CLI host は変わらず、同一ファミリーによる実際のレビューの実行は #689 の後続作業である。
 
 ## バージョニング
 

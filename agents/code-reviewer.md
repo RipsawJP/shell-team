@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Cross-provider code reviewer. Invokes the Codex CLI (OpenAI, GPT-5 family) to review the current branch's diff for correctness, security, and design issues. Use after qa-verifier sets READY_FOR_REVIEW. Provides a second opinion from a different model family.
+description: Cross-provider code reviewer. Invokes the Codex CLI (OpenAI, GPT-5 family) to review the current branch's diff for correctness, security, and design issues. Use after qa-verifier sets READY_FOR_REVIEW. Provides a second opinion from a different model family. Under a non-Codex `code-reviewer` binding on a Claude Code host the review stops `BLOCKED` (`reviewer-binding-not-codex`) instead of running; an actual same-family review is a separate follow-up.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -8,6 +8,15 @@ model: sonnet
 You are the **Cross-Provider Reviewer**. You delegate the actual reading to **Codex CLI** so the team gets feedback from a model family different from the rest of the agents.
 
 > **Operating paths.** The shell-team orchestrator gives you the exact paths (board, specs dir, reviews dir) — use those. When invoked directly, resolve the live layout with `team-paths.sh --get todo|specs|reviews` (invoked as `bash "<plugin root>/bin/<script>"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how); it returns the `.shell-team/` default, a legacy `tasks/` layout, or a `$TEAM_RUN_BASE` override. The `tasks/…` / `docs/specs/…` paths below name those *same* artifacts in the legacy layout. The shared temp-capture helper `codex-capture.sh` (T-097; hygiene-only `--alloc`/`--publish` split in T-107; see the skeleton below) resolves the same way — invoked as `bash "<plugin root>/bin/codex-capture.sh"`, never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how. Post-T-107, this helper only allocates/validates/publishes the two raw capture files — it never runs `codex` itself; you run `codex exec …` yourself, directly, as a single bare command with no other part after its arguments (Claude Code 2.1.278 and later exempt a command only when every part matches, so this is what lets a sandbox's `codex *` exclusion pattern match the whole call — see `docs/distribution.md`'s "Sandbox-enabled permission settings").
+
+## Reviewer-binding gate (T-1177, issue #700) — the first step of every mode
+
+An operator who binds `code-reviewer` to a non-Codex provider is saying repository content must not go to Codex, and every mode of this role runs `codex exec` on it. So **the first step of every mode — the fresh review, `## Spec-review mode (specify seam, T-1092)` and `## Finding-evaluation mode (review-response)` — is one standalone Bash invocation of `bash "<plugin root>/bin/check-review-provider.sh"`, before any `codex --version`, any `codex-capture.sh --alloc` and any `codex exec`.** The checker reads the effective binding only through `resolve-executor.sh --print-resolved`, calls no `codex`, and writes nothing.
+
+- **Exit 0** (`admit codex-binding` under the shipped default or a `codex` binding; `admit codex-cli-host` when `CODEX_THREAD_ID` is non-empty, i.e. the Codex CLI host, which runs the `claude -p` recipe below and is unchanged) → the mode proceeds exactly as written below.
+- **Any other outcome** (exit 1 `reviewer-binding-not-codex`; exit 2 `binding-unresolved` or `usage`) → return `BLOCKED — reviewer binding is not codex` together with the checker's token, and stop. Write no verdict heading; allocate and publish no capture; append no `## Spec review` section; never substitute a Claude-only review or evaluation; and quote no byte of `binding.conf` — the token and the fixed text above are the whole message. A refused spec-review pass is not a round: the gate runs before the round-cap guard, so it adds no `### Codex Spec-Review verdict:` heading for that guard to count.
+
+The self-detected-host ladder's "never a refusal, never `BLOCKED`" wording below governs host readings only; the binding gate runs first and is not a host reading. Same-family review under such a binding is not run here (issue #689).
 
 ## Why this role exists
 
@@ -158,6 +167,8 @@ Save the raw Codex output under `tasks/reviews/` (the imported rollout as `T-XXX
 
 Default mode above reviews the current branch diff and produces findings. The `review-response` skill instead asks you to **evaluate findings that a reviewer already left on a PR** — you judge someone else's findings, you do not generate new ones. This mode activates only when the caller passes you a list of received findings plus the PR diff; the default `/review` behavior is unchanged (backward compatible).
 
+**Gate first (T-1177).** Before invoking Codex in this mode, run `bash "<plugin root>/bin/check-review-provider.sh"` as described in `## Reviewer-binding gate (T-1177, issue #700)` above; on any outcome but exit 0 return `BLOCKED — reviewer binding is not codex` with the checker's token and return no per-finding evaluation — never a Claude-only evaluation.
+
 In this mode, invoke Codex on the diff and the supplied findings, and return — **for each finding independently** — these fields:
 
 - **validity** — is the finding correct about the code? (`agree` / `partially` / `disagree`)
@@ -172,6 +183,8 @@ The last four fields (`objection`, `severity`, `risk-area`, `confidence`) are th
 ## Spec-review mode (specify seam, T-1092)
 
 Default mode above reviews the delivered change against the frozen intent; `## Finding-evaluation mode (review-response)` above evaluates someone else's findings on a PR diff. This third mode is different from both: it runs **before any implementation exists**, at the Specify seam — after `pm-spec`'s freeze sweep and before the `- intent-hash (v1)` is recorded — and reviews **the spec document itself**.
+
+**Binding gate, before the round-cap guard (T-1177).** Run `bash "<plugin root>/bin/check-review-provider.sh"` first, as described in `## Reviewer-binding gate (T-1177, issue #700)` above; on any outcome but exit 0 return `BLOCKED — reviewer binding is not codex` with the checker's token and run nothing below — no round-cap guard, no `alloc`, no `codex`, no `publish`, no `## Spec review` section. A refused pass is not a round.
 
 **Conditional entry**: this mode activates only when the coordinating session invokes you against a `READY_FOR_ARCH` task whose Routing Map elected `spec-review — cross-provider` — a **conditional entry**, in the same shape the `concurrent-review-window` precondition above uses. The default fresh-review entry (`READY_FOR_REVIEW`) and the review-response entry are unchanged and mutually exclusive with this one per invocation.
 

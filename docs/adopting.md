@@ -1541,6 +1541,8 @@ host is free to rebind `code-reviewer` to a same-family executor in its own
 `binding.conf`, and a role still called `codex-reviewer` after doing so
 would contradict its own configuration.
 
+**A `code-reviewer` rebind to a non-Codex provider stops the review.** On a Claude Code host the reviewer's instructions run `codex exec`, so a `code-reviewer` binding whose provider is not `codex` makes every reviewer mode, `review-response` and `drift-evaluator`'s optional pass stop `BLOCKED` with `reviewer-binding-not-codex` before any Codex call, rather than silently sending repository content to Codex (`bin/check-review-provider.sh` decides). The Codex CLI host is unchanged. Running an actual same-family review under such a binding is the #689 follow-up.
+
 **What the alias covers, for one release.** A `<base>/binding.conf`
 written before this rename still resolves without an edit: `bind
 codex-reviewer <provider> <model> <effort|-> <adapter>` is accepted and

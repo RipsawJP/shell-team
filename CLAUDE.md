@@ -43,6 +43,10 @@ one people read.
   cross-provider review once that rebind exists. Never substitute another
   executor when resolution itself refuses: an unavailable or unauthenticated
   Codex CLI is `BLOCKED` with the exact error.
+  On a Claude Code host a non-Codex `code-reviewer` binding is itself a refusal:
+  every reviewer mode, `review-response` and `drift-evaluator`'s optional pass stop
+  `BLOCKED` with `reviewer-binding-not-codex` (`bin/check-review-provider.sh`)
+  instead of sending repository content to Codex.
 - **Done means both gates are green** — QA reaching `READY_FOR_REVIEW` *and* the
   cross-provider review reaching `READY_FOR_MERGE`. One green gate is not done.
 - **`bin/` stays pure bash, zero-dependency, and shellcheck-clean.** CI lints
