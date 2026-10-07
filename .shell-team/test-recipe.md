@@ -2672,3 +2672,11 @@ suite + dogfood step that must pass, run in that file's order."
   script to a scratch path and `sed` one marked line (`leading-dir-refusal`,
   `mode-change-refusal`, `unchanged-refusal`) — keep those marker comments when
   editing the script.
+- T-1174: `bash tests/setup/run.sh` takes ~2 min (`grep -c '^PASS:' <log>` counts its assertions). Its base-directory
+  fixtures pin the excludes file per case (`GIT_CONFIG_GLOBAL` pointing at a temp config); run it
+  with `ulimit -f` and a capped log. The whole CI-wired `bash tests/*/run.sh` list can be walked in
+  workflow order by a scratch driver that skips any suite whose joined text matches a
+  recursive-deletion pattern. At the T-1174 branch point `tests/check-spec-review/run.sh` fails one
+  assertion ("shipped contract loops/shell-team.contract.yaml: three rounds stop") because this
+  repository's own contract carries the operator-granted spec-review round extension — unrelated to
+  setup.

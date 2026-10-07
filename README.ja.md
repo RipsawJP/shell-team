@@ -46,7 +46,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 - Codex CLI。
 - Claude Code CLI のインストールと認証（レビュー pass 用）— 詳細は [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 7 を参照。
 
-**host 側の条件は、どちらの host でも operator の判断**。shell-team があなたの sandbox・trust・permission・network の設定を変更することはありません。セットアップ（[インストール](#インストール)）はプラグイン自身の担当分だけを行い、最後に、ループが host 側に求める条件を、何のために必要かとともに `Remains the operator's decision:` の下へ並べて報告します。Claude Code host で測定済みなのは、Codex レビュー呼び出しがセッションの sandbox の外で動くこと（関わる設定は `sandbox.excludedCommands`。[docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照）。Codex CLI host では、リポジトリの trust・コミットのための git ディレクトリへの書き込み・`claude -p` レビュー pass のための network・`<plugin root>/bin` の `PATH` 上の存在で、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に測定状況つきで書かれています。
+**host 側の条件は、どちらの host でも operator の判断**。shell-team があなたの sandbox・trust・permission・network の設定を変更することはありません。セットアップ（[インストール](#インストール)）はプラグイン自身の担当分だけを行い、最後の報告では、setup が読み取れなかった host 側の条件を、何のために必要かとともに `Remains the operator's decision:` に、読み取れたものをファイル名つきで `Already in place:` に、base dir の git 管理を必須の作業として `Required:` に出し、レビュー pass が相手側 provider へリポジトリの内容を送ることは判断ではなく情報として `Notice:` に出します。Claude Code host で測定済みなのは、Codex レビュー呼び出しがセッションの sandbox の外で動くこと（関わる設定は `sandbox.excludedCommands`。[docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照）。Codex CLI host では、リポジトリの trust・コミットのための git ディレクトリへの書き込み・`claude -p` レビュー pass のための network・`<plugin root>/bin` の `PATH` 上の存在で、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に測定状況つきで書かれています。
 
 ## インストール
 
@@ -72,7 +72,7 @@ codex plugin add shell-team@ripsawjp
 set up shell-team
 ```
 
-このプロンプトで setup スキル（[`skills/setup/SKILL.md`](skills/setup/SKILL.md)）が起動し、リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行する。単一 base dir `.shell-team/`（ボードと既定のループ契約）を scaffold し（host root の `CLAUDE.md` / `.gitignore` は改変しない。既存ファイルは書き換えない）、Codex CLI host ではさらに `.codex/agents/` を生成して git ディレクトリの `info/exclude` で無視するため、tracked ファイルは変わらない。これ以外は何も書かず、host の設定には触れず、最後に「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を短く報告する。host が書き込みを拒否した場合、報告には承認または自分で実行するための正確なコマンドが 1 つ出る。Codex CLI host では、setup が生成または変更した agent はこのリポジトリで開始した新しい Codex セッションで有効になるため、ループはそこで始める。冪等。
+このプロンプトで setup スキル（[`skills/setup/SKILL.md`](skills/setup/SKILL.md)）が起動し、リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行する。単一 base dir `.shell-team/`（ボードと既定のループ契約）を scaffold し（host root の `CLAUDE.md` / `.gitignore` は改変しない。既存ファイルは書き換えない）、Codex CLI host ではさらに `.codex/agents/` を生成して git ディレクトリの `info/exclude` で無視するため、tracked ファイルは変わらない。これ以外は何も書かず、host の設定には触れず、最後に 5 つのセクション `Done:`・`Already in place:`・`Remains the operator's decision:`・`Required:`（base dir を git が無視せずコミットすること。そのコマンドつき）・`Notice:`（レビュー pass が相手側 provider へリポジトリの内容を送ること）で短く報告する。host が書き込みを拒否した場合、報告には承認または自分で実行するための正確なコマンドが 1 つ出る。Codex CLI host では、setup が生成または変更した agent はこのリポジトリで開始した新しい Codex セッションで有効になるため、ループはそこで始める。冪等。
 
 プロンプトが自動化している手動の手順は、Claude Code host では次のスラッシュコマンド:
 
@@ -118,7 +118,7 @@ upgrade の後は、shell-team を使っている適用先リポジトリごと�
 update shell-team
 ```
 
-`set up shell-team` と同じフローの再実行で、Codex CLI host ではずれた `.codex/agents/` を再生成し、新しいテンプレートと内容が異なる scaffold ファイルは書き換えずに一覧し、「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を報告する。2 回目の実行では何も変わらない。
+`set up shell-team` と同じフローの再実行で、Codex CLI host ではずれた `.codex/agents/` を再生成し、新しいテンプレートと内容が異なる scaffold ファイルは書き換えずに一覧し、同じ 5 つのセクション（`Done:`・`Already in place:`・`Remains the operator's decision:`・`Required:`・`Notice:`）で報告する。2 回目の実行では何も変わらない。
 
 Codex CLI host での手動の手順は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従い、そのうえでリポジトリそのものの root から generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
 

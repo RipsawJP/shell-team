@@ -14,15 +14,45 @@
 #      templates (never rewritten);
 #   4. checks, by `command -v` only, that the other provider's CLI is present
 #      (it is never run, installed or probed);
-#   5. prints a three-part report: Done, Already in place, and what remains
-#      the operator's decision.
+#   5. prints a five-part report: Done, Already in place, what remains the
+#      operator's decision, Required, and Notice.
+#
+# The report's sections (each item a `- ` line, an empty section `- none`):
+#   Done:      what this run wrote.
+#   Already in place:  what was already so, with what was read. On the Claude
+#      Code host that includes a sandbox entry found in one of the three
+#      settings files setup reads (see below), stated as read, with its effect
+#      on the session left undetermined, and the base directory when git does
+#      not ignore it and its anchor is committed.
+#   Remains the operator's decision:  the host-side conditions setup cannot
+#      read or must not choose (trust, commits, network, PATH on the Codex CLI
+#      host; the sandbox when no entry was read, and commits, on the Claude
+#      Code host), each saying that setup could not determine it and what it is
+#      needed for.
+#   Required:  the one action with a single correct answer: the base directory
+#      (and, in the legacy layout, an outside specs directory) must not be
+#      ignored by git and must be committed. The blocking rule is named as
+#      <source>:<line> only (its pattern text comes from a possibly untrusted
+#      repository and is never printed); the re-include line `!<dir>/` is
+#      printed only for a rule from the global excludes file or info/exclude
+#      whose pattern is exactly the directory's own path; the printed command
+#      stages the directories (and the root .gitignore with a re-include line).
+#   Notice:  the review pass sends repository content to the other provider
+#      (information; nothing for setup to decide).
+#
+# Read set (exhaustive, read-only): on the Claude Code host the user scope
+# $HOME/.claude/settings.json (skipped when CLAUDE_CONFIG_DIR is set and
+# non-empty), the project scope <repo>/.claude/settings.json and the local scope
+# <repo>/.claude/settings.local.json, each only to see whether sandbox.
+# excludedCommands holds the exact element "codex *"; plus git (check-ignore,
+# ls-tree, config, rev-parse), which setup only asks. A file it cannot read,
+# parse or recognise is reported as not determined, never as not met.
 #
 # Write set (exhaustive): what team-init.sh writes for the repository root; on
 # the Codex CLI host only, <repo>/.codex/agents and <git common dir>/info/
 # exclude. Nothing else: no tracked file, nothing under $HOME or $CODEX_HOME,
-# and none of the host's own configuration. Every host-side condition (trust,
-# sandbox, commits, network, PATH, the review transfer) is reported as the
-# operator's decision and never changed or proposed as a grant. When a write
+# no host settings file, no root .gitignore, no index write. No host-side
+# condition is chosen, composed, defaulted or proposed as a grant. When a write
 # above is refused, the report carries one `- run yourself: <command>` line
 # whose write set is that single artifact, for the host's own per-command
 # approval or for the operator to run.
@@ -86,8 +116,16 @@ Options:
                   CODEX_THREAD_ID is set and non-empty, claude-code otherwise.
   --help, -h      Show this help and exit.
 
-Stdout: one header line, then "Done:", "Already in place:" and "Remains the
-operator's decision:" (each item a "- " line). Diagnostics go to stderr.
+Stdout: one header line, then five sections, each item a "- " line and an
+empty section printed as "- none":
+  Done:
+  Already in place:
+  Remains the operator's decision:
+  Required:
+  Notice:
+Required holds the base directory when git ignores it or it is not committed;
+Notice holds the review pass's repository-content notice. Diagnostics go to
+stderr.
 
 Exit codes (precedence 2 > 3 > 1 > 0):
   0  everything in place
@@ -289,6 +327,8 @@ fi
 DONE=""
 INPLACE=""
 REMAINS=""
+REQUIRED=""
+NOTICE=""
 EC2=0
 EC3=0
 EC1=0
@@ -296,6 +336,8 @@ nl=$'\n'
 add_done()    { DONE="${DONE}- $1${nl}"; }
 add_inplace() { INPLACE="${INPLACE}- $1${nl}"; }
 add_remains() { REMAINS="${REMAINS}- $1${nl}"; }
+add_required() { REQUIRED="${REQUIRED}- $1${nl}"; }
+add_notice()  { NOTICE="${NOTICE}- $1${nl}"; }
 q() { printf "'%s'" "$1"; }
 # refused <command>: one exact single-artifact command for a refused write.
 refused() {
@@ -478,22 +520,419 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Host-side conditions: always listed, each saying what it is needed for.
-#    They are the operator's decisions; they never change the exit status.
+# 8. Host-side conditions, the base directory and the notice. Nothing here
+#    writes, and none of it changes the exit status except a git error (2).
 # ---------------------------------------------------------------------------
+
+# 8a. Settings reader (Claude Code host). A pure-awk strict JSON reader: it
+#     answers YES only when the whole document is valid JSON (no trailing
+#     comma, no duplicate or nested look-alike key), has exactly one "sandbox"
+#     key (at top level, an object) holding exactly one "excludedCommands" key
+#     (a direct member, an array) with the exact string element "codex *".
+#     Anything it cannot classify with certainty is NO. The final conjuncts
+#     topsb, sbobj, direx and exarr (and the top-level "{" test) are
+#     defence-in-depth: each is implied by `found` together with the nsb and
+#     nex counts, because `found` is only set on the role path top-level
+#     sandbox object -> direct excludedCommands array. Their removal mutants
+#     are equivalent, so no fixture can tell them apart.
+# shellcheck disable=SC2016 # an awk program: nothing in it is meant to expand
+SBX_AWK='
+function skipws(   c) {
+  while (pos <= n) {
+    c = substr(s, pos, 1)
+    if (c == " " || c == "\t" || c == "\n" || c == "\r") pos++
+    else break
+  }
+}
+function pstring(   c, e, start) {
+  if (substr(s, pos, 1) != "\"") { bad = 1; return "" }
+  pos++
+  start = pos
+  while (pos <= n) {
+    c = substr(s, pos, 1)
+    if (c == "\"") { pos++; return substr(s, start, pos - 1 - start) }
+    if (c == "\\") {
+      e = substr(s, pos + 1, 1)
+      if (e == "u") {
+        if (substr(s, pos + 2, 4) !~ /^[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$/) { bad = 1; return "" }
+        pos += 6
+      } else if (e != "" && index("\"\\/bfnrt", e) > 0) {
+        pos += 2
+      } else { bad = 1; return "" }
+      continue
+    }
+    if (c < " ") { bad = 1; return "" }
+    pos++
+  }
+  bad = 1
+  return ""
+}
+function pobject(depth, role,   k, c, crole) {
+  pos++
+  skipws()
+  if (substr(s, pos, 1) == "}") { pos++; return }
+  while (1) {
+    skipws()
+    k = pstring()
+    if (bad) return
+    skipws()
+    if (substr(s, pos, 1) != ":") { bad = 1; return }
+    pos++
+    crole = 0
+    if (k == "sandbox") { nsb++; if (depth == 0) { topsb++; crole = 1 } }
+    if (k == "excludedCommands") { nex++; if (role == 1) { direx++; crole = 2 } }
+    pvalue(depth + 1, crole)
+    if (bad) return
+    if (crole == 1) sbobj = (vt == "o")
+    if (crole == 2) exarr = (vt == "a")
+    skipws()
+    c = substr(s, pos, 1)
+    if (c == ",") { pos++; continue }
+    if (c == "}") { pos++; return }
+    bad = 1
+    return
+  }
+}
+function parray(depth, role,   c) {
+  pos++
+  skipws()
+  if (substr(s, pos, 1) == "]") { pos++; return }
+  while (1) {
+    pvalue(depth + 1, 0)
+    if (bad) return
+    if (role == 2 && vt == "s" && lastraw == "codex *") found = 1
+    skipws()
+    c = substr(s, pos, 1)
+    if (c == ",") { pos++; continue }
+    if (c == "]") { pos++; return }
+    bad = 1
+    return
+  }
+}
+function pvalue(depth, role,   c, t) {
+  if (bad) return
+  if (depth > 40) { bad = 1; return }
+  skipws()
+  if (pos > n) { bad = 1; return }
+  c = substr(s, pos, 1)
+  if (c == "{") { pobject(depth, role); vt = "o"; return }
+  if (c == "[") { parray(depth, role); vt = "a"; return }
+  if (c == "\"") { lastraw = pstring(); vt = "s"; return }
+  if (substr(s, pos, 4) == "true") { pos += 4; vt = "l"; return }
+  if (substr(s, pos, 5) == "false") { pos += 5; vt = "l"; return }
+  if (substr(s, pos, 4) == "null") { pos += 4; vt = "l"; return }
+  if (c == "-" || (c >= "0" && c <= "9")) {
+    t = substr(s, pos, 64)
+    if (match(t, /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/)) { pos += RLENGTH; vt = "n"; return }
+  }
+  bad = 1
+}
+{ s = s $0 "\n" }
+END {
+  n = length(s)
+  pos = 1
+  skipws()
+  if (substr(s, pos, 1) != "{") bad = 1
+  else pvalue(0, 3)
+  if (!bad) { skipws(); if (pos <= n) bad = 1 }
+  if (!bad && nsb == 1 && topsb == 1 && sbobj && nex == 1 && direx == 1 && exarr && found) print "YES"
+  else print "NO"
+}
+'
+# sandbox_entry_in <file>: 0 only when the file is the recognised shape.
+sandbox_entry_in() {
+  local f="$1" out n_all n_nonul
+  if unsafe_path "$f"; then return 1; fi
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  n_all="$(wc -c < "$f" 2>/dev/null | tr -d ' ')" || return 1
+  n_nonul="$(tr -d '\000' < "$f" 2>/dev/null | wc -c | tr -d ' ')" || return 1
+  [ -n "$n_all" ] && [ "$n_all" = "$n_nonul" ] || return 1
+  # A text encoding a real JSON parser would refuse is not read (checked when
+  # iconv is available; the strict grammar below is the primary guard).
+  if command -v iconv > /dev/null 2>&1; then
+    iconv -f UTF-8 -t UTF-8 < "$f" > /dev/null 2>&1 || return 1
+  fi
+  out="$(awk "$SBX_AWK" < "$f" 2>/dev/null)" || return 1
+  [ "$out" = "YES" ]
+}
+
+SBX_FILE=""
+if [ "$HOST" = "claude-code" ]; then
+  if [ -z "${CLAUDE_CONFIG_DIR:-}" ] && [ -n "${HOME:-}" ]; then
+    if sandbox_entry_in "$HOME/.claude/settings.json"; then SBX_FILE="$HOME/.claude/settings.json"; fi
+  fi
+  if [ -z "$SBX_FILE" ] && sandbox_entry_in "$ROOT/.claude/settings.json"; then
+    SBX_FILE="$ROOT/.claude/settings.json"
+  fi
+  if [ -z "$SBX_FILE" ] && sandbox_entry_in "$ROOT/.claude/settings.local.json"; then
+    SBX_FILE="$ROOT/.claude/settings.local.json"
+  fi
+fi
+
 if [ "$HOST" = "codex-cli" ]; then
   add_remains "repository trust: project agents in .codex/agents are discovered only when the host trusts this repository; whether to trust it is your decision (in the codex-cli 0.159.3 runs relayed to this plugin, the host's own first-launch trust prompt sufficed)"
   add_remains "commits: the loop's roles commit inside this repository through one invocation of bin/team-commit.sh, which needs write access to the git common directory ${EXCL%/info/exclude}; the run asks for the host's per-command approval of that identical invocation, and what the session may write there is your decision"
   add_remains "network for the review pass: the review's claude -p call reaches the other provider over the network; in the codex-cli 0.159.3 runs relayed to this plugin it ran outside the sandbox under the host's own per-command approval, so no network change was needed for it; whether to allow it is your decision"
   add_remains "PATH: spawned roles call the plugin's scripts by bare name, which needs $PLUGIN_ROOT/bin on PATH; whether that is needed is unmeasured; it is your decision"
-  review_to="Claude"
+  review_to="Claude (Anthropic)"
 else
-  add_remains "sandbox: the reviewer's codex exec call has to run outside the session's sandbox or under the host's own per-command approval; how your sandbox treats it is your decision"
-  add_remains "commits: the loop's roles commit inside this repository, which needs write access to its git directory; what the session may write there is your decision"
-  review_to="Codex"
+  if [ -n "$SBX_FILE" ]; then
+    add_inplace "sandbox: $SBX_FILE has \"codex *\" in sandbox.excludedCommands; whether this session applies it was not determined"
+  else
+    add_remains "sandbox: setup could not determine whether the reviewer's codex exec call runs outside the session's sandbox (no readable settings entry showed it); the review pass needs that call to run outside the sandbox or under the host's own per-command approval, and how your sandbox treats it is your decision"
+  fi
+  add_remains "commits: setup could not determine whether this session may write this repository's git directory (a read-only check cannot establish it, and setup writes nothing to find out); the loop's roles commit inside this repository, which needs that write access; what the session may write there is your decision"
+  review_to="Codex (OpenAI)"
 fi
-add_remains "base directory in git: whether to track $BASE/ in version control is your decision; setup stages and commits nothing"
-add_remains "review transfer: the review pass sends repository content to $review_to, the other provider; approving that transfer is your decision, and setup does not authorize it"
+add_notice "the review pass sends repository content to $review_to, the other provider; this is information, there is nothing for setup to configure"
+
+# 8b. The base directory (and an outside specs directory) in git. One required
+#     action with a single correct answer: git must not ignore it and its
+#     anchor must be committed. Read-only: check-ignore, ls-tree, config and
+#     rev-parse only.
+PROBE_MD="setup-probe.md"
+# np <path>: collapse repeated slashes and drop a trailing one (the resolver
+# echoes TEAM_RUN_BASE as given, so `.custom/` arrives as `.custom//todo.md`).
+np() {
+  local p="$1" sl="/" dsl="//"
+  while [ "${p//$dsl/$sl}" != "$p" ]; do p="${p//$dsl/$sl}"; done
+  printf '%s' "${p%/}"
+}
+N_BASE="$(np "$BASE")"
+N_SPECS="$(np "$SPECS_DIR")"
+REQ_DIRS=("$N_BASE")
+REQ_ANCHOR=("$(np "$TODO_FILE")")
+case "$N_SPECS" in
+  "$N_BASE"|"$N_BASE"/*) : ;;
+  *) REQ_DIRS[1]="$N_SPECS"; REQ_ANCHOR[1]="$N_SPECS/.gitkeep" ;;
+esac
+probes=()
+# Every other directory the loop commits records into, when it sits under the
+# base (specs, retros, reviews, provenance, interventions), is probed with the
+# directory itself and a not-yet-existing .md path; so are the lessons file and
+# the root .gitignore the printed command may stage. runs/ is ignored by design.
+for rel in "$SPECS_DIR" "$RETROS_DIR" "$REVIEWS_DIR" "$PROV_DIR" "$INTERV_DIR"; do
+  rel="$(np "$rel")"
+  case "$rel" in
+    "$N_BASE"/*) probes[${#probes[@]}]="$rel"; probes[${#probes[@]}]="$rel/$PROBE_MD" ;;
+  esac
+done
+rel="$(np "$LESSONS_FILE")"
+case "$rel" in
+  "$N_BASE"/*) probes[${#probes[@]}]="$rel" ;;
+esac
+probes[${#probes[@]}]=".gitignore"
+for ((ri = 0; ri < ${#REQ_DIRS[@]}; ri++)); do
+  rd="${REQ_DIRS[$ri]}"
+  probes[${#probes[@]}]="$rd"
+  probes[${#probes[@]}]="${REQ_ANCHOR[$ri]}"
+  probes[${#probes[@]}]="$rd/$PROBE_MD"
+  if [ "$ri" -eq 0 ]; then
+    probes[${#probes[@]}]="$(np "$LOOPS_DIR")/shell-team.contract.yaml"
+  fi
+  acc=""
+  rest="$rd"
+  while [ "${rest#*/}" != "$rest" ]; do
+    part="${rest%%/*}"
+    rest="${rest#*/}"
+    acc="${acc:+$acc/}$part"
+    probes[${#probes[@]}]="$acc"
+  done
+done
+
+# The NUL-terminated fields come back as source, line, pattern, path (-z is
+# accepted only with --stdin). The stream is rewritten NUL -> newline and
+# newline -> \001 so a field never contains a newline; an untrusted pattern is
+# only ever compared, never printed.
+ci_rc=0
+ci_out="$(printf '%s\0' "${probes[@]}" | git -C "$ROOT" check-ignore -v -z --stdin 2>/dev/null | tr '\0\n' '\n\001')" || ci_rc=$?
+nrep=0
+r_src=()
+r_line=()
+r_pat=()
+r_path=()
+if [ "$ci_rc" -eq 0 ]; then
+  n_lines="$(printf '%s\n' "$ci_out" | wc -l | tr -d ' ')"
+  while IFS= read -r a_src && IFS= read -r a_line && IFS= read -r a_pat && IFS= read -r a_path; do
+    r_src[nrep]="$a_src"
+    r_line[nrep]="$a_line"
+    r_pat[nrep]="$a_pat"
+    r_path[nrep]="$a_path"
+    nrep=$((nrep + 1))
+  done <<< "$ci_out"
+  if [ "$n_lines" -ne $((nrep * 4)) ]; then
+    err "team-setup: git check-ignore printed a report setup could not read"
+    EC2=1
+    ci_rc=2
+  fi
+elif [ "$ci_rc" -ne 1 ]; then
+  err "team-setup: git check-ignore could not evaluate the base directory (exit $ci_rc)"
+  EC2=1
+fi
+
+# Sources a re-include is proven for: the global excludes file git uses and
+# the repository's (common) info/exclude.
+GX_FILE="$(git -C "$ROOT" config --type=path --get core.excludesFile 2>/dev/null)" || GX_FILE=""
+[ -n "$GX_FILE" ] || GX_FILE="${XDG_CONFIG_HOME:-${HOME:-}/.config}/git/ignore"
+INFO_EXCL="$(git -C "$ROOT" rev-parse --git-path info/exclude 2>/dev/null)" || INFO_EXCL=""
+
+under() { # <path> <dir>: the path is the dir or sits under it
+  [ "$1" = "$2" ] && return 0
+  case "$1" in
+    "$2"/*) return 0 ;;
+  esac
+  return 1
+}
+fmt_rule() { # <report index>: "<source>:<line>" (never the pattern)
+  local s="${r_src[$1]}" l="${r_line[$1]}"
+  case "$l" in
+    ''|*[!0-9]*) l="?" ;;
+  esac
+  case "$s" in
+    ''|*[![:print:]]*|*'`'*) s="<unprintable source>" ;;
+  esac
+  printf '%s:%s' "$s" "$l"
+}
+in_head() { # <path>: the path is in HEAD's tree (an unborn HEAD or a staged-only path is not)
+  local o
+  o="$(git -C "$ROOT" ls-tree HEAD -- "$1" 2>/dev/null)" || return 1
+  case "$o" in
+    [0-7][0-7][0-7][0-7][0-7][0-7]" blob "*) return 0 ;;
+  esac
+  return 1
+}
+
+# A report whose pattern starts with `!` is a re-include git matched, so that
+# path is NOT ignored; such reports are skipped everywhere below.
+RG_IDX=-1
+i=0
+while [ "$i" -lt "$nrep" ]; do
+  case "${r_pat[$i]}" in
+    '!'*) : ;;
+    *) if [ "${r_path[$i]}" = ".gitignore" ]; then RG_IDX="$i"; fi ;;
+  esac
+  i=$((i + 1))
+done
+BASE_OK=1
+BASE_SEGS=""
+BASE_PATHS=""
+BASE_REINC=""
+BASE_NOREINC=0
+BASE_BADPATH=0
+if [ "$ci_rc" -ne 0 ] && [ "$ci_rc" -ne 1 ]; then
+  BASE_OK=0
+  BASE_NAMES=""
+else
+  BASE_NAMES=""
+  for ((ri = 0; ri < ${#REQ_DIRS[@]}; ri++)); do
+    rd="${REQ_DIRS[$ri]}"
+    a_any=0
+    a_dir=-1
+    a_anc=-1
+    a_closed=1
+    a_exist=""
+    a_new=""
+    i=0
+    while [ "$i" -lt "$nrep" ]; do
+      rp="${r_path[$i]}"
+      case "${r_pat[$i]}" in
+        '!'*) i=$((i + 1)); continue ;;
+      esac
+      if under "$rp" "$rd"; then
+        a_any=1
+        if [ "$rp" = "$rd" ]; then
+          a_dir="$i"
+        elif [ "${rp##*/}" = "$PROBE_MD" ]; then
+          a_new="${a_new:+$a_new, }${rp%/*}/ by $(fmt_rule "$i")"
+        else
+          a_exist="${a_exist:+$a_exist, }$rp by $(fmt_rule "$i")"
+        fi
+        okp=0
+        if [ "${r_src[$i]}" = "$GX_FILE" ] || { [ -n "$INFO_EXCL" ] && [ "${r_src[$i]}" = "$INFO_EXCL" ]; }; then
+          case "${r_pat[$i]}" in
+            "$rd"|"$rd/"|"/$rd"|"/$rd/") okp=1 ;;
+          esac
+        fi
+        [ "$okp" -eq 1 ] || a_closed=0
+      else
+        # Defence-in-depth: a reported ancestor also reports every probe under
+        # the directory (a_any, with the ancestor's rule as pattern, so
+        # a_closed is already 0); no reachable input reaches this branch with
+        # a_any unset, so removing it is an equivalent mutant.
+        case "$rd/" in
+          "$rp"/*) a_anc="$i" ;;
+        esac
+      fi
+      i=$((i + 1))
+    done
+    committed=1
+    in_head "${REQ_ANCHOR[$ri]}" || committed=0
+    if [ "$a_any" -eq 0 ] && [ "$a_anc" -lt 0 ] && [ "$committed" -eq 1 ]; then
+      continue
+    fi
+    BASE_OK=0
+    BASE_NAMES="${BASE_NAMES:+$BASE_NAMES and }$rd/"
+    seg="$rd/"
+    if [ "$a_dir" -ge 0 ]; then
+      seg="$seg is ignored by $(fmt_rule "$a_dir")"
+    elif [ -n "$a_exist" ]; then
+      seg="$seg holds ignored files ($a_exist)"
+    elif [ -n "$a_new" ]; then
+      seg="$seg would ignore new .md files in $a_new"
+    elif [ "$a_anc" -ge 0 ]; then
+      seg="$seg sits under an ignored parent, ignored by $(fmt_rule "$a_anc")"
+    else
+      seg="$seg is not committed yet"
+    fi
+    if [ "$committed" -eq 0 ] && { [ "$a_any" -eq 1 ] || [ "$a_anc" -ge 0 ]; }; then
+      seg="$seg and its anchor is not in HEAD"
+    fi
+    BASE_SEGS="${BASE_SEGS:+$BASE_SEGS; }$seg"
+    # A path that cannot be single-quoted safely gets no printed command or line.
+    case "$rd" in
+      ''|*[!A-Za-z0-9._/-]*) BASE_BADPATH=1; a_closed=0 ;;
+    esac
+    if [ "$committed" -eq 0 ]; then
+      BASE_PATHS="${BASE_PATHS:+$BASE_PATHS }'$rd'"
+    fi
+    if [ "$a_any" -eq 1 ] || [ "$a_anc" -ge 0 ]; then
+      if [ "$a_closed" -eq 1 ] && [ "$a_any" -eq 1 ] && [ "$a_anc" -lt 0 ]; then
+        BASE_REINC="${BASE_REINC:+$BASE_REINC and }\`!$rd/\`"
+      else
+        BASE_NOREINC=1
+      fi
+    fi
+  done
+  if [ "$BASE_OK" -eq 1 ]; then
+    for ((ri = 0; ri < ${#REQ_DIRS[@]}; ri++)); do
+      BASE_NAMES="${BASE_NAMES:+$BASE_NAMES and }${REQ_DIRS[$ri]}/"
+    done
+    add_inplace "base directory in git: $BASE_NAMES not ignored by git, and the anchor of each (the board; a specs directory's .gitkeep) is committed in HEAD"
+  fi
+fi
+if [ "$ci_rc" -le 1 ] && [ "$BASE_OK" -eq 0 ]; then
+  msg="base directory in git: $BASE_SEGS. The loop's records must be committed for the gates to pass, and the loop does not support never-committed operating files, so this has one correct answer."
+  if [ "$BASE_BADPATH" -eq 1 ]; then
+    msg="$msg A path above cannot be quoted safely, so setup prints no command for it."
+  else
+    if [ -n "$BASE_REINC" ] && [ "$RG_IDX" -ge 0 ]; then
+      msg="$msg The repository's root .gitignore is itself ignored by $(fmt_rule "$RG_IDX"), so a re-include line could not be committed there and setup prints none; make that file trackable first."
+      BASE_NOREINC=1
+    elif [ -n "$BASE_REINC" ]; then
+      msg="$msg Add $BASE_REINC to the repository's root .gitignore (setup never edits it)."
+      BASE_PATHS="${BASE_PATHS:+$BASE_PATHS }'.gitignore'"
+    fi
+    if [ "$BASE_NOREINC" -eq 1 ]; then
+      msg="$msg For an ignored directory with no re-include line above, change or remove the rule that hides it (setup cannot name a safe line for it)."
+    fi
+    if [ -n "$BASE_PATHS" ]; then
+      msg="$msg Run \`git add -- $BASE_PATHS\` and commit; setup stages and commits nothing."
+    else
+      msg="$msg Setup stages and commits nothing."
+    fi
+  fi
+  add_required "$msg"
+fi
 
 # ---------------------------------------------------------------------------
 # 9. Report.
@@ -518,6 +957,8 @@ printf 'shell-team setup (plugin version %s); host: %s (%s)\n' "$ver" "$HOST" "$
 print_section "Done:" "$DONE"
 print_section "Already in place:" "$INPLACE"
 print_section "Remains the operator's decision:" "$REMAINS"
+print_section "Required:" "$REQUIRED"
+print_section "Notice:" "$NOTICE"
 
 if [ "$EC2" -eq 1 ]; then
   exit 2

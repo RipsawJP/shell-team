@@ -416,8 +416,9 @@ plugin's own part. It scaffolds `.shell-team/` through `team-init.sh` (an
 existing file is never rewritten). It generates or refreshes `.codex/agents/`
 and ignores it through the git directory's `info/exclude`, so no tracked file
 is edited. It checks with `command -v claude` that the Claude Code CLI is
-present, without running it. And it ends with a three-part report: `Done:`,
-`Already in place:` and `Remains the operator's decision:`. After a plugin
+present, without running it. And it ends with a five-part report: `Done:`,
+`Already in place:`, `Remains the operator's decision:`, `Required:` and
+`Notice:`. After a plugin
 upgrade, type `update shell-team`: the same flow re-run, idempotent, so a
 second run changes nothing. At the start of every run, `bash "<plugin root>/bin/check-setup.sh"`
 checks the same prerequisites read-only and stops the run `BLOCKED`, naming this
@@ -461,10 +462,20 @@ re-measured by it; each item below says which kind of evidence it rests on:
 - **`<plugin root>/bin` on `PATH`** (step 9): undetermined. The operator
   exported it in both 0.159.3 runs, so whether it is necessary was not
   separated out.
-- **The review transfer**: the review pass sends repository content to
-  Claude, the other provider. Approving that transfer is the operator's
-  decision, and setup does not authorize it.
-- **Whether to track `.shell-team/` in git.**
+
+Two things in the report are not decisions. Under `Required:`, the base
+directory (and, in the legacy layout, an outside specs directory) must not be
+ignored by git and must be committed: the loop does not support never-committed
+operating files, and `bin/team-commit.sh` refuses an ignored path, so there is
+one correct answer. Setup names each blocking rule as `<source>:<line>` (never
+the pattern text, which can come from an untrusted repository) and prints the
+one `git add` command; only when the rule sits in the global excludes file or
+`info/exclude` and names the directory itself does it print the root
+`.gitignore` line to add, such as `!.shell-team/`. Setup never edits
+`.gitignore` and stages and commits nothing. Under `Notice:`, the review pass
+sends repository content to the other provider (Claude on this host); that is
+information about what the review pass does, not something setup asks you to
+approve.
 
 The numbered steps below are the manual fallback, and the record of what each
 host condition is and what was measured about it.
