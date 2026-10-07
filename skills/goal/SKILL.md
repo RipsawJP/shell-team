@@ -79,7 +79,7 @@ later ticks — the state file already exists.
    - if so, invoke `qa-verifier` — judges the non-scriptable ACs (PASS/FAIL).
    - if QA PASS, invoke `code-reviewer` — cross-provider verdict
      (APPROVE / REQUEST_CHANGES).
-   - **Reviewer-binding pre-dispatch (T-1177, issue #700)**: immediately after resolving `code-reviewer` and before invoking it, run `bash "<plugin root>/bin/check-review-provider.sh"` (never assumed to be on `PATH`). Exit 0 proceeds; any other outcome stops this tick `BLOCKED`, escalates quoting the token `reviewer-binding-not-codex` verbatim, records `log-run.sh goal --event gate --from review --label reviewer-binding-not-codex` and dispatches nothing.
+   - **Reviewer-binding pre-dispatch (T-1177, issue #700)**: immediately after resolving `code-reviewer` and before invoking it, run `bash "<plugin root>/bin/check-review-provider.sh"` (never assumed to be on `PATH`). Exit 0 proceeds; any other outcome stops this tick `BLOCKED`: the checker prints one stderr line `check-review-provider: <token>: <detail>`; take the token (the second colon-separated field) from the closed set `reviewer-binding-not-codex` / `binding-unresolved` / `usage`, escalate with `BLOCKED — reviewer-binding gate refused` plus that token alone (never the detail), record `log-run.sh goal --event gate --from review --label <token>` and dispatch nothing; if stderr has no such token (exit 126/127, empty stderr), quote the exit status and record `--label exit-<N>`.
    - **Detection lens** (same distinction as `/shell-team:run`'s step 5/6):
      `qa-verifier` verifies empirically/by execution (does it actually run,
      actually produce the claimed output); `code-reviewer` verifies
