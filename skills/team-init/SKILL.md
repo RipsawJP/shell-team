@@ -35,9 +35,11 @@ Do this:
      captures (`reviews/*.txt`, `reviews/*.jsonl`, `reviews/*.json`); curated
      `<task-id>.md` review records stay trackable
 
-   In a **legacy** `tasks/` layout the specs dir is the one exception — it stays
-   at `docs/specs/` (the historical split-root quirk), not under `<base>/`. The
-   scaffolder's summary calls this out when it applies.
+   In a **legacy** `tasks/` layout the specs dir is `tasks/specs/` (under
+   `<base>/`) when that directory exists and `docs/specs/` is absent or holds only
+   `.gitkeep`; otherwise it stays at `docs/specs/`, outside `<base>/`. The
+   resolver (`team-paths.sh --get specs`) decides; the scaffolder's summary calls
+   out an outside specs dir when it applies.
 
    The host root is deliberately left untouched: **no** CLAUDE.md edit and **no**
    host-root `.gitignore` change.

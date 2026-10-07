@@ -13,8 +13,10 @@ lives centrally (installed once); each adopting repo only holds the per-repo
 `team-init` scaffolds everything under a **single base directory**, so the
 plugin's footprint never scatters across your mainline tree. By default that base
 is `.shell-team/`; override it with the `TEAM_RUN_BASE` environment variable. A repo
-that already uses the legacy `tasks/` + `docs/specs/` layout is detected and reused
-(the resolver `bin/team-paths.sh` decides which layout is in effect).
+that already uses the legacy `tasks/` layout is detected and reused: its specs
+directory is `tasks/specs/` when that directory exists (and `docs/specs/` is absent or
+holds nothing but `.gitkeep`), otherwise `docs/specs/` (the resolver
+`bin/team-paths.sh` decides which layout and which specs directory are in effect).
 
 ```
 <base>/                          # .shell-team/ by default
@@ -931,7 +933,7 @@ git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
 git commit -m "chore: scaffold shell-team for a one-ticket trial"
 ```
 
-Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
+Both `--get` arguments matter: in the default layout they resolve to the same directory, but in a legacy `tasks/` layout whose specs resolve to `docs/specs/`, that directory sits outside the base dir (with specs in `tasks/specs/` it is inside the base dir and the two arguments name the same tree), and dropping the second argument would leave an outside specs directory permanently untracked — commit with both, never with a hardcoded, single-directory form.
 
 The first line and the `team-init.sh` line above can also be run as one step: `team-init.sh --trial-branch trial/one-ticket .` creates `trial/one-ticket` and switches to it before scaffolding, refusing (exit 2, with a remedy) if the target is not inside a git work tree, is not that work tree's top level, or the branch already exists — the two commands staying separate is not required, only convenient to show. Without `--trial-branch`, `team-init.sh` invokes no git command of its own and does not care which branch you are on.
 

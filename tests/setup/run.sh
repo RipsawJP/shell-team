@@ -868,6 +868,79 @@ else
     && pass "T-1166 refused: a refused exclude write alone prints no note" || fail "T-1166 refused: exclude only (rc=$x)"
 fi
 
+# ---------------------------------------------------------------------------
+# T-1176 — legacy specs resolution end to end, the R4 report line, and the
+# v2.8.6 contract allowance (D1). Fixtures: a legacy adopter whose specs live
+# in tasks/specs/ and that has no docs/, in a clone with no .git/info/ (so a
+# write there would be visible), before and after a v2.8.x leftover.
+# ---------------------------------------------------------------------------
+mkdir -p "$T/empty-tpl"
+cm() { git -C "$1" -c user.email=t@example.com -c user.name=t commit -q -m "$2"; }
+mkl() { # a committed legacy scaffold with specs in tasks/specs and no docs/
+  mkdir -p "$1" && git -C "$1" init -q --template="$T/empty-tpl" && mkdir -p "$1/tasks/loops" "$1/tasks/specs" \
+    && cp "$REPO_ROOT/templates/shell-team.contract.yaml" "$1/tasks/loops/" \
+    && cp "$REPO_ROOT/templates/todo-template.md" "$1/tasks/todo.md" \
+    && printf '# spec\n' > "$1/tasks/specs/T-1-a.md" \
+    && git -C "$1" add -- tasks && cm "$1" i
+}
+intasks() { # every changed path (one per line in $1) is under ./tasks/, and there is at least one
+  [ -s "$1" ] || return 1
+  local p
+  while IFS= read -r p; do case "$p" in ./tasks/*) ;; *) return 1 ;; esac; done < "$1"
+}
+RA="$T/leg-a"; mkl "$RA"
+[ "$(cd "$RA" && bash "$REPO_ROOT/bin/team-paths.sh" --get specs)" = tasks/specs ] && pass "T-1176 A: the resolver answers tasks/specs" || fail "T-1176 A: resolver"
+snap "$RA" > "$T/la0"; x="$(st "$RA" --host claude-code)"; snap "$RA" > "$T/la1"
+chg "$T/la0" "$T/la1" > "$T/lad"
+{ [ "$x" = 0 ] && intasks "$T/lad" && [ ! -e "$RA/docs" ] && [ ! -e "$RA/.git/info" ]; } \
+  && pass "T-1176 A: setup exits 0, every change is under tasks/, no docs/ and no .git/info/ created" || fail "T-1176 A: write set (rc=$x)"
+{ [ "$(sec 'Required:' "$T/o")" = '- none' ] && ! grep -qF docs/specs "$T/o" && ! grep -q '^- specs dir: ' "$T/o"; } \
+  && pass "T-1176 A: Required is '- none', no docs/specs named, no specs-dir line" || fail "T-1176 A: report"
+RB="$T/leg-b"; mkl "$RB"; mkdir -p "$RB/docs/specs" "$RB/.git/info"; : > "$RB/docs/specs/.gitkeep"
+printf 'docs/\n' > "$RB/.git/info/exclude"
+snap "$RB" > "$T/lb0"; x="$(st "$RB" --host claude-code)"; snap "$RB" > "$T/lb1"
+chg "$T/lb0" "$T/lb1" > "$T/lbd"
+{ [ "$x" = 0 ] && intasks "$T/lbd" && [ -f "$RB/docs/specs/.gitkeep" ] && [ ! -s "$RB/docs/specs/.gitkeep" ] \
+  && [ "$(ls -A "$RB/docs/specs")" = .gitkeep ] && [ "$(ls -A "$RB/docs")" = specs ] && [ "$(cat "$RB/.git/info/exclude")" = 'docs/' ]; } \
+  && pass "T-1176 B: the leftover docs/specs/.gitkeep and the exclude line are untouched" || fail "T-1176 B: leftover touched (rc=$x)"
+{ [ "$(sec 'Required:' "$T/o")" = '- none' ] && [ "$(grep -c '^- specs dir: ' "$T/o")" = 1 ] \
+  && sec 'Already in place:' "$T/o" | grep '^- specs dir: ' | grep -qF tasks/specs/ \
+  && sec 'Already in place:' "$T/o" | grep '^- specs dir: ' | grep -qF docs/specs/ \
+  && sec 'Already in place:' "$T/o" | grep '^- specs dir: ' | grep -qF 'not read'; } \
+  && pass "T-1176 B: exactly one specs-dir line under Already in place, naming both directories and 'not read'" || fail "T-1176 B: specs-dir line"
+grep '^- specs dir: ' "$T/o" > "$T/sdl" || true
+g=0; grep -qF -e '`' -e 'rm ' "$T/sdl" || g=$?
+[ "$g" -eq 1 ] && pass "T-1176 B: the specs-dir line carries no backtick and no rm" || fail "T-1176 B: the line carries a backtick or rm (grep exit $g)"
+{ ! sec "$RM" "$T/o" | grep -qF docs/specs && ! sec 'Required:' "$T/o" | grep -qF docs/specs; } \
+  && pass "T-1176 B: nothing under the operator-decision or Required sections names docs/specs" || fail "T-1176 B: docs/specs named"
+RC="$T/leg-r5"; mkl "$RC"; mkdir -p "$RC/docs/specs"; printf '# other\n' > "$RC/docs/specs/T-2-b.md"
+x="$(st "$RC" --host claude-code)"
+{ [ "$x" = 0 ] && ! grep -q '^- specs dir: ' "$T/o" && ! grep -qF 'T-2-b.md' "$T/o"; } \
+  && pass "T-1176 R5: no specs-dir line, and nothing read from inside docs/specs is printed" || fail "T-1176 R5: report (rc=$x)"
+RD="$T/leg-r3d"; mkl "$RD"; mkdir -p "$RD/docs/specs"; printf '# other\n' > "$RD/docs/specs/.keep"
+RE="$T/leg-r1"; mkdir -p "$RE" && git -C "$RE" init -q --template="$T/empty-tpl" && mkdir -p "$RE/tasks/loops" \
+  && cp "$REPO_ROOT/templates/shell-team.contract.yaml" "$RE/tasks/loops/" && cp "$REPO_ROOT/templates/todo-template.md" "$RE/tasks/todo.md" \
+  && git -C "$RE" add -- tasks && cm "$RE" i
+x="$(st "$RE" --host claude-code)"
+{ [ "$x" = 0 ] && ! grep -q '^- specs dir: ' "$T/o"; } && pass "T-1176 R1: no specs-dir line (docs/specs stays a required outside directory, T-1174)" || fail "T-1176 R1 (rc=$x)"
+
+# D1: the v2.8.6 contract bytes are not drift; any other difference still is.
+OLDC="$REPO_ROOT/templates/prior/shell-team.contract.v2.8.6.txt"
+[ -s "$OLDC" ] && ! cmp -s "$OLDC" "$REPO_ROOT/templates/shell-team.contract.yaml" && pass "T-1176 D1: the shipped prior contract is non-empty and differs from the current template" || fail "T-1176 D1: prior contract file"
+RF="$T/d1"; mk "$RF"; x="$(st "$RF" --host claude-code)"
+K="$RF/.shell-team/loops/shell-team.contract.yaml"
+{ [ "$x" = 0 ] && cmp -s "$K" "$REPO_ROOT/templates/shell-team.contract.yaml"; } && pass "T-1176 D1: a fresh scaffold's contract equals the current template" || fail "T-1176 D1: fresh scaffold"
+cp "$OLDC" "$K"; x="$(st "$RF" --host claude-code)"
+{ [ "$x" = 0 ] && ! grep -qF 'shell-team.contract.yaml differs' "$T/o" && cmp -s "$K" "$OLDC"; } \
+  && pass "T-1176 D1: an untouched v2.8.6 copy is not drift and is not rewritten" || fail "T-1176 D1: v2.8.6 copy (rc=$x)"
+printf '# local edit\n' >> "$K"; x="$(st "$RF" --host claude-code)"
+{ [ "$x" = 0 ] && [ "$(sec "$RM" "$T/o" | grep -cF 'shell-team.contract.yaml differs from the installed plugin')" = 1 ]; } \
+  && pass "T-1176 D1: a v2.8.6 copy with one appended line is drift again" || fail "T-1176 D1: edited copy (rc=$x)"
+{ cp "$OLDC" "$K" && printf '\n' >> "$K"; } ; x="$(st "$RF" --host claude-code)"
+[ "$(sec "$RM" "$T/o" | grep -cF 'shell-team.contract.yaml differs')" = 1 ] && pass "T-1176 D1: a one-byte difference from the v2.8.6 bytes is drift" || fail "T-1176 D1: one-byte difference"
+cp "$REPO_ROOT/templates/AGENTS.md" "$RF/.shell-team/AGENTS.md"; cp "$OLDC" "$RF/.shell-team/AGENTS.md"; x="$(st "$RF" --host claude-code)"
+[ "$(sec "$RM" "$T/o" | grep -cF 'AGENTS.md differs')" = 1 ] && pass "T-1176 D1: the allowance is the contract's only (a v2.8.6 contract placed as AGENTS.md is drift)" || fail "T-1176 D1: allowance leaked to AGENTS.md"
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'setup suite: all assertions passed\n'
