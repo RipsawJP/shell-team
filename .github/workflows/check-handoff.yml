@@ -334,6 +334,12 @@ jobs:
       - name: Run check-review-provider fixture suite
         run: bash tests/check-review-provider/run.sh
 
+      - name: Lint the bounded Codex wait and its suite (T-1178)
+        run: shellcheck bin/codex-await.sh tests/codex-await/run.sh
+
+      - name: Run codex-await suite
+        run: bash tests/codex-await/run.sh
+
       - name: Dogfood applies-effort — the recipe's declaration agrees with each adapter's own effort-mechanism (T-1119)
         run: |
           set -e
