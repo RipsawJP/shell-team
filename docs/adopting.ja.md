@@ -14,8 +14,10 @@
 `team-init` はすべてを**単一のベースディレクトリ**配下にスキャフォールドする
 ので、プラグインのフットプリントが本流ツリーに散らばることはありません。
 デフォルトのベースは `.shell-team/` で、環境変数 `TEAM_RUN_BASE` で上書きできます。
-レガシーな `tasks/` + `docs/specs/` レイアウトを既に使っているリポジトリでは、
-それを検出してそのまま再利用します（どちらのレイアウトが有効かはリゾルバ
+レガシーな `tasks/` レイアウトを既に使っているリポジトリでは、それを検出して
+そのまま再利用します。specs ディレクトリは `tasks/specs/` が存在する場合（かつ
+`docs/specs/` が無いか `.gitkeep` だけの場合）は `tasks/specs/`、それ以外は
+`docs/specs/` です（どちらのレイアウト・どちらの specs ディレクトリが有効かはリゾルバ
 `bin/team-paths.sh` が判断します）。
 
 ```
@@ -423,7 +425,7 @@ slice 2（T-1135）が `code-reviewer` を 5 つ目の生成役割として追�
 ディレクトリの `info/exclude` で無視する（tracked ファイルは編集しない）。
 Claude Code CLI が存在するかは `command -v claude` で確認する（実行は
 しない）。最後に `Done:`・`Already in place:`・`Remains the operator's
-decision:` の 3 部構成で報告する。plugin の upgrade 後は `update shell-team`
+decision:`・`Required:`・`Notice:` の 5 部構成で報告する。plugin の upgrade 後は `update shell-team`
 と入力する——同じフローの再実行で冪等、2 回目は何も変えない。run の開始時には
 `bash "<plugin root>/bin/check-setup.sh"` が同じ前提条件を read-only で確認し、
 欠けている場合はこのプロンプトを案内して `BLOCKED` で止まる（存在のみの確認で、内容が古い role ファイルは run 開始時チェックを通り、`update shell-team` が報告する）。同じプロンプトは
@@ -464,10 +466,18 @@ operator の判断に残るものは報告されるだけで、変更されな�
 - **`<plugin root>/bin` の `PATH` 上の存在**（手順 9）: 未確定。operator は
   0.159.3 の両方の実行で export しており、必要かどうかは切り分けられて
   いない。
-- **レビュー転送**: レビュー pass はリポジトリの内容を相手側 provider
-  （Claude）へ送る。この転送を承認するかは operator の判断であり、setup
-  は承認しない。
-- **`.shell-team/` を git で追跡するか。**
+
+報告のうち 2 つは判断ではない。`Required:` の base dir（legacy レイアウトでは
+base の外にある specs dir も）は、git に無視されず、コミットされていなければ
+ならない。ループは一度もコミットされない運用ファイルを支えず、
+`bin/team-commit.sh` は無視されたパスを拒否するため、正解は 1 つである。setup は
+妨げているルールを `<source>:<line>` として示し（パターンの文字列は、信頼できない
+リポジトリ由来の可能性があるため出さない）、`git add` コマンドを 1 つ出す。ルールが
+グローバルの excludes ファイルか `info/exclude` にあり、ディレクトリ自身を名指しして
+いる場合に限り、ルート `.gitignore` に足す行（`!.shell-team/` など）を出す。setup は
+`.gitignore` を編集せず、stage もコミットもしない。`Notice:` は、レビュー pass が
+相手側 provider（この host では Claude）へリポジトリの内容を送るという、レビュー pass が
+行うことについての情報であり、setup があなたに承認を求めるものではない。
 
 以下の番号付き手順は手動のフォールバックであり、host 側の各条件が何で、
 それについて何が測定されているかの記録である。
@@ -918,7 +928,7 @@ git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
 git commit -m "chore: scaffold shell-team for a one-ticket trial"
 ```
 
-`--get` 引数は両方とも重要です。デフォルトレイアウトでは同じディレクトリに解決されますが、レガシーな `tasks/` + `docs/specs/` レイアウトでは `docs/specs/` がベースディレクトリの外にあるため、2 つめの引数を落とすと specs ディレクトリが永久に未追跡のままになります。必ず両方を使ってコミットしてください（単一ディレクトリをハードコードした形は使わないでください）。
+`--get` 引数は両方とも重要です。デフォルトレイアウトでは同じディレクトリに解決されますが、レガシーな `tasks/` レイアウトで specs が `docs/specs/` に解決される場合、そのディレクトリはベースディレクトリの外にあるため、2 つめの引数を落とすと外側の specs ディレクトリが永久に未追跡のままになります（specs が `tasks/specs/` にある場合はベースディレクトリの内側で、2 つの引数は同じツリーを指します）。必ず両方を使ってコミットしてください（単一ディレクトリをハードコードした形は使わないでください）。
 
 上の 1 行目と `team-init.sh` の行は 1 ステップにまとめられます。`team-init.sh --trial-branch trial/one-ticket .` は、スキャフォールドの前に `trial/one-ticket` を作成してそこへ切り替えます。ターゲットが git work tree の中に無い、その work tree の root で無い、あるいはそのブランチが既に存在する場合は、exit 2 とメッセージ（対処法つき）で拒否します。2 つのコマンドを分けて実行する必要は無く、上記は分かりやすさのために分けています。`--trial-branch` を指定しない場合、`team-init.sh` は自身で git コマンドを一切実行せず、どのブランチにいるかも気にしません。
 
@@ -1474,6 +1484,8 @@ derived tier が承認済み premise と一致しないということは、そ�
 `CLAUDE.md` の "Working rules" 節に明記されており、host は自分の `binding.conf` で
 `code-reviewer` を同一ファミリーの executor に自由に rebind できる。rebind した後も
 `codex-reviewer` と名乗り続けるロールは、自分自身の設定と矛盾することになる。
+
+**`code-reviewer` を Codex 以外の provider に rebind するとレビューは止まる。** Claude Code host では reviewer の指示が `codex exec` を実行するため、provider が `codex` でない `code-reviewer` の紐付けがあると、すべてのレビューモード・`review-response`・`drift-evaluator` の任意パスは、Codex を呼ぶ前に `reviewer-binding-not-codex` で `BLOCKED` となり、リポジトリの内容を黙って Codex に送ることはしない（判定は `bin/check-review-provider.sh`）。Codex CLI host は変わらない。そのような紐付けのもとで同一ファミリーによる実際のレビューを走らせるのは #689 の後続作業である。
 
 **alias が一リリースの間カバーするもの。** 改名前に書かれた `<base>/binding.conf`
 は編集なしでそのまま解決される: `bind codex-reviewer <provider> <model> <effort|-> <adapter>`

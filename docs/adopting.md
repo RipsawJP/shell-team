@@ -13,8 +13,10 @@ lives centrally (installed once); each adopting repo only holds the per-repo
 `team-init` scaffolds everything under a **single base directory**, so the
 plugin's footprint never scatters across your mainline tree. By default that base
 is `.shell-team/`; override it with the `TEAM_RUN_BASE` environment variable. A repo
-that already uses the legacy `tasks/` + `docs/specs/` layout is detected and reused
-(the resolver `bin/team-paths.sh` decides which layout is in effect).
+that already uses the legacy `tasks/` layout is detected and reused: its specs
+directory is `tasks/specs/` when that directory exists (and `docs/specs/` is absent or
+holds nothing but `.gitkeep`), otherwise `docs/specs/` (the resolver
+`bin/team-paths.sh` decides which layout and which specs directory are in effect).
 
 ```
 <base>/                          # .shell-team/ by default
@@ -416,8 +418,9 @@ plugin's own part. It scaffolds `.shell-team/` through `team-init.sh` (an
 existing file is never rewritten). It generates or refreshes `.codex/agents/`
 and ignores it through the git directory's `info/exclude`, so no tracked file
 is edited. It checks with `command -v claude` that the Claude Code CLI is
-present, without running it. And it ends with a three-part report: `Done:`,
-`Already in place:` and `Remains the operator's decision:`. After a plugin
+present, without running it. And it ends with a five-part report: `Done:`,
+`Already in place:`, `Remains the operator's decision:`, `Required:` and
+`Notice:`. After a plugin
 upgrade, type `update shell-team`: the same flow re-run, idempotent, so a
 second run changes nothing. At the start of every run, `bash "<plugin root>/bin/check-setup.sh"`
 checks the same prerequisites read-only and stops the run `BLOCKED`, naming this
@@ -461,10 +464,20 @@ re-measured by it; each item below says which kind of evidence it rests on:
 - **`<plugin root>/bin` on `PATH`** (step 9): undetermined. The operator
   exported it in both 0.159.3 runs, so whether it is necessary was not
   separated out.
-- **The review transfer**: the review pass sends repository content to
-  Claude, the other provider. Approving that transfer is the operator's
-  decision, and setup does not authorize it.
-- **Whether to track `.shell-team/` in git.**
+
+Two things in the report are not decisions. Under `Required:`, the base
+directory (and, in the legacy layout, an outside specs directory) must not be
+ignored by git and must be committed: the loop does not support never-committed
+operating files, and `bin/team-commit.sh` refuses an ignored path, so there is
+one correct answer. Setup names each blocking rule as `<source>:<line>` (never
+the pattern text, which can come from an untrusted repository) and prints the
+one `git add` command; only when the rule sits in the global excludes file or
+`info/exclude` and names the directory itself does it print the root
+`.gitignore` line to add, such as `!.shell-team/`. Setup never edits
+`.gitignore` and stages and commits nothing. Under `Notice:`, the review pass
+sends repository content to the other provider (Claude on this host); that is
+information about what the review pass does, not something setup asks you to
+approve.
 
 The numbered steps below are the manual fallback, and the record of what each
 host condition is and what was measured about it.
@@ -920,7 +933,7 @@ git add "$(team-paths.sh --get base)" "$(team-paths.sh --get specs)"
 git commit -m "chore: scaffold shell-team for a one-ticket trial"
 ```
 
-Both `--get` arguments matter: in the default layout they resolve to the same directory, but in the legacy `tasks/` + `docs/specs/` layout `docs/specs/` sits outside the base dir, and dropping the second argument would leave it permanently untracked — commit with both, never with a hardcoded, single-directory form.
+Both `--get` arguments matter: in the default layout they resolve to the same directory, but in a legacy `tasks/` layout whose specs resolve to `docs/specs/`, that directory sits outside the base dir (with specs in `tasks/specs/` it is inside the base dir and the two arguments name the same tree), and dropping the second argument would leave an outside specs directory permanently untracked — commit with both, never with a hardcoded, single-directory form.
 
 The first line and the `team-init.sh` line above can also be run as one step: `team-init.sh --trial-branch trial/one-ticket .` creates `trial/one-ticket` and switches to it before scaffolding, refusing (exit 2, with a remedy) if the target is not inside a git work tree, is not that work tree's top level, or the branch already exists — the two commands staying separate is not required, only convenient to show. Without `--trial-branch`, `team-init.sh` invokes no git command of its own and does not care which branch you are on.
 
@@ -1527,6 +1540,8 @@ default is documented as one in `CLAUDE.md`'s "Working rules" section — a
 host is free to rebind `code-reviewer` to a same-family executor in its own
 `binding.conf`, and a role still called `codex-reviewer` after doing so
 would contradict its own configuration.
+
+**A `code-reviewer` rebind to a non-Codex provider stops the review.** On a Claude Code host the reviewer's instructions run `codex exec`, so a `code-reviewer` binding whose provider is not `codex` makes every reviewer mode, `review-response` and `drift-evaluator`'s optional pass stop `BLOCKED` with `reviewer-binding-not-codex` before any Codex call, rather than silently sending repository content to Codex (`bin/check-review-provider.sh` decides). The Codex CLI host is unchanged. Running an actual same-family review under such a binding is the #689 follow-up.
 
 **What the alias covers, for one release.** A `<base>/binding.conf`
 written before this rename still resolves without an edit: `bind

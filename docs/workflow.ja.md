@@ -24,7 +24,7 @@
 
 異なるのは role の dispatch 方法です。**Claude Code** では orchestrator が Agent tool で role を dispatch します。**Codex CLI** では、生成済みのカスタムエージェントを Codex 自身の `spawn_agent` tool で spawn します — 生成される role は 5 つ（`tech-lead`、`pm-spec`、`engineer`、`qa-verifier`、`code-reviewer`）で、`ui-designer` と `scrum-master` は生成されません。どちらかが必要なタスクは Claude Code host から駆動してください。
 
-review pass がもう 1 つの非対称性で、これは意図的なものです: Claude Code host では `code-reviewer` が Codex CLI を通して走り、Codex CLI host では代わりに `claude -p` パスが走ります——出荷時の既定では、review はその host が使っていない側の provider から来ます。この紐付けは出荷時の既定であって絶対不変ではなく、host は自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に rebind でき、その場合ループはこの性質をもう保証しません。これは下の `## Codex CLI クイックリファレンス` セクション（Claude Code host 上での reviewer 自身の Codex 呼び出しを列挙したもの）とは別物です。
+review pass がもう 1 つの非対称性で、これは意図的なものです: Claude Code host では `code-reviewer` が Codex CLI を通して走り、Codex CLI host では代わりに `claude -p` パスが走ります——出荷時の既定では、review はその host が使っていない側の provider から来ます。この紐付けは出荷時の既定であって絶対不変ではなく、host は自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に rebind でき、その場合ループはこの性質をもう保証しません。これは下の `## Codex CLI クイックリファレンス` セクション（Claude Code host 上での reviewer 自身の Codex 呼び出しを列挙したもの）とは別物です。 Claude Code host で `code-reviewer` が Codex 以外の provider に紐付くと、どのレビューモードでも Codex を実行せず `reviewer-binding-not-codex` で `BLOCKED` となります。Codex CLI host は変わらず、同一ファミリーによる実際のレビューは #689 の後続作業です。
 
 セットアップはどちらの host でも 1 つのプロンプト `set up shell-team` で、プラグイン自身の担当分（scaffold と、Codex CLI ではエージェントの生成）を行います。host 側の条件——リポジトリの trust、sandbox の書き込みポリシー、レビュー pass のための network、`PATH` の export——は operator の判断で、setup が報告し、それぞれについて何が測定されているかは [Codex CLI から shell-team を使う](adopting.ja.md#codex-cli-から-shell-team-を使う) にあります。
 

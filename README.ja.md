@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.8.6-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.8.7-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.ja.md#codex-cli-から-shell-team-を使う)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
@@ -46,7 +46,7 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 - Codex CLI。
 - Claude Code CLI のインストールと認証（レビュー pass 用）— 詳細は [Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) の手順 7 を参照。
 
-**host 側の条件は、どちらの host でも operator の判断**。shell-team があなたの sandbox・trust・permission・network の設定を変更することはありません。セットアップ（[インストール](#インストール)）はプラグイン自身の担当分だけを行い、最後に、ループが host 側に求める条件を、何のために必要かとともに `Remains the operator's decision:` の下へ並べて報告します。Claude Code host で測定済みなのは、Codex レビュー呼び出しがセッションの sandbox の外で動くこと（関わる設定は `sandbox.excludedCommands`。[docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照）。Codex CLI host では、リポジトリの trust・コミットのための git ディレクトリへの書き込み・`claude -p` レビュー pass のための network・`<plugin root>/bin` の `PATH` 上の存在で、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に測定状況つきで書かれています。
+**host 側の条件は、どちらの host でも operator の判断**。shell-team があなたの sandbox・trust・permission・network の設定を変更することはありません。セットアップ（[インストール](#インストール)）はプラグイン自身の担当分だけを行い、最後の報告では、setup が読み取れなかった host 側の条件を、何のために必要かとともに `Remains the operator's decision:` に、読み取れたものをファイル名つきで `Already in place:` に、base dir の git 管理を必須の作業として `Required:` に出し、レビュー pass が相手側 provider へリポジトリの内容を送ることは判断ではなく情報として `Notice:` に出します。Claude Code host で測定済みなのは、Codex レビュー呼び出しがセッションの sandbox の外で動くこと（関わる設定は `sandbox.excludedCommands`。[docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照）。Codex CLI host では、リポジトリの trust・コミットのための git ディレクトリへの書き込み・`claude -p` レビュー pass のための network・`<plugin root>/bin` の `PATH` 上の存在で、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に測定状況つきで書かれています。
 
 ## インストール
 
@@ -72,7 +72,7 @@ codex plugin add shell-team@ripsawjp
 set up shell-team
 ```
 
-このプロンプトで setup スキル（[`skills/setup/SKILL.md`](skills/setup/SKILL.md)）が起動し、リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行する。単一 base dir `.shell-team/`（ボードと既定のループ契約）を scaffold し（host root の `CLAUDE.md` / `.gitignore` は改変しない。既存ファイルは書き換えない）、Codex CLI host ではさらに `.codex/agents/` を生成して git ディレクトリの `info/exclude` で無視するため、tracked ファイルは変わらない。これ以外は何も書かず、host の設定には触れず、最後に「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を短く報告する。host が書き込みを拒否した場合、報告には承認または自分で実行するための正確なコマンドが 1 つ出る。Codex CLI host では、setup が生成または変更した agent はこのリポジトリで開始した新しい Codex セッションで有効になるため、ループはそこで始める。冪等。
+このプロンプトで setup スキル（[`skills/setup/SKILL.md`](skills/setup/SKILL.md)）が起動し、リポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行する。単一 base dir `.shell-team/`（ボードと既定のループ契約）を scaffold し（host root の `CLAUDE.md` / `.gitignore` は改変しない。既存ファイルは書き換えない）、Codex CLI host ではさらに `.codex/agents/` を生成して git ディレクトリの `info/exclude` で無視するため、tracked ファイルは変わらない。これ以外は何も書かず、host の設定には触れず、最後に 5 つのセクション `Done:`・`Already in place:`・`Remains the operator's decision:`・`Required:`（base dir を git が無視せずコミットすること。そのコマンドつき）・`Notice:`（レビュー pass が相手側 provider へリポジトリの内容を送ること）で短く報告する。host が書き込みを拒否した場合、報告には承認または自分で実行するための正確なコマンドが 1 つ出る。Codex CLI host では、setup が生成または変更した agent はこのリポジトリで開始した新しい Codex セッションで有効になるため、ループはそこで始める。冪等。
 
 プロンプトが自動化している手動の手順は、Claude Code host では次のスラッシュコマンド:
 
@@ -118,7 +118,7 @@ upgrade の後は、shell-team を使っている適用先リポジトリごと�
 update shell-team
 ```
 
-`set up shell-team` と同じフローの再実行で、Codex CLI host ではずれた `.codex/agents/` を再生成し、新しいテンプレートと内容が異なる scaffold ファイルは書き換えずに一覧し、「何をしたか・すでに済んでいたもの・あなたの判断に残るもの」を報告する。2 回目の実行では何も変わらない。
+`set up shell-team` と同じフローの再実行で、Codex CLI host ではずれた `.codex/agents/` を再生成し、新しいテンプレートと内容が異なる scaffold ファイルは書き換えずに一覧し、同じ 5 つのセクション（`Done:`・`Already in place:`・`Remains the operator's decision:`・`Required:`・`Notice:`）で報告する。2 回目の実行では何も変わらない。
 
 Codex CLI host での手動の手順は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従い、そのうえでリポジトリそのものの root から generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
 
@@ -302,7 +302,7 @@ resolution が制御していない（`tech-lead` を除くいずれの役割に
 `tech-lead` の別経路だけは例外で、そこでは resolved row の model 列が
 そのまま実際に走ったものになる。reviewer 行自身の出荷時の既定とその
 理由は
-[設計上の選択](#設計上の選択) を参照。
+[設計上の選択](#設計上の選択) を参照。 第 1 軸の境界事例として、Claude Code host で `code-reviewer` を Codex 以外の provider に紐付けると、すべてのレビューモードが Codex を呼ぶ前に `BLOCKED`（`reviewer-binding-not-codex`）で停止する。Codex CLI host は変わらず、同一ファミリーによる実際のレビューは #689 で追う後続作業である。
 
 ## run のリプレイ
 
@@ -375,9 +375,9 @@ stderr に警告を出す（refuse は決してせず、exit status も変えな
 - **read-only オーケストレーター**：`tech-lead` は計画のみ。実行はメインセッションが Routing Map に従って行う。
 - **最小権限**：PM は read + spec 書き込みのみ、QA は read + bash のみ、Reviewer はコードを変更できない。
 - **真実源はファイルのみ**：`tasks/todo.md` ＋ status flag がエージェント間の単一の真実源。
-- **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身も同じ既定レイアウトで動くので、自分の board・specs・retros も `.shell-team/` 配下にある。resolver は、base dir 集約より前にチームを導入したリポのために legacy な `tasks/` + `docs/specs/` レイアウトも今なお検出・対応する——本ドキュメント群が `tasks/…` / `docs/specs/…` と書いている箇所は、その legacy レイアウトでの同じ artifact を指す。[docs/adopting.md](docs/adopting.md) 参照。
+- **単一 base dir・host root 不変**：適用先リポは全ての運用ファイルを単一 base dir 配下に保つ（既定 `.shell-team/`、`bin/team-paths.sh` が解決。`TEAM_RUN_BASE` で上書き可）。`team-init` は host の `CLAUDE.md` / root `.gitignore` を決して編集しない。このリポ自身も同じ既定レイアウトで動くので、自分の board・specs・retros も `.shell-team/` 配下にある。resolver は、base dir 集約より前にチームを導入したリポのために legacy な `tasks/` レイアウト（specs は、`tasks/specs/` が存在し、かつ `docs/specs/` が無いか `.gitkeep` だけの場合は `tasks/specs/`、それ以外は `docs/specs/`。`bin/team-paths.sh --get specs` が表示する）も今なお検出・対応する——本ドキュメント群が `tasks/…` / `docs/specs/…` と書いている箇所は、その legacy レイアウトでの同じ artifact を指す。[docs/adopting.md](docs/adopting.md) 参照。
 - **Engineer は既定で non-worktree**：編集は現在の feature ブランチに直接着地する。並列実装時のみ orchestrator が起動時に `isolation: worktree` を opt-in。
-- **別プロバイダレビューの紐付けは「出荷時の既定」・どちらの host でも**：`code-reviewer` は、ループを駆動している host とは別のプロバイダで走る——Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。独立レビュアーに到達できない場合は同一ファミリーへフォールバックせず `BLOCKED` を返す。
+- **別プロバイダレビューの紐付けは「出荷時の既定」・どちらの host でも**：`code-reviewer` は、ループを駆動している host とは別のプロバイダで走る——Claude Code host なら Codex CLI、Codex CLI host なら `claude -p` pass。理由は、同一ファミリーのモデルによるレビューはそのモデル自身の盲点を共有してしまうため。host が自分の `binding.conf` で `code-reviewer` を同一ファミリーの executor に **rebind** することは可能で、その場合は解決される executor とテレメトリに記録される値が変わる——ただし別 executor の呼び出し経路自体が配線されるわけではなく、そのような rebind が存在する場合ループは別プロバイダレビューを構造的に保証しない。独立レビュアーに到達できない場合は同一ファミリーへフォールバックせず `BLOCKED` を返す。 Claude Code host で Codex 以外の provider への rebind があると、レビューは実行されず `reviewer-binding-not-codex` で `BLOCKED` となる（Codex は呼ばれず、Claude のみの代替も行わない。`drift-evaluator` の任意パスも同様に停止する）。Codex CLI host は変わらず、同一ファミリーによる実際のレビューの実行は #689 の後続作業である。
 
 ## バージョニング
 

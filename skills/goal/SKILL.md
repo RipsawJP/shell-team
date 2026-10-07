@@ -79,6 +79,7 @@ later ticks — the state file already exists.
    - if so, invoke `qa-verifier` — judges the non-scriptable ACs (PASS/FAIL).
    - if QA PASS, invoke `code-reviewer` — cross-provider verdict
      (APPROVE / REQUEST_CHANGES).
+   - **Reviewer-binding pre-dispatch (T-1177, issue #700)**: immediately after resolving `code-reviewer` and before invoking it, run `bash "<plugin root>/bin/check-review-provider.sh"` (never assumed to be on `PATH`). Exit 0 proceeds; any other outcome stops this tick `BLOCKED`, escalates quoting the token `reviewer-binding-not-codex` verbatim, records `log-run.sh goal --event gate --from review --label reviewer-binding-not-codex` and dispatches nothing.
    - **Detection lens** (same distinction as `/shell-team:run`'s step 5/6):
      `qa-verifier` verifies empirically/by execution (does it actually run,
      actually produce the claimed output); `code-reviewer` verifies

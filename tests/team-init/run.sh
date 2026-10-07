@@ -810,4 +810,24 @@ if grep -qF -- 'This repository has .github/workflows' "$TMP/ci-parity-no.out"; 
 fi
 pass "T-1133: team-init prints no CI parity line when the target has no .github/workflows"
 
+# --- T-1176: the specs directory in a legacy layout follows the resolver. ----
+# R1 (no specs directory yet): docs/specs/ is created and called out. R3
+# (tasks/specs exists): tasks/specs/.gitkeep is created, no docs/ appears and no
+# "Specs live under:" line is printed. --help names tasks/specs.
+LG1="$TMP/t1176-r1"; LG3="$TMP/t1176-r3"
+for n in "$LG1" "$LG3"; do
+  mkdir -p "$n/tasks/loops"
+  cp "$REPO_ROOT/templates/shell-team.contract.yaml" "$n/tasks/loops/"
+done
+mkdir -p "$LG3/tasks/specs"
+init "$LG1" > "$TMP/t1176-r1.out" 2>&1 || fail "T-1176: team-init failed on an R1 legacy target"
+init "$LG3" > "$TMP/t1176-r3.out" 2>&1 || fail "T-1176: team-init failed on an R3 legacy target"
+grep -qF 'Specs live under: docs/specs/' "$TMP/t1176-r1.out" && [ -d "$LG1/docs/specs" ] \
+  || fail "T-1176: R1 must create docs/specs/ and print 'Specs live under: docs/specs/'"
+g=0; grep -qF 'Specs live under:' "$TMP/t1176-r3.out" || g=$?
+[ "$g" -eq 1 ] || fail "T-1176: R3 must print no 'Specs live under:' line (grep exit $g)"
+[ ! -e "$LG3/docs" ] && [ -f "$LG3/tasks/specs/.gitkeep" ] || fail "T-1176: R3 must create tasks/specs/.gitkeep and no docs/"
+bash "$REPO_ROOT/bin/team-init.sh" --help 2>&1 | grep -qF tasks/specs || fail "T-1176: team-init --help must name tasks/specs"
+pass "T-1176: team-init follows the resolver's legacy specs rule (R1 docs/specs with the call-out, R3 tasks/specs without) and --help names tasks/specs"
+
 printf '\nAll team-init assertions passed.\n'

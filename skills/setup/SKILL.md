@@ -1,5 +1,5 @@
 ---
-description: Set up or update shell-team in the current repository on both hosts (Claude Code and Codex CLI) when the user says "set up shell-team" or "update shell-team" — runs the plugin's own setup script, reports what was done, what was already in place, and what remains the operator's decision
+description: Set up or update shell-team in the current repository on both hosts (Claude Code and Codex CLI) when the user says "set up shell-team" or "update shell-team" — runs the plugin's own setup script, reports what was done, what was already in place, what remains the operator's decision, what is required, and the review notice
 ---
 
 The user asked you to **set up shell-team** or **update shell-team** in the
@@ -9,9 +9,10 @@ same flow re-run after a plugin upgrade, and it is idempotent.
 
 The setup script does the plugin's own part. Everything that is the host's or
 the operator's — trust, sandbox, permissions, network, whether commits are
-allowed, whether to approve the review transfer — stays the operator's
-decision. You report those conditions. You never change them, and you never
-propose a change to them as something you apply.
+allowed — stays the operator's decision. You report those conditions. You never
+change them, and you never propose a change to them as something you apply. The
+report also carries one `Required:` action (the base directory in git) and one
+`Notice:` line; neither is a host setting.
 
 Do this:
 
@@ -29,10 +30,11 @@ Do this:
    ```
 
 2. **Relay the report as printed.** Its stdout is one header line (host, the
-   ground for it, the installed plugin version) and three sections, each item a
-   `- ` line: `Done:`, `Already in place:` and `Remains the operator's
-   decision:`. Show all three, in that order, without dropping or rewording a
-   line. Diagnostics are on stderr; relay them if the exit status is not `0`.
+   ground for it, the installed plugin version) and five sections, each item a
+   `- ` line: `Done:`, `Already in place:`, `Remains the operator's
+   decision:`, `Required:` and `Notice:`. Show all five, in that order, without
+   dropping or rewording a line. Diagnostics are on stderr; relay them if the
+   exit status is not `0`.
 
 3. **Handle each `- run yourself:` line.** A refused write comes back under
    `Remains the operator's decision:` as `- run yourself: <command>`, with
@@ -50,9 +52,13 @@ Do this:
    complete: a usage error, not a git work tree, an unsafe path, or a step that
    failed — say what the stderr diagnostic says.
 
-5. **Close with the operator's part.** Point the user at the lines under
-   `Remains the operator's decision:`, including the review-transfer line, and
-   say that each is their call. Then tell them how to start the loop. On Claude
+5. **Close with what is asked of the operator.** State each `Required:` item
+   as an action to take (the printed command and, where it is printed, the
+   re-include line); setup stages and commits nothing, so those steps are the
+   operator's to run. Point the user at the lines under `Remains
+   the operator's decision:` and say that each is their call. Relay `Notice:` as
+   information about what the review pass does; never ask the operator to
+   approve or decide it. Then tell them how to start the loop. On Claude
    Code they can run:
 
    ```
@@ -83,7 +89,8 @@ Boundary — what you never do in this skill:
   and never for an approval or permission-mode bypass.
 - Never write the host's own settings files, and never add a persistent
   approval or allow rule.
-- Never pre-authorize the review transfer on the operator's behalf.
+- Never pre-authorize the review pass's transfer on the operator's behalf, and
+  never turn the `Notice:` line into a question.
 - Never hand-create or edit the artifacts yourself: the script is the single
   deterministic source of the scaffold, the agents and the ignore line, so its
   behavior stays covered by `tests/setup/` and CI.

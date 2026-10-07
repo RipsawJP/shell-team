@@ -2672,3 +2672,23 @@ suite + dogfood step that must pass, run in that file's order."
   script to a scratch path and `sed` one marked line (`leading-dir-refusal`,
   `mode-change-refusal`, `unchanged-refusal`) — keep those marker comments when
   editing the script.
+- T-1174: `bash tests/setup/run.sh` takes ~2 min (`grep -c '^PASS:' <log>` counts its assertions). Its base-directory
+  fixtures pin the excludes file per case (`GIT_CONFIG_GLOBAL` pointing at a temp config); run it
+  with `ulimit -f` and a capped log. The whole CI-wired `bash tests/*/run.sh` list can be walked in
+  workflow order by a scratch driver that skips any suite whose joined text matches a
+  recursive-deletion pattern. At the T-1174 branch point `tests/check-spec-review/run.sh` fails one
+  assertion ("shipped contract loops/shell-team.contract.yaml: three rounds stop") because this
+  repository's own contract carries the operator-granted spec-review round extension — unrelated to
+  setup.
+- T-1176: in this sandbox `ps` is denied (operation not permitted), and the frozen
+  `tmo` helper in the T-1176 AC1, AC6 and AC9 check lines reads the watcher's
+  process group through `ps -o pgid= -p`, so without a `ps` it returns 99 and the
+  criterion reads FAIL although nothing is wrong. Put a shim `ps` first on `PATH`
+  that echoes its last argument (under `set -m` the watcher's pgid equals its pid)
+  and run `PATH=<shim dir>:$PATH CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh <spec>`;
+  CI and an unsandboxed shell need no shim. A mutation self-check of a bin/ guard
+  runs from a Python script that copies `bin`, `templates`, `agents`, `docs`,
+  `skills`, `.claude-plugin` and one suite into a `$TMPDIR` root, `git init`s and
+  commits `bin` there (the check-setup suite reads tracked modes), runs the
+  pristine suite once, then each mutant, each in its own process group.
+- T-1177: `bash tests/check-review-provider/run.sh` is `bin/check-review-provider.sh`'s fixture suite (the #700 reviewer-binding gate). Self-contained beside its own `bin/` and `templates/` so a copy can run next to a stubbed checker; pure bash, scratch under `mktemp -d "${TMPDIR:-/tmp}/..."`, no `git init`. Mutation runs: write the runner as a script file under `$TMPDIR`, copy `bin`, `templates` and the suite into a scratch tree, patch only the copy, and run it under `ulimit -f` with capped output. `.codex/agents` is gitignored in this checkout, so `bin/gen-codex-agents.sh --root . --out-dir .codex/agents` regenerates an untracked working-tree copy; `bash bin/check-codex-agents.sh --root . --out-dir .codex/agents` is the sync check. A task's `git add -N` (intent-to-add) of a new `tests/` or `bin/` file records mode 100644 and makes `tests/bin-exec-bit` fail until the file is really added and committed.

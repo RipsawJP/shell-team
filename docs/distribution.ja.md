@@ -53,9 +53,9 @@ bash "<plugin root>/bin/gen-codex-agents.sh" --out-dir .codex/agents
 set up shell-team
 ```
 
-setup スキルがリポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行します。プロジェクトごとのデータを初期化し（下の scaffold を `team-init.sh` 経由で。既存ファイルは書き換えません）、Codex CLI host ではさらに `.codex/agents` を生成して git ディレクトリの `info/exclude` で無視します。これ以外は何も書かず、host の設定には触れません。最後に「何をしたか・すでに済んでいたもの・operator の判断に残るもの」を報告します。プラグインの更新後は、導入済みのリポジトリごとに `update shell-team` と入力します——同じフローの再実行で、冪等です。
+setup スキルがリポジトリ内で `bash "<plugin root>/bin/team-setup.sh"` を実行します。プロジェクトごとのデータを初期化し（下の scaffold を `team-init.sh` 経由で。既存ファイルは書き換えません）、Codex CLI host ではさらに `.codex/agents` を生成して git ディレクトリの `info/exclude` で無視します。これ以外は何も書かず、host の設定には触れません。最後に 5 つのセクション `Done:`・`Already in place:`・`Remains the operator's decision:`・`Required:`（base dir を git が無視せずコミットすること。報告にそのコマンドが出ます）・`Notice:`（レビュー pass が相手側 provider へリポジトリの内容を送ること）で報告します。プラグインの更新後は、導入済みのリポジトリごとに `update shell-team` と入力します——同じフローの再実行で、冪等です。
 
-scaffold の中身: すべては単一のベースディレクトリ配下に作られます（デフォルトは `.shell-team/`。`TEAM_RUN_BASE` で上書き可。既存のレガシー `tasks/`+`docs/specs/` レイアウトは検出され再利用される）: `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` に加えて自己完結した `.shell-team/.gitignore`。ホストルートには手を触れません — `CLAUDE.md` の編集も**無し**、ルート `.gitignore` の変更も**無し**（[adopting.ja.md](adopting.ja.md) 参照）。Claude Code host で手で行うなら:
+scaffold の中身: すべては単一のベースディレクトリ配下に作られます（デフォルトは `.shell-team/`。`TEAM_RUN_BASE` で上書き可。既存のレガシー `tasks/` レイアウトは検出され再利用される。specs ディレクトリは、`tasks/specs/` が存在し、かつ `docs/specs/` が無いか `.gitkeep` だけの場合は `tasks/specs/`、それ以外は `docs/specs/`）: `.shell-team/{todo.md, loops/shell-team.contract.yaml, runs/, retros/, reviews/, specs/}` に加えて自己完結した `.shell-team/.gitignore`。ホストルートには手を触れません — `CLAUDE.md` の編集も**無し**、ルート `.gitignore` の変更も**無し**（[adopting.ja.md](adopting.ja.md) 参照）。Claude Code host で手で行うなら:
 
 ```text
 /shell-team:team-init
@@ -88,7 +88,7 @@ Claude Code セッションが **sandbox 有効**で動いているとき、Code
 
 **一致のルールは Claude Code 2.1.278 で変わりました。** それ以前は `sandbox.excludedCommands` のパターンはコマンドラインの先頭トークンだけに一致していたため、行末にシェルのリダイレクトが付いていても `codex exec …` 行は除外対象のままでした。Claude Code 2.1.278 はこれを変更し、コマンドの**すべての部分**が一致したときだけ除外されるようになりました（先頭トークンだけではありません。計測日 2026-09-24、Claude Code **2.1.281**、codex-cli **0.156.1**）。このプラグインが出荷していた `codex exec` ブロックはどれも `> "<jsonl の生パス>" 2>&1` で終わっていたため、2.1.278 以降ではこのリダイレクトが一致しない 2 つめの部分となり、呼び出し全体が sandbox の**内側**で走っていました——うるさく失敗する形（`workspace routing discovery failed` → `turn.failed`、exit 1、最終メッセージのファイルは書かれない）か、静かに失敗する形（exit 0、`Unable to determine.` のような判断不能文、イベントストリームに `sandbox_apply` エラー）のいずれかです。リダイレクトを持たない裸の形は、2.1.278 以降でも、それより前のどのバージョンでも sandbox の外側で走り、正常に完了します。出荷される `codex exec` ブロックは今はすべて、自分自身の `-o` キャプチャだけを書く単一の裸コマンドです——リダイレクトも、標準入力のリダイレクトも、コマンド置換も、connector もありません。これにより `"codex *"` の除外パターンが呼び出し全体に再び一致します。
 
-Codex の経路を sandbox の外に置くかどうかは operator の判断であり、shell-team があなたの設定ファイルを書き込むことはありません。operator 自身の `.claude/settings.local.json` にある次の形が、直接 `codex` を呼ぶ経路をカバーするものです。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です。setup は Claude Code host で、この条件を `Remains the operator's decision:` の下に報告します:
+Codex の経路を sandbox の外に置くかどうかは operator の判断であり、shell-team があなたの設定ファイルを書き込むことはありません。operator 自身の `.claude/settings.local.json` にある次の形が、直接 `codex` を呼ぶ経路をカバーするものです。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です。Claude Code host では、報告はこの条件を `Remains the operator's decision:` に出します。ただし setup が 3 つの設定ファイル（user・project・local スコープ）のいずれかでそのエントリを読み取れた場合は、読み取った内容として `Already in place:` に出し、セッションへの効果は未判定のままにします:
 
 ```json
 {

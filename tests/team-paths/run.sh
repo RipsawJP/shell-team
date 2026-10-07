@@ -2,8 +2,9 @@
 # run.sh — drive bin/team-paths.sh and assert the resolver's precedence chain
 # (T-025):
 #   - default mode      : empty root -> base=.shell-team, specs=.shell-team/specs
-#   - legacy mode       : root with tasks/loops/shell-team.contract.yaml -> base=tasks, specs=docs/specs
-#                         (split-root lock: specs MUST stay at docs/specs)
+#   - legacy mode       : root with tasks/loops/shell-team.contract.yaml -> base=tasks; specs per a
+#                         closed five-row table (T-1176): tasks/specs when that directory exists
+#                         and docs/specs is absent or holds only .gitkeep, else docs/specs
 #   - explicit override : $TEAM_RUN_BASE wins even when a legacy layout exists
 #   - --export is eval-safe, including roots / bases containing a space
 #   - bad usage exits 2 (no mode, unknown --get key, unknown flag)
@@ -54,7 +55,7 @@ mkdir -p "$L/tasks/loops"
 [ "$(get "$L" base)"  = "tasks" ]          || fail "legacy: base should be tasks"
 [ "$(get "$L" todo)"  = "tasks/todo.md" ]  || fail "legacy: todo path wrong"
 [ "$(get "$L" runs)"  = "tasks/runs" ]     || fail "legacy: runs path wrong"
-# split-root lock: specs MUST remain at docs/specs in legacy mode.
+# split-root lock (row R1, neither specs directory exists): specs stay at docs/specs.
 [ "$(get "$L" specs)" = "docs/specs" ]     || fail "legacy: split-root broken — specs must be docs/specs"
 [ "$(get "$L" provenance)" = "tasks/provenance" ] || fail "legacy: provenance path wrong"
 [ "$(get "$L" interventions)" = "tasks/interventions" ] || fail "legacy: interventions path wrong"
@@ -149,6 +150,71 @@ print_default="$(env -u TEAM_RUN_BASE bash "$PATHS" --root "$D" --print)"
 grep -q "rule: default" <<< "$print_default" \
   || fail "--print should report the default rule for a fresh root"
 pass "--print reports which precedence rule fired"
+
+# --- legacy specs table, rows R1-R5 (T-1176) ---------------------------------
+# Each fixture root carries the legacy marker. The answer is a function of two
+# directory tests and one listing of docs/specs. Every row asserts: exit 0, the
+# exact answer from --get, an empty stderr, --export with only TEAM_SPECS_DIR
+# varying, --print's specs row, and a rule: text that begins "legacy".
+lg() { mkdir -p "$TMP/$1/tasks/loops" && : > "$TMP/$1/tasks/loops/shell-team.contract.yaml"; }
+lg lr1
+lg lr2; mkdir -p "$TMP/lr2/docs/specs"; : > "$TMP/lr2/docs/specs/.gitkeep"
+lg lr3; mkdir -p "$TMP/lr3/tasks/specs"
+lg lr4; mkdir -p "$TMP/lr4/tasks/specs" "$TMP/lr4/docs/specs"; printf 's\n' > "$TMP/lr4/tasks/specs/T-1-a.md"; : > "$TMP/lr4/docs/specs/.gitkeep"
+lg lr4e; mkdir -p "$TMP/lr4e/tasks/specs" "$TMP/lr4e/docs/specs"
+lg lr5; mkdir -p "$TMP/lr5/tasks/specs" "$TMP/lr5/docs/specs"; : > "$TMP/lr5/docs/specs/.gitkeep"; printf 's\n' > "$TMP/lr5/docs/specs/T-1-a.md"
+lg lr5h; mkdir -p "$TMP/lr5h/tasks/specs" "$TMP/lr5h/docs/specs"; : > "$TMP/lr5h/docs/specs/.keep"
+lg lr5d; mkdir -p "$TMP/lr5d/tasks/specs" "$TMP/lr5d/docs/specs/sub"
+lg lr7; : > "$TMP/lr7/tasks/specs"
+rows="lr1:docs/specs lr2:docs/specs lr3:tasks/specs lr4:tasks/specs lr4e:tasks/specs lr5:docs/specs lr5h:docs/specs lr5d:docs/specs lr7:docs/specs"
+# unreadable docs/specs listing counts as holding an entry (R5); a root user can
+# read it regardless, so that row is skipped there rather than asserted falsely.
+if [ "$(id -u)" != 0 ]; then
+  lg lr6; mkdir -p "$TMP/lr6/tasks/specs" "$TMP/lr6/docs/specs"; : > "$TMP/lr6/docs/specs/.gitkeep"
+  chmod 000 "$TMP/lr6/docs/specs"
+  rows="$rows lr6:docs/specs"
+fi
+for c in $rows; do
+  n="${c%%:*}"; want="${c#*:}"
+  got="$(env -u TEAM_RUN_BASE bash "$PATHS" --root "$TMP/$n" --get specs 2> "$TMP/stderr-$n")" \
+    || { chmod 755 "$TMP/lr6/docs/specs" 2>/dev/null || true; fail "legacy table: $n --get specs exited non-zero"; }
+  [ "$got" = "$want" ] || { chmod 755 "$TMP/lr6/docs/specs" 2>/dev/null || true; fail "legacy table: $n --get specs answered '$got', want '$want'"; }
+  [ ! -s "$TMP/stderr-$n" ] || { chmod 755 "$TMP/lr6/docs/specs" 2>/dev/null || true; fail "legacy table: $n wrote to stderr"; }
+  env -u TEAM_RUN_BASE bash "$PATHS" --root "$TMP/$n" --export > "$TMP/export-$n" 2> "$TMP/stderr-$n" \
+    || fail "legacy table: $n --export exited non-zero"
+  [ ! -s "$TMP/stderr-$n" ] || fail "legacy table: $n --export wrote to stderr"
+  printf 'export TEAM_RUN_BASE=tasks\nexport TEAM_TODO=tasks/todo.md\nexport TEAM_LOOPS_DIR=tasks/loops\nexport TEAM_RUNS_DIR=tasks/runs\nexport TEAM_RETROS_DIR=tasks/retros\nexport TEAM_REVIEWS_DIR=tasks/reviews\nexport TEAM_SPECS_DIR=%s\nexport TEAM_PROVENANCE_DIR=tasks/provenance\nexport TEAM_INTERVENTIONS_DIR=tasks/interventions\nexport TEAM_LESSONS=tasks/lessons.md\n' "$want" > "$TMP/export-want-$n"
+  cmp -s "$TMP/export-$n" "$TMP/export-want-$n" || fail "legacy table: $n --export differs from the ten legacy lines with TEAM_SPECS_DIR=$want"
+  env -u TEAM_RUN_BASE bash "$PATHS" --root "$TMP/$n" --print > "$TMP/print-$n" 2> "$TMP/stderr-$n" \
+    || fail "legacy table: $n --print exited non-zero"
+  [ ! -s "$TMP/stderr-$n" ] || fail "legacy table: $n --print wrote to stderr"
+  [ "$(awk '$1=="specs"{print $2}' "$TMP/print-$n")" = "$want" ] || fail "legacy table: $n --print specs row is not $want"
+  sed -n '1s/^shell-team paths (rule: \(.*\), root: .*$/\1/p' "$TMP/print-$n" > "$TMP/rule-$n"
+  grep -q '^legacy' "$TMP/rule-$n" || fail "legacy table: $n rule: text does not begin 'legacy'"
+done
+[ ! -e "$TMP/lr6/docs/specs" ] || chmod 755 "$TMP/lr6/docs/specs" 2>/dev/null || true
+distinct="$(cat "$TMP/rule-lr1" "$TMP/rule-lr2" "$TMP/rule-lr3" "$TMP/rule-lr4" "$TMP/rule-lr5" | sort -u | grep -c .)"
+[ "$distinct" -eq 5 ] || fail "legacy table: rows R1-R5 must carry five distinct rule: texts, got $distinct"
+pass "legacy specs table: R1/R2/R5(+hidden file, subdirectory, unreadable)/regular-file -> docs/specs; R3/R4(+empty docs/specs) -> tasks/specs; stderr empty; five distinct rule texts"
+
+# A root holding both directories but no legacy marker stays default; the env
+# override still wins over the table.
+mkdir -p "$TMP/nomarker/tasks/specs" "$TMP/nomarker/docs/specs"
+[ "$(get "$TMP/nomarker" specs)" = ".shell-team/specs" ] || fail "no marker: specs must stay under the default base"
+[ "$(get "$TMP/lr3" specs TEAM_RUN_BASE=.ops)" = ".ops/specs" ] || fail "env override must win over the legacy table"
+env TEAM_RUN_BASE=.ops bash "$PATHS" --root "$TMP/lr3" --print > "$TMP/print-env"
+sed -n '1s/^shell-team paths (rule: \(.*\), root: .*$/\1/p' "$TMP/print-env" > "$TMP/rule-env"
+[ "$(cat "$TMP/rule-env")" = "env (TEAM_RUN_BASE)" ] || fail "env override: --print rule changed"
+sed -n '1s/^shell-team paths (rule: \(.*\), root: .*$/\1/p' <<< "$print_default" > "$TMP/rule-def"
+[ "$(cat "$TMP/rule-def")" = "default" ] || fail "default: --print rule changed"
+pass "default and env branches unchanged by the legacy table"
+
+# --help describes the rule and no longer calls docs/specs the one path outside the base.
+help_out="$(bash "$PATHS" --help)"
+for w in tasks/specs docs/specs .gitkeep; do
+  grep -qF -- "$w" <<< "$help_out" || fail "--help must name $w"
+done
+pass "--help names tasks/specs, docs/specs and .gitkeep"
 
 # --- total-key set is exactly ten, in both directions (T-1002 AC15, T-1006 --
 # AC2 raises it from nine) -- A tenth key added without updating this list

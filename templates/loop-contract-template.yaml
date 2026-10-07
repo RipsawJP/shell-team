@@ -1,10 +1,11 @@
 # Loop Contract — the 8-element contract every autonomous loop must satisfy.
-# Copy this file to tasks/loops/<loop-name>.contract.yaml and adapt it.
+# Copy this file to <loops-dir>/<loop-name>.contract.yaml and adapt it
+# (<loops-dir> is `team-paths.sh --get loops`).
 # BUDGET and STOP are MANDATORY (the runaway / billing guardrail); OWNER and
 # EVIDENCE are MANDATORY too (the accountability / "unverified done" guardrail,
 # T-028). Omitting any required section (or any of their required keys/shape)
 # is a hard lint error.  Lint with:
-#   bin/check-contract.sh tasks/loops/<loop-name>.contract.yaml
+#   bin/check-contract.sh "$(team-paths.sh --get loops)/<loop-name>.contract.yaml"
 #
 # This template is itself a valid contract (it lints clean), so it doubles as
 # a copy-paste starting point.
@@ -49,7 +50,7 @@ stop:
 
 # REPORT — where/how the loop reports its outcome.
 report:
-  to: tasks/todo.md status flag and the PR description
+  to: the board's status flag (team-paths.sh --get todo) and the PR description
 
 # EVIDENCE — the objective proof a run must produce to claim "done" (REQUIRED,
 # >= 1 list item). This is the anti-"unverified done" guardrail: an agent saying
@@ -58,7 +59,7 @@ report:
 # explicitly rather than omitting the section.
 evidence:
   - the test suite output / CI status for the change
-  - the Codex cross-provider review verdict (tasks/reviews/T-XXX.md)
+  - the Codex cross-provider review verdict (the review record T-XXX.md in team-paths.sh --get reviews)
 
 # OPTIONAL — extra fields beyond the eight required elements are accepted and
 # ignored by the linter. e.g. human_gate lists the actions that pause the loop

@@ -328,6 +328,12 @@ jobs:
       - name: Dogfood check-invocation-path — the alternate-executor admissibility gate against this repository
         run: bash bin/check-invocation-path.sh --role tech-lead
 
+      - name: Lint the reviewer-binding gate and its suite (T-1177)
+        run: shellcheck bin/check-review-provider.sh tests/check-review-provider/run.sh
+
+      - name: Run check-review-provider fixture suite
+        run: bash tests/check-review-provider/run.sh
+
       - name: Dogfood applies-effort — the recipe's declaration agrees with each adapter's own effort-mechanism (T-1119)
         run: |
           set -e
