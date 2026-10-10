@@ -28,6 +28,12 @@
 # any letter case and no duplicate, and that each name an existing regular
 # file (no symlink, directory or nested repository on the way), not ignored,
 # that is new or differs from HEAD in content with its mode unchanged.
+# Mode (T-1180, issue #711): the sibling bin/team-mode.sh is read after the
+# repository checks. When the clone declares shell-team.mode as `local`, a
+# path equal to or under the resolved base dir (ASCII case-insensitive) is
+# refused (class local-mode); an unusable team-mode.sh, or an unusable
+# team-paths.sh in local mode, is refused (class mode). Tracked mode (the
+# default, including an absent key) behaves as before.
 #
 # After `git add` and immediately before `git commit` it checks that the staged
 # tree differs from HEAD only by the requested paths, each added (regular-file
@@ -44,8 +50,8 @@
 # Exit codes:
 #   0  committed and verified; stdout is the new commit's full SHA
 #   1  a git add or git commit this script ran failed; nothing is reset
-#   2  refused before any write (usage, environment, repository, message file,
-#      path)
+#   2  refused before any write (usage, environment, repository, index, mode,
+#      message file, path, local-mode)
 #   3  committed, but verification found a mismatch; the commit is kept
 #   4  the pre-commit invariant failed after git add: no commit was made, HEAD
 #      is unchanged, the staged index is left as it is
@@ -56,10 +62,11 @@ set -euo pipefail
 
 export LC_ALL=C
 
-# Resolve this script's own directory (symlink-safe, physical) so any sibling
-# script would resolve regardless of cwd — the same pattern as
-# bin/check-setup.sh. No sibling is invoked today; the directory only names the
-# script in the usage hint.
+# Resolve this script's own directory (symlink-safe, physical) so
+# sibling scripts resolve regardless of cwd — the same pattern as
+# bin/check-setup.sh. The siblings are team-mode.sh (read on every run, after
+# the repository checks) and team-paths.sh (read only in local mode); the
+# directory also names the script in the usage hint.
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")"
@@ -103,6 +110,13 @@ outside [A-Za-z0-9._/-]; a path that is absolute, climbs out, names .git,
 uses characters outside [A-Za-z0-9._/-], repeats, is a symlink or directory,
 sits under a leading directory that HEAD tracks as a file, symlink or gitlink,
 is missing (a removal), is ignored, is unchanged, or changes only its mode.
+
+Mode: the clone's declared mode is read through bin/team-mode.sh. When
+shell-team.mode is `local` (git config shell-team.mode local, written once by
+the operator into the clone's own repository file), a path equal to or under
+the base dir (ASCII case-insensitive) is refused; a missing or failing
+team-mode.sh, or in local mode a missing or failing team-paths.sh, is refused
+too. Otherwise (tracked, including no declaration) nothing changes.
 
 After staging and before committing it checks that the staged tree differs from
 HEAD only by the requested paths, each added or modified with an unchanged
@@ -234,6 +248,30 @@ IDX="$(git "${NEUTRAL[@]}" diff-index --cached --raw "${DIFFOPTS[@]}" HEAD 2> /d
 [ -z "$IDX" ] || refuse index "the index already holds a staged change"
 
 # ---------------------------------------------------------------------------
+# 3b. Declared mode (T-1180): read through the sibling reader, after every
+#     repository refusal above and before any write. team-paths.sh is needed
+#     only in local mode.
+# ---------------------------------------------------------------------------
+MODE_READER="$SCRIPT_DIR/team-mode.sh"
+{ [ -f "$MODE_READER" ] && [ -r "$MODE_READER" ]; } || refuse mode "team-mode.sh is missing or unreadable next to team-commit.sh"
+TEAM_MODE="$(bash "$MODE_READER" 2> /dev/null)" || refuse mode "team-mode.sh could not read the declared mode (shell-team.mode)"
+LOCAL_BASE=""
+case "$TEAM_MODE" in
+  tracked) : ;;
+  local)
+    PATHS_READER="$SCRIPT_DIR/team-paths.sh"
+    { [ -f "$PATHS_READER" ] && [ -r "$PATHS_READER" ]; } || refuse mode "shell-team.mode is local but team-paths.sh is missing or unreadable next to team-commit.sh"
+    LOCAL_BASE="$(bash "$PATHS_READER" --get base 2> /dev/null)" || refuse mode "shell-team.mode is local but team-paths.sh could not resolve the base dir"
+    LOCAL_BASE="${LOCAL_BASE%/}"
+    [ -n "$LOCAL_BASE" ] || refuse mode "shell-team.mode is local but the base dir resolved to nothing"
+    ;;
+  *) refuse mode "team-mode.sh printed an unexpected value (expected exactly tracked or local)" ;;
+esac
+
+# ascii_lower <string>: ASCII-only case fold (bash 3.2 has no lower-casing expansion).
+ascii_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# ---------------------------------------------------------------------------
 # 4. Message file.
 # ---------------------------------------------------------------------------
 case "$MSG" in
@@ -338,6 +376,19 @@ for p in "${PATHS[@]}"; do
   done
   i=$((i + 1))
 done
+if [ "$TEAM_MODE" = "local" ]; then
+  # A path equal to or under the base dir is refused, before any write. The
+  # comparison folds ASCII case (the fold is isolated here and in LOCAL_BASE_LC).
+  LOCAL_BASE_LC="$(ascii_lower "$LOCAL_BASE")"
+  for p in "${PATHS[@]}"; do
+    p_lc="$(ascii_lower "$p")"
+    case "$p_lc" in
+      "$LOCAL_BASE_LC"|"$LOCAL_BASE_LC"/*)
+        refuse local-mode "$p: lies under the base dir ($LOCAL_BASE) while shell-team.mode is local; the base dir is kept out of git in this clone"
+        ;;
+    esac
+  done
+fi
 for p in "${PATHS[@]}"; do
   check_path "$p"
 done

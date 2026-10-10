@@ -64,6 +64,15 @@
 #      (exit 2), following bin/check-provenance.sh's classification
 #      convention exactly.
 #
+# Local mode (T-1180, issue #711): when the clone declares `shell-team.mode`
+# as `local` (read only through the sibling bin/team-mode.sh), the base dir is
+# kept out of git on purpose, so there is nothing to observe. Right after the
+# arguments are validated, and before anything else is resolved or examined
+# (no ref, blob, registry or `durability-mode` file), the script prints the
+# single stdout line `check-durability: skipped: shell-team.mode is local — no
+# durability observation was made` and exits 0. Any other mode is today's
+# behaviour, unchanged. An unusable team-mode.sh is `structural`.
+#
 # The `specs` registry row's pattern carries a hyphen deliberately
 # (`<task-id>-*.md`): a spec file is named `<task-id>-<slug>.md`, and this is
 # what keeps a shorter id (e.g. T-104) from matching a longer one's spec
@@ -154,7 +163,7 @@ self_name="$(basename "$script_path")" \
 SELF="$SCRIPT_DIR/$self_name"
 
 print_help() {
-  sed -n '2,88p' "$SELF" | sed 's/^# \{0,1\}//' \
+  sed -n '2,97p' "$SELF" | sed 's/^# \{0,1\}//' \
     || fail_usage "failed to read this script's own header comment (--help) from: $SELF"
 }
 
@@ -182,6 +191,22 @@ esac
 [ -n "$TASK" ] || fail_usage "missing required --task"
 [[ "$TASK" =~ ^T-[0-9]+$ ]] || fail_usage "invalid --task '$TASK' (expected T-<digits>; no-task runs are out of scope)"
 [ -n "$REF" ] || fail_usage "missing required --ref (explicit; no branch/HEAD inference is ever performed)"
+
+# --- local mode: read once through the sibling reader, before anything else ---
+MODE_READER="$SCRIPT_DIR/team-mode.sh"
+if [ ! -f "$MODE_READER" ] || [ ! -r "$MODE_READER" ]; then
+  fail_structural "cannot read the declared mode (team-mode.sh missing or unreadable next to check-durability.sh)"
+fi
+TEAM_MODE="$(bash "$MODE_READER" 2>/dev/null)" \
+  || fail_structural "team-mode.sh could not read the declared mode (shell-team.mode)"
+case "$TEAM_MODE" in
+  tracked) ;;
+  local)
+    printf 'check-durability: skipped: shell-team.mode is local — no durability observation was made\n'
+    exit 0
+    ;;
+  *) fail_structural "team-mode.sh printed an unexpected value (expected exactly 'tracked' or 'local')" ;;
+esac
 
 # --- resolve the sibling path resolver ---------------------------------------
 TEAM_PATHS="$SCRIPT_DIR/team-paths.sh"
