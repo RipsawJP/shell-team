@@ -1026,8 +1026,10 @@ la="$(cd "$RA" && find . -path ./.git -prune -o -print | sort)"; lb="$(cd "$RB" 
 PC="$T/lm-plug"; mkdir -p "$PC" && cp -R "$REPO_ROOT/bin" "$REPO_ROOT/templates" "$REPO_ROOT/agents" "$REPO_ROOT/.claude-plugin" "$PC/"
 printf '%s\n' '#!/usr/bin/env bash' 'echo stub-failure >&2' 'exit 2' > "$PC/bin/team-mode.sh"
 lmu=1; lmn=0
-for v in stub-local stub-none missing-local; do
+for v in stub-local stub-none missing-local garbage-local; do
   if [ "$v" = missing-local ]; then mv "$PC/bin/team-mode.sh" "$PC/bin/team-mode.sh.off"; fi
+  # A sibling that exits 0 but prints a value outside tracked/local is refused too.
+  if [ "$v" = garbage-local ]; then printf '%s\n' '#!/usr/bin/env bash' 'echo Local' > "$PC/bin/team-mode.sh"; fi
   R="$T/lm-bad-$v"; mk "$R"; mkdir -p "$R/.git/info"; : >> "$R/.git/info/exclude"
   case "$v" in *-local) git -C "$R" config shell-team.mode local ;; esac
   b0="$(cd "$R" && find . -path ./.git -prune -o -print | sort)"; c0="$(cksum < "$R/.git/info/exclude")"; g0="$(cksum < "$R/.git/config")"
@@ -1036,7 +1038,7 @@ for v in stub-local stub-none missing-local; do
     && [ "$(cksum < "$R/.git/info/exclude")" = "$c0" ] && [ "$(cksum < "$R/.git/config")" = "$g0" ]; } || lmu=0
   lmn=$((lmn + 1))
 done
-{ [ "$lmu" = 1 ] && [ "$lmn" = 3 ]; } \
+{ [ "$lmu" = 1 ] && [ "$lmn" = 4 ]; } \
   && pass "local mode: an unreadable record mode stops setup with exit 2 before any write" \
   || fail "local mode: an unreadable record mode stops setup with exit 2 before any write"
 
