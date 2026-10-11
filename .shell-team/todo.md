@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `REWORK` — spec: .shell-team/specs/T-1187-codex-first-token.md
+- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_QA` — spec: .shell-team/specs/T-1187-codex-first-token.md
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: prose-only change across two agent prompts and one EN/JA docs pair, no new mechanism or checker, no existing suite locks the sentence (grep of `tests/` for `multi-part|added part|Do not close stdin` = 0), both gates still run.
@@ -27,6 +27,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Docs: EN and JA each add one line directly after the 2.1.278 paragraph line, no blank line, numstat 1/0 each; same meaning in both (leading part is a non-matching part under the same rule, launch line begins with `codex`).
     - Self-consistency: code-reviewer's three `codex exec` blocks (lines 54, 83, 208) begin with `codex`, carry `--cd <repo>` and `-o "<RAW_OUT>"` as an argument, with no pipe or trailing redirection. Observation, not a finding: blocks at lines 83, 208 and in drift-evaluator line 92 use a backslash line continuation inside the quoted prompt argument (pre-existing, same single command, locked by the hygiene suite); the new sentence's "line continuation after it" reads as after the command, so the tension is wording-only and left for the reviewer.
     - `check-provenance.sh .shell-team/provenance/T-1187.md` conformant (2 decision entries); `check-interventions.sh --task T-1187` conformant (sentinel); `check-handoff.sh .shell-team/todo.md` rc 0. check-intent: not applicable (trivial path, no intent block). Shellcheck: not applicable (nothing under `bin/` changed).
+    - round 2 rework (engineer): continuation clause narrowed to "after its last argument ... joins a second command or part" with the quoted-prompt backslash newline stated as fine, in both agent files; invariant sentence moved before "Do not close stdin yourself"; check-acs 5 passed, 0 failed (command: `CHECK_ACS_TIMEOUT=900 bash "<plugin root>/bin/check-acs.sh" .shell-team/specs/T-1187-codex-first-token.md`)
     - Verification ceiling: none declared in the spec. Edge cases tried: counterexample line-start anchoring (`^[[:space:]]*`?cd <repo>;`), blocks outside the five covered sites; adversarial fixture classes not applicable (prose-only, canonical commands unchanged and exercised by the hygiene suite).
     - Risk notes for reviewer: AC5 and the `P=7cd6f4d1` base are tied to T-1186's branch tip (spec Notes). The follow-up on `skills/run/SKILL.md` and `templates/prompt-blocks/alternate-executor-invocation.md` stays out of scope.
 
