@@ -87,6 +87,7 @@ Claude Code セッションが **sandbox 有効**で動いているとき、Code
 - **`permissions.allow`**（補助的・任意の層）——一致する Bash 呼び出しの permission プロンプトを抑制するだけです。単独では sandbox から何も除外しないため、`permissions.allow` のルールだけを足しても sandbox の失敗は直りません。
 
 **一致のルールは Claude Code 2.1.278 で変わりました。** それ以前は `sandbox.excludedCommands` のパターンはコマンドラインの先頭トークンだけに一致していたため、行末にシェルのリダイレクトが付いていても `codex exec …` 行は除外対象のままでした。Claude Code 2.1.278 はこれを変更し、コマンドの**すべての部分**が一致したときだけ除外されるようになりました（先頭トークンだけではありません。計測日 2026-09-24、Claude Code **2.1.281**、codex-cli **0.156.1**）。このプラグインが出荷していた `codex exec` ブロックはどれも `> "<jsonl の生パス>" 2>&1` で終わっていたため、2.1.278 以降ではこのリダイレクトが一致しない 2 つめの部分となり、呼び出し全体が sandbox の**内側**で走っていました——うるさく失敗する形（`workspace routing discovery failed` → `turn.failed`、exit 1、最終メッセージのファイルは書かれない）か、静かに失敗する形（exit 0、`Unable to determine.` のような判断不能文、イベントストリームに `sandbox_apply` エラー）のいずれかです。リダイレクトを持たない裸の形は、2.1.278 以降でも、それより前のどのバージョンでも sandbox の外側で走り、正常に完了します。出荷される `codex exec` ブロックは今はすべて、自分自身の `-o` キャプチャだけを書く単一の裸コマンドです——リダイレクトも、標準入力のリダイレクトも、コマンド置換も、connector もありません。これにより `"codex *"` の除外パターンが呼び出し全体に再び一致します。
+先頭に付く部分——`cd <dir>;`、代入、`env`、サブシェル——も、末尾のリダイレクトとまったく同じく、同じルールのもとでは一致しない部分になります。したがって起動行は `codex` というトークンで始めます。
 
 Codex の経路を sandbox の外に置くかどうかは operator の判断であり、shell-team があなたの設定ファイルを書き込むことはありません。operator 自身の `.claude/settings.local.json` にある次の形が、直接 `codex` を呼ぶ経路をカバーするものです。対応する `permissions.allow` エントリは、承認プロンプトを黙らせるだけの任意の利便機能です。Claude Code host では、報告はこの条件を `Remains the operator's decision:` に出します。ただし setup が 3 つの設定ファイル（user・project・local スコープ）のいずれかでそのエントリを読み取れた場合は、読み取った内容として `Already in place:` に出し、セッションへの効果は未判定のままにします:
 
