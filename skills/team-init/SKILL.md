@@ -64,8 +64,10 @@ Do this:
    Record mode: the operating files are committed by default (mode `tracked`).
    To keep them out of git in one clone instead, run
    `git config shell-team.mode local` once in that clone (mode `local`) and put
-   the base dir in `.git/info/exclude`; `bin/team-setup.sh` then reports the line to append.
-   `team-init` itself never writes the mode or an ignore rule.
+   the base dir in `.git/info/exclude`; `bin/team-setup.sh` then reports the line to
+   append (for a base dir already committed in HEAD it reports a `Remains` item and
+   no line). `team-init` itself never writes the mode or a rule that ignores the base
+   directory; the `<base>/.gitignore` it writes covers only the runs and raw captures.
 
 5. **Idempotency note.** If the scaffolder reported skips, explain that those
    files already existed and were left untouched — re-running `team-init` is safe

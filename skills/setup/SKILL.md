@@ -13,6 +13,7 @@ allowed — stays the operator's decision. You report those conditions. You neve
 change them, and you never propose a change to them as something you apply. The
 report also carries one `Required:` action (the base directory in git) and one
 `Notice:` line; neither is a host setting.
+In `local` record mode the base-directory item is instead an ignore line to append, an `Already in place:` item or a `Remains` item (step 5).
 
 Do this:
 

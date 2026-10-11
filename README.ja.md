@@ -48,6 +48,8 @@ shell-team は、人間が毎回参加しなくても AI が仕様化・実装�
 
 **host 側の条件は、どちらの host でも operator の判断**。shell-team があなたの sandbox・trust・permission・network の設定を変更することはありません。セットアップ（[インストール](#インストール)）はプラグイン自身の担当分だけを行い、最後の報告では、setup が読み取れなかった host 側の条件を、何のために必要かとともに `Remains the operator's decision:` に、読み取れたものをファイル名つきで `Already in place:` に、base dir の git 管理を必須の作業として `Required:` に出し、レビュー pass が相手側 provider へリポジトリの内容を送ることは判断ではなく情報として `Notice:` に出します。Claude Code host で測定済みなのは、Codex レビュー呼び出しがセッションの sandbox の外で動くこと（関わる設定は `sandbox.excludedCommands`。[docs/distribution.md#sandbox-enabled-permission-settings](docs/distribution.md#sandbox-enabled-permission-settings) を参照）。Codex CLI host では、リポジトリの trust・コミットのための git ディレクトリへの書き込み・`claude -p` レビュー pass のための network・`<plugin root>/bin` の `PATH` 上の存在で、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) に測定状況つきで書かれています。
 
+ここで述べた `Required:` の base dir 項目は既定の `tracked` 記録モードのものです。`local` 記録モードでは、代わりに `info/exclude` に追記する 1 行、`Already in place:` の項目、または `Remains the operator's decision:` の項目になります（[docs/adopting.ja.md](docs/adopting.ja.md#記録を-git-に載せない-local-record-mode) を参照）。
+
 ## インストール
 
 このリポは「プラグイン本体」と「自前マーケットプレイス（`ripsawjp`）」を兼ねる。プラグイン本体のインストールはマシンごとに 1 回だけで、使っている host で行う — 両方を下に示す。各ブロックのコマンドのうち、どれが適用先リポジトリごとに繰り返し必要かは、ブロックごとに個別に述べる。
@@ -93,7 +95,7 @@ Codex CLI の orchestrator がどの instruction 面を自動で読み込むか�
 
 **`.shell-team/` を git に載せるかを最初に決めてください。** プラグインはルートの `.gitignore` を編集しないため、base dir は repo 内で *untracked* として現れます（無視されるのは中の run テレメトリと publish 済みの raw review capture（`reviews/*.txt`、`reviews/*.jsonl`）。自己完結した `<base>/.gitignore` による。curated な `<task-id>.md` の review record は追跡対象のまま）。どちらの選択も、2 つの記録モードとして想定されており、プラグインが代わりに決めることはありません。選択は、クローンの git config の `shell-team.mode` から読みます：
 
-- **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）。これが既定の記録モード `tracked` で、setup の `Required:` 項目は base dir をコミットするコマンドになる
+- **追跡する** — ボード・spec・レビュー成果物がバージョン管理された project record になる（このリポ自身がこの形でドッグフードしている）。これが既定の記録モード `tracked` で、setup の `Required:` 項目は base dir をコミットするコマンドになる（コミット済みなら代わりに `Already in place:` 項目）
 - **git に載せない** — このクローンで 1 度だけ `git config shell-team.mode local` を実行して `local` 記録モードを宣言し、base dir をクローンの `.git/info/exclude` に入れる（クローンごとで、共同作業者からは見えない。ルールを共有したい場合の代替が `.gitignore` の 1 行）。setup の `Required:` 項目は、そのファイルに追記する 1 行になり（stage するものは無い）、耐久性ゲートは失敗せず `skipped:` 行を出し、`isolation: worktree` はこのモードでは非対応になる。mode と ignore ルールの 4 通りの組み合わせと、setup がそれぞれで何を報告するかは [docs/adopting.ja.md](docs/adopting.ja.md#記録を-git-に載せない-local-record-mode) を参照。`local` を宣言*せずに* base dir を無視するのは別のことで、自分の repo の `.gitignore` に `.shell-team/` を追記する（その repo だけに効き、取り消しも容易）。作業する全 repo で載せたくない場合は global excludes（`git config --global core.excludesFile`）に入れる。どちらを選んでも base dir は untracked のまま、モードは `tracked` のままで、このループの耐久性ゲートが反応するのは untracked という状態そのものであって、どちらの ignore ルールがそれを作ったかではない — base dir が untracked なら耐久性ゲートは恒久的に `not-durable` を返し、hand-off はそのマシン上にしか残らなくなる。この代償は repo 側の `.gitignore` を選んでも同じく発生する。repo 側の行が実際に避けるのは適用範囲の広さだけで、global 側はマシン上の他の全 repo でも base dir を隠してしまい、後から「この repo ではボードを追跡したい」と決めても、その repo 自身の root `.gitignore` に `!.shell-team/` を明示的に書いて戻さない限り隠れたままになる（repo 側のパターンが global ファイルより優先される）— だからこそ repo 側の行のほうが適用範囲が狭く取り消しやすい選択なのであって、耐久性の代償そのものを避ける手段ではない。このリポ自身もその行を持っている。ツール側へのもう 1 つの影響は [docs/adopting.md](docs/adopting.md) を参照
 
 詳細とエアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。

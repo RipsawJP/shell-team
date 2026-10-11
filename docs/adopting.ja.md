@@ -90,7 +90,7 @@ scope-lock 系の `- check:` 行もこの影響を同じく受けます: `agents
 
 ### 記録を git に載せない: local record mode
 
-既定ではループは `tracked` 記録モードで動きます。base dir 配下のボード・spec・レビュー記録はコミットされ、耐久性ゲートがそれを確認します。クローンは代わりに `local` 記録モードで動かすこともできます。このモードでは、それらの記録は作業コピーに書かれ、コミットされません。クローンごとに 1 度だけ宣言します:
+既定ではループは `tracked` 記録モードで動きます。base dir 配下のボード・spec・レビュー記録はコミットされ（specs ディレクトリが base dir の外にある legacy レイアウトでは、そのディレクトリも。setup はそれを別の項目として報告します）、耐久性ゲートがそれを確認します。クローンは代わりに `local` 記録モードで動かすこともできます。このモードでは、それらの記録は作業コピーに書かれ、コミットされません。クローンごとに 1 度だけ宣言します:
 
 ```bash
 git config shell-team.mode local
@@ -98,7 +98,7 @@ git config shell-team.mode local
 
 値はクローン自身の `.git/config` に保存され、`bin/team-mode.sh` が読みます。モードを選ぶのは値がちょうど `local` のときだけで、キーが無い、または別の値なら `tracked` です。global や system の git config の値、`git -c` で渡した値は `local` を選ばないので、1 つの global 設定で手持ちの全クローンが一度に `local` になることはありません。git が config をまったく読めない場合、読み取りは exit 2 で止まり、ループは `BLOCKED` で止まります。それが `tracked` と読まれることはありません。モードは ignore ルールから推測されません。base dir を無視しても `local` にはならず、`local` を宣言しても何も無視されません。
 
-**base dir を無視する。** 推奨の置き場所は、クローンの exclude ファイル `info/exclude`（`git rev-parse --git-path info/exclude` が出すパス）です。クローンごとで共同作業者からは見えず、それ自体がクローンごとのモードに合います。ルールを全クローンで共有したい場合の代替は root `.gitignore` の 1 行で、base dir を名指しする行がコミットされるという代償を伴います。どちらの場合も行は、既定の base dir なら `/.shell-team/` です。setup はどちらのファイルも編集せず、行を示して編集をあなたに任せます。
+**base dir を無視する。** 推奨の置き場所は、クローンの exclude ファイル `info/exclude`（`git rev-parse --git-path info/exclude` が出すパス）です。クローンごとで共同作業者からは見えず、それ自体がクローンごとのモードに合います。ルールを全クローンで共有したい場合の代替は root `.gitignore` の 1 行で、base dir を名指しする行がコミットされるという代償を伴います。モード自体は共有されません。`shell-team.mode` はクローンごとの設定で既定は `tracked` なので、その共有された行を引き継ぐクローンは、すべて `git config shell-team.mode local` も実行しなければなりません。宣言なしで ignore の行だけを持つクローンは、base dir が無視された `tracked` のクローンであり、setup はそれを妨げているルールとして報告し、`bin/team-commit.sh` は拒否します。全員が `local` を選ぶとは限らないなら、`info/exclude` を使ってください。どちらの場合も行は、既定の base dir なら `/.shell-team/` です。setup はどちらのファイルも編集せず、行を示して編集をあなたに任せます。
 
 `bin/team-setup.sh` の報告は、モードと、base dir が無視されているかで決まります:
 
@@ -111,10 +111,12 @@ git config shell-team.mode local
 
 `local` で base dir がすでに HEAD でコミットされている場合は、上の `local` の 2 行のどちらでもありません。ignore ルールは tracked ファイルには適用されないので、`info/exclude` に行を足しても何も隠れません。setup はそれを、`- base directory in local mode: ` で始まる項目として `Remains the operator's decision:` に並べ、ディレクトリが tracked であること、tracked のままにするかは operator の判断であることを述べ、`info/exclude` の行も出さず、コマンドも示しません。
 
+この報告には 2 つの限界があります。ディレクトリが無視されていると数えるのは、git がそのディレクトリ自身を無視している場合だけで、中のファイルにだけ一致するルールは数えません。また、パスを安全に引用できない base dir（`A-Za-z0-9._/-` の外の文字を含むもの）には、出力される行が一切ありません。setup はその旨を述べ、それでも何も編集せず、何も stage しません。legacy レイアウトで base の外にある specs ディレクトリも同じ基準で、1 ディレクトリずつ、別の項目として扱われます。
+
 **`local` モードで gate が何をするか。**
 
 - `bin/check-durability.sh` は `check-durability: skipped: shell-team.mode is local — no durability observation was made` を出し、どの phase でも exit 0 で終わります。何も観測していません。
-- ロールが hand-off 前に走らせる shape スキャンは、自分が書いた記録ファイルに対して `bin/check-pii-shapes.sh --paths <記録ファイル>…` を使います。既定モードと `--all` モードは無視された base dir を読まないためです。記録ファイルを書かなかった round は `rc=n/a` を報告します。
+- ロールが hand-off 前に走らせる shape スキャンは、自分が書いた記録ファイルに対して `PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh --paths <記録ファイル>…` を使います。既定モードと `--all` モードは、無視されていて tracked でもない base dir を読まないためです。記録ファイルを書かなかった round は `rc=n/a` を報告します。
 - `bin/team-commit.sh` は base dir 配下の名指しされたパスを拒否します（class `local-mode`、exit 2、何も stage されない）。engineer の実装とテストは、これまでどおりコミットされます。
 - `bin/close-out.sh` の後にボードのコミットは続かず、reviewer の curated な `<task-id>.md` は書かれますが、コミットされません。
 - `isolation: worktree` と `bin/land-worktree.sh` はサポート外です。無視された base dir は linked worktree へ引き継がれないためです。
@@ -991,11 +993,11 @@ git branch -D trial/one-ticket
 
 ただし「未マージ」は「決して伝播しない」ことを意味しません。お試し用ブランチ上のコミットは、ブランチが一度もマージされなくても本流に届くことがあります。誰かが `cherry-pick` するかもしれませんし、共有リモートへ `push` すれば自動化や別の人が拾うかもしれません。お試し用ブランチは **ローカル (local)** に留め、もし push していたなら、ローカルのものを消すときに **remote copy（リモート側のコピー）** も一緒に削除してください。分離を支えているのはその discipline であり、未マージであることだけではありません。
 
-稼働ファイルを一度もコミットしないまま（git 無視されているか、単に一度も追加していない状態で）ループを走らせることには、サポートされる形がちょうど 1 つあります。クローンごとに 1 度だけ `git config shell-team.mode local` で宣言する `local` 記録モードで、[記録を git に載せない: local record mode](#記録を-git-に載せない-local-record-mode) に書かれています。この宣言が無ければモードは `tracked` で、gate はコミット済みの記録を前提とし、一度もコミットされない稼働ファイルはサポート外です。理由は gate ごとに異なり、`local` モードで各 gate が何をするかも異なります。1 つの一括した主張ではなく、それぞれが実際に持つ失敗の形と、実際にそこへ到達するシナリオで述べます。
+稼働ファイルを一度もコミットしないまま（git 無視されているか、単に一度も追加していない状態で）ループを走らせることには、サポートされる形が 1 つあります。クローンごとに 1 度だけ `git config shell-team.mode local` で宣言する `local` 記録モードで、[記録を git に載せない: local record mode](#記録を-git-に載せない-local-record-mode) に書かれています。この宣言が無ければモードは `tracked` で、gate はコミット済みの記録を前提とし、一度もコミットされない稼働ファイルはサポート外です。コミット済みの `<base>/durability-mode` が `working-tree-only` を宣言するのは、それとは別の古い opt-out で、`bin/check-durability.sh` は独自の `skipped:` 行を出してそれを今も尊重しますが、記録モードではなく、この一覧の他の何も変えません。理由は gate ごとに異なり、`local` モードで各 gate が何をするかも異なります。1 つの一括した主張ではなく、それぞれが実際に持つ失敗の形と、実際にそこへ到達するシナリオで述べます。
 
-`bin/check-durability.sh` は `tracked` モードで**拒否 (refuses)** します。どちらの拒否に出会うかは、あなたが何をしたかによります。`<base>/durability-mode` ファイルが一切無い場合、デフォルトのモードは `tracked` であり、ループが必要とするすべての記録が、記録されたコミット内のどの blob にも解決しません。この場合の refusal は `not-in-recorded-commit`、作業ファイル自体も無ければ `missing-working-file` です。`untracked-opt-out` はより狭いケースで、`working-tree-only` を宣言する **mode file（モードファイル）** 自体がコミットされていない場合にのみ発火します。どちらにせよ、お試しは green な hand-off に到達しません。`local` モードでは、まず記録モードを読み、どの phase でも `check-durability: skipped: shell-team.mode is local — no durability observation was made` を出して exit 0 で終わります。何も観測していないので、この行は記録が耐久的だと主張することなくループを先へ進めます。
+`bin/check-durability.sh` は `tracked` モードで**拒否 (refuses)** します。どちらの拒否に出会うかは、あなたが何をしたかによります。`<base>/durability-mode` ファイルが一切無い場合、デフォルトのモードは `tracked` であり、ループが必要とするすべての記録が、記録されたコミット内のどの blob にも解決しません。この場合の refusal は `not-in-recorded-commit`、作業ファイル自体も無ければ `missing-working-file` です。`untracked-opt-out` はより狭いケースで、`working-tree-only` を宣言する **mode file（モードファイル）** 自体がコミットされていない場合にのみ発火します。どちらにせよ、お試しは green な hand-off に到達しません。`local` モードでは、何かを観測する前に記録モードを読み、どの phase でも `check-durability: skipped: shell-team.mode is local — no durability observation was made` を出して exit 0 で終わります。何も観測していないので、この行は記録が耐久的だと主張することなくループを先へ進めます。
 
-`bin/check-pii-shapes.sh` は、既定モードと `--all` モードでは、ループ自身の記録を**一度も読まないまま (without having read)** clean を報告します。diff スコープのモードはコミット済みの変更しか見ず、`--all` モードは untracked だが ignore されていないファイルにしか届きません。**gitignored（git 無視された）** ベースディレクトリは **どちらのモードでも (neither mode)** 読まれないのです。これはまさに、base dir を git から外しておく方法そのものです。そのため `local` モードでは、記録ファイルを書いたロールが代わりに、自分が書いたファイルに対して `--paths <記録ファイル>…` を走らせます。これは名指しされた各パスを ignore の状態に関わらず読み、exit `2` は、何も見つからなかったことではなく、スキャンが完了しなかったことを意味します。
+`bin/check-pii-shapes.sh` は、既定モードと `--all` モードでは、ループ自身の記録を**一度も読まないまま (without having read)** clean を報告します。diff スコープのモードはコミット済みの変更しか見ず、`--all` モードは tracked なファイルと、untracked だが ignore されていないファイルを読みます。したがって **gitignored で untracked（git 無視され、追跡もされない）** ベースディレクトリは **どちらのモードでも (neither mode)** 読まれません（tracked なファイルは、どの ignore ルールが名指ししていても両方から見えます）。base dir を git から外しておくとは、まさにその状態です。そのため `local` モードでは、記録ファイルを書いたロールが代わりに、自分が書いたファイルに対して `PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh --paths <記録ファイル>…` を走らせます。これは名指しされた各パスを ignore の状態に関わらず読み、exit `2` は、何も見つからなかったことではなく、スキャンが完了しなかったことを意味します。
 
 `local` モードでは、ほかに 2 つのことが変わります。`bin/team-commit.sh` は base dir 配下の名指しされたパスを拒否し（`team-commit: refused (local-mode): …`、exit 2、何も stage されない）、engineer のコードのコミットはそのまま通ります。また `isolation: worktree` と `bin/land-worktree.sh` はサポート外です。無視された base dir は linked worktree へ引き継がれないためで、既定の非 worktree 経路には影響しません。
 
