@@ -43,6 +43,10 @@ goal-state.sh init "$(team-paths.sh --get runs)/goal-<task-id>.state"
 (invoked as `bash "<plugin root>/bin/goal-state.sh"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how.) Skip this on
 later ticks — the state file already exists.
 
+**First-tick record mode (T-1183).** On the first tick, alongside creating the state file, run `bash "<plugin root>/bin/team-mode.sh"` once (read `<plugin root>` as above); it prints `tracked` or `local`. On exit 2 stop the loop `BLOCKED`, relaying its stderr verbatim — never read that outcome as `tracked`. Prepend the mode line below to every sub-agent's prompt beside the Operating-paths line, filled in with the resolved mode; later ticks reuse the mode read on the first tick.
+
+> Record mode for this repo: <resolved mode> (tracked or local, read at Step 0 with team-mode.sh). In local mode, record files under the base dir are written and never committed.
+
 ## Each tick
 
 1. **Implement/verify attempt** — invoke `engineer` for one implement+test pass
