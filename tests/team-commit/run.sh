@@ -496,6 +496,7 @@ new_repo; r="$R"; printf 'a\n' > "$r/a"; git -C "$r" add a; git -C "$r" commit -
 mkdir -p "$T/moved-a$CASE"; mv "$r/a" "$T/moved-a$CASE/a"; mkdir -p "$r/a"; printf 'b\n' > "$r/a/b.txt"
 COPY="$T/copy-no-leading-dir/team-commit.sh"
 mkdir -p "$T/copy-no-leading-dir"
+cp "$(dirname "$SCRIPT")/team-mode.sh" "$T/copy-no-leading-dir/team-mode.sh"
 sed '/leading-dir-refusal/s/refuse path/true path/' "$SCRIPT" > "$COPY"
 chmod +x "$COPY"
 if [ "$(grep -c 'leading-dir-refusal' "$COPY")" = 1 ] && ! cmp -s "$SCRIPT" "$COPY"; then
@@ -523,6 +524,7 @@ fi
 disable_marker() {
   local marker="$1" want="$2" out="$T/copy-$1/team-commit.sh"
   mkdir -p "$T/copy-$1"
+  cp "$(dirname "$SCRIPT")/team-mode.sh" "$T/copy-$1/team-mode.sh"
   sed "/$marker/s/refuse path/true path/" "$SCRIPT" > "$out"
   chmod +x "$out"
   if [ "$(grep -c "$marker" "$out")" = "$want" ] && ! cmp -s "$SCRIPT" "$out"; then

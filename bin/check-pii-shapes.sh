@@ -229,14 +229,31 @@
 # Usage:
 #   check-pii-shapes.sh [--base <ref>]     change-scoped (default)
 #   check-pii-shapes.sh --all              full-tree audit (never in CI)
+#   check-pii-shapes.sh --paths <path> [<path>...]
+#                                          exactly the named files and
+#                                          directories, ignore status never
+#                                          consulted (T-1182; last option,
+#                                          every later argument is a path)
 #   check-pii-shapes.sh --help
 #
 # Exit codes:
 #   0  clean (no findings)
 #   1  one or more findings
 #   2  usage or structural error (unresolvable base ref, unreadable input,
-#      unknown flag, --all combined with --base) — a check that cannot
-#      evaluate its input never exits 0.
+#      unknown flag, --all combined with --base, --paths combined with --all
+#      or --base, --paths with no path or a path beginning with '-', a named
+#      path that is missing or unreadable, or a --paths run that read no
+#      regular text file) — a check that cannot evaluate its input never
+#      exits 0.
+#
+# --paths (T-1182): a file is scanned; a directory is walked recursively
+# with any .git entry neither descended into nor scanned; a symlink (named
+# or met in a walk) is scanned by its stored target string and never
+# followed; a file carrying a NUL byte is skipped with the skip: binary
+# notice. Paths resolve against the invoking directory and findings are
+# reported relative to the repository root. Ignore rules are never
+# consulted, which is what lets a hand-off scan read records under an
+# ignored base directory.
 
 set -euo pipefail
 
@@ -297,6 +314,8 @@ print_help() {
 MODE="diff"
 BASE_REF=""
 HAVE_BASE=0
+HAVE_PATHS=0
+PATH_ARGS=()
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -305,12 +324,31 @@ while [ "$#" -gt 0 ]; do
     --base)
       [ "$#" -ge 2 ] || fail_usage "--base requires a value"
       BASE_REF="$2"; HAVE_BASE=1; shift 2 ;;
+    --paths)
+      shift
+      [ "$#" -ge 1 ] || fail_usage "--paths requires at least one path"
+      for pa in "$@"; do
+        case "$pa" in
+          "") fail_usage "--paths: an empty path argument" ;;
+          -*) fail_usage "--paths: an argument beginning with '-' is not a path (write ./<name>): $pa" ;;
+        esac
+      done
+      HAVE_PATHS=1
+      PATH_ARGS=("$@")
+      shift "$#" ;;
     --) shift; break ;;
     -*) fail_usage "unknown flag: $1" ;;
     *)  fail_usage "unexpected argument: $1" ;;
   esac
 done
 [ "$#" -eq 0 ] || fail_usage "unexpected extra argument: $1"
+
+if [ "$HAVE_PATHS" -eq 1 ]; then
+  if [ "$MODE" = "all" ] || [ "$HAVE_BASE" -eq 1 ]; then
+    fail_usage "--paths cannot be combined with --all or --base"
+  fi
+  MODE="paths"
+fi
 
 if [ "$MODE" = "all" ] && [ "$HAVE_BASE" -eq 1 ]; then
   fail_usage "--all and --base are mutually exclusive"
@@ -777,6 +815,84 @@ if [ "$MODE" = "all" ]; then
       || fail_structural "failed to read file listed by git ls-files: $path"
     scan_content_file "$path" "$CONTENT_FILE"
   done < "$FILELIST"
+elif [ "$MODE" = "paths" ]; then
+  # --- explicit paths (T-1182): exactly the named files and directories,
+  # whatever their ignore status. Resolve each named path against the
+  # invoking directory (leaf never followed), express it relative to the
+  # repository root, then scan files / walk directories / read symlink
+  # target strings. A run that reads no regular text file is exit 2.
+  INVOKE_DIR="$(pwd -P)" || fail_structural "cannot resolve the invoking directory for --paths"
+  TOPLEVEL="$(git rev-parse --show-toplevel)" \
+    || fail_structural "git rev-parse --show-toplevel failed — cannot resolve the repository root for --paths"
+  TOPLEVEL="$(cd "$TOPLEVEL" && pwd -P)" \
+    || fail_structural "cannot resolve the repository root ($TOPLEVEL) for --paths"
+
+  PFILELIST="$WORKDIR/pfilelist"   # NUL-separated absolute entries to scan
+  : > "$PFILELIST"
+  for arg in "${PATH_ARGS[@]}"; do
+    case "$arg" in
+      /*) cand="$arg" ;;
+      *)  cand="$INVOKE_DIR/$arg" ;;
+    esac
+    while [ "${#cand}" -gt 1 ] && [ "${cand%/}" != "$cand" ]; do cand="${cand%/}"; done
+    leaf="${cand##*/}"
+    if [ "$leaf" = "." ] || [ "$leaf" = ".." ] || [ "$cand" = "/" ]; then
+      # A dot component is necessarily a directory: resolve it whole.
+      abs="$(cd "$cand" 2>/dev/null && pwd -P)" \
+        || fail_structural "--paths: cannot resolve path: $arg"
+    else
+      parent="${cand%/*}"
+      [ -n "$parent" ] || parent="/"
+      parent="$(cd "$parent" 2>/dev/null && pwd -P)" \
+        || fail_structural "--paths: no such path: $arg"
+      if [ "$parent" = "/" ]; then abs="/$leaf"; else abs="$parent/$leaf"; fi
+    fi
+    if [ ! -e "$abs" ] && [ ! -L "$abs" ]; then
+      fail_structural "--paths: no such path: $arg"
+    fi
+    case "$abs" in
+      "$TOPLEVEL"|"$TOPLEVEL"/*) ;;
+      *) fail_structural "--paths: path is outside the repository: $arg" ;;
+    esac
+    if [ -d "$abs" ] && [ ! -L "$abs" ]; then
+      # .git entries (directory or file) are neither descended into nor
+      # scanned; a symlink is listed, never followed (find's default -P).
+      find "$abs" -name .git -prune -o \( -type f -o -type l \) -print0 >> "$PFILELIST" 2>/dev/null \
+        || fail_structural "--paths: cannot walk directory (unreadable entry): $arg"
+    else
+      printf '%s\0' "$abs" >> "$PFILELIST"
+    fi
+  done
+
+  READ_TEXT=0
+  while IFS= read -r -d '' abs; do
+    [ -n "$abs" ] || continue
+    if [ "$abs" = "$TOPLEVEL" ]; then path="."; else path="${abs#"$TOPLEVEL"/}"; fi
+    is_known_shape "$path" && continue
+
+    if [ -L "$abs" ]; then
+      target="$(readlink "$abs")" \
+        || fail_structural "cannot read symlink target for: $path"
+      printf '%s' "$target" > "$CONTENT_FILE"
+      scan_content_file "$path" "$CONTENT_FILE"
+      continue
+    fi
+
+    [ -e "$abs" ] || fail_structural "--paths: path no longer exists on disk: $path"
+    [ -f "$abs" ] || fail_structural "--paths: not a regular file or directory: $path"
+    [ -r "$abs" ] || fail_structural "--paths: cannot read file: $path"
+    if is_binary_file "$abs"; then
+      announce_skip "$path" file
+      continue
+    fi
+    cp "$abs" "$CONTENT_FILE" 2>/dev/null \
+      || fail_structural "--paths: failed to read file: $path"
+    READ_TEXT=$((READ_TEXT + 1))
+    scan_content_file "$path" "$CONTENT_FILE"
+  done < "$PFILELIST"
+
+  [ "$READ_TEXT" -gt 0 ] \
+    || fail_structural "--paths read no regular text file (empty directory, only binary files or only symlinks) — a scan that read nothing is never clean"
 else
   # --- change-scoped: resolve the comparison point, then read the FULL
   # committed content of each changed path (DP-4/DP-6) — never a diff

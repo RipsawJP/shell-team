@@ -1,0 +1,3 @@
+The record mode is the `shell-team.mode` key in the clone's own git config and is never inferred from ignore rules: a role with Bash reads it with `bin/team-mode.sh` (exit 2 means stop `BLOCKED`, never read it as `tracked`), and a role without Bash takes it from the orchestrator's `Record mode for this repo:` line prepended to its prompt.
+In `local` mode, record files under the base dir are written and never staged, never committed, never force-added and never passed to `bin/team-commit.sh`, while implementation and tests are still committed as usual.
+In `tracked` mode (the key absent, or any value other than `local`) every existing instruction applies unchanged.

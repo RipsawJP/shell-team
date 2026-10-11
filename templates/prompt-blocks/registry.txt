@@ -57,3 +57,4 @@ contain alternate-executor-invocation.md   skills/run/SKILL.md
 contain host-dispatch.md                   skills/run/SKILL.md
 marker  record-portability.md              agents/scrum-master.md agents/pm-spec.md agents/engineer.md agents/qa-verifier.md agents/code-reviewer.md agents/tech-lead.md
 marker  record-shape-scan.md               agents/engineer.md agents/qa-verifier.md agents/scrum-master.md agents/code-reviewer.md
+contain record-mode.md                    agents/engineer.md agents/pm-spec.md agents/qa-verifier.md agents/tech-lead.md skills/run/SKILL.md skills/goal/SKILL.md

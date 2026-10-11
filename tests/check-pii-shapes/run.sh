@@ -1942,6 +1942,191 @@ t1165_rmdir_case() {  # $1 = tool (no .sh); $2.. = command; optional T1165_CWD
 T1165_CWD="$REPO_ROOT" t1165_rmdir_case check-pii-shapes bash "$BIN" --base HEAD
 
 # =============================================================================
+# T-1182: --paths (explicit-path mode). Every shape is assembled at run time
+# from fragments (DP-1); every repository lives inside $WORK; no deletion.
+# Ignore status is never consulted, so the positive control for every
+# "reads an ignored record" claim is that --all reports the same tree clean.
+# =============================================================================
+printf '\n--- --paths (T-1182) ---\n'
+
+P_CLEAN='check-pii-shapes: clean (no PII-shaped bytes found)'
+P_TOKEN="$(printf 'gh%s_%s' p "$(printf '%024d' 5)")"
+P_HOME="$(printf '/%s/%s/x' Users qzname)"
+P_KEY="$(printf '%s-%s' QZX 42)"
+
+# pr <dir> <args...> — runs the checker from <dir>; sets PR_RC, PR_OUT, PR_ERR.
+PR_OUT="$WORK/pr.out"; PR_ERR="$WORK/pr.err"; PR_RC=0
+pr() {
+  local d="$1"; shift
+  set +e
+  (cd "$d" && bash "$BIN" "$@") > "$PR_OUT" 2> "$PR_ERR"
+  PR_RC=$?
+  set -e
+}
+# pr_no_clean — true when neither stream carries the clean line.
+pr_no_clean() { ! grep -qF "$P_CLEAN" "$PR_OUT" "$PR_ERR"; }
+pr_no_bytes() { ! grep -qF -e "$P_TOKEN" -e "$P_HOME" -e "$P_KEY" "$PR_OUT" "$PR_ERR"; }
+
+PA="$(new_repo)"
+mkdir -p "$PA/.git/info" "$PA/.shell-team/sub dir" "$PA/empty" "$PA/binonly"
+printf '.shell-team/\n' >> "$PA/.git/info/exclude"
+printf 'plain\n' > "$PA/a.txt"
+printf 'note %s\n' "$P_TOKEN" > "$PA/.shell-team/rec.md"
+printf 'clean\n' > "$PA/.shell-team/sub dir/my rec.md"
+printf 'a\000b\n' > "$PA/binonly/x.dat"
+
+# 1: a planted shape in an ignored directory is reported, exit 1
+pr "$PA" --all
+ctl_all_rc=$PR_RC; ctl_all_clean=0; grep -qxF "$P_CLEAN" "$PR_OUT" && ctl_all_clean=1
+git -C "$PA" check-ignore -q .shell-team/rec.md && ign=1 || ign=0
+pr "$PA" --paths .shell-team
+if [ "$ign" = 1 ] && [ "$ctl_all_rc" = 0 ] && [ "$ctl_all_clean" = 1 ] \
+   && [ "$PR_RC" = 1 ] && grep -qxF 'FINDING pattern=token path=.shell-team/rec.md line=1' "$PR_OUT" \
+   && [ "$(grep -c '^FINDING ' "$PR_OUT")" = 1 ] && pr_no_clean && pr_no_bytes; then
+  pass "--paths: a planted shape in an ignored directory is reported, exit 1"
+else
+  fail "--paths: a planted shape in an ignored directory is reported, exit 1 (ign=$ign all_rc=$ctl_all_rc rc=$PR_RC)"
+fi
+
+# 2: the same tree without the shape is clean
+printf 'clean\n' > "$PA/.shell-team/rec.md"
+pr "$PA" --paths .shell-team
+if [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ]; then
+  pass "--paths: the same ignored tree without the shape is clean, exit 0"
+else
+  fail "--paths: the same ignored tree without the shape is clean, exit 0 (rc=$PR_RC)"
+fi
+
+# 3: an empty directory exits 2 without the clean line
+pr "$PA" --paths empty
+if [ "$PR_RC" = 2 ] && pr_no_clean; then
+  pass "--paths: an empty directory exits 2 without the clean line"
+else
+  fail "--paths: an empty directory exits 2 without the clean line (rc=$PR_RC)"
+fi
+
+# 4: a missing path
+pr "$PA" --paths no-such-path
+if [ "$PR_RC" = 2 ] && pr_no_clean; then
+  pass "--paths: a missing path exits 2 without the clean line"
+else
+  fail "--paths: a missing path exits 2 without the clean line (rc=$PR_RC)"
+fi
+
+# 5: an unreadable file (and a directory holding one); a run as root cannot
+# make a file unreadable, so that is a failure rather than a vacuous pass.
+printf 'ok\n' > "$PA/u.txt"; mkdir -p "$PA/ud"; printf 'ok\n' > "$PA/ud/u.txt"
+chmod 000 "$PA/u.txt" "$PA/ud/u.txt"
+if [ -r "$PA/u.txt" ]; then
+  fail "--paths: an unreadable file exits 2 without the clean line (mode 000 file still readable: run as a non-root user)"
+else
+  pr "$PA" --paths u.txt; u1=$PR_RC; pr_no_clean && c1=1 || c1=0
+  pr "$PA" --paths ud; u2=$PR_RC; pr_no_clean && c2=1 || c2=0
+  if [ "$u1" = 2 ] && [ "$u2" = 2 ] && [ "$c1" = 1 ] && [ "$c2" = 1 ]; then
+    pass "--paths: an unreadable file exits 2 without the clean line"
+  else
+    fail "--paths: an unreadable file exits 2 without the clean line (file rc=$u1, directory rc=$u2)"
+  fi
+fi
+chmod 600 "$PA/u.txt" "$PA/ud/u.txt"
+
+# 6: a directory holding only a binary file (skip notice, nothing read)
+pr "$PA" --paths binonly
+if [ "$PR_RC" = 2 ] && pr_no_clean && grep -qF 'skip: binary' "$PR_ERR"; then
+  pass "--paths: a directory holding only a binary file exits 2 without the clean line"
+else
+  fail "--paths: a directory holding only a binary file exits 2 without the clean line (rc=$PR_RC)"
+fi
+
+# 7: no path argument; an argument beginning with '-'
+pr "$PA" --paths; n1=$PR_RC
+pr "$PA" --paths -x; n2=$PR_RC
+if [ "$n1" = 2 ] && [ "$n2" = 2 ]; then
+  pass "--paths: no path argument exits 2"
+else
+  fail "--paths: no path argument exits 2 (bare rc=$n1, dash-argument rc=$n2)"
+fi
+
+# 8: combined with --all or --base, in either order
+cm=0
+pr "$PA" --paths a.txt --all; [ "$PR_RC" = 2 ] && pr_no_clean || cm=1
+pr "$PA" --all --paths a.txt; [ "$PR_RC" = 2 ] && pr_no_clean || cm=1
+pr "$PA" --paths a.txt --base HEAD; [ "$PR_RC" = 2 ] && pr_no_clean || cm=1
+pr "$PA" --base HEAD --paths a.txt; [ "$PR_RC" = 2 ] && pr_no_clean || cm=1
+pr "$PA" --paths a.txt; [ "$PR_RC" = 0 ] || cm=1
+if [ "$cm" = 0 ]; then
+  pass "--paths: combined with --all or --base exits 2"
+else
+  fail "--paths: combined with --all or --base exits 2"
+fi
+
+# 9: .git inside a walked directory is not scanned (positive control: a copy
+# outside .git is reported)
+printf 'note %s\n' "$P_TOKEN" > "$PA/.git/probe.txt"
+pr "$PA" --paths .; g1=$PR_RC; [ "$(cat "$PR_OUT")" = "$P_CLEAN" ] && g1c=1 || g1c=0
+mkdir -p "$PA/ctl"; cp "$PA/.git/probe.txt" "$PA/ctl/probe.txt"
+pr "$PA" --paths ./ctl; g2=$PR_RC
+grep -qxF 'FINDING pattern=token path=ctl/probe.txt line=1' "$PR_OUT" && g2f=1 || g2f=0
+if [ "$g1" = 0 ] && [ "$g1c" = 1 ] && [ "$g2" = 1 ] && [ "$g2f" = 1 ]; then
+  pass "--paths: .git inside a walked directory is not scanned"
+else
+  fail "--paths: .git inside a walked directory is not scanned (walk rc=$g1, control rc=$g2)"
+fi
+
+# 10: a path containing a space
+printf 'note %s\n' "$P_TOKEN" > "$PA/.shell-team/sub dir/my rec.md"
+pr "$PA" --paths ".shell-team/sub dir"
+if [ "$PR_RC" = 1 ] && grep -qxF 'FINDING pattern=token path=.shell-team/sub dir/my rec.md line=1' "$PR_OUT"; then
+  pass "--paths: a path containing a space is scanned"
+else
+  fail "--paths: a path containing a space is scanned (rc=$PR_RC)"
+fi
+printf 'clean\n' > "$PA/.shell-team/sub dir/my rec.md"
+
+# 11: a relative path from a subdirectory is reported relative to the root
+printf 'note %s\n' "$P_TOKEN" > "$PA/.shell-team/rec.md"
+pr "$PA/.shell-team" --paths rec.md
+if [ "$PR_RC" = 1 ] && grep -qxF 'FINDING pattern=token path=.shell-team/rec.md line=1' "$PR_OUT"; then
+  pass "--paths: a relative path from a subdirectory is reported relative to the repository root"
+else
+  fail "--paths: a relative path from a subdirectory is reported relative to the repository root (rc=$PR_RC)"
+fi
+printf 'clean\n' > "$PA/.shell-team/rec.md"
+
+# 12: the tracker-key opt-in applies unchanged
+printf 'see %s\n' "$P_KEY" > "$PA/.shell-team/k.md"
+pr "$PA" --paths .shell-team/k.md; k1=$PR_RC
+set +e
+(cd "$PA" && PII_CHECK_TRACKER_KEY=1 bash "$BIN" --paths .shell-team/k.md) > "$PR_OUT" 2> "$PR_ERR"
+k2=$?
+set -e
+if [ "$k1" = 0 ] && [ "$k2" = 1 ] && grep -qxF 'FINDING pattern=tracker-key path=.shell-team/k.md line=1' "$PR_OUT"; then
+  pass "--paths: the tracker-key opt-in applies unchanged"
+else
+  fail "--paths: the tracker-key opt-in applies unchanged (without rc=$k1, with rc=$k2)"
+fi
+
+# 13: symlinks are scanned by target string and never followed
+PS="$(new_repo)"
+mkdir -p "$PS/rec" "$PS/else"
+printf 'note %s\n' "$P_TOKEN" > "$PS/else/secret.txt"
+printf 'ok\n' > "$PS/rec/f.txt"
+ln -s ../else/secret.txt "$PS/rec/link.md"
+ln -s ../else "$PS/rec/dl"
+ln -s "$P_HOME" "$PS/rec/hl"
+pr "$PS" --paths rec; s1=$PR_RC
+s1f=0; grep -qxF 'FINDING pattern=home-path path=rec/hl line=1' "$PR_OUT" && [ "$(grep -c '^FINDING ' "$PR_OUT")" = 1 ] && s1f=1
+pr "$PS" --paths rec/link.md rec/dl rec/f.txt; s2=$PR_RC
+s2c=0; grep -qxF "$P_CLEAN" "$PR_OUT" && s2c=1
+pr "$PS" --paths else/secret.txt; s3=$PR_RC
+s3f=0; grep -qxF 'FINDING pattern=token path=else/secret.txt line=1' "$PR_OUT" && s3f=1
+if [ "$s1" = 1 ] && [ "$s1f" = 1 ] && [ "$s2" = 0 ] && [ "$s2c" = 1 ] && [ "$s3" = 1 ] && [ "$s3f" = 1 ]; then
+  pass "--paths: a symlink is scanned by its target string and never followed"
+else
+  fail "--paths: a symlink is scanned by its target string and never followed (walk rc=$s1, named rc=$s2, control rc=$s3)"
+fi
+
+# =============================================================================
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'check-pii-shapes suite: all assertions passed\n'

@@ -52,6 +52,7 @@ Raw review captures you already committed stay tracked either way — the
 plugin performs no migration of its own, and removing them from the index or
 rewriting history to remove them is your own decision, not one it makes for
 you.
+To move an existing repository to local record mode, or to decide whether to, see [Moving an existing repository to local record mode](migrating-to-local-mode.md).
 
 If you keep the base dir out of git, the two ways of doing that differ in scope.
 A `.shell-team/` line in the repo's own `.gitignore` applies to that repo and is
@@ -69,6 +70,8 @@ one-line re-include lives.
 
 For what the loop's **gates** actually do if you leave the operating files untracked instead of committing them, see [Trying the team on one ticket](#trying-the-team-on-one-ticket) below — this paragraph is about scope, not about what happens if you skip tracking altogether.
 
+Keeping the base dir out of git on purpose is a supported mode of its own, not a side effect of an ignore rule: `local` record mode, declared once per clone with `git config shell-team.mode local`, with the ignore line preferably in the clone's `info/exclude` rather than a shared file. [Keeping the records out of git: local record mode](#keeping-the-records-out-of-git-local-record-mode) below describes it. Without that declaration an ignored base dir leaves the mode `tracked`.
+
 That global file has a second consequence. Anything that asks git whether a
 path is ignored — `git check-ignore`, and checks built on it — reads it too, so
 such a check can fail on your machine while passing in CI, where no global
@@ -81,6 +84,40 @@ A scope-lock `- check:` line inherits this consequence unchanged: `agents/pm-spe
 How often the session stops to check with you is your call too, and it is set
 per-checkout rather than shipped: see
 [tuning-oversight.md](tuning-oversight.md).
+
+### Keeping the records out of git: local record mode
+
+By default the loop runs in `tracked` record mode: the board, the specs and the review records under the base dir are committed (in the legacy layout whose specs directory lies outside the base dir, that directory too, and setup reports it as its own item), and the durability gates check that they were. A clone can instead run in `local` record mode, where those records are written to the working copy and never committed. Declare it once per clone:
+
+```bash
+git config shell-team.mode local
+```
+
+The value is stored in the clone's own `.git/config` and read by `bin/team-mode.sh`. Only the exact value `local` selects the mode: a missing key or any other value is `tracked`, and a value from your global or system git config, or passed with `git -c`, never selects it, so one global setting cannot move every clone you have into `local` at once. If git cannot read the config at all, the read stops with exit 2 and the loop stops `BLOCKED`; it is never read as `tracked`. The mode is never inferred from ignore rules: ignoring the base dir does not make a clone `local`, and declaring `local` ignores nothing.
+
+**Ignoring the base dir.** The clone's exclude file, `info/exclude` (the path `git rev-parse --git-path info/exclude` prints), is the preferred place: it is per clone and invisible to collaborators, which suits a mode that is itself per clone. A root `.gitignore` line is the alternative when you want the rule shared with every clone, at the cost of committing a line that names the base dir. The mode itself is not shared: `shell-team.mode` is per clone and defaults to `tracked`, so every clone that inherits the shared line must also run `git config shell-team.mode local`. A clone that has the ignore line without the declaration is a `tracked` clone with an ignored base dir, which setup reports as a blocking rule and `bin/team-commit.sh` refuses. If not every collaborator will opt in, use `info/exclude`. Either way the line is `/.shell-team/` for the default base dir, and setup edits neither file: it names the line and leaves the edit to you.
+
+What `bin/team-setup.sh` reports depends on the mode and on whether the base dir is ignored:
+
+| Mode | Base dir | What setup reports |
+|---|---|---|
+| `tracked` | not ignored | A `Required:` item led by `- base directory in git: ` with the `git add` command that commits it (an `Already in place:` item instead once it is committed). |
+| `tracked` | ignored | A `Required:` item naming each blocking rule as `<source>:<line>` and the `git add` command, plus the root `.gitignore` re-include line (such as `!.shell-team/`) when the rule is in the global excludes file or `info/exclude` and names the directory itself. |
+| `local` | not ignored | A `Required:` item led by `- base directory in local mode: ` naming the line to append (`/.shell-team/` for the default base dir) to the clone's exclude file, with a root `.gitignore` line named as the alternative. No `git add`; nothing to stage. |
+| `local` | ignored | An `Already in place:` item led by `- base directory in local mode: ` naming the directory. Nothing is required. |
+
+A base dir already committed in HEAD under `local` is neither of the two `local` rows. Ignore rules do not apply to tracked files, so an `info/exclude` line would hide nothing there. Setup lists it under `Remains the operator's decision:` as an item led by `- base directory in local mode: `, says that the directory is tracked and that whether to keep tracking it is the operator's decision, prints no `info/exclude` line and names no command for it.
+
+Two limits of that report. A directory counts as ignored when `git check-ignore` reports `<dir>/` as ignored: `/.shell-team/`, `/.shell-team/*` and `/.shell-team/**` all do, while a rule that matches only particular files inside it, such as `*.md`, does not. And a base dir whose path cannot be quoted safely (characters outside `A-Za-z0-9._/-`) gets no printed line at all: setup says so and still edits and stages nothing. In the legacy layout the outside specs directory is judged the same way, one directory at a time, as its own item.
+
+**What the gates do in `local` mode.**
+
+- `bin/check-durability.sh` prints `check-durability: skipped: shell-team.mode is local — no durability observation was made` and exits 0 in every phase; it observed nothing.
+- The shape scan the roles run before hand-off uses `PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh --paths <record file>…` over the record files they wrote, because the default and `--all` modes do not read an ignored, untracked base dir. A round that wrote no record file reports `rc=n/a`.
+- `bin/team-commit.sh` refuses a named path under the base dir (class `local-mode`, exit 2, nothing staged). The engineer's implementation and tests are still committed.
+- No commit of the board follows `bin/close-out.sh`, and the reviewer's curated `<task-id>.md` is written and never committed.
+- `isolation: worktree` and `bin/land-worktree.sh` are unsupported, because an ignored base dir does not travel into a linked worktree.
+- The records exist only in this working copy: a fresh clone starts without them.
 
 ## `AGENTS.md` — a cross-tool pointer doc
 
@@ -184,6 +221,8 @@ repository. The tracked files under the base dir are the only state that
 crosses between roles, so a base dir hidden by a global excludes file leaves the
 gates reading nothing — [Where the operating files
 live](#where-the-operating-files-live) has the one-line re-include.
+
+In `local` record mode (`shell-team.mode` set to `local` in the clone's git config) the state that crosses between roles is the ignored files of this one working copy rather than tracked files, so a base dir kept out of git is the expected state there, not a fault. [Keeping the records out of git: local record mode](#keeping-the-records-out-of-git-local-record-mode) has what the gates do instead.
 
 **Driving a run from another session is the same off-path shape.** A session
 rooted in a hub repository can hand a task to a session rooted in the target
@@ -466,15 +505,24 @@ re-measured by it; each item below says which kind of evidence it rests on:
   separated out.
 
 Two things in the report are not decisions. Under `Required:`, the base
-directory (and, in the legacy layout, an outside specs directory) must not be
-ignored by git and must be committed: the loop does not support never-committed
-operating files, and `bin/team-commit.sh` refuses an ignored path, so there is
-one correct answer. Setup names each blocking rule as `<source>:<line>` (never
-the pattern text, which can come from an untrusted repository) and prints the
-one `git add` command; only when the rule sits in the global excludes file or
-`info/exclude` and names the directory itself does it print the root
-`.gitignore` line to add, such as `!.shell-team/`. Setup never edits
-`.gitignore` and stages and commits nothing. Under `Notice:`, the review pass
+directory (and, in the legacy layout, an outside specs directory) has one
+correct state, and which one depends on the record mode: `tracked` unless
+`git config shell-team.mode local` was run in this clone. In `tracked` mode it
+must not be ignored by git and must be committed, because `bin/team-commit.sh`
+refuses an ignored path, so there is one correct answer. Setup names each
+blocking rule as `<source>:<line>` (never the pattern text, which can come from
+an untrusted repository) and prints the one `git add` command; only when the
+rule sits in the global excludes file or `info/exclude` and names the directory
+itself does it print the root `.gitignore` line to add, such as
+`!.shell-team/`. In `local` mode it must instead be ignored: an item led by
+`- base directory in local mode: ` names the line to append to the clone's
+exclude file, written `/.shell-team/` for the default base dir, names a root
+`.gitignore` line as the alternative, and prints no `git add`, because there is
+nothing to stage. A directory that is already ignored is listed under `Already
+in place:`, and one already committed in HEAD under `Remains the operator's
+decision:`; [Keeping the records out of git: local record mode](#keeping-the-records-out-of-git-local-record-mode)
+has the four combinations. In both modes setup never edits `.gitignore` or an
+exclude file, and stages and commits nothing. Under `Notice:`, the review pass
 sends repository content to the other provider (Claude on this host); that is
 information about what the review pass does, not something setup asks you to
 approve.
@@ -952,11 +1000,13 @@ Deleting an **unmerged** branch destroys every commit **reachable only from** it
 
 "Unmerged" is not the same as "never propagated." A commit made on the trial branch can still reach your mainline without the branch ever merging — someone can `cherry-pick` it, or you can `push` the branch to a shared remote where automation or another person picks it up. Keep the trial branch **local**, and if you did push it, delete the remote copy too when you delete the local one — the isolation rests on that discipline, not on the branch being unmerged alone.
 
-Running the loop with the operating files never committed — git-ignored, or simply never added — is **not supported**. The reason differs per gate, stated in the failure mode each one actually has and in the scenario that actually reaches it, rather than as one blanket claim that they all stop working.
+Running the loop with the operating files never committed — git-ignored, or simply never added — is supported in one way: `local` record mode, declared once in the clone with `git config shell-team.mode local` and described in [Keeping the records out of git: local record mode](#keeping-the-records-out-of-git-local-record-mode). Without that declaration the mode is `tracked`, the gates assume committed records, and a never-committed operating file is unsupported. A committed `<base>/durability-mode` file declaring `working-tree-only` is a separate, older opt-out that `bin/check-durability.sh` still honours with its own `skipped:` line; it is not the record mode and changes nothing else on this list. The reason differs per gate, and so does what each gate does in `local` mode; each is stated in the failure mode it actually has and in the scenario that actually reaches it, rather than as one blanket claim that they all stop working.
 
-`bin/check-durability.sh` **refuses**, and which refusal you meet depends on what you did. With no `<base>/durability-mode` file at all the default mode is `tracked`, and every record the loop needs resolves to no blob in the recorded commit: `not-in-recorded-commit`, or `missing-working-file` when the working file itself is gone too. `untracked-opt-out` is the narrower case — it fires only when a **mode file** declaring `working-tree-only` is itself not committed. Either way the trial reaches no green hand-off.
+`bin/check-durability.sh` **refuses** in `tracked` mode, and which refusal you meet depends on what you did. With no `<base>/durability-mode` file at all the default mode is `tracked`, and every record the loop needs resolves to no blob in the recorded commit: `not-in-recorded-commit`, or `missing-working-file` when the working file itself is gone too. `untracked-opt-out` is the narrower case — it fires only when a **mode file** declaring `working-tree-only` is itself not committed (or its committed content differs). Either way the trial reaches no green hand-off. In `local` mode it reads the record mode before it observes anything and, for every phase, prints `check-durability: skipped: shell-team.mode is local — no durability observation was made` and exits 0: it observed nothing, so that line advances the loop without claiming the records are durable.
 
-`bin/check-pii-shapes.sh` reports clean **without having read** the loop's own records at all. Its diff-scoped mode only sees committed changes, and its `--all` mode reaches untracked-but-not-ignored files only — a **gitignored** base dir is read by **neither mode**, which is exactly how you keep the base dir out of git in the first place.
+`bin/check-pii-shapes.sh` reports clean **without having read** the loop's own records at all, in its default and `--all` modes. Its diff-scoped mode only sees committed changes, and its `--all` mode reads tracked files and untracked-but-not-ignored ones — so a **gitignored, untracked** base dir is read by **neither mode** (files that are tracked stay visible to both, whatever ignore rule names them), and keeping the base dir out of git is exactly that state. In `local` mode the role that wrote a record file therefore runs `PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh --paths <record file>…` over the files it wrote instead: it reads each named path whatever its ignore status, and an exit status of `2` is a scan that did not complete, never a scan that found nothing.
+
+Two more things change in `local` mode. `bin/team-commit.sh` refuses a named path under the base dir (`team-commit: refused (local-mode): …`, exit 2, nothing staged), while the engineer's code commit goes through unchanged. And `isolation: worktree` and `bin/land-worktree.sh` are unsupported, because an ignored base dir does not travel into a linked worktree; the default non-worktree path is unaffected.
 
 `bin/check-intent.sh` keeps answering from a ledger with no durable existence of its own: the frozen-intent hash and its attestation live on the board, so a **fresh** clone or checkout, or `git clean -fdx` (its `-x` flag is what reaches a gitignored path), simply never has them. `git reset --hard` **leaves an untracked** board alone, so that is not the operation that removes it.
 

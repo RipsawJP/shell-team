@@ -43,13 +43,19 @@ goal-state.sh init "$(team-paths.sh --get runs)/goal-<task-id>.state"
 (invoked as `bash "<plugin root>/bin/goal-state.sh"` — never assumed to be on `PATH`, even with the plugin loaded; read `<plugin root>` from what your host reports, see `docs/adopting.md`'s "Locate the installed plugin root" step for how.) Skip this on
 later ticks — the state file already exists.
 
+**First-tick record mode (T-1183).** On the first tick, alongside creating the state file, run `bash "<plugin root>/bin/team-mode.sh"` once (read `<plugin root>` as above); it prints `tracked` or `local`. On exit 2 stop the loop `BLOCKED`, relaying its stderr verbatim — never read that outcome as `tracked`. Prepend the mode line below to every sub-agent's prompt beside the Operating-paths line, filled in with the resolved mode; later ticks reuse the mode read on the first tick.
+
+> Record mode for this repo: <resolved mode> (tracked or local, read at Step 0 with team-mode.sh). In local mode, record files under the base dir are written and never committed.
+
 ## Each tick
 
 1. **Implement/verify attempt** — invoke `engineer` for one implement+test pass
    over the target task's spec (prepend the Operating-paths line to its prompt,
    as `/shell-team:run` does). It updates the board to `READY_FOR_QA`.
    - **Preserve the implementation across the seam (T-073)**: the engineer commits its implementation and tests before it sets `READY_FOR_QA`; as a second-layer guard, confirm there is no uncommitted implementation diff before invoking `qa-verifier` in the completion gate (`git status --short` shows nothing to commit). When you (the orchestrator) edit the task's interventions file at this same seam under the producer discipline below, commit that edit immediately — the same way the engineer commits its own work — before this check runs: this check is over the whole working tree, so an uncommitted interventions append at that exact moment would otherwise make it non-empty for a reason this guard's own prose does not name (T-1002 rework1 fix, mirroring `skills/run/SKILL.md`'s same fix).
+   - **Local record mode (T-1181).** In `local` mode this uncommitted-diff check looks only outside the base dir — record files under it are expected to stay uncommitted — while the engineer's implementation and tests are still committed.
    - **Interventions producer discipline (T-1002, referenced not restated)**: the same producer discipline `skills/run/SKILL.md`'s Implement phase carries applies to every tick here too — when a user message during an active tick interrupts, corrects, or stops the work (trigger 1), append the entry at that moment, before you act on the message; self-check `assumption-contradicted` (trigger 3) and `work-deferred`/`work-abandoned` (trigger 5) at this tick's own checkpoints — the Implement/verify attempt boundary above, the Completion-gate branch below, and any `STOP:` this tick reaches. The entry grammar (the marker pair and the field quad) is not restated here — see `skills/run/SKILL.md`'s own producer-discipline paragraph and `templates/prompt-blocks/interventions-classes.md`'s canonical template. The same durability duty applies identically here too (T-1002 rework2): every append to an interventions file is committed immediately, as its own commit, at the moment of recording, at every one of this tick's own checkpoints — never deferred to the next tick or to the Completion gate above to notice.
+   - **Local record mode (T-1181).** In `local` mode every append to an interventions file is written and never committed; the commit-immediately duty above does not apply, and the append still happens at the same moment.
 
 2. **Completion gate (layered, each verifier independent)** — run in order, and
    **do not carry one verifier's conclusion into the next** (a QA false-positive
@@ -250,6 +256,14 @@ later ticks — the state file already exists.
      next tick with `ScheduleWakeup(delaySeconds, <re-invoke this /goal prompt>)`.
      Pick `delaySeconds` ≤ the 5-minute cache TTL when the loop should continue
      soon (a cost optimization only — it never affects the bound).
+
+## Record mode (T-1181)
+
+The record mode is the `shell-team.mode` key in the clone's own git config and is never inferred from ignore rules: a role with Bash reads it with `bin/team-mode.sh` (exit 2 means stop `BLOCKED`, never read it as `tracked`), and a role without Bash takes it from the orchestrator's `Record mode for this repo:` line prepended to its prompt.
+
+In `local` mode, record files under the base dir are written and never staged, never committed, never force-added and never passed to `bin/team-commit.sh`, while implementation and tests are still committed as usual.
+
+In `tracked` mode (the key absent, or any value other than `local`) every existing instruction applies unchanged.
 
 ## Telemetry (best-effort)
 
