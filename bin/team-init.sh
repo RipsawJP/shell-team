@@ -398,6 +398,12 @@ if [ -d "$TARGET/.github/workflows" ]; then
 fi
 printf 'If %s/ does not appear in git status afterwards, a repo-level or global ignore rule may be hiding it — see "Where the operating files live" in docs/adopting.md for the one-line re-include.\n' \
   "$TEAM_RUN_BASE"
+# T-1183: the record-mode lines. Static text, printed in every mode and outside
+# any git repository; this script still invokes no git command without
+# --trial-branch (it neither reads nor writes the mode).
+printf 'Record mode: the operating files are committed by default (mode tracked); a clone can instead keep them out of git (mode local).\n'
+# shellcheck disable=SC2016  # backticks here are literal text for the user, not a subshell.
+printf 'To select local mode in this clone, run once: `git config shell-team.mode local` (it is stored in the clone'"'"'s own .git/config; bin/team-setup.sh then reports the ignore line to add).\n'
 # shellcheck disable=SC2016  # backticks here are literal text for the user, not a subshell.
 printf 'Next: run `/shell-team:run <your request>` from the target repo. See docs/adopting.md.\n'
 exit 0

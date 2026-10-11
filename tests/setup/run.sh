@@ -941,6 +941,105 @@ printf '# local edit\n' >> "$K"; x="$(st "$RF" --host claude-code)"
 cp "$REPO_ROOT/templates/AGENTS.md" "$RF/.shell-team/AGENTS.md"; cp "$OLDC" "$RF/.shell-team/AGENTS.md"; x="$(st "$RF" --host claude-code)"
 [ "$(sec "$RM" "$T/o" | grep -cF 'AGENTS.md differs')" = 1 ] && pass "T-1176 D1: the allowance is the contract's only (a v2.8.6 contract placed as AGENTS.md is drift)" || fail "T-1176 D1: allowance leaked to AGENTS.md"
 
+# ---------------------------------------------------------------------------
+# T-1183 (issue #711) — record mode local: the base dir is reported through the
+# clone's info/exclude, never through a git add. Every fixture sets the mode in
+# the clone's own repository file. Tracked-mode output is held by the labels
+# above (unchanged) and by the spec's byte-identity check against the base.
+# ---------------------------------------------------------------------------
+LMP='- base directory in local mode: '
+lmrepo() { mk "$1" && git -C "$1" config shell-team.mode local && mkdir -p "$1/.git/info" && : >> "$1/.git/info/exclude"; }
+nogit() { # <file>...: none of the printed streams names a git add, a re-include or a removal command
+  local f
+  for f in "$@"; do
+    if grep -qE 'git add|git rm|--cached|git clean|filter-branch|filter-repo|!\.shell-team/|r[m][[:space:]]+-[A-Za-z]*[rRf]' "$f"; then return 1; fi
+  done
+  return 0
+}
+
+R="$T/lm-ign"; lmrepo "$R"; printf '/.shell-team/\n' >> "$R/.git/info/exclude"
+x="$(st "$R" --host claude-code)"
+{ [ "$x" = 0 ] && git -C "$R" check-ignore -q .shell-team \
+  && [ "$(sec 'Required:' "$T/o")" = '- none' ] \
+  && [ "$(sec 'Already in place:' "$T/o" | grep -cF -- "$LMP")" = 1 ] \
+  && sec 'Already in place:' "$T/o" | grep -F -- "$LMP" | grep -qF .shell-team/ \
+  && ! grep -q '^- base directory in git: ' "$T/o" && nogit "$T/o" "$T/e"; } \
+  && pass "local mode: an ignored base dir is reported under Already in place and nothing is required for it" \
+  || fail "local mode: an ignored base dir is reported under Already in place and nothing is required for it (rc=$x)"
+
+R="$T/lm-noign"; lmrepo "$R"
+x="$(st "$R" --host claude-code)"
+EP="$(git -C "$R" rev-parse --git-path info/exclude)"
+sec 'Required:' "$T/o" > "$T/lmr"
+{ [ "$x" = 0 ] && [ -n "$EP" ] && [ "$(wc -l < "$T/lmr" | tr -d ' ')" = 1 ] \
+  && grep -qF -- "$LMP" "$T/lmr" && grep -qF -- '`/.shell-team/`' "$T/lmr" \
+  && grep -qF -- "$EP" "$T/lmr" && grep -qF .gitignore "$T/lmr" \
+  && ! grep -q '^- base directory in git: ' "$T/o" && nogit "$T/o" "$T/e"; } \
+  && pass "local mode: a base dir that is not ignored gets the info/exclude line under Required, with no git add" \
+  || fail "local mode: a base dir that is not ignored gets the info/exclude line under Required, with no git add (rc=$x)"
+
+# Legacy layout (tasks/ base, specs outside it at docs/specs): one item per
+# directory, each with its own line.
+RL="$T/lm-leg"; mk "$RL"; git -C "$RL" config shell-team.mode local; mkdir -p "$RL/tasks/loops" \
+  && cp "$REPO_ROOT/templates/shell-team.contract.yaml" "$RL/tasks/loops/" && cp "$REPO_ROOT/templates/todo-template.md" "$RL/tasks/todo.md"
+x="$(st "$RL" --host claude-code)"
+sec 'Required:' "$T/o" > "$T/lmr"
+{ [ "$x" = 0 ] && [ "$(wc -l < "$T/lmr" | tr -d ' ')" = 2 ] \
+  && [ "$(grep -cF -- '`/tasks/`' "$T/lmr")" = 1 ] && [ "$(grep -cF -- '`/docs/specs/`' "$T/lmr")" = 1 ] \
+  && [ "$(grep -cF -- "$LMP" "$T/lmr")" = 2 ] && nogit "$T/o" "$T/e"; } \
+  && pass "local mode: an outside specs dir in the legacy layout gets its own info/exclude line" \
+  || fail "local mode: an outside specs dir in the legacy layout gets its own info/exclude line (rc=$x)"
+
+# Anchor committed in HEAD: case (a) takes precedence over ignored and not-ignored.
+R="$T/lm-head"; mk "$R"; bash "$REPO_ROOT/bin/team-init.sh" "$R" > /dev/null 2>&1 \
+  && git -C "$R" add .shell-team && cm "$R" s && git -C "$R" config shell-team.mode local && mkdir -p "$R/.git/info"
+h0="$(git -C "$R" rev-parse HEAD)"; n0="$(git -C "$R" ls-files | wc -l | tr -d ' ')"
+lmh=1; lmk=0
+for ph in plain excluded; do
+  if [ "$ph" = excluded ]; then printf '/.shell-team/\n' >> "$R/.git/info/exclude"; fi
+  x="$(st "$R" --host claude-code)"
+  sec "$RM" "$T/o" | grep -F -- "$LMP" > "$T/lmr" || true
+  { [ "$x" = 0 ] && [ "$(sec 'Required:' "$T/o")" = '- none' ] && [ "$(wc -l < "$T/lmr" | tr -d ' ')" = 1 ] \
+    && grep -qF .shell-team/ "$T/lmr" && grep -qF tracked "$T/lmr" \
+    && ! sec 'Already in place:' "$T/o" | grep -qF -- "$LMP" \
+    && ! grep -qF -- '`/.shell-team/`' "$T/o" && nogit "$T/o" "$T/e" \
+    && [ "$(git -C "$R" rev-parse HEAD)" = "$h0" ] && [ "$(git -C "$R" ls-files | wc -l | tr -d ' ')" = "$n0" ]; } || lmh=0
+  lmk=$((lmk + 1))
+done
+{ [ "$lmh" = 1 ] && [ "$lmk" = 2 ]; } \
+  && pass "local mode: a base dir committed in HEAD is left to the operator, with no removal command" \
+  || fail "local mode: a base dir committed in HEAD is left to the operator, with no removal command"
+
+# The write set equals a tracked run's: the same file list, the exclude file,
+# the config and the index untouched, and no root .gitignore.
+RA="$T/lm-ws-a"; RB="$T/lm-ws-b"; lmrepo "$RA"; mk "$RB"
+c0="$(cksum < "$RA/.git/info/exclude")"; g0="$(cksum < "$RA/.git/config")"
+xa="$(st "$RA" --host claude-code)"; xb="$(st "$RB" --host claude-code)"
+la="$(cd "$RA" && find . -path ./.git -prune -o -print | sort)"; lb="$(cd "$RB" && find . -path ./.git -prune -o -print | sort)"
+{ [ "$xa" = 0 ] && [ "$xb" = 0 ] && [ "$la" = "$lb" ] && [ "$(cksum < "$RA/.git/info/exclude")" = "$c0" ] \
+  && [ "$(cksum < "$RA/.git/config")" = "$g0" ] && [ ! -e "$RA/.gitignore" ] && [ -z "$(git -C "$RA" diff --cached --name-only)" ]; } \
+  && pass "local mode: setup writes nothing a tracked run would not write" \
+  || fail "local mode: setup writes nothing a tracked run would not write (rc=$xa/$xb)"
+
+# A failed mode read stops setup with exit 2 before any write (a stub that exits
+# 2, a missing sibling), in a local repository and in one with no key.
+PC="$T/lm-plug"; mkdir -p "$PC" && cp -R "$REPO_ROOT/bin" "$REPO_ROOT/templates" "$REPO_ROOT/agents" "$REPO_ROOT/.claude-plugin" "$PC/"
+printf '%s\n' '#!/usr/bin/env bash' 'echo stub-failure >&2' 'exit 2' > "$PC/bin/team-mode.sh"
+lmu=1; lmn=0
+for v in stub-local stub-none missing-local; do
+  if [ "$v" = missing-local ]; then mv "$PC/bin/team-mode.sh" "$PC/bin/team-mode.sh.off"; fi
+  R="$T/lm-bad-$v"; mk "$R"; mkdir -p "$R/.git/info"; : >> "$R/.git/info/exclude"
+  case "$v" in *-local) git -C "$R" config shell-team.mode local ;; esac
+  b0="$(cd "$R" && find . -path ./.git -prune -o -print | sort)"; c0="$(cksum < "$R/.git/info/exclude")"; g0="$(cksum < "$R/.git/config")"
+  x="$(cd "$R" && PATH="$SP" bash "$PC/bin/team-setup.sh" --host claude-code < /dev/null > "$T/o" 2> "$T/e" || printf '%s' "$?")"
+  { [ "$x" = 2 ] && [ -s "$T/e" ] && [ "$(cd "$R" && find . -path ./.git -prune -o -print | sort)" = "$b0" ] && [ ! -e "$R/.shell-team" ] \
+    && [ "$(cksum < "$R/.git/info/exclude")" = "$c0" ] && [ "$(cksum < "$R/.git/config")" = "$g0" ]; } || lmu=0
+  lmn=$((lmn + 1))
+done
+{ [ "$lmu" = 1 ] && [ "$lmn" = 3 ]; } \
+  && pass "local mode: an unreadable record mode stops setup with exit 2 before any write" \
+  || fail "local mode: an unreadable record mode stops setup with exit 2 before any write"
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'setup suite: all assertions passed\n'

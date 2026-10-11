@@ -40,6 +40,21 @@
 #   Notice:  the review pass sends repository content to the other provider
 #      (information; nothing for setup to decide).
 #
+# Record mode (T-1183, issue #711): setup reads the clone's declared
+# `shell-team.mode` once, through the sibling team-mode.sh run in the
+# repository root, before any write; a failed read is exit 2 with nothing
+# written. With `tracked` (the default) the report is as described above.
+# With `local` the base directory (and, in the legacy layout, an outside specs
+# directory) is handled one directory at a time: (a) its anchor committed in
+# HEAD is left to the operator under Remains, with no command (ignore rules do
+# not apply to tracked files); (b) a directory git ignores is listed under
+# Already in place; (c) otherwise one Required item names the line
+# `/<dir>/` to append to the clone's info/exclude (path as `git rev-parse
+# --git-path info/exclude` prints it) with a root .gitignore line as the
+# alternative. In that mode setup never prints a git add command, a
+# re-include line or a removal command, and edits and stages nothing; its
+# write set is the tracked-mode write set, and the commits item is unchanged.
+#
 # Read set (exhaustive, read-only): on the Claude Code host the user scope
 # $HOME/.claude/settings.json (skipped when CLAUDE_CONFIG_DIR is set and
 # non-empty), the project scope <repo>/.claude/settings.json and the local scope
@@ -115,6 +130,16 @@ Options:
   --host <host>   claude-code or codex-cli. Default: codex-cli when
                   CODEX_THREAD_ID is set and non-empty, claude-code otherwise.
   --help, -h      Show this help and exit.
+
+Record mode: setup reads shell-team.mode once, through team-mode.sh, before it
+writes anything (an unreadable value is exit 2 with nothing written). With
+shell-team.mode local, set once in the clone with `git config shell-team.mode
+local`, the Required item for the base dir changes: a base dir that git
+ignores is listed under Already in place; one that is not ignored gets a
+Required item naming the line to append to the clone's info/exclude file; one
+already committed in HEAD is left to the operator. Setup never edits an ignore
+file, stages anything or prints a git add command in that mode. Any other
+value of shell-team.mode, or none, leaves the report as it is.
 
 Stdout: one header line, then five sections, each item a "- " line and an
 empty section printed as "- none":
@@ -344,6 +369,23 @@ refused() {
   EC3=1
   add_remains "run yourself: $1"
 }
+
+# ---------------------------------------------------------------------------
+# 3b. The declared record mode (T-1183), read once, in every mode, before any
+#     write: the sibling team-mode.sh run with the repository root as the
+#     working directory (it reads that directory's own repository file). A
+#     failed read, a missing sibling or a value outside tracked/local is exit 2
+#     with nothing written; an unreadable declaration is never read as tracked.
+# ---------------------------------------------------------------------------
+MODE_RC=0
+MODE="$(cd "$ROOT" && bash "$SCRIPT_DIR/team-mode.sh")" || MODE_RC=$?
+if [ "$MODE_RC" -ne 0 ]; then
+  die "could not read the record mode through team-mode.sh (exit $MODE_RC); nothing was written"
+fi
+case "$MODE" in
+  tracked|local) : ;;
+  *) die "team-mode.sh printed an unexpected record mode; nothing was written" ;;
+esac
 
 # ---------------------------------------------------------------------------
 # 4. Scaffold through team-init.sh (never --force: --force would overwrite the
@@ -725,6 +767,59 @@ case "$N_SPECS" in
   "$N_BASE"|"$N_BASE"/*) : ;;
   *) REQ_DIRS[1]="$N_SPECS"; REQ_ANCHOR[1]="$N_SPECS/.gitkeep" ;;
 esac
+in_head() { # <path>: the path is in HEAD's tree (an unborn HEAD or a staged-only path is not)
+  local o
+  o="$(git -C "$ROOT" ls-tree HEAD -- "$1" 2>/dev/null)" || return 1
+  case "$o" in
+    [0-7][0-7][0-7][0-7][0-7][0-7]" blob "*) return 0 ;;
+  esac
+  return 1
+}
+
+if [ "$MODE" = "local" ]; then
+  # T-1183: local record mode. The directories are handled one at a time and
+  # nothing here edits an ignore file, stages anything or names a removal
+  # command. Case (a), the anchor committed in HEAD, takes precedence: ignore
+  # rules do not apply to tracked files, so whether to keep tracking is the
+  # operator's decision. Case (b), ignored (the directory itself or a parent,
+  # by a rule that is not a re-include): Already in place. Case (c): one
+  # Required item naming the exclude line.
+  LM_EXCL="$(git -C "$ROOT" rev-parse --git-path info/exclude 2>/dev/null)" || LM_EXCL=""
+  [ -n "$LM_EXCL" ] || LM_EXCL="the clone's info/exclude"
+  for ((ri = 0; ri < ${#REQ_DIRS[@]}; ri++)); do
+    rd="${REQ_DIRS[$ri]}"
+    if in_head "${REQ_ANCHOR[$ri]}"; then
+      add_remains "base directory in local mode: $rd/ is tracked in git (${REQ_ANCHOR[$ri]} is committed in HEAD), and ignore rules do not apply to tracked files; whether to keep tracking it is the operator's decision, and setup names no command for it"
+      continue
+    fi
+    lm_rc=0
+    lm_out="$(printf '%s\0' "$rd/" | git -C "$ROOT" check-ignore -v -z --stdin 2>/dev/null | tr '\0\n' '\n\001')" || lm_rc=$?
+    lm_ignored=0
+    if [ "$lm_rc" -eq 0 ]; then
+      lm_pat="$(printf '%s\n' "$lm_out" | sed -n '3p')"
+      case "$lm_pat" in
+        '!'*|'') : ;;
+        *) lm_ignored=1 ;;
+      esac
+    elif [ "$lm_rc" -ne 1 ]; then
+      err "team-setup: git check-ignore could not evaluate $rd/ (exit $lm_rc)"
+      EC2=1
+      continue
+    fi
+    if [ "$lm_ignored" -eq 1 ]; then
+      add_inplace "base directory in local mode: $rd/ is ignored by git"
+      continue
+    fi
+    case "$rd" in
+      ''|*[!A-Za-z0-9._/-]*)
+        add_required "base directory in local mode: $rd/ is not ignored by git, and its path cannot be quoted safely, so setup prints no line for it. Setup edits no ignore file and stages nothing."
+        ;;
+      *)
+        add_required "base directory in local mode: $rd/ is not ignored by git. Append the line \`/$rd/\` to this clone's exclude file $LM_EXCL (per-clone, invisible to collaborators); a root .gitignore line is the alternative when you prefer it shared. Setup edits neither file and stages nothing."
+        ;;
+    esac
+  done
+else
 probes=()
 # Every other directory the loop commits records into, when it sits under the
 # base (specs, retros, reviews, provenance, interventions), is probed with the
@@ -811,14 +906,6 @@ fmt_rule() { # <report index>: "<source>:<line>" (never the pattern)
     ''|*[![:print:]]*|*'`'*) s="<unprintable source>" ;;
   esac
   printf '%s:%s' "$s" "$l"
-}
-in_head() { # <path>: the path is in HEAD's tree (an unborn HEAD or a staged-only path is not)
-  local o
-  o="$(git -C "$ROOT" ls-tree HEAD -- "$1" 2>/dev/null)" || return 1
-  case "$o" in
-    [0-7][0-7][0-7][0-7][0-7][0-7]" blob "*) return 0 ;;
-  esac
-  return 1
 }
 
 # A report whose pattern starts with `!` is a re-include git matched, so that
@@ -951,6 +1038,7 @@ if [ "$ci_rc" -le 1 ] && [ "$BASE_OK" -eq 0 ]; then
     fi
   fi
   add_required "$msg"
+fi
 fi
 
 # ---------------------------------------------------------------------------

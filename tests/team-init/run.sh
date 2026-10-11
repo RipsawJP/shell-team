@@ -830,4 +830,30 @@ g=0; grep -qF 'Specs live under:' "$TMP/t1176-r3.out" || g=$?
 bash "$REPO_ROOT/bin/team-init.sh" --help 2>&1 | grep -qF tasks/specs || fail "T-1176: team-init --help must name tasks/specs"
 pass "T-1176: team-init follows the resolver's legacy specs rule (R1 docs/specs with the call-out, R3 tasks/specs without) and --help names tasks/specs"
 
+# --- T-1183 (issue #711): the closing summary names both record modes and the
+# --- one command that selects local, in every mode, and makes no git call. ----
+RMD="$TMP/t1183-rm"; RMG="$TMP/t1183-rm-stub"; RMR="$GIT_TMP/t1183-rm-repo"
+mkdir -p "$RMD" "$RMG/bin" "$RMG/target" "$RMR"
+init "$RMD" > "$RMD.out" 2>&1 || fail "T-1183 record mode: team-init exited non-zero"
+grep -F 'tracked' "$RMD.out" | grep -qF 'local' || fail "T-1183 record mode: no summary line names both tracked and local"
+[ "$(grep -cF -- 'git config shell-team.mode local' "$RMD.out")" = 1 ] || fail "T-1183 record mode: the config command is not on exactly one summary line"
+[ "$(grep -cF -- 'does not appear in git status' "$RMD.out")" = 1 ] || fail "T-1183 record mode: the pointer line is not still exactly one"
+g=0; grep -qE 'git add|git rm|--cached' "$RMD.out" || g=$?
+[ "$g" -eq 1 ] || fail "T-1183 record mode: the summary names a git add or a removal command (grep exit $g)"
+# No git call: a stub git first on PATH records any call (positive control: it
+# records a direct call).
+printf '%s\n' '#!/usr/bin/env bash' ": > '$RMG/git-called'" 'exit 1' > "$RMG/bin/git" && chmod +x "$RMG/bin/git"
+env -u TEAM_RUN_BASE PATH="$RMG/bin:$PATH" bash "$INIT" "$RMG/target" > "$RMG/out" 2>&1 || fail "T-1183 record mode: team-init failed with a stub git first on PATH"
+[ ! -e "$RMG/git-called" ] || fail "T-1183 record mode: team-init invoked git without --trial-branch"
+( PATH="$RMG/bin:$PATH"; git --version > /dev/null 2>&1 ) || true
+[ -e "$RMG/git-called" ] || fail "T-1183 record mode: the stub git did not record a direct call (control)"
+# Mode independence: the same summary lines in a clone declaring local mode.
+git init -q "$RMR" > /dev/null 2>&1 || fail "T-1183 record mode: git init failed (control)"
+git -C "$RMR" config shell-team.mode local || fail "T-1183 record mode: could not set the mode (control)"
+init "$RMR" > "$RMR.out" 2>&1 || fail "T-1183 record mode: team-init failed in a local-mode clone"
+grep -F 'shell-team.mode' "$RMD.out" > "$TMP/t1183-a" || fail "T-1183 record mode: no mode line (control)"
+grep -F 'shell-team.mode' "$RMR.out" > "$TMP/t1183-b" || fail "T-1183 record mode: no mode line in the clone (control)"
+cmp -s "$TMP/t1183-a" "$TMP/t1183-b" || fail "T-1183 record mode: the mode lines differ between a plain directory and a local-mode clone"
+pass "record mode: the closing summary names tracked and local and the git config command, with no git call"
+
 printf '\nAll team-init assertions passed.\n'
