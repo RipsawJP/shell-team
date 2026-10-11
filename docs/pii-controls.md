@@ -143,6 +143,10 @@ round, instead of the `--all` run; a round that wrote no record file has
 nothing to name and reports the `- shape-scan:` line with a zero count. In
 `tracked` mode the `--all` instruction above applies unchanged.
 
+That zero-count line is the one place no scan ran: with no record file to name,
+`--paths` is not run with no path, so the line carries `rc=n/a` (there is no
+exit status to report) beside its zero `<N>`.
+
 A hit the checker's own documents declare as **accepted noise** — this
 project's design-point label vocabulary and same-outline standards
 identifiers, under the opt-in — is classified as such in the summary line
