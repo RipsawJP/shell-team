@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1187-codex-first-token.md
+- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `REWORK` — spec: .shell-team/specs/T-1187-codex-first-token.md
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: prose-only change across two agent prompts and one EN/JA docs pair, no new mechanism or checker, no existing suite locks the sentence (grep of `tests/` for `multi-part|added part|Do not close stdin` = 0), both gates still run.
@@ -19,6 +19,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - stacked-on: T-1186 (hotfix/720-crlf-line-endings @ 7cd6f4d1); PR base develop; ships in v2.9.1 with T-1186 (operator ruling 2026-10-11)
   - follow-up: `skills/run/SKILL.md` (~260) and `templates/prompt-blocks/alternate-executor-invocation.md` (~29), "matches on its first token alone", are out of scope here; recommend filing an issue.
   - qa (round 1, qa-verifier): PASS — READY_FOR_REVIEW
+  - codex-reviewer (T-1187, round 1): REQUEST_CHANGES — static-only, base 7cd6f4d1; passes `primary` / `adversarial` (captures `T-1187-codex-primary` / `T-1187-codex-adversarial`, bare `codex exec` lines); rollout gate 6/6 and 12/12; evidence ledger 13 rows (6 holds, 2 defect, 5 not-applicable); blockers 0, major 1: the new sentence forbids a "line continuation after it" while the same files' own `codex exec` blocks (code-reviewer lines 83 and 208, drift-evaluator line 92) use a backslash newline inside the quoted prompt argument — a reader could flatten a valid block or read it as a violation; root-cause class: prohibition-wider-than-the-adjacent-blocks; minor 2 (drift-evaluator's "Instead:" now follows the new sentence; the list does not name newline-joining or a heredoc, covered by "nothing else" — calibrated); synthesis: no severity changes; no fast-follow deferrals; `check-review-input.sh` rc=0 — record: .shell-team/reviews/T-1187.md
     - Tests: `bash tests/codex-skeleton-hygiene/run.sh` → `grep -c '^PASS'` 48, `grep -c '^FAIL'` 0, final line `OK` (ran under `ulimit -f 400000`, output capped with `head -c 2000000`; a grep for recursive-delete patterns in that suite and the three bin scripts it touches returned no match, rc=1).
     - Acceptance criteria: `CHECK_ACS_TIMEOUT=900 bash "<plugin root>/bin/check-acs.sh" .shell-team/specs/T-1187-codex-first-token.md` → `check-acs: 5 passed, 0 failed, 0 skipped, 0 unrecognized`; AC1–AC5 PASS (no runtime criteria; no `SKIP`).
     - AC4 extras: `bash bin/check-prompt-sync.sh` rc 0; `bash bin/gen-codex-agents.sh --root "$PWD" --out-dir "$TMPDIR/t1187-qa-agents"` rc 0; `bash bin/check-codex-agents.sh --root "$PWD" --out-dir "$TMPDIR/t1187-qa-agents"` rc 0; repo `.codex/agents` untouched.
