@@ -11,7 +11,7 @@ The new key is `shell-team.mode`, set per clone in its own git config. The adopt
 What an existing adopter may notice:
 
 - `bin/team-setup.sh` reports the base dir by mode: in `local` mode it names an ignore line to append, lists an ignored base dir under `Already in place:`, or, for a base dir already committed in HEAD, lists it under `Remains the operator's decision:`; its report in `tracked` mode is unchanged.
-- `bin/team-init.sh` now ends its summary with two lines about record mode, printed in every mode: one says the operating files are committed by default (mode `tracked`), the other gives `git config shell-team.mode local` for a clone that should keep them out of git.
+- `bin/team-init.sh` now prints two lines about record mode, in every mode, just before its closing `Next:` line: one says the operating files are committed by default (mode `tracked`), the other gives `git config shell-team.mode local` for a clone that should keep them out of git.
 - `bin/check-pii-shapes.sh --paths <file>…` scans exactly the files you name. In `local` mode the roles use it for their records, because the default and `--all` modes do not read an ignored, untracked base dir and would report clean without having read a record.
 - In `local` mode the hand-off writes the board, specs and review records into the working copy and never commits them, while the engineer's implementation and tests are still committed.
 - `bin/team-commit.sh` refuses any named path under the base dir in `local` mode, and `bin/check-durability.sh` prints a `skipped:` line instead of checking whether the records were committed.
@@ -69,7 +69,7 @@ Any value other than exactly `local` reads as `tracked`, so setting the value is
 
 Back in `tracked` mode, a base dir that is still ignored is reported by setup as a blocking rule under `Required:`: the ignore source and line, the `git add` command, and, where it applies, a re-include line. Decide whether to change your ignore line or to add the re-include setup names, then commit the records with the `git add` command it prints; setup commits nothing.
 
-Records written while the clone was `local` stay in the working copy, and nothing committed them; they enter git only when you commit them, and after that `bin/check-durability.sh` checks them again.
+Records written while the clone was `local` stay in the working copy, and nothing committed them; they enter git only when you commit them. In `tracked` mode `bin/check-durability.sh` runs at once and reports an uncommitted record as `not-durable`.
 
 ## Checking the result
 

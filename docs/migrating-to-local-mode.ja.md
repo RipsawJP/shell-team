@@ -11,7 +11,7 @@
 既存の adopter が気づきうること:
 
 - `bin/team-setup.sh` は base dir をモード別に報告します。`local` モードでは、追記する ignore の行を示し、無視されている base dir は `Already in place:` に並べ、すでに HEAD でコミットされている base dir は `Remains the operator's decision:` に並べます。`tracked` モードの報告は変わりません。
-- `bin/team-init.sh` は、要約の最後に記録モードについての 2 行を、どのモードでも出すようになりました。1 行目は運用ファイルが既定でコミットされること（モード `tracked`）を述べ、2 行目は記録を git に載せないクローン向けに `git config shell-team.mode local` を示します。
+- `bin/team-init.sh` は、記録モードについての 2 行を、どのモードでも、最後の `Next:` の行の直前に出すようになりました。1 行目は運用ファイルが既定でコミットされること（モード `tracked`）を述べ、2 行目は記録を git に載せないクローン向けに `git config shell-team.mode local` を示します。
 - `bin/check-pii-shapes.sh --paths <file>…` は、指名したファイルだけをスキャンします。`local` モードでは、ロールが自分の記録に対してこれを使います。既定モードと `--all` モードは、無視されていて tracked でもない base dir を読まず、記録を 1 つも読まないまま clean と報告してしまうためです。
 - `local` モードでは、hand-off はボード・spec・レビュー記録を作業コピーに書き、コミットしません。engineer の実装とテストは、これまでどおりコミットされます。
 - `local` モードでは、`bin/team-commit.sh` は base dir 配下の名指しされたパスを拒否し、`bin/check-durability.sh` は記録がコミットされたかを確認する代わりに `skipped:` の行を出します。
@@ -69,7 +69,7 @@ git config shell-team.mode tracked
 
 `tracked` モードに戻ったあと base dir がまだ無視されていれば、setup は `Required:` の下で、妨げているルールを報告します。ignore の出どころと行、`git add` コマンド、該当するなら再包含の行です。ignore の行を変えるか、setup が示す再包含の行を足すかを決め、setup が出す `git add` コマンドで記録をコミットしてください。setup 自身は何もコミットしません。
 
-クローンが `local` だった間に書かれた記録は作業コピーに残り、それをコミットしたものは何もありません。記録が git に入るのは、あなたがコミットしたときだけで、その後は `bin/check-durability.sh` が再びそれらを確認します。
+クローンが `local` だった間に書かれた記録は作業コピーに残り、それをコミットしたものは何もありません。記録が git に入るのは、あなたがコミットしたときだけです。`tracked` モードでは `bin/check-durability.sh` はすぐに実行され、コミットされていない記録を `not-durable` と報告します。
 
 ## 結果を確かめる
 
