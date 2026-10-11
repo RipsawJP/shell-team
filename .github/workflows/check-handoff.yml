@@ -413,3 +413,9 @@ jobs:
 
       - name: Run team-mode fixture suite
         run: bash tests/team-mode/run.sh
+
+      - name: shellcheck (T-1183 additions)
+        run: shellcheck tests/local-mode/run.sh
+
+      - name: Run local-mode fixture suite
+        run: bash tests/local-mode/run.sh
