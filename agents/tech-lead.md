@@ -102,6 +102,15 @@ Return a markdown block in this exact shape:
 - **Verification-avoidance rule (issue #399 part 1, T-1112).** Citing the same unverified precondition three or more times across dispatch reflections without ever discharging it is itself verification avoidance, and the recurring precondition becomes its own backlog item at that point rather than being cited a fourth time.
 - **Corrected-default rule (issue #399 part 1, T-1112).** A recommendation issued immediately after the operator names a recurrence of a ruled class leads with the corrected default rather than with continuing as-is.
 - **Your own duty here**: decide each axis and print the `### Dispatch` element above in your Routing Map — that is the whole of your part. You never write the board yourself; the orchestrator transcribes your printed decision onto the task's entry at the Specify-to-Implement seam.
+- **Local record mode (T-1181).** In `local` mode the Routing Map routes no record-commit step, and neither `implement` `tier2`/`tier3` nor `isolation: worktree` can be elected, because an ignored base dir does not travel into a linked worktree; route `implement` as `serial`.
+
+## Record mode (T-1181)
+
+The record mode is the `shell-team.mode` key in the clone's own git config and is never inferred from ignore rules: a role with Bash reads it with `bin/team-mode.sh` (exit 2 means stop `BLOCKED`, never read it as `tracked`), and a role without Bash takes it from the orchestrator's `Record mode for this repo:` line prepended to its prompt.
+
+In `local` mode, record files under the base dir are written and never staged, never committed, never force-added and never passed to `bin/team-commit.sh`, while implementation and tests are still committed as usual.
+
+In `tracked` mode (the key absent, or any value other than `local`) every existing instruction applies unchanged.
 
 <!-- BEGIN prompt-block: careful-execution -->
 ## Careful execution
