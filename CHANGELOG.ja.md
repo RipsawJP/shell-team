@@ -6,6 +6,11 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.0**
+  - **clone ごとに `local` record mode を宣言すると、ループの記録を git に載せずに運用できる。** `git config shell-team.mode local` を clone で 1 回設定すると、`bin/team-setup.sh` は `git add` の代わりに `info/exclude` に足す行を報告し、各ロールは base dir 配下の記録を書くだけで stage も commit もせず（engineer のコードとテストは従来どおり commit）、`bin/check-durability.sh` は `skipped:` 1 行で skip し、`bin/team-commit.sh` は base dir 配下のパスを拒否する。モードは clone 単位で共有されない。base dir が既に commit 済みのリポジトリはオペレーターの判断に委ね、setup は削除コマンドを一切出さない。`local` モードでは `isolation: worktree` は非対応。キーが無ければ全スクリプト・ロール文・ゲートは従来（`tracked`）とバイト単位で同じ。（#711・#587）
+  - **`bin/check-pii-shapes.sh --paths <path>…` は ignore 状態に関わらず名指しした file / directory を走査する**。`local` モードのロールが自分の書いた記録を走査できる。何も読まなかった実行は exit 2 で、clean とは報告しない。`record-shape-scan` block は `local` モードでこれを使うよう指示する。
+  - **`bin/team-init.sh` の最後の要約が両モードを名指しし**、`bin/team-mode.sh` が全スクリプト・ロール共通のキーの唯一の読み取り口になった。
+  - **adopting guide がモードを文書化し**（モード × ignore 規則の 4 行表・各ケースで setup が報告する内容・ゲートの挙動）、README が言及し、既存 adopter 向けの移行ガイド（`docs/migrating-to-local-mode.md`・英日）が `tracked` のまま使う場合・clone を `local` に移す手順・commit 済み base dir の場合・混在チーム・戻し方・確認方法を扱う。goal skill は最初の tick でモードを読む。
 - **v2.8.8**
   - **サブエージェントから起動した Codex のレビューが、標準入力が閉じないパイプのときに無期限に待たなくなった。** `code-reviewer`（全モード）と `drift-evaluator` は、`codex exec` の各 pass をバックグラウンドで起動し、新設の `bin/codex-await.sh` で自分で回収する。120 秒以内に `thread.started` が出なければ、`BLOCKED — codex did not start` とトークン `no-thread-started`、捕捉した出力の末尾を添えて止まる。開始した pass は最大 63 分待ち、それを超えると `BLOCKED — codex did not finish` になる。素の `codex exec` の行は変えていないので、既存の `codex *` の sandbox 除外はそのまま当たり、設定の変更は要らない。（#695）
   - **`drift-evaluator` は、`codex --version` の確認を含むどの `codex` コマンドよりも前に、レビュアーの binding を確かめるようになった。** 拒否されたときは、spec に intent block が無くても、レポートを書かずに `BLOCKED` を返す。（#701）
