@@ -124,6 +124,8 @@ It is the same flow as `set up shell-team`, re-run: it refreshes a drifted `.cod
 
 The manual path on a Codex CLI host is [Using shell-team from Codex CLI](docs/adopting.md#using-shell-team-from-codex-cli) step 1's own version check, then, from the repository's own root, re-running the generator (`bash "<plugin root>/bin/gen-codex-agents.sh"`) and confirming with `bash "<plugin root>/bin/check-codex-agents.sh"`.
 
+To move an existing repository to local record mode, or to decide whether to, see [Moving an existing repository to local record mode](docs/migrating-to-local-mode.md).
+
 See [docs/distribution.md](docs/distribution.md) for the full update path, version-line policy, and the air-gapped fallback.
 
 ## Usage
