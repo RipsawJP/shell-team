@@ -86,9 +86,9 @@ Do this:
    In `local` record mode (`shell-team.mode` set to `local` in the clone's git
    config) a `Required:` item led by `- base directory in local mode: ` asks for
    something else: relay the line it names (for the default base dir,
-   `/.shell-team/`) as the line to append to the clone's `info/exclude` file, or
-   to a root `.gitignore` as the alternative the item names, and say that there
-   is nothing to stage. Never offer a `git add` for it. A `local`-mode item under
+   `/.shell-team/`) as the line to append to the clone's
+   `info/exclude` file in `local` mode, or to a root `.gitignore` as the
+   alternative the item names, and say that there is nothing to stage. Never offer a `git add` for it. A `local`-mode item under
    `Remains the operator's decision:` (the base dir is already committed) is
    relayed as that decision, with no command of your own.
 
