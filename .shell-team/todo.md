@@ -20,7 +20,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
-- [ ] **T-1186** A fresh clone of the plugin is LF whatever core.autocrlf says, and the run-start check names a CRLF declaration file before the run stops on it (issue #720) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1186-crlf-line-endings.md
+- [ ] **T-1186** A fresh clone of the plugin is LF whatever core.autocrlf says, and the run-start check names a CRLF declaration file before the run stops on it (issue #720) — `READY_FOR_QA` — spec: .shell-team/specs/T-1186-crlf-line-endings.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #720 (filed; a Windows / Git Bash adopter with `core.autocrlf=true` cannot start a run because `bin/check-invocation-path.sh` reads CRLF declaration rows as malformed). Hotfix branch `hotfix/720-crlf-line-endings`, cut from `develop` at `f5b0569b` (v2.9.0), with no open predecessor. Scope is the reporter's options (1) `.gitattributes` and (3) a `check-setup.sh` note; option (2), stripping `\r` in the readers, is a non-goal. Pre-commitment (AI self-discipline): N1 LF enforcement by `.gitattributes` and N2 "the note never changes the exit code" are never dropped. Droppable, in order: the docs paragraph's placement clauses, then the mutation positive control (**AC9**). The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.

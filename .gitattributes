@@ -1,0 +1,9 @@
+* text=auto eol=lf
+bin/** text eol=lf
+templates/** text eol=lf
+agents/** text eol=lf
+skills/** text eol=lf
+tests/** text eol=lf
+tests/check-handoff/fixtures/valid-crlf.md -text
+*.png binary
+tests/derive-populations/fixtures/control-char.txt -text

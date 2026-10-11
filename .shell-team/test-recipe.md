@@ -2717,3 +2717,4 @@ suite + dogfood step that must pass, run in that file's order."
   copy and `cmp`, run again (criteria that read `B...HEAD` need the mutation
   committed in the scratch clone; the clone sees the source branches as
   `refs/remotes/origin/*`, which the base-ref chain accepts).
+- T-1186 (CRLF note mutation, run in a scratch clone only): move `bin/check-setup.sh` to `bin/check-setup.real` and put a wrapper at the old name that runs the moved script piped through `grep -v '^- note: .*CRLF'` and exits with `${PIPESTATUS[0]}`; `bash tests/check-setup/run.sh` then exits non-zero with `FAIL: crlf: declaration files with CRLF line endings get one note each and exit 0` on stderr.
