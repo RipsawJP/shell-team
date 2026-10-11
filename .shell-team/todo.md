@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_ENG` — spec: .shell-team/specs/T-1187-codex-first-token.md
+- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_QA` — spec: .shell-team/specs/T-1187-codex-first-token.md
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: prose-only change across two agent prompts and one EN/JA docs pair, no new mechanism or checker, no existing suite locks the sentence (grep of `tests/` for `multi-part|added part|Do not close stdin` = 0), both gates still run.
