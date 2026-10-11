@@ -73,6 +73,7 @@ Generic, publishable shapes, each identified by a stable pattern id:
 bin/check-pii-shapes.sh                 # change-scoped against the default base
 bin/check-pii-shapes.sh --base develop  # change-scoped against an explicit ref
 bin/check-pii-shapes.sh --all           # full-tree audit (see below)
+bin/check-pii-shapes.sh --paths <path> [<path>...]   # exactly the named paths
 ```
 
 `tracker-key` is off in the shipped default; set `PII_CHECK_TRACKER_KEY` to a
@@ -83,8 +84,8 @@ PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh
 ```
 
 Exit codes: `0` clean, `1` one or more findings, `2` usage or structural
-error (an unresolvable base ref, an unreadable input, an unknown flag, or
-`--all` combined with `--base`). A finding never echoes the matched text —
+error (an unresolvable base ref, an unreadable input, an unknown flag,
+`--all` combined with `--base`, or any of the `--paths` failures below). A finding never echoes the matched text —
 only the pattern id, the path, and a line number (when available) are
 reported — so a public CI log never carries the byte that tripped the gate.
 
@@ -95,6 +96,22 @@ deliberately carry a PII shape as fixtures for another guard's own suite
 this repository; a newly added shape-bearing path anywhere else would still
 be reported. Use it locally when you want to sweep further than the current
 change.
+
+`bin/check-pii-shapes.sh --paths <path> [<path>...]` scans exactly the files
+and directories you name, whatever their ignore status: neither the default
+mode (committed blobs) nor `--all` (tracked and untracked-but-not-ignored
+files) reads a file under a gitignored directory, and `--paths` does. It must
+be the last option, and every argument after it is a path, so a path
+beginning with `-` is written `./-name`. A file is scanned; a directory is
+walked recursively, with any `.git` entry neither descended into nor
+scanned; a symlink is scanned by its stored target string and never
+followed; a file carrying a NUL byte is skipped with the usual `skip: binary`
+notice. Paths resolve against the directory you run it from, and findings
+use the usual `FINDING pattern=<id> path=<path> line=<n>` form with the path
+relative to the repository root. It fails closed: a missing or unreadable
+path, `--paths` with no path, `--paths` combined with `--all` or `--base`, or
+a run that read no regular text file (an empty directory, or one holding
+only binary files or symlinks) exits `2` and never prints the clean line.
 
 ## When the loop runs it
 
@@ -116,6 +133,15 @@ check-handoff.yml` never sets `PII_CHECK_TRACKER_KEY` — so it is the only
 mechanical catch for the opt-in shapes; the change-scoped scan on every pull
 request is the separate, unconditional check for everything else this gate
 covers.
+
+In `local` record mode (`shell-team.mode` set to `local` in the clone's git
+config, read with `bin/team-mode.sh`) the base dir is gitignored, so `--all`
+reads none of the records and reports clean without having read one. There
+the same four roles run `PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh
+--paths <record file>...` naming the record files they wrote or edited this
+round, instead of the `--all` run; a round that wrote no record file has
+nothing to name and reports the `- shape-scan:` line with a zero count. In
+`tracked` mode the `--all` instruction above applies unchanged.
 
 A hit the checker's own documents declare as **accepted noise** — this
 project's design-point label vocabulary and same-outline standards
