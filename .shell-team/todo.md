@@ -11,6 +11,14 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_ENG` — spec: .shell-team/specs/T-1187-codex-first-token.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - trivial-path: prose-only change across two agent prompts and one EN/JA docs pair, no new mechanism or checker, no existing suite locks the sentence (grep of `tests/` for `multi-part|added part|Do not close stdin` = 0), both gates still run.
+  - source: T-1186's first code-review round (2026-10-11, 2.9.0 snapshot) failed to start because the reviewer launched `cd <repo>; codex exec …`, and Claude Code 2.1.278+ ran that multi-part line inside the sandbox (`workspace routing discovery failed` → `turn.failed`); no issue filed — the fix ships directly as a hotfix stacked on T-1186.
+  - stacked-on: T-1186 (hotfix/720-crlf-line-endings @ 7cd6f4d1); PR base develop; ships in v2.9.1 with T-1186 (operator ruling 2026-10-11)
+  - follow-up: `skills/run/SKILL.md` (~260) and `templates/prompt-blocks/alternate-executor-invocation.md` (~29), "matches on its first token alone", are out of scope here; recommend filing an issue.
+
 
 
 
