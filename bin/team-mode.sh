@@ -67,8 +67,14 @@ esac
 
 command -v git > /dev/null 2>&1 || { printf 'team-mode: git is not on PATH\n' >&2 || true; exit 2; }
 
-rc=0
-val="$(git config --local --get shell-team.mode)" || rc=$?
+# Byte-exact capture: a command substitution strips every trailing line feed, so
+# a sentinel and git's exit status ride behind the value ("<value>x<status>").
+# git ends a printed value with one record terminator; a stored value that itself
+# ends in line feeds (or holds one) must not collapse into the exact string `local`.
+nl=$'\n'
+raw="$(set +e; git config --local --get shell-team.mode; printf 'x%s' "$?")"
+rc="${raw##*x}"
+val="${raw%x*}"
 case "$rc" in
   0) ;;
   1) val="" ;;
@@ -78,7 +84,7 @@ case "$rc" in
     ;;
 esac
 
-if [ "$rc" -eq 0 ] && [ "$val" = "local" ]; then
+if [ "$rc" -eq 0 ] && [ "$val" = "local$nl" ]; then
   printf 'local\n'
 else
   printf 'tracked\n'

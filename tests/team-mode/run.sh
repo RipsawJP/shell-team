@@ -48,6 +48,16 @@ run_in() {
   ERR="$(cat "$T/err")"
 }
 
+# out_is <word>: the captured stdout is byte for byte <word> + one line feed
+# (cmp against an expected file; $(...) would hide trailing line feeds).
+out_is() { out_line "$1"; }
+
+# out_line <text>: the captured stdout is byte for byte <text> + one line feed.
+out_line() {
+  printf '%s\n' "$1" > "$T/expected"
+  cmp -s "$T/out" "$T/expected"
+}
+
 n=0
 new_repo() {  # new_repo <name>: a committed repository with a base dir
   n=$((n + 1))
@@ -71,19 +81,30 @@ new_repo() {  # new_repo <name>: a committed repository with a base dir
 new_repo resolver
 mkdir -p "$R/sub"
 run_in "$R" bash "$MODE_SH"
-if [ "$RC" -eq 0 ] && [ "$OUT" = "tracked" ] && [ -z "$ERR" ]; then pass "mode-absent key absent prints tracked, exit 0, empty stderr"; else fail "mode-absent: rc=$RC out=$OUT err=$ERR"; fi
+if [ "$RC" -eq 0 ] && out_is tracked && [ -z "$ERR" ]; then pass "mode-absent key absent prints tracked, exit 0, empty stderr"; else fail "mode-absent: rc=$RC out=$OUT err=$ERR"; fi
 
 for v in tracked Local LOCAL locally 'local ' ''; do
   git -C "$R" config shell-team.mode "$v"
   run_in "$R" bash "$MODE_SH"
-  if [ "$RC" -eq 0 ] && [ "$OUT" = "tracked" ] && [ -z "$ERR" ]; then pass "mode-value-tracked [$v] is not the exact value local, so tracked"; else fail "mode-value [$v]: rc=$RC out=$OUT err=$ERR"; fi
+  if [ "$RC" -eq 0 ] && out_is tracked && [ -z "$ERR" ]; then pass "mode-value-tracked [$v] is not the exact value local, so tracked"; else fail "mode-value [$v]: rc=$RC out=$OUT err=$ERR"; fi
 done
 
 git -C "$R" config shell-team.mode local
 run_in "$R" bash "$MODE_SH"
-if [ "$RC" -eq 0 ] && [ "$OUT" = "local" ] && [ -z "$ERR" ]; then pass "mode-local exact value local prints local"; else fail "mode-local: rc=$RC out=$OUT err=$ERR"; fi
+if [ "$RC" -eq 0 ] && out_is local && [ -z "$ERR" ]; then pass "mode-local exact value local prints local"; else fail "mode-local: rc=$RC out=$OUT err=$ERR"; fi
 run_in "$R/sub" bash "$MODE_SH"
-if [ "$RC" -eq 0 ] && [ "$OUT" = "local" ]; then pass "mode-subdir run from a subdirectory reads the same clone"; else fail "mode-subdir: rc=$RC out=$OUT err=$ERR"; fi
+if [ "$RC" -eq 0 ] && out_is local; then pass "mode-subdir run from a subdirectory reads the same clone"; else fail "mode-subdir: rc=$RC out=$OUT err=$ERR"; fi
+
+# Byte-exact values: a stored value that differs from `local` by a line feed is
+# tracked. The escapes are written into .git/config as typed here (git decodes
+# \n inside a quoted value), so the resolver sees a real line feed.
+for spec in 'local\n' 'local\n\n' 'lo\ncal' '\nlocal'; do
+  new_repo "lf-$n"
+  printf '[shell-team]\n\tmode = "%s"\n' "$spec" >> "$R/.git/config"
+  seen="$(cd "$R" && git config --local --get shell-team.mode | od -An -c | tr -s ' ' | tr -d '\n')"
+  run_in "$R" bash "$MODE_SH"
+  if [ -n "$seen" ] && [ "$RC" -eq 0 ] && out_is tracked && [ -z "$ERR" ]; then pass "mode-lf-value [$spec] a stored value with a line feed prints exactly tracked plus one line feed, exit 0"; else fail "mode-lf-value [$spec]: rc=$RC seen=$seen err=$ERR"; fi
+done
 
 # Other scopes never select local: each variant is first shown visible to an
 # all-scopes read (positive control), then the resolver must still say tracked.
@@ -91,13 +112,13 @@ git -C "$R" config --unset-all shell-team.mode
 printf '[shell-team]\n\tmode = local\n' > "$T/g.conf"
 seen="$(cd "$R" && GIT_CONFIG_GLOBAL="$T/g.conf" git config --get shell-team.mode || true)"
 run_in "$R" env GIT_CONFIG_GLOBAL="$T/g.conf" bash "$MODE_SH"
-if [ "$seen" = local ] && [ "$RC" -eq 0 ] && [ "$OUT" = "tracked" ]; then pass "mode-global-scope a global value is visible to git yet stays tracked"; else fail "mode-global: seen=$seen rc=$RC out=$OUT"; fi
+if [ "$seen" = local ] && [ "$RC" -eq 0 ] && out_is tracked; then pass "mode-global-scope a global value is visible to git yet stays tracked"; else fail "mode-global: seen=$seen rc=$RC out=$OUT"; fi
 seen="$(cd "$R" && env "GIT_CONFIG_PARAMETERS='shell-team.mode=local'" git config --get shell-team.mode || true)"
 run_in "$R" env "GIT_CONFIG_PARAMETERS='shell-team.mode=local'" bash "$MODE_SH"
-if [ "$seen" = local ] && [ "$RC" -eq 0 ] && [ "$OUT" = "tracked" ]; then pass "mode-config-parameters injected value is visible to git yet stays tracked"; else fail "mode-config-parameters: seen=$seen rc=$RC out=$OUT"; fi
+if [ "$seen" = local ] && [ "$RC" -eq 0 ] && out_is tracked; then pass "mode-config-parameters injected value is visible to git yet stays tracked"; else fail "mode-config-parameters: seen=$seen rc=$RC out=$OUT"; fi
 seen="$(cd "$R" && env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=shell-team.mode GIT_CONFIG_VALUE_0=local git config --get shell-team.mode || true)"
 run_in "$R" env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=shell-team.mode GIT_CONFIG_VALUE_0=local bash "$MODE_SH"
-if [ "$seen" = local ] && [ "$RC" -eq 0 ] && [ "$OUT" = "tracked" ]; then pass "mode-config-count injected value is visible to git yet stays tracked"; else fail "mode-config-count: seen=$seen rc=$RC out=$OUT"; fi
+if [ "$seen" = local ] && [ "$RC" -eq 0 ] && out_is tracked; then pass "mode-config-count injected value is visible to git yet stays tracked"; else fail "mode-config-count: seen=$seen rc=$RC out=$OUT"; fi
 
 # Unreadable declaration fails closed.
 mkdir -p "$T/nogit"
@@ -123,11 +144,11 @@ if [ "$RC" -eq 2 ] && [ -z "$OUT" ]; then pass "mode-usage-two two arguments exi
 new_repo launch
 git -C "$R" config shell-team.mode local
 run_in "$R" "$MODE_SH"
-if [ "$RC" -eq 0 ] && [ "$OUT" = local ]; then pass "mode-launch-direct executed directly prints local"; else fail "mode-launch-direct: rc=$RC out=$OUT err=$ERR"; fi
+if [ "$RC" -eq 0 ] && out_is local; then pass "mode-launch-direct executed directly prints local"; else fail "mode-launch-direct: rc=$RC out=$OUT err=$ERR"; fi
 mkdir -p "$T/pathdir"
 ln -s "$MODE_SH" "$T/pathdir/team-mode.sh"
 run_in "$R" env PATH="$T/pathdir:$PATH" team-mode.sh
-if [ "$RC" -eq 0 ] && [ "$OUT" = local ]; then pass "mode-launch-path a bare name reached through a PATH symlink prints local"; else fail "mode-launch-path: rc=$RC out=$OUT err=$ERR"; fi
+if [ "$RC" -eq 0 ] && out_is local; then pass "mode-launch-path a bare name reached through a PATH symlink prints local"; else fail "mode-launch-path: rc=$RC out=$OUT err=$ERR"; fi
 
 # --- check-durability.sh under local ------------------------------------------
 SKIP_LINE='check-durability: skipped: shell-team.mode is local — no durability observation was made'
@@ -141,10 +162,10 @@ if [ "$RC" -eq 1 ]; then pass "dur-tracked-control an ignored board fails closed
 git -C "$R" config shell-team.mode local
 for ph in implement pre-merge close-out; do
   run_in "$R" bash "$DUR_SH" --phase "$ph" --task T-900 --ref refs/heads/main
-  if [ "$RC" -eq 0 ] && [ "$OUT" = "$SKIP_LINE" ] && [ -z "$ERR" ]; then pass "dur-local-$ph under local prints the one skipped line, exit 0, empty stderr"; else fail "dur-local-$ph: rc=$RC out=$OUT err=$ERR"; fi
+  if [ "$RC" -eq 0 ] && out_line "$SKIP_LINE" && [ -z "$ERR" ]; then pass "dur-local-$ph under local prints the one skipped line, exit 0, empty stderr"; else fail "dur-local-$ph: rc=$RC out=$OUT err=$ERR"; fi
 done
 run_in "$R" bash "$DUR_SH" --phase implement --task T-900 --ref refs/heads/nope
-if [ "$RC" -eq 0 ] && [ "$OUT" = "$SKIP_LINE" ]; then pass "dur-local-badref a ref naming no commit still skips under local"; else fail "dur-local-badref: rc=$RC out=$OUT"; fi
+if [ "$RC" -eq 0 ] && out_line "$SKIP_LINE"; then pass "dur-local-badref a ref naming no commit still skips under local"; else fail "dur-local-badref: rc=$RC out=$OUT"; fi
 run_in "$R" bash "$DUR_SH" --phase bogus --task T-900 --ref HEAD
 if [ "$RC" -eq 2 ] && [ -z "$OUT" ] && printf '%s' "$ERR" | grep -q '^check-durability: usage:'; then pass "dur-local-usage usage errors keep exit 2 under local"; else fail "dur-local-usage: rc=$RC err=$ERR"; fi
 
@@ -156,23 +177,26 @@ run_in "$U" bash "$DUR_SH" --phase implement --task T-900 --ref HEAD
 if [ "$RC" -eq 1 ]; then pass "dur-unborn-control an unborn repository is not-durable in tracked mode"; else fail "dur-unborn-control: rc=$RC"; fi
 git -C "$U" config shell-team.mode local
 run_in "$U" bash "$DUR_SH" --phase implement --task T-900 --ref HEAD
-if [ "$RC" -eq 0 ] && [ "$OUT" = "$SKIP_LINE" ]; then pass "dur-local-unborn an unborn repository skips under local"; else fail "dur-local-unborn: rc=$RC out=$OUT"; fi
+if [ "$RC" -eq 0 ] && out_line "$SKIP_LINE"; then pass "dur-local-unborn an unborn repository skips under local"; else fail "dur-local-unborn: rc=$RC out=$OUT"; fi
 new_repo durbad
 printf 'bogus\n' > "$R/.shell-team/durability-mode"
 run_in "$R" bash "$DUR_SH" --phase implement --task T-900 --ref HEAD
 if [ "$RC" -eq 2 ]; then pass "dur-malformed-control a malformed durability-mode is structural in tracked mode"; else fail "dur-malformed-control: rc=$RC"; fi
 git -C "$R" config shell-team.mode local
 run_in "$R" bash "$DUR_SH" --phase implement --task T-900 --ref HEAD
-if [ "$RC" -eq 0 ] && [ "$OUT" = "$SKIP_LINE" ]; then pass "dur-local-malformed a malformed durability-mode is never read under local"; else fail "dur-local-malformed: rc=$RC out=$OUT"; fi
+if [ "$RC" -eq 0 ] && out_line "$SKIP_LINE"; then pass "dur-local-malformed a malformed durability-mode is never read under local"; else fail "dur-local-malformed: rc=$RC out=$OUT"; fi
 
 # Resolver failure is structural, never tracked.
-mkdir -p "$T/inst-none/bin" "$T/inst-weird/bin" "$T/inst-ok/bin" "$T/inst-none/templates" "$T/inst-weird/templates" "$T/inst-ok/templates"
-for d in inst-none inst-weird inst-ok; do
+mkdir -p "$T/inst-none/bin" "$T/inst-weird/bin" "$T/inst-ok/bin" "$T/inst-none/templates" "$T/inst-weird/templates" "$T/inst-ok/templates" "$T/inst-lf2l/bin" "$T/inst-lf2t/bin" "$T/inst-lf2l/templates" "$T/inst-lf2t/templates"
+for d in inst-none inst-weird inst-ok inst-lf2l inst-lf2t; do
   cp "$DUR_SH" "$REPO_ROOT/bin/team-paths.sh" "$T/$d/bin/"
   cp "$REPO_ROOT/templates/durability-records.txt" "$T/$d/templates/"
 done
 cp "$MODE_SH" "$T/inst-ok/bin/"
 printf '%s\n' '#!/usr/bin/env bash' 'printf "weird\n"' > "$T/inst-weird/bin/team-mode.sh"
+# Out-of-set by trailing line feeds only: the word plus TWO line feeds is not exactly tracked / local.
+printf '%s\n' '#!/usr/bin/env bash' 'printf "local\n\n"' > "$T/inst-lf2l/bin/team-mode.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "tracked\n\n"' > "$T/inst-lf2t/bin/team-mode.sh"
 mkdir -p "$T/inst-fail/bin" "$T/inst-fail/templates"
 cp "$DUR_SH" "$REPO_ROOT/bin/team-paths.sh" "$T/inst-fail/bin/"
 cp "$REPO_ROOT/templates/durability-records.txt" "$T/inst-fail/templates/"
@@ -183,7 +207,7 @@ run_in "$R" bash "$T/inst-ok/bin/check-durability.sh" --phase implement --task T
 if [ "$RC" -eq 0 ]; then pass "dur-install-control an install with its sibling resolver passes a durable fixture"; else fail "dur-install-control: rc=$RC err=$ERR"; fi
 for v in unset local; do
   if [ "$v" = local ]; then git -C "$R" config shell-team.mode local; fi
-  for d in inst-none inst-weird inst-fail; do
+  for d in inst-none inst-weird inst-fail inst-lf2l inst-lf2t; do
     run_in "$R" bash "$T/$d/bin/check-durability.sh" --phase implement --task T-900 --ref refs/heads/main
     if [ "$RC" -eq 2 ] && [ -z "$OUT" ] && [ "$(printf '%s\n' "$ERR" | sed -n 1p | grep -c '^check-durability: structural:')" = 1 ]; then pass "dur-install-$d-$v a missing or out-of-set resolver is structural (exit 2)"; else fail "dur-install-$d-$v: rc=$RC out=$OUT err=$ERR"; fi
   done
@@ -240,7 +264,7 @@ for v in unset Local tracked; do
 done
 
 # Resolver failure is a refusal (class mode) before any write.
-mkdir -p "$T/ci-none" "$T/ci-weird" "$T/ci-nopaths" "$T/ci-fail"
+mkdir -p "$T/ci-none" "$T/ci-weird" "$T/ci-nopaths" "$T/ci-fail" "$T/ci-lf2l" "$T/ci-lf2t"
 cp "$COMMIT_SH" "$T/ci-fail/"
 printf '%s\n' '#!/usr/bin/env bash' 'printf "tracked\n"' 'exit 3' > "$T/ci-fail/team-mode.sh"
 cp "$COMMIT_SH" "$T/ci-none/"
@@ -248,8 +272,12 @@ cp "$COMMIT_SH" "$T/ci-weird/"
 cp "$COMMIT_SH" "$MODE_SH" "$T/ci-nopaths/"
 printf '%s\n' '#!/usr/bin/env bash' 'printf "weird\n"' > "$T/ci-weird/team-mode.sh"
 cp "$REPO_ROOT/bin/team-paths.sh" "$T/ci-weird/"
+cp "$COMMIT_SH" "$REPO_ROOT/bin/team-paths.sh" "$T/ci-lf2l/"
+cp "$COMMIT_SH" "$REPO_ROOT/bin/team-paths.sh" "$T/ci-lf2t/"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "local\n\n"' > "$T/ci-lf2l/team-mode.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "tracked\n\n"' > "$T/ci-lf2t/team-mode.sh"
 for v in unset local; do
-  for d in ci-none ci-weird ci-fail; do
+  for d in ci-none ci-weird ci-fail ci-lf2l ci-lf2t; do
     new_repo "ci$v$d"; dirty "$R"
     if [ "$v" = local ]; then git -C "$R" config shell-team.mode local; fi
     if refused "$R" mode bash "$T/$d/team-commit.sh" "${M[@]}" README; then pass "commit-mode-$d-$v a missing or out-of-set resolver is refused (class mode)"; else fail "commit-mode-$d-$v: rc=$RC err=$ERR"; fi

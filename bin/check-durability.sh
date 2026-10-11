@@ -197,11 +197,13 @@ MODE_READER="$SCRIPT_DIR/team-mode.sh"
 if [ ! -f "$MODE_READER" ] || [ ! -r "$MODE_READER" ]; then
   fail_structural "cannot read the declared mode (team-mode.sh missing or unreadable next to check-durability.sh)"
 fi
-TEAM_MODE="$(bash "$MODE_READER" 2>/dev/null)" \
+# Sentinel capture: only the exact output `tracked` or `local` plus one line feed counts.
+NL=$'\n'
+TEAM_MODE="$(bash "$MODE_READER" 2>/dev/null && printf x)" \
   || fail_structural "team-mode.sh could not read the declared mode (shell-team.mode)"
 case "$TEAM_MODE" in
-  tracked) ;;
-  local)
+  "tracked${NL}x") ;;
+  "local${NL}x")
     printf 'check-durability: skipped: shell-team.mode is local — no durability observation was made\n'
     exit 0
     ;;

@@ -254,11 +254,13 @@ IDX="$(git "${NEUTRAL[@]}" diff-index --cached --raw "${DIFFOPTS[@]}" HEAD 2> /d
 # ---------------------------------------------------------------------------
 MODE_READER="$SCRIPT_DIR/team-mode.sh"
 { [ -f "$MODE_READER" ] && [ -r "$MODE_READER" ]; } || refuse mode "team-mode.sh is missing or unreadable next to team-commit.sh"
-TEAM_MODE="$(bash "$MODE_READER" 2> /dev/null)" || refuse mode "team-mode.sh could not read the declared mode (shell-team.mode)"
+NL=$'\n'
+TEAM_MODE="$(bash "$MODE_READER" 2> /dev/null && printf x)" || refuse mode "team-mode.sh could not read the declared mode (shell-team.mode)"
 LOCAL_BASE=""
 case "$TEAM_MODE" in
-  tracked) : ;;
-  local)
+  "tracked${NL}x") TEAM_MODE=tracked ;;
+  "local${NL}x")
+    TEAM_MODE=local
     PATHS_READER="$SCRIPT_DIR/team-paths.sh"
     { [ -f "$PATHS_READER" ] && [ -r "$PATHS_READER" ]; } || refuse mode "shell-team.mode is local but team-paths.sh is missing or unreadable next to team-commit.sh"
     LOCAL_BASE="$(bash "$PATHS_READER" --get base 2> /dev/null)" || refuse mode "shell-team.mode is local but team-paths.sh could not resolve the base dir"
