@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_QA` — spec: .shell-team/specs/T-1187-codex-first-token.md
+- [ ] **T-1187** The reviewer prompts and the distribution docs say a codex exec launch line starts with codex and carries nothing before or after it — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1187-codex-first-token.md
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: prose-only change across two agent prompts and one EN/JA docs pair, no new mechanism or checker, no existing suite locks the sentence (grep of `tests/` for `multi-part|added part|Do not close stdin` = 0), both gates still run.
@@ -30,6 +30,13 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - round 2 rework (engineer): continuation clause narrowed to "after its last argument ... joins a second command or part" with the quoted-prompt backslash newline stated as fine, in both agent files; invariant sentence moved before "Do not close stdin yourself"; check-acs 5 passed, 0 failed (command: `CHECK_ACS_TIMEOUT=900 bash "<plugin root>/bin/check-acs.sh" .shell-team/specs/T-1187-codex-first-token.md`)
     - Verification ceiling: none declared in the spec. Edge cases tried: counterexample line-start anchoring (`^[[:space:]]*`?cd <repo>;`), blocks outside the five covered sites; adversarial fixture classes not applicable (prose-only, canonical commands unchanged and exercised by the hygiene suite).
     - Risk notes for reviewer: AC5 and the `P=7cd6f4d1` base are tied to T-1186's branch tip (spec Notes). The follow-up on `skills/run/SKILL.md` and `templates/prompt-blocks/alternate-executor-invocation.md` stays out of scope.
+  - qa (round 2, qa-verifier): PASS — READY_FOR_REVIEW (supersedes the round-1 flag only; round-1 PASS stands for the unchanged parts)
+    - Acceptance criteria: `CHECK_ACS_TIMEOUT=900 bash "<plugin root>/bin/check-acs.sh" .shell-team/specs/T-1187-codex-first-token.md` -> `check-acs: 5 passed, 0 failed, 0 skipped, 0 unrecognized`; AC1-AC5 PASS (no runtime criteria)
+    - Tests: `bash tests/codex-skeleton-hygiene/run.sh` under `ulimit -f 400000`, output capped by `head -c 2000000` -> `grep -c '^PASS'` 48, `grep -c '^FAIL'` 0, last line OK; `check-prompt-sync.sh` rc 0; `gen-codex-agents.sh` + `check-codex-agents.sh` (`--out-dir "$TMPDIR/t1187-qa2-agents"`) rc 0 / rc 0
+    - Class closure: every backslash newline in the two agent files (`grep -n '\\$' agents/code-reviewer.md agents/drift-evaluator.md`) read against the narrowed clause: each `codex exec` one (drift-evaluator 92-101; code-reviewer 83-84 and 208-211) sits inside the double-quoted prompt argument, so the clause calls it fine and none is a violation; drift-evaluator 76/78 are a non-launch preflight snippet; no backslash newline joins a second command to a launch line. The clause text from `The Bash command that launches` through `...fail.` hashes identically in both files (`grep -o ... | md5`); order is counterexample, then `Do not close stdin`, then `So:` (code-reviewer) / `Instead:` (drift-evaluator). Docs: `grep -n -i 'continuation\|backslash' docs/distribution.md docs/distribution.ja.md` no hits; numstat still 1/0 each, no change needed.
+    - Bare-line counts: `grep -cE '^[[:space:]]*codex exec '` code-reviewer 3, drift-evaluator 1; leading `cd <repo>;` line grep 0 / 0; `grep -cF 'is that one command and nothing else'` 1 / 1.
+    - `check-provenance.sh .shell-team/provenance/T-1187.md` conformant (3 decision entries); `check-interventions.sh --task T-1187` conformant (sentinel); `check-handoff.sh .shell-team/todo.md` rc 0; AC5 scope lock PASS.
+    - Risk notes for reviewer: prose-only, adversarial fixture classes not applicable; the follow-up on `skills/run/SKILL.md` and `templates/prompt-blocks/alternate-executor-invocation.md` stays out of scope.
 
 
 
