@@ -377,14 +377,19 @@ refused() {
 #     failed read, a missing sibling or a value outside tracked/local is exit 2
 #     with nothing written; an unreadable declaration is never read as tracked.
 # ---------------------------------------------------------------------------
+nl_mode=$'\n'
+# Sentinel capture (as in check-durability.sh and team-commit.sh): a command
+# substitution strips every trailing line feed, so a printf x rides behind the
+# value and only `tracked` or `local` plus exactly one line feed counts.
 MODE_RC=0
-MODE="$(cd "$ROOT" && bash "$SCRIPT_DIR/team-mode.sh")" || MODE_RC=$?
+MODE="$(cd "$ROOT" && bash "$SCRIPT_DIR/team-mode.sh" && printf x)" || MODE_RC=$?
 if [ "$MODE_RC" -ne 0 ]; then
   die "could not read the record mode through team-mode.sh (exit $MODE_RC); nothing was written"
 fi
 case "$MODE" in
-  tracked|local) : ;;
-  *) die "team-mode.sh printed an unexpected record mode; nothing was written" ;;
+  "tracked${nl_mode}x") MODE=tracked ;;
+  "local${nl_mode}x") MODE=local ;;
+  *) die "team-mode.sh printed an unexpected record mode (expected exactly tracked or local, one line); nothing was written" ;;
 esac
 
 # ---------------------------------------------------------------------------
