@@ -52,6 +52,7 @@ Raw review captures you already committed stay tracked either way — the
 plugin performs no migration of its own, and removing them from the index or
 rewriting history to remove them is your own decision, not one it makes for
 you.
+To move an existing repository to local record mode, or to decide whether to, see [Moving an existing repository to local record mode](migrating-to-local-mode.md).
 
 If you keep the base dir out of git, the two ways of doing that differ in scope.
 A `.shell-team/` line in the repo's own `.gitignore` applies to that repo and is

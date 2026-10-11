@@ -47,4 +47,8 @@
   date: 2026-10-11
   summary: while task B of #711 was being specified, the operator added a sprint item: because the loop's mechanics change in this sprint, a document describing what changed for an existing adopter environment and the migration steps is to be written and shipped before the release
   effect: the sprint backlog gains a documentation task after task C (the guide needs the final state of tasks A, B and C); the release follows that task; no change to tasks A, B or C
+- intervention: human-correction
+  date: 2026-10-11
+  summary: after the second operator gate of the day opened on a harness refusal (the reviewer's record commit refused by the auto-mode classifier at T-1183; the engineer's doc edit refused by the removal-safety check at T-1185), the operator said the rules meant to reach the goal were being blocked by rules for following rules, that work which could have been done was not done, and that a shape-specific fix plus a new rule each time is not the countermeasure wanted, because near variants slip through and the rules hollow out
+  effect: no rule was added or changed in the loop; the coordinating session committed to judging a stop by whether it protects something irreversible it can name (deletion, credentials, sandbox or configuration changes, production), to writing that named thing as the first line of any gate it opens, and to counting the operator turns its own stop decisions caused; the consolidation of the three overlapping refusal rules into one purpose statement goes to the sprint retro as a candidate for the operator's ruling
 <!-- END interventions: no-task -->

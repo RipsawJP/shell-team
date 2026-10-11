@@ -124,6 +124,8 @@ update shell-team
 
 Codex CLI host での手動の手順は、[Codex CLI から shell-team を使う](docs/adopting.ja.md#codex-cli-から-shell-team-を使う) 手順 1 自身のバージョンチェックに従い、そのうえでリポジトリそのものの root から generator を再実行し（`bash "<plugin root>/bin/gen-codex-agents.sh"`）、`bash "<plugin root>/bin/check-codex-agents.sh"` で確認すること。
 
+既存のリポジトリを local record mode に移す場合、またはそうするかを判断する場合は、[既存のリポジトリを local record mode に移す](docs/migrating-to-local-mode.ja.md) を参照。
+
 更新の全体像・バージョン方針・エアギャップ用フォールバックは [docs/distribution.md](docs/distribution.md) を参照。
 
 ## 使い方

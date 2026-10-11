@@ -2699,3 +2699,21 @@ suite + dogfood step that must pass, run in that file's order."
 - T-1182: `bash tests/check-pii-shapes/run.sh` now also carries the `--paths` cases (thirteen `--paths:` labels, shapes assembled from fragments, repositories under `$WORK`); it needs a non-root user for the unreadable-file case, which fails rather than passing vacuously when run as root. AC6 of `T-1182-local-mode-shape-scan.md` runs it plus `tests/bin-help/run.sh`, so run `CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh <spec>` (minutes); `ps` is denied in this sandbox, so use the shim-`ps` form from the T-1176 note above if the frozen `tmo` helper returns 99. AC4/AC5/AC7/AC8/AC11-AC13 read the base through the merge-base discriminator and need the work committed.
 - T-1183: `bash tests/local-mode/run.sh` drives the whole mechanical `local` record-mode path (team-mode, check-durability skip, team-commit refusal and commit, `check-pii-shapes.sh --paths`, setup's `info/exclude` report, check-handoff and close-out on an ignored board, final `git log --all` on the base dir) in a fixture clone under `${TMPDIR:-/tmp}`. No new prerequisite (bash + git); every script runs under a process-group timeout (`set -m`, the helper shape of the spec's check lines) with `ulimit -f`. Pin `GIT_CONFIG_GLOBAL=/dev/null` for any ignore assertion: the operator's global excludes file can list the base dir and make a "not ignored" fixture look ignored (measured on this workstation). The new `tests/setup/run.sh` labels and the `tests/team-init/run.sh` label are plain additions to those suites.
 - T-1184: the docs-and-skills task is verified by `CHECK_ACS_TIMEOUT=3600 bash bin/check-acs.sh .shell-team/specs/T-1184-local-mode-docs.md` (its AC8 runs five whole suites, so give it the raised timeout and a fresh `TMPDIR`; run it in the background and poll a log, since it exceeds a foreground call's limit), plus `bash bin/check-prompt-sync.sh`, `bash bin/check-readme-version.sh README.md README.ja.md`, and `gen-codex-agents.sh` then `check-codex-agents.sh` against a scratch `--out-dir`. Every check line reads base blobs through `git merge-base` on the predecessor branch, so the stacked branch ref must exist locally.
+
+- T-1185: probing the record-mode scripts for a doc's claim inventory runs in
+  scratch repos under `$TMPDIR` with `GIT_CONFIG_GLOBAL=/dev/null` and
+  `GIT_CONFIG_NOSYSTEM=1` (and `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`,
+  `CODEX_THREAD_ID`, `TEAM_RUN_BASE` unset). Three traps. `bin/check-durability.sh`
+  needs all of `--phase`, `--task` and `--ref` before it reads the mode, so a
+  bare call prints a usage error and exit 2 in every mode; the `local` skip line
+  appears only with the full argument set. A `--paths` fixture for
+  `bin/check-pii-shapes.sh` must not spell a secret-shaped string in the tool
+  input (the host's secret guard blocks the call); a home-path-shaped string
+  assembled from two `printf` fragments is flagged by `--paths` and is not
+  blocked, and `--all` reports clean over an ignored base dir, which is the
+  point of the probe. Mutation probes for a spec's `check:` lines run in a
+  `git clone --shared` scratch copy: extract one criterion's check line with
+  `awk`, run it with `bash` under `ulimit -f`, mutate, run, restore from a saved
+  copy and `cmp`, run again (criteria that read `B...HEAD` need the mutation
+  committed in the scratch clone; the clone sees the source branches as
+  `refs/remotes/origin/*`, which the base-ref chain accepts).

@@ -54,6 +54,7 @@ capture は自己完結した `<base>/.gitignore` で無視されます。ベー
 追跡されたままです — プラグイン自身は何の移行処理も行わないため、index から
 取り除くか、履歴を書き換えて取り除くかはあなた自身の判断であり、プラグインが
 代わりに決めることはありません。
+既存のリポジトリを local record mode に移す場合、またはそうするかを判断する場合は、[既存のリポジトリを local record mode に移す](migrating-to-local-mode.ja.md) を参照してください。
 
 base dir を git に載せない方法は 2 つあり、効く範囲が違います。repo 自身の
 `.gitignore` に `.shell-team/` を書けば、その repo だけに効き、取り消しも容易
