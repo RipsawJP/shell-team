@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1185** A migration guide tells an existing adopter what local record mode changes, how to move a clone to it and how to go back (issue #711, sprint local-mode) — `REWORK` — spec: .shell-team/specs/T-1185-local-mode-migration-guide.md
+- [ ] **T-1185** A migration guide tells an existing adopter what local record mode changes, how to move a clone to it and how to go back (issue #711, sprint local-mode) — `READY_FOR_QA` — spec: .shell-team/specs/T-1185-local-mode-migration-guide.md
   - entry-mode: pm-authored
   - source: the operator's sprint addition of 2026-10-11, verbatim: 「このスプリントの最後に、仕組みに変化があったので、既存の環境からの変更点や移行手順をドキュメントとして、加えた上でリリースしたい」. No separate issue was filed: the request came in-session as the last task of sprint `local-mode` (issue #711), and T-1184's Non-goals had named this guide as a later task. Stacked on T-1184's tip (`feature/711-local-mode-docs` at `dc4136d9`); PR base `develop`. Base-side reads use the two-arm discriminator (`git merge-base feature/711-local-mode-docs HEAD`, falling back to `develop`). Pre-commitment (AI self-discipline): never-dropped N1 the two ordered step lists, N2 the committed-base-dir section with no command, N3 EN/JA lockstep; droppable, first and only, the restated detail in "What changed" and "Checking the result" (shrinks to links plus the scripts' `--help`). The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
   - spec-review: none
