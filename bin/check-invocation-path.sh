@@ -18,9 +18,10 @@
 # own installed directory, one level up — never from an adopter's working
 # tree. Argv composition for the one alternate path this repository ships
 # (tech-lead under codex-cli, --sandbox read-only) stays shipped PROSE
-# inside that block: a Claude Code sandbox matches its own exclusion
-# patterns on a command line's first token, so a wrapper-embedded `codex
-# exec` invocation can never run outside the sandbox
+# inside that block: since Claude Code 2.1.278 a sandbox exempts a command
+# only when every part of the command line matches its exclusion patterns
+# (before that, only the leading token was matched), so a wrapper-embedded
+# `codex exec` invocation can never run outside the sandbox
 # (bin/codex-capture.sh:8-23) — this is why the recipe's ALLOWLIST is
 # prose-carried and this gate is only the ADMISSIBILITY half.
 #
