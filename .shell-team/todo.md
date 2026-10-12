@@ -11,6 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1190** Test follow-ups: the team-commit suite reports a missing team-mode.sh sibling instead of aborting, and the setup suite covers four more local-mode classes (issues #712, #718) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1190-local-mode-followups-tests.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issues #712 and #718, filed as fast-follows of T-1180 and T-1183. Branch `feature/local-mode-followups-tests` cut from T-1189's tip `8b917f80` (predecessor `feature/local-mode-followups-prose`, PR #743 open against develop); this task's PR also targets develop. Pre-commitment (AI self-discipline): never-dropped N1 no `bin/` edit, N2 team-commit normal-run stdout byte-identical, N3 no recursive deletion; droppable, in order, AC5's global-excludes variant (class-B re-freeze). Any finding needing a `bin/` edit returns to planning as a new issue. Relayed premises (coordinating-session measurement of the parent-directory check-ignore output; errexit inside command substitution, reasoned only) are labelled in the spec's Assumptions. The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+
 
 
 
