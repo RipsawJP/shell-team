@@ -11,12 +11,22 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1188** Four prose fixes: the check-setup CRLF note, the codex exec launch-line invariant, the alternate-executor recipe sentence and a freeze-sweep item for per-checkout values — `READY_FOR_QA` — spec: .shell-team/specs/T-1188-fast-follow-prompts-sweep.md
+- [ ] **T-1188** Four prose fixes: the check-setup CRLF note, the codex exec launch-line invariant, the alternate-executor recipe sentence and a freeze-sweep item for per-checkout values — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1188-fast-follow-prompts-sweep.md
   - engineer: implementation committed 06aee1a3 (7 files); check-acs 7 passed 0 failed; suites check-setup/codex-skeleton-hygiene/check-invocation-path all pass
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: four prose-only edits (one note string in `bin/check-setup.sh` plus its header comment, two hand-written agent-prompt lines, one contained template line and its SKILL.md copy, one new SKILL.md sweep sub-bullet, one EN/JA docs pair), no behaviour or checker change; precedent T-1187 on the same agent and template lines; both gates still run.
   - source: issues #728, #730, #731, #734 (filed as fast-follows of T-1186 / T-1187); PR body carries `Closes #728`, `Closes #730`, `Closes #731`, `Closes #734`.
+  - qa (round 1, qa-verifier): PASS — READY_FOR_REVIEW
+    ### QA verdict: PASS
+    - Task: T-1188 → READY_FOR_REVIEW
+    - Tests: `bash tests/check-setup/run.sh` → `grep -c '^PASS'` 188, `grep -c '^FAIL'` 0; `tests/codex-skeleton-hygiene/run.sh` 48 / 0; `tests/check-invocation-path/run.sh` 26 / 0 (counts from `grep -c '^PASS' <log>` / `grep -c '^FAIL' <log>` on each captured log; each suite grepped for `rm -[a-zA-Z]*[rR]|find .*-delete` first, rc 1 = no match; run under `ulimit -f 400000` with `| head -c 20000000`)
+    - Acceptance criteria: `CHECK_ACS_TIMEOUT=900 bash "<plugin root>/bin/check-acs.sh" .shell-team/specs/T-1188-fast-follow-prompts-sweep.md` → `check-acs: 7 passed, 0 failed, 0 skipped, 0 unrecognized`; all seven carry a `check:` line, so no runtime criterion remains to audit item by item.
+    - Verification ceiling: none declared in the spec (no `- verification-ceiling:` line; `grep -c verification-ceiling <spec>` 0).
+    - Static and records: `bash bin/check-prompt-sync.sh` rc 0; `shellcheck bin/check-setup.sh` rc 0; `bash bin/check-handoff.sh .shell-team/todo.md` rc 0; `check-provenance.sh .shell-team/provenance/T-1188.md` conformant (2 decision entries); `check-interventions.sh --task T-1188` conformant (sentinel); AC6 gen-codex-agents → check-codex-agents rc 0 via check-acs.
+    - Notes 13 readings: (a) invariant segment in code-reviewer.md and drift-evaluator.md byte-identical (`grep -oE` of the segment | `shasum` equal in both files); (b) template `**Constructing` line and its SKILL.md copy byte-identical (`shasum` equal); (c) EN line 206 "can stop the run at Step 1" and JA line 210 "Step 1 で run を止めることがあります" carry the same softened claim, with the rest of the paragraph unchanged in meaning; (d) SKILL.md line 76 sub-bullet covers the absolute path and temp path (T-1181 AC9 case) and a `set -x` trace line (T-1183 case) and a timestamp, carries the scope clause naming bootstrap freeze, vN attestation backfill and class-M re-freeze, and its determiners ("a value", "a stream that a check compares") do not narrow the class; (e) the six `codex exec` launch lines (code-reviewer 54, 83, 208; drift-evaluator 92; SKILL.md 255; template 23), multi-line continuations included, hold no `$(` and no backtick (awk scan, 0 hits); the other "command substitution" mentions (SKILL.md 218 on the `claude -p` line, SKILL.md/template on the earlier `$(cat …)` form, the two default-diagnosis sentences) agree with the new sentence.
+    - Edge cases tried: scan of continuation lines of every multi-line `codex exec` block for substitution (0 hits); `git status --short` clean before the board edit (no working-tree mutation by QA).
+    - Risk notes for reviewer: AC4 numstat (+2/-1) and AC7 are tied to base a9bc8eec by design. Prose-only artifacts: the meaning-symmetry readings in (c)/(d) are reading judgments, not executed checks. CI parity: workflow files not re-derived beyond the reverse-mapped suites (`check-setup`, `codex-skeleton-hygiene`, `check-invocation-path`) plus shellcheck on the one edited script; the pull-request-only steps were not run locally.
 
 
 
