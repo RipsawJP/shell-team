@@ -11,9 +11,21 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1190** Test follow-ups: the team-commit suite reports a missing team-mode.sh sibling instead of aborting, and the setup suite covers four more local-mode classes (issues #712, #718) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1190-local-mode-followups-tests.md
+- [ ] **T-1190** Test follow-ups: the team-commit suite reports a missing team-mode.sh sibling instead of aborting, and the setup suite covers four more local-mode classes (issues #712, #718) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1190-local-mode-followups-tests.md
   - entry-mode: pm-authored
   - spec-review: none
+  - dispatch-reflection: implement — T-1189 — repeat — T-1189's recorded value is `serial`; two test files with small additive hunks, no balanced disjoint partition
+  - dispatch-reflection: verify — T-1189 — repeat — T-1189's recorded value is `serial`; one spec's check-acs plus the two edited suites, no mechanism-class full-population half
+  - dispatch-reflection: specify — T-1189 — repeat — T-1189's recorded value is `pm-authored`; the issue bodies plus the tech-lead's measured premises hand over as text
+  - dispatch-reflection: spec-review — T-1189 — repeat — T-1189's recorded value is `none`; every premise is an in-repo script or test line, and the one git behaviour was measured live before the freeze
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — two test files with small additive hunks; no balanced disjoint partition, and the tier2 trigger does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs plus the two edited suites and shellcheck, below the fan-out threshold; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue bodies and the tech-lead's measured premises hand over as text
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: every premise is an in-repo script or test line measured at the base; the parent-pattern reporting of `git check-ignore -v` was measured live by the coordinating session before the freeze
+  - freeze-attestation (v1, 2026-10-12): lines=11/11 sweep=mutual-satisfiability verdict=4P/7F owner=coordinating session
+  - freeze read (v1, 2026-10-12): every check line run live with check-acs against the pre-implementation tree at c4f509a5 (754 s) — AC2, AC7, AC8, AC10 PASS; AC1, AC3–AC6, AC9, AC11 FAIL, each red only for the absent guard, fixtures or diff; AC2's own stability guard ran the base suite twice with identical stdout, so the byte-identity comparison carries no per-run value; AC1's only path comparison is the fixture's own directory against itself, not a fixed expectation; every recursive-deletion pattern match in the spec is the guard regex as a grep literal; post-implementation read: AC2 (normal-run stdout unchanged) and AC1 (guarded copy sites) are mutually satisfiable because the guard only changes the missing-sibling path, AC11 (setup additions only) and AC3–AC6 are satisfiable by appended fixtures, and AC9's allowed set covers this task's records; premise M4 parent-directory reporting measured live before the freeze (`git check-ignore -v -z` on `ops/st/` with `/ops/` in `.git/info/exclude` reported `.git/info/exclude`, `1`, `/ops/`); declaration gates read: `user-visible: no` (check-adopter-docs exit 0), `verification-ceiling: unit-and-static` with no criterion above it, `base-ref-discriminator` three-arm expression because the predecessor branch has an open PR (#743) and AC2, AC9 and AC11 read the base; entry-mode pm-authored and spec-review none agree with the tech-lead's printed decisions; check-entry-mode and check-oversight exit 0
+  - version-derivation (v1, 2026-10-12): verdict=match — derived=PATCH — headline=not-met — default-reach=not-met — premise=PATCH (v2.9.3), approved at the sprint planning GO on 2026-10-12 on the ground that every item is a fix with no new adopter capability — grounds: tests only; no shipped file changes
+  - intent-hash (v1): a5cbbfa61398e26181ca483c0cf44133531f93bc
   - source: issues #712 and #718, filed as fast-follows of T-1180 and T-1183. Branch `feature/local-mode-followups-tests` cut from T-1189's tip `8b917f80` (predecessor `feature/local-mode-followups-prose`, PR #743 open against develop); this task's PR also targets develop. Pre-commitment (AI self-discipline): never-dropped N1 no `bin/` edit, N2 team-commit normal-run stdout byte-identical, N3 no recursive deletion; droppable, in order, AC5's global-excludes variant (class-B re-freeze). Any finding needing a `bin/` edit returns to planning as a new issue. Relayed premises (coordinating-session measurement of the parent-directory check-ignore output; errexit inside command substitution, reasoned only) are labelled in the spec's Assumptions. The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
 
 
@@ -7041,6 +7053,7 @@ Supersedes nothing above (rounds 1-3's own numbers stand as measured then); this
 
 - [x] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
   - closed: 2026-10-12, PR #743 → develop, closes #737 — also closes #738, #721, #723 and #714 (#714 delivered by T-1184)
+  - CI (AC14, 2026-10-12): PR #743 check run `check-handoff lint` conclusion success on head 8b917f80 (completed 09:55Z), read through the GitHub check-runs API
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1188 — no-predecessor-row — T-1188 took the trivial path and recorded no dispatch row for this axis

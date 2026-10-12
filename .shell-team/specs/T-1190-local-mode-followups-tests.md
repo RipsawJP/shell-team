@@ -1,6 +1,6 @@
 # Test follow-ups: the team-commit suite survives an override with no sibling, and the setup suite covers four more local-mode classes
 
-**Status**: READY_FOR_ARCH
+**Status**: READY_FOR_ENG
 **Owner**: pm-spec
 **Task ID**: T-1190
 
