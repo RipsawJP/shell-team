@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
+- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1188 — no-predecessor-row — T-1188 took the trivial path and recorded no dispatch row for this axis
@@ -42,6 +42,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Risk notes for reviewer: (1) near-miss, not a FAIL: README line 51, setup SKILL line 16 and the team-init paragraph say that for a base path with a character outside A-Za-z0-9._/- the local-mode item is a Required item that prints no line; bin/team-setup.sh:796-823 checks committed-in-HEAD (Remains) and already-ignored (Already in place) before the unsafe-path branch, so for an unsafe path that is committed or ignored the item is not Required. The qualifier holds for the not-committed, not-ignored case and is read in a list of alternatives; the reviewer may judge whether to tighten it. (2) The run skill wording "treated as broken as a command" is the trigger name from the tuning docs, read grammatically; not a defect. (3) Prose-only and comment-only deliverable: the adversarial-fixture checklist does not apply beyond the two mutation probes above.
     - Edge cases tried: unsafe-path/committed/ignored precedence read in team-setup.sh (above); non-comment mutation of the script; JA phrase removal.
     - CI parity: .github/workflows present; shellcheck over bin/ run locally on the one edited script (exit 0); the pull-request-only steps were not run locally and are covered by AC14.
+  - code review round 1 (2026-10-12): REQUEST_CHANGES (record `.shell-team/reviews/T-1189.md`, pass ids primary and adversarial) — Major: README.md:51 / README.ja.md:51, skills/setup/SKILL.md:16 and skills/team-init/SKILL.md:69 present the unsafe-path `Required:` item as a `local`-mode outcome with no precondition, while `bin/team-setup.sh:795-798` (committed → `Remains`) and `:813-815` (ignored → `Already in place:`) run before the path-safety case at `:818-821`; minor: guide line 70 (EN/JA) names only the suppressed `git add` command, but `:1026-1029` suppresses the re-include line too; minor: README lines 77/99 (EN/JA) omit that an unsafe path in the not-yet-committed state prints no exclude line. Routed back to engineer → `READY_FOR_ENG`. Pre-commitment count for the class "a sentence this task edits is contradicted by a script line": 1 of 2 (QA round 1 recorded no finding of this class).
+  - fast-follow disposition (2026-10-12): README.md:77 / README.ja.md:77 pre-existing "ignores it through `info/exclude`" wording outside this diff (nit) — filed as issue #744 — wording-only, outside this task's edited sentences, one sub-point unverified
 
 
 
