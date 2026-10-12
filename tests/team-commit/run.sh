@@ -18,6 +18,9 @@
 #
 # TEAM_COMMIT_SCRIPT overrides the script under test (a mutation self-check
 # points it at a scratch copy; the default is the tracked bin/team-commit.sh).
+# TEAM_COMMIT_SCRIPT is a copy-plus-sibling contract: it must sit beside team-mode.sh
+# (the script refuses without it); mode_sibling gives each scratch copy that
+# sibling, and a missing one is reported as a FAIL naming it.
 
 set -euo pipefail
 
@@ -38,6 +41,18 @@ if [ "$g" -ne 1 ]; then
   exit 1
 fi
 pass "gate no recursive delete in the script or this suite (grep exit 1, completed)"
+
+# mode_sibling <dest-dir>: put team-mode.sh (taken from the override's directory)
+# beside a scratch copy of the script. A missing or unreadable sibling is a FAIL
+# naming the file and that directory; the caller carries on so the suite still
+# reaches its trailer (set -e would abort a bare cp at top level). Inside a
+# command substitution the fails counter is lost, so the caller's own case fails.
+mode_sibling() {
+  if ! cp "$(dirname "$SCRIPT")/team-mode.sh" "$1/team-mode.sh" 2> /dev/null; then
+    fail "team-mode.sh missing or unreadable in $(dirname "$SCRIPT") (TEAM_COMMIT_SCRIPT needs its sibling)"
+    return 1
+  fi
+}
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/t1169-suite.XXXXXX")"
 T="$(cd "$T" && pwd -P)"
@@ -496,7 +511,7 @@ new_repo; r="$R"; printf 'a\n' > "$r/a"; git -C "$r" add a; git -C "$r" commit -
 mkdir -p "$T/moved-a$CASE"; mv "$r/a" "$T/moved-a$CASE/a"; mkdir -p "$r/a"; printf 'b\n' > "$r/a/b.txt"
 COPY="$T/copy-no-leading-dir/team-commit.sh"
 mkdir -p "$T/copy-no-leading-dir"
-cp "$(dirname "$SCRIPT")/team-mode.sh" "$T/copy-no-leading-dir/team-mode.sh"
+mode_sibling "$T/copy-no-leading-dir" || true
 sed '/leading-dir-refusal/s/refuse path/true path/' "$SCRIPT" > "$COPY"
 chmod +x "$COPY"
 if [ "$(grep -c 'leading-dir-refusal' "$COPY")" = 1 ] && ! cmp -s "$SCRIPT" "$COPY"; then
@@ -524,7 +539,7 @@ fi
 disable_marker() {
   local marker="$1" want="$2" out="$T/copy-$1/team-commit.sh"
   mkdir -p "$T/copy-$1"
-  cp "$(dirname "$SCRIPT")/team-mode.sh" "$T/copy-$1/team-mode.sh"
+  mode_sibling "$T/copy-$1" || true
   sed "/$marker/s/refuse path/true path/" "$SCRIPT" > "$out"
   chmod +x "$out"
   if [ "$(grep -c "$marker" "$out")" = "$want" ] && ! cmp -s "$SCRIPT" "$out"; then
