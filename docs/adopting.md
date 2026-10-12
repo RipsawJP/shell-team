@@ -203,6 +203,8 @@ host's configuration. A host that rebinds `code-reviewer` to a same-family
 executor and has no other-provider CLI is still stopped at Step 0 by the CLI
 line.
 
+**A plugin checkout with CRLF line endings stops the run at Step 1.** With `core.autocrlf=true` (the usual Git for Windows setup) and no `.gitattributes`, git writes the plugin's text files with CRLF line endings, and the declaration files the run reads at Step 1 no longer parse. v2.9.1 and later ship a `.gitattributes` that keeps the working tree LF, so a clone made from then on is LF whatever `core.autocrlf` says. A checkout made before that stays CRLF until it is cloned again: `/plugin marketplace update` alone does not fix an existing CRLF checkout, because git does not rewrite unchanged files. The Step 0 check prints a `- note:` line for each declaration file that holds a carriage return, naming the file and the remedies, and it does not change the exit code. For a plugin-manager install, run `/plugin marketplace remove ripsawjp` and then `/plugin marketplace add RipsawJP/shell-team`; for a manual clone, clone again with `git clone -c core.autocrlf=false`, which applies to that clone only.
+
 **The loop operates on the repository your session is rooted in.** `run`
 resolves the board, specs and loop contract from the current working directory
 (the skill's Step 0), and the sub-agents it dispatches read, edit and test that

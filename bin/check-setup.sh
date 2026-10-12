@@ -15,7 +15,13 @@
 #      never run, installed or probed); a missing one is reported as the
 #      operator's decision and names neither setup prompt;
 #   4. a scaffold file whose bytes differ from the installed plugin's template
-#      gets a `- note:` line (never changes the exit status).
+#      gets a `- note:` line (never changes the exit status);
+#   5. (T-1186, issue #720) a declaration file under the plugin root that holds
+#      a carriage return (a CRLF checkout, e.g. `core.autocrlf=true` on a
+#      plugin cloned before a `.gitattributes` shipped) gets a `- note:` line
+#      naming the file and the two re-clone remedies; a missing or unreadable
+#      one makes the check exit 2. The `git clone -c core.autocrlf=false` the
+#      note names is scoped to that one clone, so it is not a host setting.
 #
 # Write set: none. Nothing is written anywhere: not in the repository
 # (including .git), the plugin root, $HOME or $CODEX_HOME, and no scratch file
@@ -38,7 +44,8 @@
 #   0  nothing is unmet (only `- note:` lines may appear)
 #   1  at least one item is unmet
 #   2  the checker cannot evaluate: not in a git work tree, an unknown argument
-#      or --host value, or a resolver refusal
+#      or --host value, a resolver refusal, or a missing or unreadable plugin
+#      declaration file
 #
 # External dependencies: bash 3.2+ and standard POSIX tools plus git.
 
@@ -82,8 +89,9 @@ Options:
   --help, -h      Show this help and exit.
 
 Stdout: one header line, then one "- " line per unmet item (and "- note:"
-lines for scaffold files that differ from the plugin's templates). Diagnostics
-go to stderr.
+lines for scaffold files that differ from the plugin's templates, and one for
+each plugin declaration file that has CRLF line endings, which stops the run at
+Step 1; the note names the re-clone remedies). Diagnostics go to stderr.
 
 Exit codes (precedence 2 > 1 > 0):
   0  nothing is unmet
@@ -91,7 +99,8 @@ Exit codes (precedence 2 > 1 > 0):
      "set up shell-team" / "update shell-team", a host-side condition is the
      operator's decision
   2  cannot evaluate: not in a git work tree, an unknown argument or --host
-     value, or a resolver refusal
+     value, a resolver refusal, or a plugin declaration file that is missing
+     or unreadable
 EOF
 }
 
@@ -243,7 +252,35 @@ tpl_note "$BASE/.gitignore"           "$TEMPLATES_DIR/shell-team.gitignore"
 tpl_note "$BASE/binding.conf.example" "$TEMPLATES_DIR/binding-template.conf"
 
 # ---------------------------------------------------------------------------
-# 7. Report.
+# 7. CRLF declaration files (T-1186, note only, never changes the exit status
+#    except that a file that cannot be read is "cannot evaluate"). Read from the
+#    plugin root. `grep -q` exits 1 for no match and 2 for an error, so the
+#    status is taken explicitly.
+# ---------------------------------------------------------------------------
+CR="$(printf '\r')"
+crlf_note() { # <path relative to the plugin root>
+  local rel="$1" f g
+  f="$PLUGIN_ROOT/$rel"
+  if [ ! -f "$f" ] || [ ! -r "$f" ]; then
+    err "check-setup: cannot read $f"
+    EC2=1
+    return 0
+  fi
+  g=0
+  grep -q "$CR" "$f" 2>/dev/null || g=$?
+  case "$g" in
+    0) add_note "$rel has CRLF line endings, so the run will stop at Step 1; make a new clone: for a plugin-manager install run \`/plugin marketplace remove ripsawjp\` then \`/plugin marketplace add RipsawJP/shell-team\`, for a manual clone clone again with \`git clone -c core.autocrlf=false\` (a clone made from v2.9.1 on is LF)" ;;
+    1) : ;;
+    *) err "check-setup: cannot read $f"; EC2=1 ;;
+  esac
+}
+crlf_note "templates/prompt-blocks/alternate-executor-invocation.md"
+crlf_note "templates/adapters/claude-cli.txt"
+crlf_note "templates/adapters/codex-cli.txt"
+crlf_note "templates/binding-default.conf"
+
+# ---------------------------------------------------------------------------
+# 8. Report.
 # ---------------------------------------------------------------------------
 printf 'shell-team setup check: host: %s (%s)\n' "$HOST" "$GROUND"
 printf '%s' "$UNMET"
