@@ -1,6 +1,6 @@
 # check-pii-shapes --paths hardening: a known-shape path prints a skip notice, a trailing slash on a non-directory is refused, and a failed scratch write exits 2
 
-**Status**: READY_FOR_ARCH
+**Status**: READY_FOR_ENG
 **Owner**: pm-spec
 **Task ID**: T-1191
 
