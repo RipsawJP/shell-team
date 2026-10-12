@@ -11,6 +11,12 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1188** Four prose fixes: the check-setup CRLF note, the codex exec launch-line invariant, the alternate-executor recipe sentence and a freeze-sweep item for per-checkout values — `READY_FOR_ENG` — spec: .shell-team/specs/T-1188-fast-follow-prompts-sweep.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - trivial-path: four prose-only edits (one note string in `bin/check-setup.sh` plus its header comment, two hand-written agent-prompt lines, one contained template line and its SKILL.md copy, one new SKILL.md sweep sub-bullet, one EN/JA docs pair), no behaviour or checker change; precedent T-1187 on the same agent and template lines; both gates still run.
+  - source: issues #728, #730, #731, #734 (filed as fast-follows of T-1186 / T-1187); PR body carries `Closes #728`, `Closes #730`, `Closes #731`, `Closes #734`.
+
 
 
 
