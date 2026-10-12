@@ -6,6 +6,10 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.1**
+  - **プラグインの新規 clone は `core.autocrlf` の設定に関係なく LF になる。** ルートの `.gitattributes` が `bin/`・`templates/`・`agents/`・`skills/`・`tests/` に `eol=lf` を強制し（その他は `text=auto eol=lf`）、意図的に別のバイトを持つ fixture 2 本と画像は対象外。`core.autocrlf=true` の Windows checkout では宣言ファイルが CRLF になり、`bin/check-invocation-path.sh` が `in-process\r` を malformed row と読んで run が Step 1 で止まっていた。既存の CRLF checkout は `/plugin marketplace update` では直らない: marketplace を入れ直す（`/plugin marketplace remove ripsawjp` → `/plugin marketplace add RipsawJP/shell-team`）か、`git clone -c core.autocrlf=false` で clone し直す。（#720）
+  - **`bin/check-setup.sh` が、run が止まる前に CRLF の宣言ファイルを名指しする。** Step 0/1 のチェッカーが読む 4 本の宣言ファイルのうち CR を含むものごとに `- note:` を 1 行出し、2 つの再 clone 手段を示す。終了コードは不変で、宣言ファイルが無い・読めない時は exit 2。adopting ガイド（EN/JA）に症状と対処の段落を追加。（#720）
+  - **`code-reviewer` と `drift-evaluator` が「`codex exec` の起動行はそのコマンド 1 つだけ」と明記する** — 第 1 トークンは `codex`、前に何も置かず（`cd`・代入・`env`・サブシェル・`time`）、後ろにも何も置かない（pipe・redirect・`;`・`&&`・`||`・`&`・コマンド置換・行継続）。作業ディレクトリは `--cd` で渡す。先頭の `cd <repo>;` が review を sandbox 内で走らせて失敗させた実例に基づく。`docs/distribution.md` に、先頭側も 2.1.278 の一致ルールの同じ対象だと追記。
 - **v2.9.0**
   - **clone ごとに `local` record mode を宣言すると、ループの記録を git に載せずに運用できる。** `git config shell-team.mode local` を clone で 1 回設定すると、`bin/team-setup.sh` は `git add` の代わりに `info/exclude` に足す行を報告し、各ロールは base dir 配下の記録を書くだけで stage も commit もせず（engineer のコードとテストは従来どおり commit）、`bin/check-durability.sh` は `skipped:` 1 行で skip し、`bin/team-commit.sh` は base dir 配下のパスを拒否する。モードは clone 単位で共有されない。base dir が既に commit 済みのリポジトリはオペレーターの判断に委ね、setup は削除コマンドを一切出さない。`local` モードでは `isolation: worktree` は非対応。キーが無ければ全スクリプト・ロール文・ゲートは従来（`tracked`）とバイト単位で同じ。（#711・#587）
   - **`bin/check-pii-shapes.sh --paths <path>…` は ignore 状態に関わらず名指しした file / directory を走査する**。`local` モードのロールが自分の書いた記録を走査できる。何も読まなかった実行は exit 2 で、clean とは報告しない。`record-shape-scan` block は `local` モードでこれを使うよう指示する。
