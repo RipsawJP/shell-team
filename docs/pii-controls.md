@@ -85,7 +85,9 @@ PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh
 
 Exit codes: `0` clean, `1` one or more findings, `2` usage or structural
 error (an unresolvable base ref, an unreadable input, an unknown flag,
-`--all` combined with `--base`, or any of the `--paths` failures below). A finding never echoes the matched text —
+`--all` combined with `--base`, a failed write into the checker's own scratch
+files (with two exceptions, stated in the `--paths` paragraph below), or any of
+the `--paths` failures below). A finding never echoes the matched text —
 only the pattern id, the path, and a line number (when available) are
 reported — so a public CI log never carries the byte that tripped the gate.
 
@@ -106,12 +108,24 @@ beginning with `-` is written `./-name`. A file is scanned; a directory is
 walked recursively, with any `.git` entry neither descended into nor
 scanned; a symlink is scanned by its stored target string and never
 followed; a file carrying a NUL byte is skipped with the usual `skip: binary`
-notice. Paths resolve against the directory you run it from, and findings
+notice. A path on the checker's short list of known-shape fixtures (named, or
+met in a walk) is never scanned: it prints one
+`skip: known-shape fixture, not scanned: <path>` line on stderr and is not
+counted as read, so naming only such paths exits `2`. An argument written with
+a trailing slash must name a real directory (not a file, and not a symlink to
+one); otherwise the run exits `2`. Paths resolve against the directory you run it from, and findings
 use the usual `FINDING pattern=<id> path=<path> line=<n>` form with the path
 relative to the repository root. It fails closed: a missing or unreadable
 path, `--paths` with no path, `--paths` combined with `--all` or `--base`, or
 a run that read no regular text file (an empty directory, or one holding
-only binary files or symlinks) exits `2` and never prints the clean line.
+only binary files or symlinks) exits `2` and never prints the clean line. A
+failed write into the checker's own scratch files (a full or read-only temp
+filesystem, for instance) is likewise exit `2` with a structural message (the
+newly guarded writes use `failed to write scratch file`; older guarded writes
+keep their own messages): a scan that did not complete, never a clean run. The
+exceptions are an append of a `FINDING` line to the findings list and any write
+to the changed-path list of the default and `--base` modes: those still end in
+exit `1` with no `FINDING` line.
 
 ## When the loop runs it
 

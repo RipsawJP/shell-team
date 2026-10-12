@@ -62,7 +62,9 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-BIN="$REPO_ROOT/bin/check-pii-shapes.sh"
+# CHECK_PII_SHAPES_BIN (T-1191) points the whole suite at another copy of the
+# checker (the regression probe runs it against the base commit's script).
+BIN="${CHECK_PII_SHAPES_BIN:-$REPO_ROOT/bin/check-pii-shapes.sh}"
 
 fails=0
 pass() { printf 'PASS: %s\n' "$1"; }
@@ -2125,6 +2127,218 @@ if [ "$s1" = 1 ] && [ "$s1f" = 1 ] && [ "$s2" = 0 ] && [ "$s2c" = 1 ] && [ "$s3"
 else
   fail "--paths: a symlink is scanned by its target string and never followed (walk rc=$s1, named rc=$s2, control rc=$s3)"
 fi
+
+
+# =============================================================================
+# T-1191: --paths hardening (#716 items 1-3). Every shape is assembled at run
+# time from fragments; every repository and stub lives inside $WORK; nothing
+# is deleted. Item 3 fault injections are proven to bite before they count.
+# =============================================================================
+printf '\n--- T-1191: --paths known-shape notice, trailing slash, scratch writes ---\n'
+
+KS_PATH="tests/rollup-track/fixtures/winpath.jsonl"
+KS_NOTICE="check-pii-shapes: skip: known-shape fixture, not scanned: $KS_PATH"
+
+# --- item 1: a known-shape path prints a notice and is not counted as read ----
+K1="$(new_repo)"
+mkdir -p "$K1/tests/rollup-track/fixtures"
+printf '%s\n' "$P_HOME" > "$K1/$KS_PATH"
+printf '%s\n' "$P_HOME" > "$K1/ctl.txt"
+printf 'ok\n' > "$K1/clean.txt"
+i1=0
+pr "$K1" --paths ctl.txt
+{ [ "$PR_RC" = 1 ] && grep -qxF 'FINDING pattern=home-path path=ctl.txt line=1' "$PR_OUT"; } || i1=1
+for a in "$KS_PATH" tests; do
+  pr "$K1" --paths "$a" clean.txt
+  [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ] && [ "$(grep -cxF -- "$KS_NOTICE" "$PR_ERR")" = 1 ] \
+    && ! grep -q '^FINDING ' "$PR_OUT" "$PR_ERR" || i1=1
+  pr "$K1" --paths "$a"
+  [ "$PR_RC" = 2 ] && pr_no_clean && [ "$(grep -cxF -- "$KS_NOTICE" "$PR_ERR")" = 1 ] || i1=1
+done
+pr "$K1" --all
+{ ! grep -qF 'skip: known-shape' "$PR_ERR"; } || i1=1
+if [ "$i1" = 0 ]; then
+  pass "T-1191 item1 --paths: a known-shape path prints one skip notice and is not counted as read"
+else
+  fail "T-1191 item1 --paths: a known-shape path prints one skip notice and is not counted as read (rc=$PR_RC)"
+fi
+
+# --- item 2: a trailing slash must name a real directory ----------------------
+K2="$(new_repo)"
+mkdir -p "$K2/d" "$K2/sub dir"
+for f in ok.txt f.txt d/g.txt "sub dir/h.txt" "my f.txt"; do printf 'ok\n' > "$K2/$f"; done
+ln -s f.txt "$K2/lf"; ln -s d "$K2/ld"
+i2=0; i2_why=""
+t91_refuse() {  # <label> <args...> : exit 2, new message, no clean line
+  local label="$1"; shift
+  pr "$K2" "$@"
+  if [ "$PR_RC" = 2 ] && pr_no_clean \
+     && grep '^check-pii-shapes: structural: --paths: ' "$PR_ERR" | grep -qF 'trailing slash'; then return 0; fi
+  i2=1; i2_why="$i2_why $label(rc=$PR_RC)"
+}
+t91_exit2() {  # <label> <args...> : exit 2, no clean line
+  local label="$1"; shift
+  pr "$K2" "$@"
+  if [ "$PR_RC" = 2 ] && pr_no_clean; then return 0; fi
+  i2=1; i2_why="$i2_why $label(rc=$PR_RC)"
+}
+t91_clean() {  # <label> <dir> <args...> : exactly the clean line
+  local label="$1" d="$2"; shift 2
+  pr "$d" "$@"
+  if [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ]; then return 0; fi
+  i2=1; i2_why="$i2_why $label(rc=$PR_RC)"
+}
+t91_refuse file-slash --paths f.txt/ ok.txt
+t91_refuse file-doubleslash --paths f.txt// ok.txt
+t91_refuse link-to-file-slash --paths lf/ ok.txt
+t91_refuse link-to-dir-slash --paths ld/ ok.txt
+t91_refuse abs-file-slash --paths "$K2/f.txt/" ok.txt
+t91_refuse space-file-slash --paths "my f.txt/" ok.txt
+t91_exit2 missing-slash --paths missing/ ok.txt
+t91_exit2 file-slash-dot --paths f.txt/. ok.txt
+t91_exit2 root-slash --paths / ok.txt
+t91_clean dir-slash "$K2" --paths d/
+t91_clean dir-doubleslash "$K2" --paths d//
+t91_clean dot-slash "$K2" --paths ./
+t91_clean abs-dir-slash "$K2" --paths "$K2/d/"
+t91_clean space-dir-slash "$K2" --paths "sub dir/"
+t91_clean parent-slash "$K2/d" --paths ../
+t91_clean file-control "$K2" --paths f.txt
+t91_clean link-control "$K2" --paths lf ok.txt
+if [ "$i2" = 0 ]; then
+  pass "T-1191 item2 --paths: a trailing slash on a non-directory exits 2, a real directory is scanned"
+else
+  fail "T-1191 item2 --paths: a trailing slash on a non-directory exits 2, a real directory is scanned (rows:$i2_why)"
+fi
+
+# --- item 3: a failed write into the checker's own scratch files --------------
+# Fault injections (each is proven to bite before the case counts):
+#   - a file-size limit of 0 with SIGXFSZ ignored (the --paths list append);
+#   - a PATH stub for mktemp that pre-creates the scratch "content" file
+#     read-only (the symlink-target writes);
+#   - a PATH stub for git that makes the scratch "filelist" read-only once the
+#     untracked listing starts (the --all untracked append);
+#   - a PATH stub for tr / grep that exits 2 for one call shape (the binary
+#     detector and the two pattern-scan helpers).
+# The two chmod-based injections cannot bite a process running as root.
+T91_BIN="$WORK/t91-stubs"
+REAL_MKTEMP="$(command -v mktemp)"; REAL_GIT="$(command -v git)"; REAL_GREP="$(command -v grep)"
+mkdir -p "$T91_BIN/mktemp" "$T91_BIN/git" "$T91_BIN/tr" "$T91_BIN/grepnE" "$T91_BIN/grepnoE"
+cat > "$T91_BIN/mktemp/mktemp" <<EOF_STUB
+#!/bin/sh
+d=\$($REAL_MKTEMP "\$@") || exit \$?
+: > "\$d/content" && chmod 444 "\$d/content" || exit 1
+printf '%s\\n' "\$d"
+EOF_STUB
+cat > "$T91_BIN/git/git" <<EOF_STUB
+#!/bin/sh
+case " \$* " in *" --others "*) for f in "\$TMPDIR"/check-pii-shapes.*/filelist; do [ -f "\$f" ] && chmod 444 "\$f"; done ;; esac
+exec $REAL_GIT "\$@"
+EOF_STUB
+cat > "$T91_BIN/tr/tr" <<'EOF_STUB'
+#!/bin/sh
+exit 2
+EOF_STUB
+cat > "$T91_BIN/grepnE/grep" <<EOF_STUB
+#!/bin/sh
+case "\$1" in -nE) exit 2 ;; esac
+exec $REAL_GREP "\$@"
+EOF_STUB
+cat > "$T91_BIN/grepnoE/grep" <<EOF_STUB
+#!/bin/sh
+case "\$1" in -noE) exit 2 ;; esac
+exec $REAL_GREP "\$@"
+EOF_STUB
+chmod 755 "$T91_BIN/mktemp/mktemp" "$T91_BIN/git/git" "$T91_BIN/tr/tr" "$T91_BIN/grepnE/grep" "$T91_BIN/grepnoE/grep"
+
+F_OUT="$WORK/t91.out"; F_RC=0
+# f_run <dir> <file-size-limit|-> <stub-dir|-> <tmpdir|-> <args...> — one faulted
+# run. Output is captured through a pipe (a file written inside the limit
+# would itself fail); sets F_RC and F_OUT (stdout and stderr merged).
+f_run() {
+  local d="$1" lim="$2" sd="$3" td="$4"; shift 4
+  set +e
+  ( cd "$d" || exit 99
+    [ "$sd" = "-" ] || export PATH="$sd:$PATH"
+    [ "$td" = "-" ] || export TMPDIR="$td"
+    trap '' XFSZ
+    [ "$lim" = "-" ] || ulimit -f "$lim"
+    exec bash "$BIN" "$@" ) < /dev/null 2>&1 | head -c 100000 > "$F_OUT"
+  F_RC=${PIPESTATUS[0]}
+  set -e
+}
+# t91_verdict <name> <control-ok 0|1> — the faulted run must be a structural
+# exit 2 naming the scratch write, with no FINDING line and no clean line.
+t91_verdict() {
+  local name="$1" ctl="$2"
+  if [ "$ctl" = 1 ] && [ "$F_RC" = 2 ] \
+     && grep -qF 'check-pii-shapes: structural: ' "$F_OUT" \
+     && grep -qF 'failed to write scratch file' "$F_OUT" \
+     && ! grep -q '^FINDING ' "$F_OUT" && ! grep -qF "$P_CLEAN" "$F_OUT"; then
+    pass "T-1191 item3 $name — a failed scratch write exits 2 with a structural message"
+  else
+    fail "T-1191 item3 $name — a failed scratch write exits 2 with a structural message (control=$ctl) (rc=$F_RC)"
+  fi
+}
+t91_root=0; [ "$(id -u)" = 0 ] && t91_root=1
+
+# paths-list (the --paths list append): size limit 0
+K3="$(new_repo)"; printf 'ok\n' > "$K3/clean.txt"
+pr "$K3" --paths clean.txt
+c=0; { [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ]; } && c=1
+f_run "$K3" 0 - - --paths clean.txt
+t91_verdict paths-list "$c"
+
+# paths-symlink-target (--paths) and all-symlink-target (--all): a read-only
+# scratch "content" file, created by the mktemp stub
+K4="$(new_repo)"; printf 'ok\n' > "$K4/clean.txt"; ln -s target-elsewhere "$K4/lnk"
+mkdir -p "$WORK/t91-tmp-a" "$WORK/t91-tmp-b"
+pr "$K4" --paths lnk clean.txt
+c=0; { [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ]; } && c=1
+[ "$t91_root" = 0 ] || c=0
+f_run "$K4" - "$T91_BIN/mktemp" "$WORK/t91-tmp-a" --paths lnk clean.txt
+t91_verdict paths-symlink-target "$c"
+
+K5="$(new_repo)"; ln -s target-elsewhere "$K5/lnk"
+pr "$K5" --all
+c=0; { [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ]; } && c=1
+[ "$t91_root" = 0 ] || c=0
+f_run "$K5" - "$T91_BIN/mktemp" "$WORK/t91-tmp-b" --all
+t91_verdict all-symlink-target "$c"
+
+# all-untracked-list (--all untracked append): a read-only scratch "filelist"
+# set by the git stub just before the untracked listing is read
+K6="$(new_repo)"; printf 'ok\n' > "$K6/untracked.txt"
+pr "$K6" --all
+c=0; { [ "$PR_RC" = 0 ] && [ "$(cat "$PR_OUT")" = "$P_CLEAN" ]; } && c=1
+[ "$t91_root" = 0 ] || c=0
+mkdir -p "$WORK/t91-tmp-c"
+f_run "$K6" - "$T91_BIN/git" "$WORK/t91-tmp-c" --all
+t91_verdict all-untracked-list "$c"
+
+# binary-detection (is_binary_file): a failing tr; the control is a binary-only
+# --paths run, which exits 2 through the binary skip (so a clean exit after the
+# fault can only mean the failed detector read as "not binary")
+K7="$(new_repo)"; printf 'a\000b\n' > "$K7/b.dat"
+pr "$K7" --paths b.dat
+c=0; { [ "$PR_RC" = 2 ] && grep -qF 'skip: binary' "$PR_ERR" && pr_no_clean; } && c=1
+f_run "$K7" - "$T91_BIN/tr" - --paths b.dat
+t91_verdict binary-detection "$c"
+
+# pattern-scan (report_pattern_lines): a failing grep -nE hides a planted token
+K8="$(new_repo)"; printf 'note %s\n' "$P_TOKEN" > "$K8/t.txt"
+pr "$K8" --paths t.txt
+c=0; { [ "$PR_RC" = 1 ] && grep -qxF 'FINDING pattern=token path=t.txt line=1' "$PR_OUT"; } && c=1
+f_run "$K8" - "$T91_BIN/grepnE" - --paths t.txt
+t91_verdict pattern-scan "$c"
+
+# email-scan (scan_email_candidates): a failing grep -noE hides a planted mailbox
+P_MAIL="$(printf '%s%s@%s.io' ali ce ordinary)"
+K9="$(new_repo)"; printf 'contact %s\n' "$P_MAIL" > "$K9/m.txt"
+pr "$K9" --paths m.txt
+c=0; { [ "$PR_RC" = 1 ] && grep -qxF 'FINDING pattern=email-nonnoreply path=m.txt line=1' "$PR_OUT"; } && c=1
+f_run "$K9" - "$T91_BIN/grepnoE" - --paths m.txt
+t91_verdict email-scan "$c"
 
 # =============================================================================
 printf '\n'
