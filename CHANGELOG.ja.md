@@ -6,6 +6,11 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.2**
+  - **CRLF で「止まる」という記述を実際の挙動に合わせて狭めた。** `bin/check-setup.sh` の CRLF note（とヘッダコメント）と adopting ガイド（EN/JA）は、CR を含む宣言ファイルがあると run は Step 1 で止まる*ことがある*と書く。custom binding では run が読む宣言ファイルが減るので、使われないファイルの CR では止まらない。再 clone の対処は不変。（#728）
+  - **`code-reviewer` と `drift-evaluator` が、`codex exec` の起動行ではコマンド置換を引用符内のプロンプト引数も含めてどこにも許さないと明記。** 引数内の `$(…)` は `codex` の起動前に走り、2.1.278 の一致ルールでは末尾のものと同じく隠れた追加パートになる。引数内のバックスラッシュ改行の許容は不変。（#730）
+  - **alternate-executor の recipe も同じ起動行の invariant を書く。** `templates/prompt-blocks/alternate-executor-invocation.md` と run skill 内の写しは「第 1 トークンだけで一致する」と言わなくなり、その 1 コマンドだけ・第 1 トークン `codex`・作業ディレクトリは `--cd`、と書く。（#731）
+  - **run skill の凍結 sweep に「checkout ごとに変わる値を比較ストリームに生で差し込んだ行」の項目を追加。** 絶対パス・temp パス・スクリプト自身の位置の trace・timestamp を固定期待値と比較するストリームにそのまま埋め込んだ check 行は書いた場所でしか通らない。sweep は broken として扱い、CI で再現できる形へ `pm-spec` に差し戻す。3 つの sweep 分岐すべてに適用。（#734）
 - **v2.9.1**
   - **プラグインの新規 clone は `core.autocrlf` の設定に関係なく LF になる。** ルートの `.gitattributes` が `bin/`・`templates/`・`agents/`・`skills/`・`tests/` に `eol=lf` を強制し（その他は `text=auto eol=lf`）、意図的に別のバイトを持つ fixture 2 本と画像は対象外。`core.autocrlf=true` の Windows checkout では宣言ファイルが CRLF になり、`bin/check-invocation-path.sh` が `in-process\r` を malformed row と読んで run が Step 1 で止まっていた。既存の CRLF checkout は `/plugin marketplace update` では直らない: marketplace を入れ直す（`/plugin marketplace remove ripsawjp` → `/plugin marketplace add RipsawJP/shell-team`）か、`git clone -c core.autocrlf=false` で clone し直す。（#720）
   - **`bin/check-setup.sh` が、run が止まる前に CRLF の宣言ファイルを名指しする。** Step 0/1 のチェッカーが読む 4 本の宣言ファイルのうち CR を含むものごとに `- note:` を 1 行出し、2 つの再 clone 手段を示す。終了コードは不変で、宣言ファイルが無い・読めない時は exit 2。adopting ガイド（EN/JA）に症状と対処の段落を追加。（#720）
