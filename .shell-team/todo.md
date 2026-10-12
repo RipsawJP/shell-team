@@ -11,6 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issues #737, #738, #721 (items 1–3), #723 (items 1–4), all filed as fast-follows of T-1184 / T-1185 / T-1188; #714 and #716 item 4 were already delivered by T-1184 and are recorded as measured premises with no edit (**AC10**). Branch `feature/local-mode-followups-prose` cut from `develop` at `68873e2c`, no open predecessor. The PR body carries `Closes #737`, `Closes #738`, `Closes #721`, `Closes #723` and `Closes #714` (delivered by T-1184); #716 stays open for items 1–3. Pre-commitment (AI self-discipline): never-dropped N1 EN/JA lockstep at fixed line numbers, N2 every qualifier backed by a cited script line, N3 T-1185's frozen block untouched; droppable, in order, AC2 (#738) then AC1 (#737), each by class-B re-freeze raised to the operator. Relayed premise contradicted: issue #738's "no reader-visible output" — lines 21–23 of `bin/check-invocation-path.sh` are printed by `--help`. The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+
 
 
 
