@@ -66,7 +66,7 @@ Do this:
    `git config shell-team.mode local` once in that clone (mode `local`) and put
    the base dir in `.git/info/exclude`; `bin/team-setup.sh` then reports the line to
    append (for a base dir already committed in HEAD it reports a `Remains` item and
-   no line, and for a base dir not yet committed and not yet ignored whose path has a character outside `A-Za-z0-9._/-` it reports a
+   no line, for one already ignored an `Already in place:` item and no line, and for a base dir not yet committed and not yet ignored whose path has a character outside `A-Za-z0-9._/-` it reports a
    `Required:` item that prints no line). `team-init` itself never writes the mode or a rule that ignores the base
    directory; the `<base>/.gitignore` it writes covers only the runs and raw captures.
 

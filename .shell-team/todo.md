@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
+- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_QA` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1188 — no-predecessor-row — T-1188 took the trivial path and recorded no dispatch row for this axis
@@ -59,6 +59,17 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Risk notes for reviewer: none beyond issue #744 (README:77 pre-existing `info/exclude` wording, outside this diff).
   - code review round 2 (2026-10-12): APPROVE (pass ids primary-r2 and adversarial-r2, both Codex captures published, `check-review-input` exit 0) — round-1 Major and both minors conceded as fixed; remaining minor: README.md:99 / README.ja.md:99 condition the exclude-line outcome on "not yet committed" only, while an uncommitted base dir already ignored by a repository or global rule gets `Already in place:` (`bin/team-setup.sh:813-816`); the README :77 `.codex/agents` clause stays with issue #744.
   - pre-commitment trigger fired (2026-10-12): code review rounds 1 and 2 each carry a recorded verdict and a new finding of the class "a sentence this task edits is contradicted by a script line". Means-ends reflection — (1) never-dropped N1 EN/JA lockstep, N2 every qualifier backed by a cited script line and N3 T-1185 frozen block untouched are all green; (2) the finding targets README.md:99 / README.ja.md:99, which is not one of the named droppable components (AC2, AC1); (3) the recorded drop order AC2 then AC1 has no entry for it, so no pre-priced disposition applies; (4) cost: one one-clause edit in EN and JA plus a scoped QA round and review round, against shipping a known imprecision in a sentence this task wrote, in a sprint whose goal is to close known defects. Disposition (coordinating session, AI self-discipline, not operator-ratified): fix in this task rather than fold into #744; no stop, because nothing irreversible is at stake (operator ruling 2026-10-11 on when to stop). The rework re-runs the class inventory over every edited sentence against both preconditions (committed in HEAD, already ignored) so a third round is not reached for this class. Routed back to engineer → `READY_FOR_ENG`.
+  - engineer rework 3 (2026-10-12): class-closure sweep, hand-off
+    - Fix: README.md:99 and README.ja.md:99 now say "not yet committed and not yet ignored" (JA: base dir (まだ無視されてもいないもの)); skills/team-init/SKILL.md record-mode note also names the already-ignored `Already in place:` outcome beside the committed `Remains` one. Single-line edits kept, line locks held.
+    - Inventory against `bin/team-setup.sh` local order (a) committed in HEAD -> Remains `:795-798`, (b) ignored -> Already in place `:813-816`; tracked `:1000-1030`. Columns: (a) applies / (b) applies / excluded already / fix.
+    - README.md:51 and README.ja.md:51 (no-line outcome, local): says "not yet committed and not yet ignored" -> excluded already (both) -> none.
+    - README.md:77 and README.ja.md:77 (exclude line, local): "for a base dir not yet committed, until it is ignored" -> (a) excluded by "not yet committed", (b) excluded by "until it is ignored" -> none (the `.codex/agents` clause is issue #744, untouched).
+    - README.md:99 and README.ja.md:99 (exclude line, local): (a) excluded; (b) NOT excluded -> fixed as above.
+    - skills/setup/SKILL.md:16: "not yet committed and not yet ignored" -> both excluded -> none. skills/setup/SKILL.md:92: relays a `local` `Required:` item only when setup emitted it -> conditional on the item, no pre-empted branch -> none.
+    - skills/team-init/SKILL.md:69-70: the committed case was named, the already-ignored case was not (the sentence led with "reports the line to append") -> (a) excluded, (b) NOT excluded -> fixed (added the `Already in place:` clause).
+    - docs/migrating-to-local-mode.md:20 and .ja.md:20 (.codex/agents append): "when not already ignored ... otherwise Already in place:" -> (b) excluded; (a) concerns the base dir, not this path -> none. :70 and .ja.md:70 (tracked): "ignored and not yet committed" -> `:1000-1030` blocking-rule branch, committed excluded -> none. :89 and .ja.md:89 (check-codex-agents result): no setup outcome -> n/a.
+    - skills/run/SKILL.md freeze-sweep item and bin/check-invocation-path.sh comment: no setup outcome -> n/a.
+    - Check: `ulimit -f 400000; bash bin/check-acs.sh .shell-team/specs/T-1189-local-mode-followups-prose.md | head -c 200000 | tail -2` printed `13 passed, 0 failed, 1 skipped` (first run after the JA edit failed AC3 on the fixed phrase; rephrased to keep the phrase contiguous and re-ran green).
 
 
 
