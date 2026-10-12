@@ -17,7 +17,7 @@
 - `local` モードでは、`bin/team-commit.sh` は base dir 配下の名指しされたパスを拒否し、`bin/check-durability.sh` は記録がコミットされたかを確認する代わりに `skipped:` の行を出します。
 - `isolation: worktree` と `bin/land-worktree.sh` は `local` モードではサポート外です。無視された base dir は linked worktree へ引き継がれないためです。この制限は run スキルと adopting ガイドに書かれています。`bin/land-worktree.sh` はモードを読まないので、そのスクリプトがモードを理由に拒否することはなく、この組み合わせを避けるのはあなたの側です。
 - Codex CLI host では、このリリースでロールのプロンプトが変わったため、以前のバージョンで生成した `.codex/agents/shell-team-*.toml` は新しく生成し直した内容と一致しません。`.codex/agents` を再生成するまで、`bin/check-codex-agents.sh` はそれぞれをずれていると報告します。
-- セットアップは 2 つのプロンプトで進みます。すでに shell-team があるリポジトリでは `update shell-team`、無いリポジトリでは `set up shell-team` です。どちらも同じフローを実行し、モードは変えず、base dir の ignore の行も編集しません。Codex CLI host では、`.codex/agents` をクローンの `info/exclude` に追記し、`Done:` に報告します。
+- セットアップは 2 つのプロンプトで進みます。すでに shell-team があるリポジトリでは `update shell-team`、無いリポジトリでは `set up shell-team` です。どちらも同じフローを実行し、モードは変えず、base dir の ignore の行も編集しません。Codex CLI host では、`.codex/agents` がまだ無視されていなければ、クローンの `info/exclude` に追記し、`Done:` に報告します（すでに無視されている場合は何も追記せず、`Already in place:` と報告します）。
 
 ## tracked モードのまま使う
 
@@ -67,7 +67,7 @@ git config shell-team.mode tracked
 
 ちょうど `local` ではない値はすべて `tracked` と読まれるので、値を設定するだけで足ります。キー自体は残してかまいません。
 
-`tracked` モードに戻ったあと base dir が無視されていて、まだコミットされていなければ、setup は `Required:` の下で、妨げているルールを報告します。ignore の出どころと行、`git add` コマンド、該当するなら再包含の行です。ignore の行を変えるか、setup が示す再包含の行を足すかを決め、setup が出す `git add` コマンドで記録をコミットしてください。setup 自身は何もコミットしません。
+`tracked` モードに戻ったあと base dir が無視されていて、まだコミットされていなければ、setup は `Required:` の下で、妨げているルールを報告します。ignore の出どころと行、`git add` コマンド、該当するなら再包含の行です。ignore の行を変えるか、setup が示す再包含の行を足すかを決め、setup が出す `git add` コマンドで記録をコミットしてください。setup 自身は何もコミットしません。base パスに `A-Za-z0-9._/-` の外の文字がある場合、`Required:` の項目は安全に引用できないパスだと述べ、そのパスの `git add` コマンドも再包含の行も出しません。
 
 クローンが `local` だった間に書かれた記録は作業コピーに残り、それをコミットしたものは何もありません。記録が git に入るのは、あなたがコミットしたときだけです。`tracked` モードでは `bin/check-durability.sh` はすぐに実行され、コミットされていない記録、またはコミット後に変更された記録を `not-durable` と報告します。
 
@@ -86,4 +86,4 @@ git status --short
 
 もう一度 `update shell-team` と入力します。`local` モードで base dir が `Already in place:` に並んでいれば、git はそれを無視しており、2 回目の実行では何も変わりません。
 
-Codex CLI host では、`.codex/agents` を再生成したあと、`bin/check-codex-agents.sh` はそれを in sync と報告します。
+Codex CLI host では、`.codex/agents` を再生成したあと、`bin/check-codex-agents.sh` はそれを in sync と報告します。ただしディレクトリに生成器が管理しない余分な `shell-team-*.toml` もある場合は、チェッカーがそのファイルを名指しし、手で対処するまで in sync とは報告しません。

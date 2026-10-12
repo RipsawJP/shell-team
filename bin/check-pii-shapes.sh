@@ -243,8 +243,14 @@
 #      unknown flag, --all combined with --base, --paths combined with --all
 #      or --base, --paths with no path or a path beginning with '-', a named
 #      path that is missing or unreadable, or a --paths run that read no
-#      regular text file) — a check that cannot evaluate its input never
-#      exits 0.
+#      regular text file, a --paths argument written with a trailing slash
+#      that does not name a real directory, or a failed write into the
+#      checker's own scratch files) — a check that cannot evaluate its
+#      input never exits 0.
+#      A failed write into the checker's own scratch files is exit 2, except
+#      an append of a FINDING line to the findings list and any write to the
+#      changed-path list of the default and --base modes, which still end in
+#      exit 1 with no FINDING line.
 #
 # --paths (T-1182): a file is scanned; a directory is walked recursively
 # with any .git entry neither descended into nor scanned; a symlink (named
@@ -254,6 +260,15 @@
 # reported relative to the repository root. Ignore rules are never
 # consulted, which is what lets a hand-off scan read records under an
 # ignored base directory.
+#
+# --paths known-shape paths (T-1191): a path on the checker's short list of
+# known-shape fixtures (named, or met in a walk) is never scanned. It prints
+# one stderr line, skip: known-shape fixture, not scanned: <path>, and is not
+# counted as read, so a run whose only inputs are such paths exits 2.
+#
+# --paths trailing slash (T-1191): an argument written with a trailing slash
+# must name a real directory (not a file, and not a symlink to one);
+# otherwise the run exits 2.
 
 set -euo pipefail
 
@@ -671,12 +686,13 @@ trap cleanup EXIT
 
 FINDINGS_FILE="$WORKDIR/findings"
 CONTENT_FILE="$WORKDIR/content"
-: > "$FINDINGS_FILE"
+: > "$FINDINGS_FILE" || fail_structural "failed to write scratch file: findings list"
 
 # is_binary_file <file> — true (0) iff <file> contains a NUL byte (git's own
 # text/binary convention — never a printable-character heuristic, AC27).
 is_binary_file() {
-  LC_ALL=C tr -d '\000' < "$1" > "$WORKDIR/stripped" 2>/dev/null || return 1
+  LC_ALL=C tr -d '\000' < "$1" > "$WORKDIR/stripped" 2>/dev/null \
+    || fail_structural "failed to write scratch file: binary-detection copy for: $1"
   ! cmp -s "$WORKDIR/stripped" "$1"
 }
 
@@ -685,11 +701,15 @@ is_binary_file() {
 # the N field is ever used; the content half is discarded before it can be
 # written anywhere (AC14: a finding never echoes the matched text).
 report_pattern_lines() {
-  local id="$1" path="$2" file="$3" re="$4" ln rest
+  local id="$1" path="$2" file="$3" re="$4" ln rest grc=0
   # `--` guards against a regex that itself begins with a literal `-`
   # (RE_PRIVATE_KEY does) being parsed as a grep option instead of a
   # pattern argument.
-  grep -nE -- "$re" "$file" > "$WORKDIR/matches" 2>/dev/null || true
+  : > "$WORKDIR/matches" || fail_structural "failed to write scratch file: pattern match list ($id)"
+  # grep's no-match status (1) is normal; only a status above 1 (an error,
+  # a failed write included) is a structural failure.
+  grep -nE -- "$re" "$file" > "$WORKDIR/matches" 2>/dev/null || grc=$?
+  [ "$grc" -le 1 ] || fail_structural "failed to write scratch file: pattern match list ($id)"
   while IFS=: read -r ln rest; do
     [ -n "${ln:-}" ] || continue
     printf 'FINDING pattern=%s path=%s line=%s\n' "$id" "$path" "$ln" >> "$FINDINGS_FILE"
@@ -703,8 +723,10 @@ report_pattern_lines() {
 # FINDING line is emitted per (path, line) pair even if several candidates
 # on that line survive exclusion.
 scan_email_candidates() {
-  local path="$1" file="$2" ln cand domain excluded last_ln=""
-  grep -noE -- "$RE_EMAIL_BASE" "$file" > "$WORKDIR/emails" 2>/dev/null || true
+  local path="$1" file="$2" ln cand domain excluded last_ln="" grc=0
+  : > "$WORKDIR/emails" || fail_structural "failed to write scratch file: email candidate list"
+  grep -noE -- "$RE_EMAIL_BASE" "$file" > "$WORKDIR/emails" 2>/dev/null || grc=$?
+  [ "$grc" -le 1 ] || fail_structural "failed to write scratch file: email candidate list"
   while IFS=: read -r ln cand; do
     [ -n "${ln:-}" ] || continue
     domain="${cand#*@}"
@@ -747,6 +769,10 @@ announce_skip() {  # $1 = path, $2 = mode label (blob|file)
   printf 'check-pii-shapes: skip: binary %s (NUL byte present), not scanned: %s\n' "$2" "$1" >&2 || true
 }
 
+announce_known_shape() {  # $1 = repo-root-relative path
+  printf 'check-pii-shapes: skip: known-shape fixture, not scanned: %s\n' "$1" >&2 || true
+}
+
 if [ "$MODE" = "all" ]; then
   # --- full-tree audit: repo-root scope regardless of invoking directory,
   # tracked + untracked-but-not-ignored files, symlinks scanned by their
@@ -756,7 +782,7 @@ if [ "$MODE" = "all" ]; then
   cd "$TOPLEVEL" || fail_structural "failed to change into the repository root ($TOPLEVEL) for --all"
 
   FILELIST="$WORKDIR/filelist"
-  : > "$FILELIST"
+  : > "$FILELIST" || fail_structural "failed to write scratch file: file list (--all)"
 
   # Tracked files via `ls-files -s` (not the plain `--cached` form used
   # below for untracked), because `-s` carries each entry's MODE — needed to
@@ -777,7 +803,8 @@ if [ "$MODE" = "all" ]; then
       printf 'check-pii-shapes: skip: gitlink (submodule reference, no scannable content): %s\n' "$p" >&2 || true
       continue
     fi
-    printf '%s\n' "$p" >> "$FILELIST"
+    printf '%s\n' "$p" >> "$FILELIST" \
+      || fail_structural "failed to write scratch file: file list (--all)"
   done < "$TRACKED_S_Z"
 
   # Untracked-but-not-ignored files never carry a git mode at all (they are
@@ -787,7 +814,8 @@ if [ "$MODE" = "all" ]; then
   git ls-files -z --others --exclude-standard > "$OTHERS_Z" \
     || fail_structural "git ls-files --others failed — cannot enumerate untracked files for --all"
   while IFS= read -r -d '' p; do
-    printf '%s\n' "$p" >> "$FILELIST"
+    printf '%s\n' "$p" >> "$FILELIST" \
+      || fail_structural "failed to write scratch file: file list (--all)"
   done < "$OTHERS_Z"
 
   while IFS= read -r path; do
@@ -800,7 +828,8 @@ if [ "$MODE" = "all" ]; then
       # even exist on this machine) — the classic --all blind spot.
       target="$(readlink "$path")" \
         || fail_structural "cannot read symlink target for: $path"
-      printf '%s' "$target" > "$CONTENT_FILE"
+      printf '%s' "$target" > "$CONTENT_FILE" \
+        || fail_structural "failed to write scratch file: symlink target for: $path"
       scan_content_file "$path" "$CONTENT_FILE"
       continue
     fi
@@ -828,12 +857,16 @@ elif [ "$MODE" = "paths" ]; then
     || fail_structural "cannot resolve the repository root ($TOPLEVEL) for --paths"
 
   PFILELIST="$WORKDIR/pfilelist"   # NUL-separated absolute entries to scan
-  : > "$PFILELIST"
+  : > "$PFILELIST" || fail_structural "failed to write scratch file: file list (--paths)"
   for arg in "${PATH_ARGS[@]}"; do
     case "$arg" in
       /*) cand="$arg" ;;
       *)  cand="$INVOKE_DIR/$arg" ;;
     esac
+    # Record a trailing slash before it is stripped: such an argument must
+    # name a real directory (checked below, once the entry is resolved).
+    slash=0
+    case "$arg" in */) slash=1 ;; esac
     while [ "${#cand}" -gt 1 ] && [ "${cand%/}" != "$cand" ]; do cand="${cand%/}"; done
     leaf="${cand##*/}"
     if [ "$leaf" = "." ] || [ "$leaf" = ".." ] || [ "$cand" = "/" ]; then
@@ -854,13 +887,17 @@ elif [ "$MODE" = "paths" ]; then
       "$TOPLEVEL"|"$TOPLEVEL"/*) ;;
       *) fail_structural "--paths: path is outside the repository: $arg" ;;
     esac
+    if [ "$slash" -eq 1 ] && { [ -L "$abs" ] || [ ! -d "$abs" ]; }; then
+      fail_structural "--paths: an argument with a trailing slash must name a real directory (not a file or a symlink): $arg"
+    fi
     if [ -d "$abs" ] && [ ! -L "$abs" ]; then
       # .git entries (directory or file) are neither descended into nor
       # scanned; a symlink is listed, never followed (find's default -P).
       find "$abs" -name .git -prune -o \( -type f -o -type l \) -print0 >> "$PFILELIST" 2>/dev/null \
         || fail_structural "--paths: cannot walk directory (unreadable entry): $arg"
     else
-      printf '%s\0' "$abs" >> "$PFILELIST"
+      printf '%s\0' "$abs" >> "$PFILELIST" \
+        || fail_structural "failed to write scratch file: file list (--paths)"
     fi
   done
 
@@ -868,12 +905,16 @@ elif [ "$MODE" = "paths" ]; then
   while IFS= read -r -d '' abs; do
     [ -n "$abs" ] || continue
     if [ "$abs" = "$TOPLEVEL" ]; then path="."; else path="${abs#"$TOPLEVEL"/}"; fi
-    is_known_shape "$path" && continue
+    if is_known_shape "$path"; then
+      announce_known_shape "$path"
+      continue
+    fi
 
     if [ -L "$abs" ]; then
       target="$(readlink "$abs")" \
         || fail_structural "cannot read symlink target for: $path"
-      printf '%s' "$target" > "$CONTENT_FILE"
+      printf '%s' "$target" > "$CONTENT_FILE" \
+        || fail_structural "failed to write scratch file: symlink target for: $path"
       scan_content_file "$path" "$CONTENT_FILE"
       continue
     fi

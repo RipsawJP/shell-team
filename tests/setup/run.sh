@@ -1045,6 +1045,56 @@ done
   && pass "local mode: an unreadable record mode stops setup with exit 2 before any write" \
   || fail "local mode: an unreadable record mode stops setup with exit 2 before any write"
 
+# T-1190 (issue #718) — four more local-mode classes, each asserting its item, no
+# git add / removal command on either stream, and the exit status.
+
+# AC3: a TEAM_RUN_BASE override that is not ignored is reported under Required.
+R="$T/lm-ovr"; lmrepo "$R"
+x="$(TEAM_RUN_BASE=.custom st "$R" --host claude-code)"
+EP="$(git -C "$R" rev-parse --git-path info/exclude)"
+sec 'Required:' "$T/o" > "$T/lmr"
+{ [ "$x" = 0 ] && [ -n "$EP" ] && [ "$(grep -cF -- "$LMP" "$T/lmr")" = 1 ] \
+  && grep -F -- "$LMP" "$T/lmr" | grep -qF -- '`/.custom/`' && grep -F -- "$LMP" "$T/lmr" | grep -qF -- "$EP" \
+  && ! grep -qF .shell-team/ "$T/lmr" && nogit "$T/o" "$T/e"; } \
+  && pass "T-1190 AC3 local mode: a TEAM_RUN_BASE override that is not ignored is Required, naming /.custom/ and the exclude file" \
+  || fail "T-1190 AC3 local mode: a TEAM_RUN_BASE override that is not ignored is Required (rc=$x)"
+
+# AC4: a parent-directory pattern (/ops/) in info/exclude covers ops/st/.
+R="$T/lm-parent"; lmrepo "$R"; printf '/ops/\n' >> "$R/.git/info/exclude"
+x="$(TEAM_RUN_BASE=ops/st st "$R" --host claude-code)"
+{ [ "$x" = 0 ] && [ "$(sec 'Already in place:' "$T/o" | grep -cF -- "$LMP")" = 1 ] \
+  && sec 'Already in place:' "$T/o" | grep -F -- "$LMP" | grep -qF -- 'ops/st/' \
+  && ! sec 'Required:' "$T/o" | grep -qF -- "$LMP" && nogit "$T/o" "$T/e"; } \
+  && pass "T-1190 AC4 local mode: a parent-directory pattern covering the base dir is reported under Already in place" \
+  || fail "T-1190 AC4 local mode: a parent-directory pattern covering the base dir is reported under Already in place (rc=$x)"
+
+# AC5: the same outcome when the rule lives in the root .gitignore or a global
+# excludes file (setup reads only the matched pattern, so this is outcome
+# equivalence across sources, not a distinct code path).
+R="$T/lm-rootgi"; lmrepo "$R"; printf '/.shell-team/\n' > "$R/.gitignore"; g0="$(cksum < "$R/.gitignore")"
+x="$(st "$R" --host claude-code)"
+{ [ "$x" = 0 ] && [ "$(sec 'Already in place:' "$T/o" | grep -cF -- "$LMP")" = 1 ] \
+  && sec 'Already in place:' "$T/o" | grep -F -- "$LMP" | grep -qF -- .shell-team/ \
+  && ! sec 'Required:' "$T/o" | grep -qF -- "$LMP" && [ "$(cksum < "$R/.gitignore")" = "$g0" ] && nogit "$T/o" "$T/e"; } \
+  && pass "T-1190 AC5 root-gitignore local mode: a root .gitignore rule is reported under Already in place, .gitignore untouched" \
+  || fail "T-1190 AC5 root-gitignore local mode: a root .gitignore rule is reported under Already in place (rc=$x)"
+
+R="$T/lm-globex"; lmrepo "$R"; gcf lm190 '/.shell-team/'
+x="$(stg "$T/gc-lm190" "$R" --host claude-code)"
+{ [ "$x" = 0 ] && [ "$(sec 'Already in place:' "$T/o" | grep -cF -- "$LMP")" = 1 ] \
+  && sec 'Already in place:' "$T/o" | grep -F -- "$LMP" | grep -qF -- .shell-team/ \
+  && ! sec 'Required:' "$T/o" | grep -qF -- "$LMP" && nogit "$T/o" "$T/e"; } \
+  && pass "T-1190 AC5 global-excludes local mode: a global excludes rule is reported under Already in place" \
+  || fail "T-1190 AC5 global-excludes local mode: a global excludes rule is reported under Already in place (rc=$x)"
+
+# AC6: a check-ignore exit above 1 is a setup error (exit 2), with no item printed.
+R="$T/lm-cierr"; lmrepo "$R"
+x="$( (cd "$R" && PATH="$T/gs:$SP" bash "$S" --host claude-code < /dev/null > "$T/o" 2> "$T/e"); printf '%s' "$?")"
+{ [ "$x" = 2 ] && grep -qF 'could not evaluate' "$T/e" && grep -qF .shell-team/ "$T/e" \
+  && ! grep -q '^- base directory in local mode: ' "$T/o" && nogit "$T/o" "$T/e"; } \
+  && pass "T-1190 AC6 local mode: a check-ignore error exits 2 with a diagnostic and prints no base item" \
+  || fail "T-1190 AC6 local mode: a check-ignore error exits 2 with a diagnostic and prints no base item (rc=$x)"
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'setup suite: all assertions passed\n'
