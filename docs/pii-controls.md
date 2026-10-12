@@ -86,7 +86,8 @@ PII_CHECK_TRACKER_KEY=1 bin/check-pii-shapes.sh
 Exit codes: `0` clean, `1` one or more findings, `2` usage or structural
 error (an unresolvable base ref, an unreadable input, an unknown flag,
 `--all` combined with `--base`, a failed write into the checker's own scratch
-files, or any of the `--paths` failures below). A finding never echoes the matched text —
+files (with two exceptions, stated in the `--paths` paragraph below), or any of
+the `--paths` failures below). A finding never echoes the matched text —
 only the pattern id, the path, and a line number (when available) are
 reported — so a public CI log never carries the byte that tripped the gate.
 
@@ -120,7 +121,10 @@ a run that read no regular text file (an empty directory, or one holding
 only binary files or symlinks) exits `2` and never prints the clean line. A
 failed write into the checker's own scratch files (a full or read-only temp
 filesystem, for instance) is likewise exit `2` with a `failed to write scratch
-file` message: a scan that did not complete, never a clean run.
+file` message: a scan that did not complete, never a clean run. The exceptions
+are an append of a `FINDING` line to the findings list and any write to the
+default mode's changed-path list: those still end in exit `1` with no
+`FINDING` line.
 
 ## When the loop runs it
 
