@@ -11,6 +11,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1191** check-pii-shapes --paths hardening: a known-shape path prints a skip notice, a trailing slash on a non-directory exits 2, and a failed scratch write exits 2 (issue #716 items 1-3) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1191-local-mode-followups-pii-paths.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #716 items 1-3 (item 4, the docs rc=n/a wording, stays on #716), filed as a fast-follow of T-1182's review. Branch `feature/local-mode-followups-pii-paths` cut from T-1190's tip `01be9002` (predecessor `feature/local-mode-followups-tests`, PR #745 open against develop; T-1189 PR #743 also open). Pre-commitment is the operator-approved sprint stop rule (2026-10-12 sprint planning; relayed): never-dropped N1 existing-mode byte identity, N2 a read-nothing --paths run exits 2, N3 prompt sync; repeated same-class Majors cut the task; drop order item 3, item 2, item 1. Scope reading: helper sites :679/:692/:707 fail the never-exit-0 test and are brought into item 3; :695/:720/:936/:957 end in exit 1 and go to a follow-up issue the coordinating session files. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+
 
 
 
