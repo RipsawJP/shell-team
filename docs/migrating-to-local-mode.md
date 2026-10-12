@@ -67,7 +67,7 @@ git config shell-team.mode tracked
 
 Any value other than exactly `local` reads as `tracked`, so setting the value is enough; the key itself can stay.
 
-Back in `tracked` mode, a base dir that is ignored and not yet committed is reported by setup as a blocking rule under `Required:`: the ignore source and line, the `git add` command, and, where it applies, a re-include line. Decide whether to change your ignore line or to add the re-include setup names, then commit the records with the `git add` command it prints; setup commits nothing. If the base path has a character outside `A-Za-z0-9._/-`, the `Required:` item says the path cannot be quoted safely and prints no `git add` command for it.
+Back in `tracked` mode, a base dir that is ignored and not yet committed is reported by setup as a blocking rule under `Required:`: the ignore source and line, the `git add` command, and, where it applies, a re-include line. Decide whether to change your ignore line or to add the re-include setup names, then commit the records with the `git add` command it prints; setup commits nothing. If the base path has a character outside `A-Za-z0-9._/-`, the `Required:` item says the path cannot be quoted safely and prints no `git add` command and no re-include line for it.
 
 Records written while the clone was `local` stay in the working copy, and nothing committed them; they enter git only when you commit them. In `tracked` mode `bin/check-durability.sh` runs at once and reports a record that is uncommitted, or changed since its commit, as `not-durable`.
 
