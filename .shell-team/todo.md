@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
+- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_QA` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1188 — no-predecessor-row — T-1188 took the trivial path and recorded no dispatch row for this axis
@@ -27,6 +27,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-12): verdict=match — derived=PATCH — headline=not-met — default-reach=met — premise=PATCH (v2.9.3), approved at the sprint planning GO on 2026-10-12 on the ground that every item is a wording fix with no new adopter capability — grounds: all four items are precision edits to shipped prose and one comment; none is a release-note headline
   - intent-hash (v1): d0c36ef3118408951a92db1c2810934d7e5ac599
   - source: issues #737, #738, #721 (items 1–3), #723 (items 1–4), all filed as fast-follows of T-1184 / T-1185 / T-1188; #714 and #716 item 4 were already delivered by T-1184 and are recorded as measured premises with no edit (**AC10**). Branch `feature/local-mode-followups-prose` cut from `develop` at `68873e2c`, no open predecessor. The PR body carries `Closes #737`, `Closes #738`, `Closes #721`, `Closes #723` and `Closes #714` (delivered by T-1184); #716 stays open for items 1–3. Pre-commitment (AI self-discipline): never-dropped N1 EN/JA lockstep at fixed line numbers, N2 every qualifier backed by a cited script line, N3 T-1185's frozen block untouched; droppable, in order, AC2 (#738) then AC1 (#737), each by class-B re-freeze raised to the operator. Relayed premise contradicted: issue #738's "no reader-visible output" — lines 21–23 of `bin/check-invocation-path.sh` are printed by `--help`. The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - engineer hand-off (2026-10-12, 5-line form):
+    - Files: README.md, README.ja.md, skills/run|setup|team-init/SKILL.md, bin/check-invocation-path.sh (comment only), docs/migrating-to-local-mode(.ja).md, T-1185 inventory rows (outside intent block), provenance T-1189; committed at 7cdaca87.
+    - Check: `CHECK_ACS_TIMEOUT=600 bash bin/check-acs.sh .shell-team/specs/T-1189-local-mode-followups-prose.md` printed `13 passed, 0 failed, 1 skipped` (AC14 SKIP); full-suite and shellcheck runs are left to QA and CI.
+    - Mutation probes (scratch edits restored, tree clean after): restoring the old run-skill clause failed AC1; a wrapped guide line 70 failed AC11 (and AC7, AC8 by shift); a `:86` anchor failed AC9.
+    - Notes for QA: read each new qualifier against its `## Backing lines` row (N2); EN/JA symmetric; README durability clause on line 99 untouched.
 
 
 
