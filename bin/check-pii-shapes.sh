@@ -249,8 +249,8 @@
 #      input never exits 0.
 #      A failed write into the checker's own scratch files is exit 2, except
 #      an append of a FINDING line to the findings list and any write to the
-#      default mode's changed-path list, which still end in exit 1 with no
-#      FINDING line.
+#      changed-path list of the default and --base modes, which still end in
+#      exit 1 with no FINDING line.
 #
 # --paths (T-1182): a file is scanned; a directory is walked recursively
 # with any .git entry neither descended into nor scanned; a symlink (named

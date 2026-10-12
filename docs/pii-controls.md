@@ -120,11 +120,12 @@ path, `--paths` with no path, `--paths` combined with `--all` or `--base`, or
 a run that read no regular text file (an empty directory, or one holding
 only binary files or symlinks) exits `2` and never prints the clean line. A
 failed write into the checker's own scratch files (a full or read-only temp
-filesystem, for instance) is likewise exit `2` with a `failed to write scratch
-file` message: a scan that did not complete, never a clean run. The exceptions
-are an append of a `FINDING` line to the findings list and any write to the
-default mode's changed-path list: those still end in exit `1` with no
-`FINDING` line.
+filesystem, for instance) is likewise exit `2` with a structural message (the
+newly guarded writes use `failed to write scratch file`; older guarded writes
+keep their own messages): a scan that did not complete, never a clean run. The
+exceptions are an append of a `FINDING` line to the findings list and any write
+to the changed-path list of the default and `--base` modes: those still end in
+exit `1` with no `FINDING` line.
 
 ## When the loop runs it
 
