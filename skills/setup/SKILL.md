@@ -13,7 +13,7 @@ allowed — stays the operator's decision. You report those conditions. You neve
 change them, and you never propose a change to them as something you apply. The
 report also carries one `Required:` action (the base directory in git) and one
 `Notice:` line; neither is a host setting.
-In `local` record mode the base-directory item is instead an ignore line to append, an `Already in place:` item or a `Remains` item (step 5).
+In `local` record mode the base-directory item is instead an ignore line to append, an `Already in place:` item or a `Remains` item (step 5); for a base dir not yet committed and not yet ignored whose path has a character outside `A-Za-z0-9._/-` it is a `Required:` item that prints no line.
 
 Do this:
 
@@ -89,7 +89,7 @@ Do this:
    something else: relay the line it names (for the default base dir,
    `/.shell-team/`) as the line to append to the clone's
    `info/exclude` file in `local` mode, or to a root `.gitignore` as the
-   alternative the item names, and say that there is nothing to stage. Never offer a `git add` for it. A `local`-mode item under
+   alternative the item names, and say that no base-dir record is staged and that a `.gitignore` edit, if the operator chooses it, is a separate change the operator commits. Never offer a `git add` for it. A `local`-mode `Required:` item that says the path cannot be quoted safely carries no line: relay it as it stands and offer none. A `local`-mode item under
    `Remains the operator's decision:` (the base dir is already committed) is
    relayed as that decision, with no command of your own.
 
