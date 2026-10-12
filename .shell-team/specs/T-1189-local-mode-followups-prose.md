@@ -1,6 +1,6 @@
 # Prose follow-ups: the freeze-sweep item's re-freeze trigger, the invocation-path comment, and the local-mode summary qualifiers in the README, skills and migration guide
 
-**Status**: READY_FOR_ARCH
+**Status**: READY_FOR_ENG
 **Owner**: pm-spec
 **Task ID**: T-1189
 
