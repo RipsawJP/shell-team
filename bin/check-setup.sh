@@ -90,7 +90,7 @@ Options:
 
 Stdout: one header line, then one "- " line per unmet item (and "- note:"
 lines for scaffold files that differ from the plugin's templates, and one for
-each plugin declaration file that has CRLF line endings, which stops the run at
+each plugin declaration file that has CRLF line endings, which may stop the run at
 Step 1; the note names the re-clone remedies). Diagnostics go to stderr.
 
 Exit codes (precedence 2 > 1 > 0):
@@ -269,7 +269,7 @@ crlf_note() { # <path relative to the plugin root>
   g=0
   grep -q "$CR" "$f" 2>/dev/null || g=$?
   case "$g" in
-    0) add_note "$rel has CRLF line endings, so the run will stop at Step 1; make a new clone: for a plugin-manager install run \`/plugin marketplace remove ripsawjp\` then \`/plugin marketplace add RipsawJP/shell-team\`, for a manual clone clone again with \`git clone -c core.autocrlf=false\` (a clone made from v2.9.1 on is LF)" ;;
+    0) add_note "$rel has CRLF line endings, so the run may stop at Step 1; make a new clone: for a plugin-manager install run \`/plugin marketplace remove ripsawjp\` then \`/plugin marketplace add RipsawJP/shell-team\`, for a manual clone clone again with \`git clone -c core.autocrlf=false\` (a clone made from v2.9.1 on is LF)" ;;
     1) : ;;
     *) err "check-setup: cannot read $f"; EC2=1 ;;
   esac

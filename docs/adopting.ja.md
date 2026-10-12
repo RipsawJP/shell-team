@@ -207,7 +207,7 @@ operator の判断として述べます。このチェックは別の dispatch �
 再割り当てしていて相手側 provider の CLI を持たない host も、この CLI の行により
 Step 0 で止まります。
 
-**CRLF 改行の plugin checkout は Step 1 で run を止めます。** `core.autocrlf=true`（Git for Windows の通常設定）で `.gitattributes` が無いと、git は plugin のテキストファイルを CRLF 改行で書き出し、run が Step 1 で読む宣言ファイルが解釈できなくなります。v2.9.1 以降は作業ツリーを LF に保つ `.gitattributes` を同梱するため、それ以降に作った clone は `core.autocrlf` の値にかかわらず LF です。それ以前に作った checkout は、clone し直すまで CRLF のままです。`/plugin marketplace update` だけでは既存の CRLF checkout は直りません（git は変更のないファイルを書き換えないため）。Step 0 のチェックは、復帰文字を含む宣言ファイルごとに `- note:` 行を出し、ファイル名と対処を示します。終了コードは変えません。plugin manager 経由のインストールでは `/plugin marketplace remove ripsawjp` のあとに `/plugin marketplace add RipsawJP/shell-team` を実行し、手動 clone では `git clone -c core.autocrlf=false` で clone し直します（この指定はその clone だけに効きます）。
+**CRLF 改行の plugin checkout は Step 1 で run を止めることがあります。** `core.autocrlf=true`（Git for Windows の通常設定）で `.gitattributes` が無いと、git は plugin のテキストファイルを CRLF 改行で書き出し、run が Step 1 で読む宣言ファイルが解釈できなくなります。v2.9.1 以降は作業ツリーを LF に保つ `.gitattributes` を同梱するため、それ以降に作った clone は `core.autocrlf` の値にかかわらず LF です。それ以前に作った checkout は、clone し直すまで CRLF のままです。`/plugin marketplace update` だけでは既存の CRLF checkout は直りません（git は変更のないファイルを書き換えないため）。Step 0 のチェックは、復帰文字を含む宣言ファイルごとに `- note:` 行を出し、ファイル名と対処を示します。終了コードは変えません。plugin manager 経由のインストールでは `/plugin marketplace remove ripsawjp` のあとに `/plugin marketplace add RipsawJP/shell-team` を実行し、手動 clone では `git clone -c core.autocrlf=false` で clone し直します（この指定はその clone だけに効きます）。
 
 **ループはセッションの root にある repository に対して動きます。** `run` は
 ボード・spec・loop contract をカレントディレクトリから解決し（skill の Step 0）、
