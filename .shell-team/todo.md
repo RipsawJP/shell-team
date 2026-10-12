@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1190** Test follow-ups: the team-commit suite reports a missing team-mode.sh sibling instead of aborting, and the setup suite covers four more local-mode classes (issues #712, #718) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1190-local-mode-followups-tests.md
+- [ ] **T-1190** Test follow-ups: the team-commit suite reports a missing team-mode.sh sibling instead of aborting, and the setup suite covers four more local-mode classes (issues #712, #718) — `READY_FOR_QA` — spec: .shell-team/specs/T-1190-local-mode-followups-tests.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1189 — repeat — T-1189's recorded value is `serial`; two test files with small additive hunks, no balanced disjoint partition
@@ -27,6 +27,11 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-10-12): verdict=match — derived=PATCH — headline=not-met — default-reach=not-met — premise=PATCH (v2.9.3), approved at the sprint planning GO on 2026-10-12 on the ground that every item is a fix with no new adopter capability — grounds: tests only; no shipped file changes
   - intent-hash (v1): a5cbbfa61398e26181ca483c0cf44133531f93bc
   - source: issues #712 and #718, filed as fast-follows of T-1180 and T-1183. Branch `feature/local-mode-followups-tests` cut from T-1189's tip `8b917f80` (predecessor `feature/local-mode-followups-prose`, PR #743 open against develop); this task's PR also targets develop. Pre-commitment (AI self-discipline): never-dropped N1 no `bin/` edit, N2 team-commit normal-run stdout byte-identical, N3 no recursive deletion; droppable, in order, AC5's global-excludes variant (class-B re-freeze). Any finding needing a `bin/` edit returns to planning as a new issue. Relayed premises (coordinating-session measurement of the parent-directory check-ignore output; errexit inside command substitution, reasoned only) are labelled in the spec's Assumptions. The intent hash is not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - engineer hand-off (T-1190, 2026-10-12): `tests/team-commit/run.sh` gains the `mode_sibling` guard (both copy sites) and a contract comment; probe: `set -e` aborts a top-level `cp` of a missing sibling but does not fire inside `$(...)`, an unreadable sibling behaves the same; the standalone-copy run now reaches the trailer with exit 1 and a `FAIL: team-mode.sh missing or unreadable in <dir>` line, and the normal run's stdout is byte-identical to the base (`cmp` of the base blob's run against the head run).
+  - engineer hand-off (T-1190): `tests/setup/run.sh` gains five fixtures after the local-mode block (`PASS: T-1190 AC3`, `AC4`, `AC5 root-gitignore`, `AC5 global-excludes`, `AC6`), additions only; mutation probes (each fixture's subject broken once in place, then restored with `cmp`) each went red on exactly its own fixture. No file under `bin/` changed.
+  - engineer hand-off (T-1190): `CHECK_ACS_TIMEOUT=900 bash bin/check-acs.sh .shell-team/specs/T-1190-local-mode-followups-tests.md` reported `check-acs: 11 passed, 0 failed, 0 skipped, 0 unrecognized`; `shellcheck tests/team-commit/run.sh tests/setup/run.sh` exit 0; shape-scan: `PII_CHECK_TRACKER_KEY=1 bash bin/check-pii-shapes.sh --all` found nothing on the task's own files (only the board's existing tracker-key noise).
+  - engineer hand-off (T-1190): a scratch-copy probe that symlinked `bin/` let the existing missing-sibling fixture rewrite the real `bin/team-mode.sh`; restored with `git checkout` and `git status` shows no `bin/` change (see provenance).
+  - engineer hand-off (T-1190): notes for QA — AC3–AC6 assertion content (item placement, `nogit`, exit status) is reading-judged; commit cabe1fd7; provenance `.shell-team/provenance/T-1190.md` conformant.
 
 
 
