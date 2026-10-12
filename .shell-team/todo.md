@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_QA` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
+- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1188 — no-predecessor-row — T-1188 took the trivial path and recorded no dispatch row for this axis
@@ -70,6 +70,14 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - docs/migrating-to-local-mode.md:20 and .ja.md:20 (.codex/agents append): "when not already ignored ... otherwise Already in place:" -> (b) excluded; (a) concerns the base dir, not this path -> none. :70 and .ja.md:70 (tracked): "ignored and not yet committed" -> `:1000-1030` blocking-rule branch, committed excluded -> none. :89 and .ja.md:89 (check-codex-agents result): no setup outcome -> n/a.
     - skills/run/SKILL.md freeze-sweep item and bin/check-invocation-path.sh comment: no setup outcome -> n/a.
     - Check: `ulimit -f 400000; bash bin/check-acs.sh .shell-team/specs/T-1189-local-mode-followups-prose.md | head -c 200000 | tail -2` printed `13 passed, 0 failed, 1 skipped` (first run after the JA edit failed AC3 on the fixed phrase; rephrased to keep the phrase contiguous and re-ran green).
+  - QA round 3 (2026-10-12): PASS, T-1189 -> `READY_FOR_REVIEW`; scoped to rework commit 68d04ebc (README.md:99, README.ja.md:99, skills/team-init/SKILL.md record-mode paragraph).
+    - Tests: `bash bin/check-acs.sh .shell-team/specs/T-1189-local-mode-followups-prose.md` printed `13 passed, 0 failed, 1 skipped` rc=0; `bash tests/check-adopter-docs/run.sh` printed `all 75 cases passed` rc=0; `bash tests/check-readme-version/run.sh` printed `All check-readme-version assertions passed.` rc=0. All run with `ulimit -f 400000`; every suite and checker grepped for `rm -[a-zA-Z]*[rR]|find .*-delete` first, 0 hits.
+    - Checkers (exit codes read explicitly): check-intent `aligned` rc=0; check-provenance `conformant` (3 entries) rc=0; check-handoff `.shell-team/todo.md` rc=0; check-interventions `--task T-1189` `conformant` rc=0.
+    - Acceptance criteria: 13 of 14 mechanically verified by the check-acs run above; AC14 is the runtime criterion (`SKIP (runtime — no check:)`) and stays with the coordinating session, so it is not confirmed here.
+    - Verification ceiling: unit-and-static — verifies every criterion at or below that level; AC14 stays with the coordinating session.
+    - Reading check against `bin/team-setup.sh:784-823` (local) and `:1000-1030` (tracked): inventory judgements re-read row by row. README/README.ja 51 and skills/setup/SKILL.md:16 ("not yet committed and not yet ignored") confirmed excluded already; README/README.ja 77 ("not yet committed, until it is ignored") confirmed excluded already; README/README.ja 99 and skills/team-init/SKILL.md now exclude both preconditions (committed -> `Remains`, already ignored -> `Already in place:`, matching `:795-798` and `:813-816`); EN/JA symmetric at 99 (each carries the safe-character-set clause); no `team-setup.sh:NNN` or `line N` self-reference in either README (grep printed nothing); no new qualifier lacks a script line. Rows for skills/setup:92, docs/migrating 20/70/89 (EN and JA) and the run skill and invocation-path comment were judged from the engineer's table plus the script ranges, not re-read in full.
+    - Not exercised: a live `team-setup.sh` fixture run per branch (reading only); edge cases tried: the unsafe-path branch (no line printed, `:1004-1008`) and the `!` re-include branch (`:803-809`) read against the README wording.
+    - Risk notes for reviewer: README:77 `.codex/agents` wording stays with issue #744; tree clean at 68d04ebc before this append.
 
 
 
