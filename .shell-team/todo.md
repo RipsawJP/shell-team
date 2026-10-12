@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
+- [ ] **T-1189** Prose follow-ups: the freeze-sweep item names its re-freeze trigger, the invocation-path comment names the every-part rule, and the README, setup and team-init skills and migration guide state the local-mode outcomes they omitted (issues #737, #738, #721, #723) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1189-local-mode-followups-prose.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1188 — no-predecessor-row — T-1188 took the trivial path and recorded no dispatch row for this axis
@@ -78,6 +78,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Reading check against `bin/team-setup.sh:784-823` (local) and `:1000-1030` (tracked): inventory judgements re-read row by row. README/README.ja 51 and skills/setup/SKILL.md:16 ("not yet committed and not yet ignored") confirmed excluded already; README/README.ja 77 ("not yet committed, until it is ignored") confirmed excluded already; README/README.ja 99 and skills/team-init/SKILL.md now exclude both preconditions (committed -> `Remains`, already ignored -> `Already in place:`, matching `:795-798` and `:813-816`); EN/JA symmetric at 99 (each carries the safe-character-set clause); no `team-setup.sh:NNN` or `line N` self-reference in either README (grep printed nothing); no new qualifier lacks a script line. Rows for skills/setup:92, docs/migrating 20/70/89 (EN and JA) and the run skill and invocation-path comment were judged from the engineer's table plus the script ranges, not re-read in full.
     - Not exercised: a live `team-setup.sh` fixture run per branch (reading only); edge cases tried: the unsafe-path branch (no line printed, `:1004-1008`) and the `!` re-include branch (`:803-809`) read against the README wording.
     - Risk notes for reviewer: README:77 `.codex/agents` wording stays with issue #744; tree clean at 68d04ebc before this append.
+  - code review round 3 (2026-10-12): APPROVE (pass ids primary-r3 and adversarial-r3, both Codex captures published, `check-review-input` exit 0; synthesis ledger: no severity changes) — round-2 minor conceded as fixed (README.md:99 / README.ja.md:99 now "not yet committed and not yet ignored"); no finding on any sentence this task edited; two pre-existing nits outside the diff. Pre-commitment class count: round 3 adds no new finding of the class. → `READY_FOR_MERGE`.
+  - fast-follow disposition (2026-10-12): docs/adopting.md:106 and :520, docs/adopting.ja.md:110 and :521 omit the unsafe-path no-line outcome that the same guide states at :111 / :115 (nit, outside this diff) — filed as issue #744 (added to that issue as a comment); README.md:77 / README.ja.md:77 `.codex/agents` clause (nit, pre-existing) — filed as issue #744
 
 
 
