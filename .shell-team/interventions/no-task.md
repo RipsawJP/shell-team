@@ -55,4 +55,8 @@
   date: 2026-10-11
   summary: After the sprint close the operator asked what to do with the local-mode fixture under the scratch root; the orchestrator recommended keeping it ("reusable, no harm") and the operator corrected that hidden, unattributed scratch data left behind is itself the harm.
   effect: Scratch fixtures and clones are deleted at the end of the task that created them (the orchestrator presents the deletion command then, never runs a recursive delete itself); no "keep in case" recommendation; the remaining scratch entries are attributed and presented for deletion.
+- intervention: assumption-contradicted
+  date: 2026-10-12
+  summary: the sprint plan approved for T-1189 listed issue #714 and issue #716 item 4 as outstanding work; the tech-lead measured both as already delivered by T-1184 (agents/engineer.md, skills/goal/SKILL.md, skills/run/SKILL.md and docs/pii-controls*.md carry the text), and #714 was left open on the tracker after that merge
+  effect: T-1189 edits only #737, #738, #721 and #723; its pull request closes #714 citing T-1184 as the delivery; #716 stays open for items 1-3 (T-1191); the sprint goal and release tier are unchanged
 <!-- END interventions: no-task -->
