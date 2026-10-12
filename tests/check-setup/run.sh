@@ -316,6 +316,38 @@ printf '# local edit\n' >> "$KE"; x="$(ck "$SP" "$LE" --host claude-code)"
 cp "$OLDC" "$LE/.shell-team/AGENTS.md"; x="$(ck "$SP" "$LE" --host claude-code)"
 { [ "$x" = 0 ] && grep -q '^- note: .*AGENTS.md differs' "$T/o"; } && pass "T-1176 D1: the allowance is the contract's only" || fail "T-1176 D1: allowance leaked (rc=$x)"
 
+# --- T-1186: CRLF declaration files (issue #720) ------------------------------
+# A plugin copy (the same pattern as the read-only lock) whose declaration files
+# are converted to CRLF; the run reads them from its own plugin root.
+PC="$T/t1186-pc"; mkdir -p "$PC" && cp -R "$REPO_ROOT/bin" "$REPO_ROOT/templates" "$REPO_ROOT/agents" "$REPO_ROOT/.claude-plugin" "$PC/"
+PCK="$PC/bin/check-setup.sh"
+CRF="$T/t1186-fx"; mk "$CRF"; sr "$CRF" claude-code
+ckp() { (cd "$CRF" && TMPDIR="$T/tmpd" PATH="$SP" "$BASH" "$PCK" --host claude-code < /dev/null > "$T/o" 2> "$T/e") && printf '0' || printf '%s' "$?"; }
+DECL="templates/prompt-blocks/alternate-executor-invocation.md templates/adapters/claude-cli.txt templates/adapters/codex-cli.txt templates/binding-default.conf"
+x="$(ckp)"
+n="$(grep -c '^- note: .*CRLF' "$T/o" || true)"
+{ [ "$x" = 0 ] && [ "$n" = 0 ]; } && pass "crlf: LF declaration files get no CRLF note and exit 0" || fail "crlf: LF declaration files get no CRLF note and exit 0 (rc=$x, notes=$n)"
+for d in $DECL; do awk '{ printf "%s\r\n", $0 }' "$PC/$d" > "$PC/$d.t" && mv "$PC/$d.t" "$PC/$d"; done
+x="$(ckp)"
+n="$(grep -c '^- note: .*CRLF' "$T/o" || true)"
+ok=1; for d in $DECL; do
+  grep '^- note: .*CRLF' "$T/o" | grep -F -- "$d" | grep -qF 'git clone -c core.autocrlf=false' || ok=0
+  grep '^- note: .*CRLF' "$T/o" | grep -F -- "$d" | grep -qF 'marketplace remove' || ok=0
+done
+g=0; grep -qF -- '--global' "$T/o" "$T/e" || g=$?
+{ [ "$x" = 0 ] && [ "$n" = 4 ] && [ "$ok" = 1 ] && [ "$g" = 1 ]; } && pass "crlf: declaration files with CRLF line endings get one note each and exit 0" || fail "crlf: declaration files with CRLF line endings get one note each and exit 0 (rc=$x, notes=$n, ok=$ok, global-grep=$g)"
+UF="$PC/templates/adapters/codex-cli.txt"
+chmod 000 "$UF"
+if cat "$UF" > /dev/null 2>&1; then
+  fail "crlf: precondition (an unreadable declaration file) does not hold"
+else
+  x="$(ckp)"
+  chmod 644 "$UF"
+  mv "$PC/templates/binding-default.conf" "$T/t1186-bdc"; y="$(ckp)"; mv "$T/t1186-bdc" "$PC/templates/binding-default.conf"
+  { [ "$x" = 2 ] && [ "$y" = 2 ]; } && pass "crlf: an unreadable declaration file exits 2" || fail "crlf: an unreadable declaration file exits 2 (rc=$x, missing rc=$y)"
+fi
+chmod 644 "$UF"
+
 if [ "$fails" -gt 0 ]; then
   printf '\ncheck-setup suite: %d assertion(s) FAILED\n' "$fails" >&2
   exit 1

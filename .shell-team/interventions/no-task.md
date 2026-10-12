@@ -51,4 +51,8 @@
   date: 2026-10-11
   summary: after the second operator gate of the day opened on a harness refusal (the reviewer's record commit refused by the auto-mode classifier at T-1183; the engineer's doc edit refused by the removal-safety check at T-1185), the operator said the rules meant to reach the goal were being blocked by rules for following rules, that work which could have been done was not done, and that a shape-specific fix plus a new rule each time is not the countermeasure wanted, because near variants slip through and the rules hollow out
   effect: no rule was added or changed in the loop; the coordinating session committed to judging a stop by whether it protects something irreversible it can name (deletion, credentials, sandbox or configuration changes, production), to writing that named thing as the first line of any gate it opens, and to counting the operator turns its own stop decisions caused; the consolidation of the three overlapping refusal rules into one purpose statement goes to the sprint retro as a candidate for the operator's ruling
+- intervention: human-correction
+  date: 2026-10-11
+  summary: After the sprint close the operator asked what to do with the local-mode fixture under the scratch root; the orchestrator recommended keeping it ("reusable, no harm") and the operator corrected that hidden, unattributed scratch data left behind is itself the harm.
+  effect: Scratch fixtures and clones are deleted at the end of the task that created them (the orchestrator presents the deletion command then, never runs a recursive delete itself); no "keep in case" recommendation; the remaining scratch entries are attributed and presented for deletion.
 <!-- END interventions: no-task -->
