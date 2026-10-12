@@ -389,3 +389,11 @@ The derived tier is PATCH, the maximum of the column.
 - **Runtime.** Run long suites in their own process group with a timeout that kills the group, under `ulimit -f`, with output capped.
 - **Measured-at-ref command check.** Not applicable: no deliverable prints a command labelled as measured at a git ref.
 - **Review depth.** The checker is a shipped `bin/` gate (full strength); the docs are shipped text; the inline check lines get dev-scaffold depth (operator ruling 2026-08-22).
+
+## Notes from engineer
+
+- Measured premises (macOS host, bash 3.2, base script at `01be9002`, each run in a subshell with `trap '' XFSZ` and the output captured through a pipe):
+  - `:863`: `ulimit -f 0` with `--paths clean.txt` ends the base at exit `1` (stale absolute path on stdout, no `FINDING` line) and HEAD at exit `2` with the message sharing that line, as predicted.
+  - `ulimit -f` counts 1024-byte units in POSIX mode too on this bash, so the predicted 512-byte route does not exist here. On this host an append (`>>`) is refused only when one single write exceeds the limit, so no limit makes the `:790` list append fail after the smaller guarded writes, and a 900-byte symlink target stayed under a 1-block limit. The `:790`, `:803` and `:876` fixtures therefore use read-only scratch files made through PATH stubs for `mktemp` and `git` (see the suite's T-1191 block); `:863` keeps the limit route.
+  - Against the base script the suite's T-1191 item 3 cases end at exit `1` (`paths-list`, `paths-symlink-target`, `all-untracked-list`, `all-symlink-target`) and `0` (`binary-detection`, `pattern-scan`, `email-scan`), as AC7 expects.
+- A `--paths` argument that resolves outside the repository keeps its existing message ahead of the trailing-slash check, so `/` still exits `2` through the containment check.
