@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1191** check-pii-shapes --paths hardening: a known-shape path prints a skip notice, a trailing slash on a non-directory exits 2, and a failed scratch write exits 2 (issue #716 items 1-3) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1191-local-mode-followups-pii-paths.md
+- [ ] **T-1191** check-pii-shapes --paths hardening: a known-shape path prints a skip notice, a trailing slash on a non-directory exits 2, and a failed scratch write exits 2 (issue #716 items 1-3) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1191-local-mode-followups-pii-paths.md
   - entry-mode: pm-authored
   - spec-review: none
   - dispatch-reflection: implement — T-1190 — repeat — T-1190's recorded value is `serial`; one checker, its suite and the EN/JA docs land in lockstep, no balanced disjoint partition
@@ -44,6 +44,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - engineer review-minor wording fix (2026-10-12): the two docs now say a failed scratch write exits 2 with a structural message (newly guarded writes use `failed to write scratch file`, older guarded writes keep their own), and name the changed-path list as the default and `--base` modes' list (header too); AC8 and AC9 check lines rc=0, `tests/bin-help` green, shellcheck clean.
   - code review round 1 (2026-10-12): APPROVE (record `.shell-team/reviews/T-1191.md`, pass ids primary and adversarial, both Codex captures published, `check-review-input` exit 0; synthesis ledger: no severity changes) — N1, N2, N3 held; no blocker or major; the sprint stop rule did not fire. Two minors on wording this task wrote (the docs promised the `failed to write scratch file` message for every failed scratch write; "the default mode's changed-path list" also covers `--base`) were fixed in-task in fd4424cb by the coordinating session's decision, so round 2 reviews that delta.
   - fast-follow disposition (2026-10-12): chmod-based fixtures fail under root (minor) — waived: the suite fails loudly rather than passing, and CI and the workstation run as a non-root user; item1 `--all` case asserts the notice's absence but not the exit status (minor) — waived: the absence assertion guards what AC1 names, and AC5 pins the `--all` exit status byte-for-byte against the base; any grep status above 1 reported as `failed to write scratch file` (nit) — waived: spec D3 accepts it; changed-path list wording (nit) — fixed in-task in fd4424cb; docs message promise (minor) — fixed in-task in fd4424cb
+  - code review round 2 (2026-10-12): APPROVE (pass ids primary-r2 and adversarial-r2, both Codex captures published, `check-review-input` exit 0; synthesis ledger: no severity changes) — both round-1 wording minors conceded as fixed; no code line changed since round 1 (comment lines only); no new finding. → `READY_FOR_MERGE`.
+  - fast-follow disposition (2026-10-12): remaining exit-1 scratch-write sites (the `FINDING` appends and the changed-path list of the default and `--base` modes) — filed as issue #746
 
 
 
