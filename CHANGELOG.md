@@ -6,6 +6,9 @@ A change that alters no behaviour and touches only committed records is describe
 
 日本語版: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
+- **v2.9.4**
+  - **The engineer and QA playbooks gain one rule from the lessons corpus.** A scratch install of the code under test, built to run a suite against it, copies the files instead of symlinking the checkout's directories, because a fixture that renames, rewrites or removes a file in the install would otherwise act on the real tree through the link. An existing corpus entry on restating a script's outcome is also extended. (#750)
+  - Records maintenance.
 - **v2.9.3**
   - **`check-pii-shapes.sh` no longer reports a clean scan it did not complete.** In `--paths`, a path on the known-shape fixture list now prints `skip: known-shape fixture, not scanned: <path>` and does not count as read, so a run naming only such paths exits 2. An argument written with a trailing slash must name a real directory (`file.txt/` exits 2 instead of scanning the file). A failed write into the checker's own scratch files exits 2 with a structural message; before, the match lists and the binary-detection copy could swallow the error and end clean, and the list and symlink-target writes ended in exit 1 with no finding. Existing modes are byte-identical on their success paths. (#716)
   - **The local-mode summaries state the outcomes they left out.** The README (EN and JA), the setup and team-init skills and the migration guide now say that the `info/exclude` line applies to a base dir not yet committed and not yet ignored, that a base path with a character outside `A-Za-z0-9._/-` gets a `Required:` item with no printed line (and, back in `tracked` mode, no `git add` command and no re-include line), that `.codex/agents` is appended only when not already ignored, and that `check-codex-agents.sh` names an extra `shell-team-*.toml` it does not own. (#721, #723)
