@@ -6,6 +6,9 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.4**
+  - **engineer と QA の playbook に、lessons corpus から規則が 1 つ加わる。** テスト対象のコードを scratch に install して suite を走らせる時は、checkout のディレクトリへの symlink ではなくファイルをコピーする。install 内のファイルを fixture が rename・書き換え・削除すると、link を通じて実物の tree に作用するため。スクリプトの結果を言い直す時の既存 corpus エントリも拡張された。（#750）
+  - Records maintenance.
 - **v2.9.3**
   - **`check-pii-shapes.sh` は、完了していない走査を clean と報告しなくなった。** `--paths` では、既知形状の fixture 一覧にあるパスは `skip: known-shape fixture, not scanned: <path>` を出し、読んだ数に数えない。そのようなパスだけを名指しした run は終了コード 2 で終わる。末尾にスラッシュを付けた引数は実在のディレクトリを指さなければならない（`file.txt/` はファイルを走査せず 2 で終わる）。checker 自身の作業ファイルへの書き込みに失敗すると、構造エラーのメッセージとともに 2 で終わる。以前は一致リストとバイナリ判定用コピーがエラーを握りつぶして clean で終わり得たし、一覧と symlink 先の書き込みは finding なしの 1 で終わっていた。既存モードの成功時の出力は byte 単位で不変。（#716）
   - **local mode の要約が、書き落としていた結果を述べる。** README（EN/JA）・setup と team-init のスキル・移行ガイドは次を書く: `info/exclude` の行はまだコミットされておらず、まだ無視されてもいない base dir に対するものであること。`A-Za-z0-9._/-` の外の文字を含む base パスには行を出さない `Required:` 項目が出ること（`tracked` に戻ったあとは `git add` コマンドも再包含の行も出ない）。`.codex/agents` はまだ無視されていない時だけ追記されること。`check-codex-agents.sh` は自分が管理しない余分な `shell-team-*.toml` を名指しすること。（#721、#723）
