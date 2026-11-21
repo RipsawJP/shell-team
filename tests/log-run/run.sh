@@ -317,6 +317,90 @@ set -e
 [ ! -e "$INST_DIR/ev" ] || fail "log-run --instance in event mode created a runs dir"
 pass "log-run rejects --instance in event mode (exit 2, nothing written)"
 
+# --- T-1194 log-run-exclusive: the lock never trusts mkdir's reported success ---
+# Measured cause (CI runner): `mkdir` there is uutils coreutils, whose
+# concurrent calls on one path can all report success. A `mkdir` stub that
+# runs the real mkdir, discards its status and always exits 0 models that
+# deterministically on any host. Everything below runs the shipped writer
+# ($LOGRUN) itself. Setup failures use the distinct label
+# `T-1194 log-run-exclusive-setup`; an exclusivity failure uses
+# `T-1194 log-run-exclusive:`.
+X94="$TMP/t1194"
+mkdir -p "$X94/sb"
+X94_REAL_MKDIR="$(command -v mkdir)" || fail "T-1194 log-run-exclusive-setup: no mkdir on PATH"
+printf '%s\n' '#!/bin/sh' "\"$X94_REAL_MKDIR\" \"\$@\" 2> /dev/null" 'exit 0' > "$X94/sb/mkdir" \
+  || fail "T-1194 log-run-exclusive-setup: could not write the mkdir stub"
+chmod +x "$X94/sb/mkdir" || fail "T-1194 log-run-exclusive-setup: could not make the mkdir stub executable"
+X94_PATH_STUB="$X94/sb:$PATH"
+PATH="$X94_PATH_STUB" mkdir "$X94/probe" || fail "T-1194 log-run-exclusive-setup: stub mkdir failed on a new path"
+PATH="$X94_PATH_STUB" mkdir "$X94/probe" || fail "T-1194 log-run-exclusive-setup: stub mkdir did not report success twice on one path"
+[ -d "$X94/probe" ] || fail "T-1194 log-run-exclusive-setup: stub mkdir did not create the probe directory"
+
+# x94_writer <writer> <runs-dir> <PATH> <timeout> <instance> <stderr-file> — exit status is the writer's
+x94_writer() {
+  env PATH="$3" TEAM_RUNS_DIR="$2" TEAM_LOG_LOCK_TIMEOUT="$4" bash "$1" lk --run-id X \
+    --seq auto --span s --phase p --iteration 0 --attempt 1 --status success --instance "$5" \
+    < /dev/null > /dev/null 2> "$6"
+}
+
+# Pre-held lock, four arms: (directory with owner | token-less directory) x (stub | real mkdir).
+for x94_arm in tok-stub tok-real bare-stub bare-real; do
+  x94_dir="$X94/arm-$x94_arm"
+  x94_lock="$x94_dir/.lk.jsonl.lock"
+  mkdir -p "$x94_lock" || fail "T-1194 log-run-exclusive-setup: could not pre-hold the lock for $x94_arm"
+  case "$x94_arm" in
+    tok-*) : > "$x94_lock/owner" || fail "T-1194 log-run-exclusive-setup: could not write the pre-held owner for $x94_arm" ;;
+  esac
+  case "$x94_arm" in
+    *-stub) x94_p="$X94_PATH_STUB" ;;
+    *)      x94_p="$PATH" ;;
+  esac
+  set +e
+  x94_writer "$LOGRUN" "$x94_dir" "$x94_p" 2 w0 "$X94/err-$x94_arm"
+  x94_rc=$?
+  set -e
+  [ "$x94_rc" -eq 3 ] || fail "T-1194 log-run-exclusive: $x94_arm: a writer facing a pre-held lock exited $x94_rc, expected 3 (it took the held lock)"
+  [ ! -e "$x94_dir/lk.jsonl" ] || fail "T-1194 log-run-exclusive: $x94_arm: a runs file was written under a pre-held lock"
+  [ -d "$x94_lock" ] || fail "T-1194 log-run-exclusive: $x94_arm: the pre-held lock directory was removed"
+  case "$x94_arm" in
+    tok-*) [ -f "$x94_lock/owner" ] || fail "T-1194 log-run-exclusive: $x94_arm: the pre-held owner token was removed" ;;
+  esac
+  grep -qF -- "$x94_lock" "$X94/err-$x94_arm" || fail "T-1194 log-run-exclusive: $x94_arm: the refusal did not name the full lock path"
+  grep -qF -- owner "$X94/err-$x94_arm" || fail "T-1194 log-run-exclusive: $x94_arm: the refusal did not name the owner token removal step"
+  grep -qF -- rmdir "$X94/err-$x94_arm" || fail "T-1194 log-run-exclusive: $x94_arm: the refusal did not name the rmdir step"
+done
+
+# Concurrency under the always-success mkdir: 4 writers x 10 rows, exactly seq 1..40, no lock left.
+X94_C="$X94/conc"
+mkdir -p "$X94_C" || fail "T-1194 log-run-exclusive-setup: could not create the concurrency runs dir"
+x94_pids=()
+for x94_i in 1 2 3 4; do
+  (
+    x94_f=0
+    # shellcheck disable=SC2034  # x94_j is the loop counter only, never read
+    for x94_j in 1 2 3 4 5 6 7 8 9 10; do
+      x94_writer "$LOGRUN" "$X94_C" "$X94_PATH_STUB" 120 "w$x94_i" /dev/null || x94_f=1
+    done
+    exit "$x94_f"
+  ) &
+  x94_pids+=("$!")
+done
+x94_failed=0
+for x94_p in "${x94_pids[@]}"; do
+  wait "$x94_p" || x94_failed=$((x94_failed + 1))
+done
+[ "$x94_failed" -eq 0 ] || fail "T-1194 log-run-exclusive: $x94_failed of 4 concurrent writers exited non-zero under the stub mkdir"
+[ -s "$X94_C/lk.jsonl" ] || fail "T-1194 log-run-exclusive: the concurrency arm wrote no runs file"
+grep -oE '"run_id":"X","seq":[0-9]+' "$X94_C/lk.jsonl" | grep -oE '[0-9]+$' | LC_ALL=C sort -n > "$X94/c-got"
+seq 1 40 > "$X94/c-exp"
+if ! cmp -s "$X94/c-got" "$X94/c-exp"; then
+  x94_dup="$(uniq -d "$X94/c-got" | tr '\n' ' ')"
+  x94_miss="$( { grep -vxFf "$X94/c-got" "$X94/c-exp" || true; } | tr '\n' ' ')"
+  fail "T-1194 log-run-exclusive: concurrent --seq auto under the stub mkdir did not yield exactly 1..40 — duplicated: [${x94_dup}] missing: [${x94_miss}]"
+fi
+[ ! -e "$X94_C/.lk.jsonl.lock" ] || fail "T-1194 log-run-exclusive: a lock directory remained after all writers finished"
+pass "T-1194 log-run-exclusive — pre-held lock held on 4 arms (owner/token-less x stub/real mkdir); 4 writers x 10 rows under an always-success mkdir yield exactly seq 1..40 and leave no lock"
+
 # =====================================================================
 # T-1076: append-lock contention suite (AC9) plus the lock-disabled
 # negative control (AC10). Floors read back by AC9's own check: N
@@ -438,8 +522,11 @@ POS_SEQS="$TMP/pos-seqs.txt"
 grep -oE '"run_id":"SHARED","seq":[0-9]+' "$POS_FILE" | grep -oE '[0-9]+$' | LC_ALL=C sort -n > "$POS_SEQS"
 POS_EXP="$TMP/pos-exp.txt"
 seq 1 "$((CONT_N * CONT_M))" > "$POS_EXP"
-cmp -s "$POS_SEQS" "$POS_EXP" \
-  || fail "T-1076 contention-auto-seq-set: derived seq set for run_id SHARED does not exactly match 1..$((CONT_N * CONT_M)) (duplicate or gap)"
+if ! cmp -s "$POS_SEQS" "$POS_EXP"; then
+  POS_DUP="$(uniq -d "$POS_SEQS" | tr '\n' ' ')"
+  POS_MISS="$( { grep -vxFf "$POS_SEQS" "$POS_EXP" || true; } | tr '\n' ' ')"
+  fail "T-1076 contention-auto-seq-set: derived seq set for run_id SHARED does not exactly match 1..$((CONT_N * CONT_M)) — duplicated: [${POS_DUP}] missing: [${POS_MISS}]"
+fi
 pass "T-1076 contention-auto-seq-set"
 
 # --- the D2 refusal case: a pre-held lock => nothing written, exit 3 -------
@@ -456,6 +543,7 @@ set -e
 grep -qF -- '.locktest.jsonl.lock' "$TMP/lt-err" || fail "T-1076 lock-timeout-refusal: stderr did not name the lock path"
 rmdir "$LT_DIR/.locktest.jsonl.lock"
 pass "T-1076 lock-timeout-refusal"
+
 
 # T-1076 rework round 3 (Codex round-2 Minor fix): lock_mtime's dialect
 # probe must actually select a form that produces a legible value on THIS
@@ -785,6 +873,7 @@ cat > "$REL_REPL" <<'EOF'
   trap '' INT TERM
   if [ "$LOCK_ACQUIRED" = "1" ]; then
     LOCK_ACQUIRED=0
+    rm -f -- "$LOCK_DIR/owner" 2>/dev/null || true
     rmdir "$LOCK_DIR" 2>/dev/null || true
     : > "${LOCK_DIR}.rel-probe-marker"
     rp_w=0
@@ -1059,9 +1148,12 @@ mkdir -p "$NEG_BIN_DIR"
 # shellcheck disable=SC2016  # single-quoted sed program: the literal text
 # `$LOCK_DIR` is the pattern being matched in the SOURCE file, not an
 # expansion in THIS script.
-sed 's/^  if mkdir "\$LOCK_DIR" 2>\/dev\/null; then$/  if true; then/' "$LOGRUN" > "$NEG_BIN_DIR/log-run.sh"
-grep -q '^  if true; then$' "$NEG_BIN_DIR/log-run.sh" \
+sed -e 's/^    if mkdir "\$LOCK_DIR" 2>\/dev\/null; then$/    if true; then/' \
+    -e 's/^      claim_owner || LOCK_ACQUIRED=0$/      :/' "$LOGRUN" > "$NEG_BIN_DIR/log-run.sh"
+grep -q '^    if true; then$' "$NEG_BIN_DIR/log-run.sh" \
   || fail "T-1076 negative-control setup: the lock-disabling patch did not apply to the scratch copy"
+grep -q '^      :$' "$NEG_BIN_DIR/log-run.sh" \
+  || fail "T-1076 negative-control setup: the owner-claim-disabling patch did not apply to the scratch copy"
 if cmp -s "$LOGRUN" "$NEG_BIN_DIR/log-run.sh"; then
   fail "T-1076 negative-control setup: the mutant is byte-identical to the real writer (patch had no effect)"
 fi

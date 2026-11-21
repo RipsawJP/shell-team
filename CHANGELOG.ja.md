@@ -6,6 +6,12 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.5**
+  - **`<base>/binding.conf` で `code-reviewer` に指定したモデルが、Codex のすべてのレビューパスに届くようになる。** 実効 binding が `provider-configured` 以外のモデルを指定していると、`code-reviewer`（全モード）と `drift-evaluator` が実行するすべての `codex exec` に `-m <model>` が付く。各パスの Codex のセッションログがそのモデルを示さなければ、そのラウンドは判定を出さずに `BLOCKED — review not established` で止まる。レビュー記録には、パスごとに実際に使われたモデルが、セッションログから読んだ値で記録される。このリリースより前に書かれ、`code-reviewer` のモデルを指定している `binding.conf` は、このリリースから効くようになる。出荷時の既定は `provider-configured`（モデル指定なし）のまま。新しく作られる `binding.conf.example` の `code-reviewer` 行は、仮の `model-2` ではなく `provider-configured` になる。
+  - **モデルを照合するとき、`bin/codex-capture.sh` は解釈できないセッションログを拒否する。** `--publish --expect-model` と読み取り専用の `--observe` は、閉じていない文字列や、トップレベルの `type` キーを 2 つ以上持つレコードを malformed として扱い、そこからモデル名を読まない。診断メッセージと `--help` に `--observe` モードが載る。
+  - **`mkdir` が排他にならない環境でも、`bin/log-run.sh --seq auto` が 2 つの書き込みに同じ seq を渡さなくなる。** `mkdir` が uutils coreutils のホスト（Ubuntu 25.10 以降）では、ロックディレクトリの同時 `mkdir` が複数の書き込みに成功を返すことがあった。ロックは、ディレクトリの中に `owner` トークンを排他的に作れた書き込みだけが持つ形になった。既存のロックディレクトリは使用中とみなし、タイムアウトの拒否メッセージは手で消す 2 つの手順（`<lock>/owner` があれば消し、そのあと `rmdir <lock>`）を示す。
+  - **`bin/discover-work.sh` は `dirname` を使わずに自分のディレクトリを求める。** `cd ""` がエラーになる bash 5.3 でも動く。
+  - **テストスイート:** ロックの決定的なフィクスチャ（常に成功する偽の `mkdir`）、discover-work の `dirname` なしフィクスチャを追加。T-1076 の同時書き込みの検査は、重複した seq と欠けた seq を名指しする。check-intent の AC8 の対照は bash 5.2 と 5.3 の両方で成り立つ。
 - **v2.9.4**
   - **engineer と QA の playbook に、lessons corpus から規則が 1 つ加わる。** テスト対象のコードを scratch に install して suite を走らせる時は、checkout のディレクトリへの symlink ではなくファイルをコピーする。install 内のファイルを fixture が rename・書き換え・削除すると、link を通じて実物の tree に作用するため。スクリプトの結果を言い直す時の既存 corpus エントリも拡張された。（#750）
   - Records maintenance.

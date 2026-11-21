@@ -75,6 +75,49 @@ bash "$CHECK_HANDOFF" "$ac2_todo" >/dev/null 2>&1 \
   || fail "AC2: emitted candidates do not pass check-handoff"
 pass "AC2: emitted candidates pass check-handoff in ## Active"
 
+# --- T-1194 discover-work: no `dirname`, no cwd fallback ---------------------
+# AC4a above only greps 'not found', which `dirname: command not found` also
+# satisfies. Here the PATH holds no dirname (asserted), the working directory
+# holds a decoy team-paths.sh, and every invocation shape must exit 0, print
+# the gh note, print no 'command not found', and never run the decoy.
+T94="$TMP/t1194"
+NODN="$T94/nodn"
+mkdir -p "$NODN" "$T94/k/bin" "$T94/cw" "$T94/ln"
+for t in bash awk grep sed tr readlink; do
+  src="$(command -v "$t")" || fail "T-1194 discover-work-setup: $t not found on PATH"
+  ln -sf "$src" "$NODN/$t"
+done
+if PATH="$NODN" bash -c 'command -v dirname' >/dev/null 2>&1; then
+  fail "T-1194 discover-work-setup: dirname still resolves on the fixture PATH"
+fi
+cp "$DISCOVER" "$REPO_ROOT/bin/team-paths.sh" "$T94/k/bin/"
+for d in "$T94/cw" "$T94/k"; do
+  # shellcheck disable=SC2016  # the decoy body must expand $DECOY_LOG when it runs, not here
+  printf '%s\n' 'printf x >> "$DECOY_LOG"' 'exit 1' > "$d/team-paths.sh"
+done
+ln -s ../k/bin/discover-work.sh "$T94/ln/dr"
+ln -s "$T94/k/bin/discover-work.sh" "$T94/ln/da"
+n94=0
+t1194_shape() {  # $1 = cwd, $2 = script spelling
+  n94=$((n94 + 1))
+  local o="$T94/out-$n94" dl="$T94/decoy-$n94" rc
+  set +e
+  ( cd "$1" && DECOY_LOG="$dl" PATH="$NODN" bash "$2" --todo /nonexistent ) >"$o" 2>&1 </dev/null
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "T-1194 discover-work: '$2' exited $rc (out: $(cat "$o"))"
+  grep -qF 'gh CLI not found' "$o" || fail "T-1194 discover-work: '$2' printed no gh note (out: $(cat "$o"))"
+  ! grep -qF 'command not found' "$o" || fail "T-1194 discover-work: '$2' printed 'command not found' (out: $(cat "$o"))"
+  [ ! -e "$dl" ] || fail "T-1194 discover-work: '$2' fell back to the working directory (decoy team-paths.sh ran)"
+}
+t1194_shape "$T94/cw" "$DISCOVER"
+t1194_shape "$T94/cw" "$T94/k/bin/discover-work.sh"
+t1194_shape "$T94/k" "bin/discover-work.sh"
+t1194_shape "$T94/k/bin" "discover-work.sh"
+t1194_shape "$T94/cw" "$T94/ln/dr"
+t1194_shape "$T94/cw" "$T94/ln/da"
+pass "T-1194 discover-work: six invocation shapes resolve their own dir without dirname"
+
 # --- AC4a: gh absent => fail-soft -------------------------------------------
 # Build a PATH with the real tools discover-work needs but NO gh.
 NOGH="$TMP/nogh"
