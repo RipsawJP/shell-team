@@ -36,15 +36,26 @@ set -euo pipefail
 
 # Resolve this script's own dir (symlink-safe) so we can call the sibling
 # team-paths.sh resolver regardless of cwd / how we were invoked.
+# No external `dirname`: the header declares bash + gh only, and an empty
+# `$(dirname …)` made `cd ""` fall back to the caller's cwd (bash 5.2) or
+# fail (bash 5.3). Parameter expansion yields the directory part instead.
+script_dir_of() {  # $1 = path; prints its directory part (never empty)
+  local p="$1"
+  case "$p" in
+    */*) p="${p%/*}"; [ -n "$p" ] || p="/" ;;
+    *)   p="." ;;
+  esac
+  printf '%s' "$p"
+}
 script_path="${BASH_SOURCE[0]}"
 while [ -L "$script_path" ]; do
   link_target="$(readlink "$script_path")"
   case "$link_target" in
     /*) script_path="$link_target" ;;
-    *)  script_path="$(cd "$(dirname "$script_path")" && pwd)/$link_target" ;;
+    *)  script_path="$(cd "$(script_dir_of "$script_path")" && pwd)/$link_target" ;;
   esac
 done
-SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
+SCRIPT_DIR="$(cd "$(script_dir_of "$script_path")" && pwd)"
 
 MAX=10
 LABEL="loop-triage"
