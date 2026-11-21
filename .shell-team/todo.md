@@ -11,7 +11,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
+- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_QA` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
+  - T-1193 engineer: extract_model now marks a line with an unterminated string (decided in the tokenizer, any line type) and a line with more than one depth-1 type key as MALFORMED; diagnostics and --help name --observe; hygiene suite gains T-1193 fixtures and mutation probes.
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #759 (T-1192 cross-provider review fast-follow F1 and F3), filed by the coordinating session. Its body was relayed verbatim in the pm-spec briefing and is quoted in the spec's Summarized sources, labelled relayed until the freeze run confirms it. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.

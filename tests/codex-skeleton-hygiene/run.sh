@@ -2132,6 +2132,113 @@ cmp -s "$T1192/snap0" "$T1192/snap1" || fail "T-1192 observe: the CODEX_HOME tre
 [[ -z "$(ls -A "$T1192/obs-cwd")" ]] || fail "T-1192 observe: the working directory is not empty"
 pass "T-1192 observe: read-only model observation with the same extraction and causes, exit 2 on every misuse, nothing written to CODEX_HOME or the working directory"
 
+# --- T-1193 (issue #759): extraction fails closed on an unterminated string and
+# on a duplicated depth-1 type key. Same synthesized shapes as above.
+printf -- '\n--- T-1193 extraction fail-closed ---\n'
+T1193="$TMP/t1193"
+mkdir -p "$T1193" || fail "T-1193: cannot create the scratch root"
+T1193_CR="$(printf '\015')"
+[[ "${#T1193_CR}" -eq 1 ]] || fail "T-1193: the carriage-return builder is broken"
+T1193_P0='{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","payload":{"model_provider":"openai","provenance":{"type":"model","model":"zq-model-1'
+T1193_SMOK="$T1193_P0\"}}}"
+t1193_mk() {  # file line... : the lines, then the completed-run records
+  local f="$1" l
+  shift
+  { for l in "$@"; do printf '%s\n' "$l"; done; t1192_tl; } > "$T1193/$f"
+}
+t1193_mk u1 "${T1193_P0}X"
+t1193_mk u2 "$T1193_P0"
+t1193_mk u3 "$T1193_P0$T1192_BS"
+t1193_mk u4 "$T1193_SMOK\""
+t1193_mk u5 "$T1193_P0$T1193_CR"
+t1193_mk u6 "$T1193_P0\",\"zq"
+t1193_mk u7 '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"session_configured","thread_settings":{"model":"zq-model-1X' "$T1193_SMOK"
+t1193_mk u8 '{"timestamp":"2026-11-21T00:00:00Z,"type":"session_meta","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1193_SMOK"
+t1193_mk u9 "$T1193_P0\"},\"note\":\"abc$T1192_BS\""
+t1193_mk d1 '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d2 '{"timestamp":"2026-11-21T00:00:00Z","type":"event_msg","type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d3 '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","type":"event_msg","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1193_SMOK"
+t1193_mk d5 '{"timestamp":"2026-11-21T00:00:00Z","type":1,"type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d7 '{"timestamp":"2026-11-21T00:00:00Z","type":{"a":1},"type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d6 '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","payload":{"type":"x","type":"y","provenance":{"model":"zq-model-1"}}}'
+t1193_mk w6 "$T1193_P0\"},\"note\":\"abc$T1192_BS$T1192_BS\"}}"
+grep -qF "zq-model-1$T1192_BS" "$T1193/u3" || fail "T-1193: u3 does not end in a backslash (vacuous fixture)"
+grep -qF "abc$T1192_BS\"" "$T1193/u9" || fail "T-1193: u9 lacks its escaped quote (vacuous fixture)"
+[[ "$(grep -c "$T1193_CR" "$T1193/u5")" -eq 1 ]] || fail "T-1193: u5 lacks its carriage return (vacuous fixture)"
+
+# t1193_obs SCRIPT ROLLOUT [flags...]: --observe in a fresh CODEX_HOME. Sets T1193_RC, T1193_OUT, T1193_OERR.
+t1193_obs() {
+  local script="$1" src="$2" id
+  shift 2
+  T1192_N=$((T1192_N + 1))
+  id="$(printf '00000000-0000-4000-8000-%012d' "$T1192_N")"
+  mkdir -p "$T1192/ch$T1192_N/sessions/2026/11/21" "$T1192/oc$T1192_N" || fail "T-1193: scratch dirs"
+  cp "$src" "$T1192/ch$T1192_N/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$id.jsonl" || fail "T-1193: copy rollout"
+  T1193_OUT="$T1192/oo$T1192_N"; T1193_OERR="$T1192/oe$T1192_N"
+  set +e
+  ( cd "$T1192/oc$T1192_N" && exec env CODEX_HOME="$T1192/ch$T1192_N" bash "$script" --observe --thread-id "$id" "$@" ) < /dev/null > "$T1193_OUT" 2> "$T1193_OERR"
+  T1193_RC=$?
+  set -e
+}
+t1193_nozq() { if grep -qF zq-model "$1"; then fail "T-1193 $2: a model value was echoed on stderr"; fi; }
+# t1193_four NAME: the three paths, report-only checked twice.
+t1193_four() {
+  local name="$1" f="$T1193/$1"
+  t1192_refuse "T-1193 $name publish-named" "$f" malformed --expect-model zq-model-1
+  t1193_nozq "$T1192_ERR" "$name publish-named"
+  t1193_obs "$SCRIPT" "$f" --expect-model zq-model-1
+  if [[ "$T1193_RC" -ne 3 ]] || ! grep -qF 'model not established' "$T1193_OERR" || ! grep -qF cause=malformed "$T1193_OERR" || [[ -s "$T1193_OUT" ]]; then
+    fail "T-1193 $name observe-named: expected exit 3, model not established, cause=malformed, empty stdout (rc=$T1193_RC)"
+  fi
+  t1193_nozq "$T1193_OERR" "$name observe-named"
+  t1192_pub "$SCRIPT" "$f"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1193 $name report-only publish: expected exit 0, got $T1192_RC"
+  grep -qE "^codex-capture: publish: rollout thread=$T1192_ID .* model=unavailable\$" "$T1192_ERR" || fail "T-1193 $name report-only publish: the summary must end in ' model=unavailable'"
+  cmp -s "$f" "$T1192_RV/T-000-codex-primary.jsonl" || fail "T-1193 $name report-only publish: the published jsonl is not byte-equal to the rollout"
+  t1193_nozq "$T1192_ERR" "$name report-only publish"
+  t1193_obs "$SCRIPT" "$f"
+  [[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=unavailable" ]] || fail "T-1193 $name report-only observe: expected exactly model=unavailable (rc=$T1193_RC)"
+}
+for n in u1 u2 u3 u4 u5 u6 u7 u8 u9; do t1193_four "$n"; done
+pass "T-1193 unterminated string: nine shapes (extra byte, none, trailing backslash, lone quote, CRLF, key, unread type, swallowed type, escaped-quote value) are malformed on publish-named, observe-named and both report-only paths"
+for n in d1 d2 d3 d5 d7; do t1193_four "$n"; done
+pass "T-1193 duplicated type: equal, either-order, non-string and object-valued duplicates are malformed on all four paths"
+t1192_ok "T-1193 d6 nested duplicate type is not counted" "$T1193/d6" zq-model-1 --expect-model zq-model-1
+t1193_obs "$SCRIPT" "$T1193/d6" --expect-model zq-model-1
+[[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=zq-model-1" ]] || fail "T-1193 d6 observe: a nested duplicate type must still print model=zq-model-1"
+t1192_ok "T-1193 w6 escaped backslash before the closing quote stays well-formed" "$T1193/w6" zq-model-1 --expect-model zq-model-1
+pass "T-1193 boundary: a nested duplicate type and an escaped backslash before a closing quote keep their T-1192 outcome"
+
+# --- T-1193 mutation probes: break each new guard once in a scratch copy; the
+# unmutated script refuses the fixture, so a mutant that still refuses it (or
+# fails to refuse where it must) is a vacuous probe or an uncaught mutation.
+t1193_mutant() {  # label sed-expr
+  local m="$T1193/mut-$1.sh"
+  sed "$2" "$SCRIPT" > "$m" || fail "T-1193 mutation $1: sed failed"
+  cmp -s "$SCRIPT" "$m" && fail "T-1193 mutation $1: the sed expression changed nothing (the probe is vacuous)"
+  printf '%s\n' "$m"
+}
+t1193_notrefused() {  # label mutant fixture
+  t1192_pub "$2" "$3" --expect-model zq-model-1
+  if [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=malformed "$T1192_ERR"; then
+    fail "T-1193 mutation $1: the mutant still refused $3 as malformed (the fixture does not pin the guard)"
+  fi
+}
+M_UNOFF="$(t1193_mutant no-unterm 's/if (unterm) { nmal++; next }/if (unterm) { next }/')"
+t1193_notrefused no-unterm "$M_UNOFF" "$T1193/u1"
+M_UNTYPE="$(t1193_mutant unterm-typed-only 's/if (unterm) { nmal++; next }/if (unterm \&\& 0) { nmal++; next }/')"
+t1193_notrefused unterm-disabled "$M_UNTYPE" "$T1193/u7"
+M_LASTB="$(t1193_mutant last-byte 's/if (!closed) unterm = 1/if (substr(tok2, length(tok2), 1) != "\\"") unterm = 1/')"
+t1193_notrefused last-byte "$M_LASTB" "$T1193/u9"
+M_DUPOFF="$(t1193_mutant no-dup 's/if (ntype > 1) { nmal++; next }/if (ntype > 1) { next }/')"
+t1193_notrefused no-dup "$M_DUPOFF" "$T1193/d1"
+M_DUPSTR="$(t1193_mutant dup-disabled 's/if (depth == 1 \&\& last_key == "type") ntype++/if (depth == 1 \&\& last_key == "type" \&\& 0) ntype++/')"
+t1193_notrefused dup-disabled "$M_DUPSTR" "$T1193/d5"
+M_DUPDEPTH="$(t1193_mutant dup-any-depth 's/if (depth == 1 \&\& last_key == "type") ntype++/if (last_key == "type") ntype++/')"
+t1192_pub "$M_DUPDEPTH" "$T1193/d6" --expect-model zq-model-1
+[[ "$T1192_RC" -eq 3 ]] || fail "T-1193 mutation dup-any-depth: counting a nested type must refuse d6, proving the fixture pins depth"
+pass "T-1193 mutation self-check: dropping the unterminated verdict, disabling it, a last-byte test, dropping the duplicate verdict, and counting nested type keys are each caught by a fixture"
+
 # --- mutation self-check: break each guard in a scratch copy of the script and
 # require the suite's own fixtures to notice (the detector is not vacuous).
 t1192_mutant() {  # label sed-expr

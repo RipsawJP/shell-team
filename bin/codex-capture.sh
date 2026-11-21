@@ -155,6 +155,7 @@
 # Exit codes:
 #   0  success — `--alloc`: both raws allocated, their paths printed.
 #              — `--publish`: both canonical files published, non-empty.
+#              — `--observe`: `model=<observed>` printed on stdout.
 #   2  usage error (bad/missing/conflicting flags, unresolvable reviews dir,
 #      `--thread-id` combined with `--alloc`, a `--thread-id` value that does
 #      not match the id shape, a non-empty jsonl raw given with `--thread-id`,
@@ -162,7 +163,10 @@
 #      `--publish` only — a raw failing the fail-closed placement
 #      precondition: wrong parent directory, wrong basename prefix, or not an
 #      existing regular file; `mv` is never attempted in this case)
-#   3  (`--publish` only) captured output failed validation (empty -o
+#   3  `--observe` exits 3 only for a failed rollout import and for `model not
+#      established`; the remaining causes in this item (an empty capture, no
+#      valid event line, `review did not run`, `unicode-escape`) are
+#      `--publish` only. Captured output failed validation (empty -o
 #      capture, or the JSONL stream has no valid event line — no complete
 #      `{…}` object line carrying the `"type"` key; T-098 DP-A) — or, with
 #      `--thread-id`: the search under `${CODEX_HOME:-$HOME/.codex}/sessions`
@@ -190,10 +194,16 @@
 # `payload.provenance.model`; 0.171.0 `review` writes
 # `payload.base_instructions.provenance.model`, so no fixed path is used). Any
 # other record type (`event_msg`, `world_state`, `response_item`, ...) is never
-# read, text inside a string value is never read as a key, a `model` key whose
+# aggregated (but see the two malformed rules below), text inside a string value is never read as a key, a `model` key whose
 # value is an object or an array is ignored, and a non-string scalar value is
 # malformed. The model is ESTABLISHED when at least one string value exists
 # and all of them are one identical token of `[A-Za-z0-9][A-Za-z0-9._-]*`.
+# T-1193: the observation is malformed when any line the extraction reads (any
+# line carrying the bytes `model` or a backslash-u) has an unterminated string
+# (no closing unescaped quote before the end of the line, a trailing carriage
+# return included), whatever that line's type, and when such a line carries the
+# depth-1 `type` key more than once (equal or differing values, any value
+# kind; a nested `type` is not counted).
 #   --publish --thread-id <id> --expect-model <m>   with <m> a named model
 #      (anything but `provider-configured`): refuse (exit 3, no canonical
 #      file, both raws removed) unless the observed model is established and
@@ -303,8 +313,9 @@ extract_model() {
       }
       return 1
     }
-    function tokenize(line,    n, i, c, tok2, esc) {
+    function tokenize(line,    n, i, c, tok2, esc, closed) {
       ntok = 0
+      unterm = 0
       n = length(line)
       i = 1
       while (i <= n) {
@@ -313,14 +324,16 @@ extract_model() {
           tok2 = c
           i++
           esc = 0
+          closed = 0
           while (i <= n) {
             c = substr(line, i, 1)
             tok2 = tok2 c
             if (esc) { esc = 0 }
             else if (c == "\\") { esc = 1 }
-            else if (c == "\"") { i++; break }
+            else if (c == "\"") { closed = 1; i++; break }
             i++
           }
+          if (!closed) unterm = 1
           ntok++; tok[ntok] = tok2
         } else if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == ",") {
           ntok++; tok[ntok] = c
@@ -344,13 +357,18 @@ extract_model() {
       # carry a model key (a key spelled through an escape is the second case).
       if (index($0, "model") == 0 && index($0, "\\u") == 0) next
       tokenize($0)
-      depth = 0; last_key = ""; line_type = ""; nl = 0; key_u = 0
+      # T-1193: a string with no closing quote on this line makes the whole
+      # observation malformed, whatever the line is typed (it can swallow the
+      # type key); the line is then not read any further.
+      if (unterm) { nmal++; next }
+      depth = 0; last_key = ""; line_type = ""; nl = 0; key_u = 0; ntype = 0
       for (i = 1; i <= ntok; i++) {
         t = tok[i]
         if (substr(t, 1, 1) == "\"") {
           if (i < ntok && tok[i + 1] == ":") {
             if (has_u_escape(t)) key_u = 1
             last_key = strip_quotes(t)
+            if (depth == 1 && last_key == "type") ntype++
           } else {
             if (last_key == "model") { nl++; lk[nl] = "S"; lv[nl] = strip_quotes(t) }
             else if (last_key == "type" && depth == 1) line_type = strip_quotes(t)
@@ -367,6 +385,8 @@ extract_model() {
           last_key = ""
         }
       }
+      # T-1193: more than one depth-1 type key (any value kind) is malformed.
+      if (ntype > 1) { nmal++; next }
       if (line_type == "session_meta" || line_type == "turn_context") {
         if (key_u) nmal++
         for (j = 1; j <= nl; j++) {
@@ -479,11 +499,11 @@ while [ "$#" -gt 0 ]; do
       die 2 "'--' / trailing argv is no longer accepted -- the codex-argv-substitution mode was removed in T-107 (#353); the caller now runs codex itself"
       ;;
     -*) die 2 "unknown flag: $1" ;;
-    *) die 2 "unexpected positional argument: $1 (usage: codex-capture.sh --alloc --stem <stem> [--reviews-dir <dir>] | codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id>] [--reviews-dir <dir>])" ;;
+    *) die 2 "unexpected positional argument: $1 (usage: codex-capture.sh --alloc --stem <stem> [--reviews-dir <dir>] | codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id>] [--reviews-dir <dir>] | codex-capture.sh --observe --thread-id <id> [--expect-model <m>])" ;;
   esac
 done
 
-[ -n "$mode" ] || die 2 "exactly one of --alloc / --publish is required"
+[ -n "$mode" ] || die 2 "exactly one of --alloc / --publish / --observe is required"
 
 # --- T-1192: --expect-model usage errors (exit 2) ----------------------------
 if [ "$expect_model_given" -eq 1 ]; then
