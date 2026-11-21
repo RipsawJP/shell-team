@@ -11,6 +11,13 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1194** CI is green on the current runner image: discover-work resolves its own directory without dirname, and log-run's append lock never hands two writers the same seq (issue #762) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1194-ci-runner-image-red.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #762 (CI red on develop's tip with the current runner image), filed by the coordinating session; its title only was relayed, and the CI measurements from diagnostic draft PR #764 were relayed as text and are labelled relayed in the spec's Assumptions. No separate issue filed. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live, embeds the `## Class sweep` derivation block, and freezes once.
+  - stacked-on: T-1193 (feature/759-capture-extraction-fail-closed @ 2c4d05bb); PR #763 base develop, open; T-1193 stacks on T-1192 (PR #758); sprint codex-model-pin (prerequisite for the batch merge, not the sprint goal), release PATCH v2.9.5 (relayed)
+  - follow-up candidate (coordinating session decides whether to file): the combined `$(cd "$(dirname …)" && pwd)` self-resolution in the other class-B scripts of the spec's AC8 falls back to the working directory on bash 5.2 and exits non-zero on bash 5.3 when dirname is missing; out of scope here because dirname is on PATH in every invocation those scripts' contracts and suites make
+
 
 
 
