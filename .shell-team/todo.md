@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1196** codex-capture's completed-run gate refuses an unterminated string, and a backslash-u-escaped depth-1 key counts toward the duplicated-type rule in both extractors (issue #760) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1196-completed-run-gate-fail-closed.md
+- [ ] **T-1196** codex-capture's completed-run gate refuses an unterminated string, and a backslash-u-escaped depth-1 key counts toward the duplicated-type rule in both extractors (issue #760) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1196-completed-run-gate-fail-closed.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked-on: T-1195 (feature/757-codex-review-effort-pin @ f80d97e1); PR #772 base develop, open; T-1195 stacks on T-1194/T-1193/T-1192 in the same train; sprint effort-pin, last backlog item, release PATCH v2.9.6 (relayed)
@@ -29,6 +29,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, existing fixture suites, shellcheck and one base-vs-HEAD pass over local captures; below the fan-out threshold
   - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue body and the measured line ranges hand over as text
   - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: correctness rests on this repository's awk tokenizer, measurable by fixtures; the one external premise (the Codex CLI writes neither shape) is not load-bearing because the fix refuses either way
+  - freeze-attestation (v1, 2026-11-22): lines=13/13 sweep=mutual-satisfiability verdict=3P/10F owner=coordinating session (live check-acs on the pre-implementation tree at a20b26bb in the WSL mirror; every FAIL classified expected-unimplemented, every PASS non-vacuous, no cross-AC contradiction; AC13 fails in the mirror only on its empty population (gitignored captures are not mirrored) and passes when run natively from this checkout over its local captures (population 593, base-published 148, rc=0))
+  - intent-hash (v1): 89ea4e659785068010f35c7d4379ebe891ec90d0
 
 
 
