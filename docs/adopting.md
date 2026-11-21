@@ -264,7 +264,7 @@ you want to assign specific executors to all six:
    rows from `templates/binding-default.conf` (**not** the grammar example
    below, which is a custom-binding illustration with different values)
    for any role you are not changing. Editing one row and stopping there
-   ships five placeholder bindings into resolution and telemetry. The
+   ships four placeholder bindings into resolution and telemetry. The
    `code-reviewer` row is different: the scaffolded specimen carries
    `provider-configured` there (a fresh scaffold's `code-reviewer` row
    used to carry a placeholder model; an already-scaffolded

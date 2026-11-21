@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1192** code-reviewer model pin: a model named by the binding reaches every codex exec as -m, and the review record states the model each pass actually ran on (issues #755, #756) — `READY_FOR_QA` — spec: .shell-team/specs/T-1192-codex-review-model-pin.md
+- [ ] **T-1192** code-reviewer model pin: a model named by the binding reaches every codex exec as -m, and the review record states the model each pass actually ran on (issues #755, #756) — `BLOCKED` — spec: .shell-team/specs/T-1192-codex-review-model-pin.md
   - entry-mode: pm-authored
   - spec-review: cross-provider
   - source: issue #755 (design decision) and issue #756 (implementation), one task, filed by the host; the five fixed decisions were relayed by the coordinating session from the issue body and the host's answers on 2026-11-21 and are labelled relayed in the spec's Assumptions. Branch `feature/755-codex-review-model-pin` cut from develop at 75866424 with no open predecessor. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -30,6 +30,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - version-derivation (v1, 2026-11-21): verdict=match — derived=PATCH — headline=met — default-reach=not-met — premise=PATCH, host ruling 2026-11-21 (the model pin takes effect only through a host-authored binding.conf, so the shipped default path is unchanged) — grounds: spec ## Version table; the headline item (a named code-reviewer model applied as -m) fails default-reachability, every other item fails at least one test, so the two tests never jointly hold
   - intent-hash (v1): a7a6af5dabcb158addee071dae70bd3ce1db9265
   - engineer (2026-11-21): implemented D1-D9 in commit 43ba4157 (codex-capture.sh --expect-model/--observe, check-review-input.sh codex-model field, both agent files, review-response run record, specimen row, docs, .shell-team/binding.conf); tests/check-invocation-path/run.sh was edited outside AC13's allow-list (see the spec's Notes from engineer); AC15-AC17 left to the coordinating session
+  - engineer (2026-11-21, supersedes the `READY_FOR_QA` flag set by the commit before this one): flag is `BLOCKED` pending a ruling, because AC13 (scope lock) and AC18 (check-invocation-path suite exits 0) cannot both pass as frozen under D9; the one-line edit to tests/check-invocation-path/run.sh is kept as a separate hunk. Options: (A) keep it and add that path to AC13's allow-list (class-B re-freeze); (B) revert it, which turns AC18 and CI's check-invocation-path step red. Every other runnable AC passes
 
 
 

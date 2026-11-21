@@ -264,7 +264,7 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    ください。変更しない役割の行には `templates/binding-default.conf` の
    実際の行を転記します（**下記の grammar example からは転記しないで
    ください**。あれは異なる値を持つ custom-binding の例示です）。1 行
-   だけ編集して止めると、残り 5 役割のプレースホルダー紐付けが
+   だけ編集して止めると、残り 4 役割のプレースホルダー紐付けが
    resolution と telemetry にそのまま入ってしまいます。`code-reviewer`
    の行は別です。スキャフォールドされる specimen は、この行に
    `provider-configured` を持ちます（以前の新規スキャフォールドはこの行に
