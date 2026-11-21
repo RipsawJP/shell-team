@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1194** CI is green on the current runner image: discover-work resolves its own directory without dirname, and log-run's append lock never hands two writers the same seq (issue #762) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1194-ci-runner-image-red.md
+- [ ] **T-1194** CI is green on the current runner image: discover-work resolves its own directory without dirname, and log-run's append lock never hands two writers the same seq (issue #762) — `READY_FOR_QA` — spec: .shell-team/specs/T-1194-ci-runner-image-red.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #762 (CI red on develop's tip with the current runner image), filed by the coordinating session; its title only was relayed, and the CI measurements from diagnostic draft PR #764 were relayed as text and are labelled relayed in the spec's Assumptions. No separate issue filed. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live, embeds the `## Class sweep` derivation block, and freezes once.
