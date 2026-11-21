@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1196** codex-capture's completed-run gate refuses an unterminated string, and a backslash-u-escaped depth-1 key counts toward the duplicated-type rule in both extractors (issue #760) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1196-completed-run-gate-fail-closed.md
+- [ ] **T-1196** codex-capture's completed-run gate refuses an unterminated string, and a backslash-u-escaped depth-1 key counts toward the duplicated-type rule in both extractors (issue #760) — `READY_FOR_QA` — spec: .shell-team/specs/T-1196-completed-run-gate-fail-closed.md
   - entry-mode: pm-authored
   - spec-review: none
   - stacked-on: T-1195 (feature/757-codex-review-effort-pin @ f80d97e1); PR #772 base develop, open; T-1195 stacks on T-1194/T-1193/T-1192 in the same train; sprint effort-pin, last backlog item, release PATCH v2.9.6 (relayed)
@@ -31,6 +31,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: correctness rests on this repository's awk tokenizer, measurable by fixtures; the one external premise (the Codex CLI writes neither shape) is not load-bearing because the fix refuses either way
   - freeze-attestation (v1, 2026-11-22): lines=13/13 sweep=mutual-satisfiability verdict=3P/10F owner=coordinating session (live check-acs on the pre-implementation tree at a20b26bb in the WSL mirror; every FAIL classified expected-unimplemented, every PASS non-vacuous, no cross-AC contradiction; AC13 fails in the mirror only on its empty population (gitignored captures are not mirrored) and passes when run natively from this checkout over its local captures (population 593, base-published 148, rc=0))
   - intent-hash (v1): 89ea4e659785068010f35c7d4379ebe891ec90d0
+  - T-1196 engineer: the completed-run gate tokenizer tracks whether each string closed and refuses with `rollout not parseable (… cause=unterminated-string)` ahead of unicode-escape and review-did-not-run; both extractors count every depth-1 key containing a backslash-u toward the duplicated-type rule (separate statement, so the frozen T-1193 probes still match their text); `--help` exit-3 item and extraction paragraphs updated; suite gains a T-1196 block (g1-g8, o1-o2, w1-w6, e1-e5, x1-x5, four range-scoped mutation probes) placed before the T-1193 block, and the T-1193/T-1195 publish assertions and probes that D4 names were moved to the gate refusal or to --observe. AC1-AC12 pass under check-acs (WSL); AC13 not run by the engineer (coordinating session, native); AC14 is CI.
 
 
 
