@@ -11,6 +11,24 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #759 (T-1192 cross-provider review fast-follow F1 and F3), filed by the coordinating session. Its body was relayed verbatim in the pm-spec briefing and is quoted in the spec's Summarized sources, labelled relayed until the freeze run confirms it. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - stacked-on: T-1192 (feature/755-codex-review-model-pin @ 7fccd1e0); PR #758 base develop, open; sprint codex-model-pin, release PATCH v2.9.5 (relayed)
+  - follow-up to file (coordinating session, D-d): the completed-run gate in bin/codex-capture.sh (`:707-842`) carries the same unterminated-string tokenizer and unchecked `strip_quotes`; out of scope here. Also candidate for that issue: a `\u`-spelled `type` key beside a plain one is not seen as a duplicate (spec Input space out-of-scope 2)
+  - dispatch-reflection: implement — T-1192 — repeat — T-1192's recorded value is `serial`; one script's tokenizer and the one suite that pins it land together, no balanced disjoint partition
+  - dispatch-reflection: verify — T-1192 — repeat — T-1192's recorded value is `serial`; one spec's check-acs, a few existing fixture suites and one base-vs-HEAD comparison, no mechanism-class full-population half
+  - dispatch-reflection: specify — T-1192 — repeat — T-1192's recorded value is `pm-authored`; the issue body, the review record's F1/F3 and the measured line numbers hand over as text
+  - dispatch-reflection: spec-review — T-1192 — differs — T-1192's recorded value is `cross-provider`; this task's correctness rests only on JSON syntax and in-repo awk behaviour, both measurable with synthesized fixtures, with no unmeasurable Codex CLI or provider premise
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — one script's tokenizer and the one suite that pins it land together; no balanced disjoint partition, and the tier2 trigger does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, a few existing fixture suites and one base-vs-HEAD comparison, below the fan-out threshold; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue body, the review record's F1/F3 and the measured line numbers hand over as text
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: correctness rests only on JSON syntax and in-repo awk behaviour, both measured with synthesized fixtures; the verification-mechanism rigour is carried by the pre-commitment and the live pre-freeze sweep
+  - freeze-attestation (v1, 2026-11-21): lines=11/11 sweep=mutual-satisfiability verdict=3P/8F owner=coordinating session
+  - version-derivation (v1, 2026-11-21): verdict=match — derived=PATCH — headline=not-met — default-reach=not-met — premise=PATCH, sprint codex-model-pin planning approved by the host 2026-11-21 (release v2.9.5) — grounds: spec ## Version; a fail-closed bug fix in an opt-in extraction path plus diagnostic wording, no new capability
+  - intent-hash (v1): 3a076b79b1440c224d9c05575d7653668afdf980
+
 
 
 
