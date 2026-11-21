@@ -2180,11 +2180,28 @@ t1193_obs() {
   T1193_RC=$?
   set -e
 }
+# T-1193-labelled copies of t1192_refuse / t1192_ok: a failure here must read FAIL: T-1193.
+t1193_refuse() {  # name src cause flags...
+  local name="$1" src="$2" cause="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1193 $name: expected exit 3, got $T1192_RC"
+  grep -qF 'model not established' "$T1192_ERR" || fail "T-1193 $name: stderr lacks 'model not established'"
+  grep -qF "cause=$cause" "$T1192_ERR" || fail "T-1193 $name: stderr lacks cause=$cause"
+  [[ -z "$(ls -A "$T1192_RV")" ]] || fail "T-1193 $name: the reviews dir is not empty after a refusal"
+}
+t1193_ok() {  # name src observed flags...
+  local name="$1" src="$2" want="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1193 $name: expected exit 0, got $T1192_RC"
+  grep -qE "^codex-capture: publish: rollout thread=$T1192_ID .* model=$want\$" "$T1192_ERR" || fail "T-1193 $name: the summary must end in ' model=$want'"
+}
 t1193_nozq() { if grep -qF zq-model "$1"; then fail "T-1193 $2: a model value was echoed on stderr"; fi; }
 # t1193_four NAME: the three paths, report-only checked twice.
 t1193_four() {
   local name="$1" f="$T1193/$1"
-  t1192_refuse "T-1193 $name publish-named" "$f" malformed --expect-model zq-model-1
+  t1193_refuse "$name publish-named" "$f" malformed --expect-model zq-model-1
   t1193_nozq "$T1192_ERR" "$name publish-named"
   t1193_obs "$SCRIPT" "$f" --expect-model zq-model-1
   if [[ "$T1193_RC" -ne 3 ]] || ! grep -qF 'model not established' "$T1193_OERR" || ! grep -qF cause=malformed "$T1193_OERR" || [[ -s "$T1193_OUT" ]]; then
@@ -2203,10 +2220,10 @@ for n in u1 u2 u3 u4 u5 u6 u7 u8 u9; do t1193_four "$n"; done
 pass "T-1193 unterminated string: nine shapes (extra byte, none, trailing backslash, lone quote, CRLF, key, unread type, swallowed type, escaped-quote value) are malformed on publish-named, observe-named and both report-only paths"
 for n in d1 d2 d3 d5 d7; do t1193_four "$n"; done
 pass "T-1193 duplicated type: equal, either-order, non-string and object-valued duplicates are malformed on all four paths"
-t1192_ok "T-1193 d6 nested duplicate type is not counted" "$T1193/d6" zq-model-1 --expect-model zq-model-1
+t1193_ok "d6 nested duplicate type is not counted" "$T1193/d6" zq-model-1 --expect-model zq-model-1
 t1193_obs "$SCRIPT" "$T1193/d6" --expect-model zq-model-1
 [[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=zq-model-1" ]] || fail "T-1193 d6 observe: a nested duplicate type must still print model=zq-model-1"
-t1192_ok "T-1193 w6 escaped backslash before the closing quote stays well-formed" "$T1193/w6" zq-model-1 --expect-model zq-model-1
+t1193_ok "w6 escaped backslash before the closing quote stays well-formed" "$T1193/w6" zq-model-1 --expect-model zq-model-1
 pass "T-1193 boundary: a nested duplicate type and an escaped backslash before a closing quote keep their T-1192 outcome"
 
 # --- T-1193 mutation probes: break each new guard once in a scratch copy; the
