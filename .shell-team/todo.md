@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_QA` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
+- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
   - T-1193 engineer: extract_model now marks a line with an unterminated string (decided in the tokenizer, any line type) and a line with more than one depth-1 type key as MALFORMED; diagnostics and --help name --observe; hygiene suite gains T-1193 fixtures and mutation probes.
   - entry-mode: pm-authored
   - spec-review: none
@@ -29,6 +29,10 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - freeze-attestation (v1, 2026-11-21): lines=11/11 sweep=mutual-satisfiability verdict=3P/8F owner=coordinating session
   - version-derivation (v1, 2026-11-21): verdict=match — derived=PATCH — headline=not-met — default-reach=not-met — premise=PATCH, sprint codex-model-pin planning approved by the host 2026-11-21 (release v2.9.5) — grounds: spec ## Version; a fail-closed bug fix in an opt-in extraction path plus diagnostic wording, no new capability
   - intent-hash (v1): 3a076b79b1440c224d9c05575d7653668afdf980
+  - qa (2026-11-21, qa-verifier round 1; transcribed by the coordinating session because the auto-mode classifier refused the verifier's own board write): PASS -> READY_FOR_REVIEW. check-acs 11 passed, 0 failed, 1 skipped (AC12 = CI on the pull request, environmentally-unverified: CI is red on develop's own tip for unrelated suites, issue #762); every `tests/*/run.sh` 69 PASS, 0 FAIL in a Linux environment; shellcheck 0.11.0 clean on bin/codex-capture.sh and tests/codex-skeleton-hygiene/run.sh; check-intent aligned v1, check-provenance conformant (3), check-interventions conformant (2), check-handoff exit 0.
+  - qa never-dropped: D1 (unterminated string, AC1 u1-u9 on publish-named, observe-named and report-only paths; base accepts u1 and u3-u9 as the positive control) held; D2 (duplicated depth-1 type, AC2 d1, d2, d3, d5 malformed; d6 depth-2 not counted) held. AC3 well-formed rollouts (0.160.0, 0.171.0, prompt shapes) byte-identical to base 7fccd1e0.
+  - qa edge cases beyond the fixtures (13 shapes, base 7fccd1e0 vs HEAD with `--observe --expect-model`): triple type, duplicated type on an event_msg line, an unterminated event line carrying `\u`, a lone `"model` line, an unterminated string inside an array, a duplicated type with whitespace — HEAD exit 3, base exit 0; a "type" string value, a depth-1 type after nesting, a type inside an array object, `\"` inside an array — exit 0 on both (no over-refusal); an unterminated line outside the prefilter — exit 0 on both (outside the input space); a `type` duplicate key — exit 3 on both (existing behaviour, out of scope 2, issue #760).
+  - qa reading items: the header documents both new rules; the "never read" sentence now reads "never aggregated (but see the two malformed rules below)"; `--help` exit 0 and 3 items name `--observe`; the no-mode and positional usage errors name `--observe`; the completed-run gate tokenizer is unchanged (`git diff 7fccd1e0 HEAD -- bin/codex-capture.sh` shows no hunk there; issue #760).
 
 
 
