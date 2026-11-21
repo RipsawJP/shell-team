@@ -140,16 +140,30 @@
 #   bound, the writer writes NOTHING and exits 3 — a code distinct from
 #   0/1/2 — and its stderr names the lock directory's full path and its
 #   mtime. The lock is NEVER stolen: no age heuristic, no PID probe, no
-#   silent steal. Release uses `rmdir` ONLY — a forced, recursive removal
-#   is never spelled anywhere in this script — so release can never destroy contents
-#   a sibling process left inside the lock directory; release is wired to
-#   EXIT/INT/TERM and fires only for a lock THIS process itself acquired
-#   (a guard flag set at acquisition — never at release time). The one
-#   residual case is disclosed rather than engineered away: a writer killed
-#   with SIGKILL while holding the lock leaves the directory behind, and
-#   every later write to that file refuses (exit 3) until an operator
-#   removes it by hand — `rmdir <the printed path>` is always safe, since
-#   `rmdir` itself refuses to remove a non-empty directory.
+#   silent steal.
+#
+#   T-1194 — ownership does not trust `mkdir`'s reported success. Some
+#   hosts ship a `mkdir` (uutils coreutils) whose concurrent calls on one
+#   path can ALL report success, which let two writers hold the lock and
+#   take the same `seq`. So a writer holds the lock only when (1) the lock
+#   directory did not already exist (an existing directory is HELD, with or
+#   without an owner token inside it) and (2) it has itself created the
+#   file `owner` inside the directory by an exclusive create (bash's own
+#   `noclobber` redirection, which fails if the file exists). A writer
+#   whose `mkdir` reported success but whose token creation failed does not
+#   hold the lock and keeps waiting inside the bounded wait.
+#   Release removes THIS writer's own `owner` token and then uses `rmdir`
+#   — a forced, recursive removal is never spelled anywhere in this script
+#   — so release can never destroy contents a sibling process left inside
+#   the lock directory; release is wired to EXIT/INT/TERM and fires only
+#   for a lock THIS process itself acquired (a guard flag set at
+#   acquisition — never at release time). The one residual case is
+#   disclosed rather than engineered away: a writer killed with SIGKILL
+#   while holding the lock leaves the directory (and its `owner`) behind,
+#   and every later write to that file refuses (exit 3) until an operator
+#   removes it by hand: remove `<the printed path>/owner` if present, then
+#   `rmdir <the printed path>`. `rmdir` itself refuses to remove a
+#   non-empty directory.
 #
 #   `--seq auto` is a new, CASE-SENSITIVE accepted literal on the existing
 #   `--seq` flag (`AUTO`/`Auto` stay validation errors, exit 2, nothing
@@ -604,6 +618,7 @@ release_lock() {
   trap '' INT TERM
   if [ "$LOCK_ACQUIRED" = "1" ]; then
     LOCK_ACQUIRED=0
+    rm -f -- "$LOCK_DIR/owner" 2>/dev/null || true
     rmdir "$LOCK_DIR" 2>/dev/null || true
   fi
   trap 'on_lock_signal INT 130' INT
@@ -625,6 +640,20 @@ on_lock_signal() {  # $1 = signal name, $2 = the conventional 128+N exit code
 trap 'on_lock_signal INT 130' INT
 trap 'on_lock_signal TERM 143' TERM
 
+# claim_owner — exclusive create of "$LOCK_DIR/owner" with bash's own
+# `noclobber` (fails if the file exists; no external command). Returns 0
+# only for the single writer whose create succeeded. Runs inside the masked
+# acquire bracket below.
+claim_owner() {
+  local rc=1
+  set -o noclobber
+  if { printf '%s\n' "$$" > "$LOCK_DIR/owner"; } 2>/dev/null; then
+    rc=0
+  fi
+  set +o noclobber
+  return "$rc"
+}
+
 lock_start="$(date +%s)"
 while :; do
   # The mkdir-attempt-then-flag-set pair below is the acquire-side half of
@@ -633,16 +662,23 @@ while :; do
   # executing is simply dropped rather than observed with a half-updated
   # flag.
   trap '' INT TERM
-  if mkdir "$LOCK_DIR" 2>/dev/null; then
-    LOCK_ACQUIRED=1
+  # T-1194: a directory that already exists is HELD (token or not) — never
+  # ask `mkdir` about it, since some hosts' `mkdir` reports success on an
+  # existing path. On a free path, `mkdir` success alone is not ownership:
+  # only the writer whose exclusive `owner` create succeeds holds the lock.
+  if [ ! -e "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ]; then
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      LOCK_ACQUIRED=1
+      claim_owner || LOCK_ACQUIRED=0
+    fi
   fi
   trap 'on_lock_signal INT 130' INT
   trap 'on_lock_signal TERM 143' TERM
   [ "$LOCK_ACQUIRED" = "1" ] && break
   lock_now="$(date +%s)"
   if [ "$(( 10#$lock_now - 10#$lock_start ))" -ge "$((10#$LOCK_TIMEOUT))" ]; then
-    printf 'log-run: could not acquire append lock %s within %ss (existing lock mtime: %s) — refusing to write, exiting 3. If the process that created it was killed, remove it by hand: rmdir %s\n' \
-      "$LOCK_DIR" "$LOCK_TIMEOUT" "$(lock_mtime "$LOCK_DIR")" "$LOCK_DIR" >&2 || true
+    printf 'log-run: could not acquire append lock %s within %ss (existing lock mtime: %s) — refusing to write, exiting 3. If the process that created it was killed, remove it by hand: first remove %s/owner if it exists, then rmdir %s\n' \
+      "$LOCK_DIR" "$LOCK_TIMEOUT" "$(lock_mtime "$LOCK_DIR")" "$LOCK_DIR" "$LOCK_DIR" >&2 || true
     exit 3
   fi
   # Whole-second retry granularity (measured, not assumed — see

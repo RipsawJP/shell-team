@@ -75,23 +75,6 @@ bash "$CHECK_HANDOFF" "$ac2_todo" >/dev/null 2>&1 \
   || fail "AC2: emitted candidates do not pass check-handoff"
 pass "AC2: emitted candidates pass check-handoff in ## Active"
 
-# --- AC4a: gh absent => fail-soft -------------------------------------------
-# Build a PATH with the real tools discover-work needs but NO gh.
-NOGH="$TMP/nogh"
-mkdir -p "$NOGH"
-for t in bash awk grep sed tr; do
-  src="$(command -v "$t")" && ln -sf "$src" "$NOGH/$t"
-done
-out="$TMP/ac4a.out"
-set +e
-PATH="$NOGH" bash "$DISCOVER" --todo /nonexistent >"$out" 2>&1
-rc=$?
-set -e
-[ "$rc" -eq 0 ] || fail "AC4a: gh-absent should exit 0, got $rc (out: $(cat "$out"))"
-grep -qi 'not found' "$out" || fail "AC4a: gh-absent note missing (out: $(cat "$out"))"
-[ "$(grep -c '^- \[ \]' "$out" || true)" -eq 0 ] || fail "AC4a: gh-absent should emit no candidates"
-pass "AC4a: gh absent => exit 0, note, no candidates"
-
 # --- T-1194 discover-work: no `dirname`, no cwd fallback ---------------------
 # AC4a above only greps 'not found', which `dirname: command not found` also
 # satisfies. Here the PATH holds no dirname (asserted), the working directory
@@ -134,6 +117,23 @@ t1194_shape "$T94/k/bin" "discover-work.sh"
 t1194_shape "$T94/cw" "$T94/ln/dr"
 t1194_shape "$T94/cw" "$T94/ln/da"
 pass "T-1194 discover-work: six invocation shapes resolve their own dir without dirname"
+
+# --- AC4a: gh absent => fail-soft -------------------------------------------
+# Build a PATH with the real tools discover-work needs but NO gh.
+NOGH="$TMP/nogh"
+mkdir -p "$NOGH"
+for t in bash awk grep sed tr; do
+  src="$(command -v "$t")" && ln -sf "$src" "$NOGH/$t"
+done
+out="$TMP/ac4a.out"
+set +e
+PATH="$NOGH" bash "$DISCOVER" --todo /nonexistent >"$out" 2>&1
+rc=$?
+set -e
+[ "$rc" -eq 0 ] || fail "AC4a: gh-absent should exit 0, got $rc (out: $(cat "$out"))"
+grep -qi 'not found' "$out" || fail "AC4a: gh-absent note missing (out: $(cat "$out"))"
+[ "$(grep -c '^- \[ \]' "$out" || true)" -eq 0 ] || fail "AC4a: gh-absent should emit no candidates"
+pass "AC4a: gh absent => exit 0, note, no candidates"
 
 # --- AC4b: gh unauthenticated => fail-soft ----------------------------------
 out="$TMP/ac4b.out"
