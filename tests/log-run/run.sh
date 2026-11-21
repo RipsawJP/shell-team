@@ -407,6 +407,22 @@ run_contention_writer() {
 
 # --- the positive contention arm: real writer, real lock, no payload --------
 POS_DIR="$TMP/contention-pos"
+# DIAGNOSTIC (throwaway branch for issue #762; never merged): repeat the
+# positive contention arm 10 times and report each seq-set mismatch.
+echo "DIAG-762: bash=$BASH_VERSION nproc=$(nproc 2>/dev/null) ImageVersion=${ImageVersion:-} $(grep '^PRETTY_NAME' /etc/os-release 2>/dev/null)"
+for rep in 1 2 3 4 5 6 7 8 9 10; do
+  RD="$TMP/diag-rep-$rep"
+  run_contention_writer "$LOGRUN" "$RD" contloop SHARED "$CONT_N" "$CONT_M"
+  RF="$RD/contloop.jsonl"
+  grep -oE '"run_id":"SHARED","seq":[0-9]+' "$RF" | grep -oE '[0-9]+$' | LC_ALL=C sort -n > "$RD.seqs"
+  seq 1 "$((CONT_N * CONT_M))" > "$RD.exp"
+  if cmp -s "$RD.seqs" "$RD.exp"; then
+    echo "DIAG-762: rep $rep ok writers_failed=$WRITER_FAILED_COUNT lines=$(grep -c . "$RF")"
+  else
+    echo "DIAG-762: rep $rep MISMATCH writers_failed=$WRITER_FAILED_COUNT lines=$(grep -c . "$RF") dups=$(uniq -d "$RD.seqs" | tr '\n' ' ') missing=$(comm -13 "$RD.seqs" "$RD.exp" | tr '\n' ' ')"
+    for d in $(uniq -d "$RD.seqs"); do grep -n "\"seq\":${d}[,}]" "$RF" | cut -c1-260 | sed 's/^/DIAG-762:   row /'; done
+  fi
+done
 run_contention_writer "$LOGRUN" "$POS_DIR" contloop SHARED "$CONT_N" "$CONT_M"
 POS_FILE="$POS_DIR/contloop.jsonl"
 
