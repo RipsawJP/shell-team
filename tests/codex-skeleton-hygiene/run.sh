@@ -1927,6 +1927,380 @@ no_trailing_operator "$(grep '^codex exec ' "$NTO_MUT_ALT")" \
 pass "agentmd-no-trailing-operator-mutation — appending a shell operator after each of the five covered sites, in a scratch copy, is caught at every site (4 agent codex blocks via the shared tailconnector mutator, plus the alternate-executor recipe line via a standalone sed mutation)"
 
 # =============================================================================
+# T-1192 (issues #755/#756): the model a pass ran on, read from its own rollout.
+#   --publish --thread-id <id> [--expect-model <m>]  and  --observe --thread-id <id>
+# Rollouts below are SYNTHESIZED in the measured record shapes (codex-cli
+# 0.160.0 `review`, the prompt shape, 0.171.0 `review`); none is a real
+# rollout (those carry account identifiers). `zq-model-1` / `zq-model-2` name
+# no real model.
+# =============================================================================
+printf -- '\n--- T-1192 model gate ---\n'
+T1192="$TMP/t1192"
+mkdir -p "$T1192" || fail "T-1192: cannot create the scratch root"
+T1192_BS="$(printf '\134')"
+[[ "${#T1192_BS}" -eq 1 ]] || fail "T-1192: the backslash builder is broken"
+T1192_CE='{"timestamp":"2026-11-21T00:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","exit_code":0,"aggregated_output":"ok"}}}'
+T1192_CE_TEXT='{"timestamp":"2026-11-21T00:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","exit_code":0,"aggregated_output":"\"model\":\"zq-model-1\""}}}'
+T1192_TC='{"timestamp":"2026-11-21T00:00:09Z","type":"event_msg","payload":{"type":"task_complete","last_agent_message":null}}'
+t1192_sm() { printf '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","payload":{"model_provider":"openai","provenance":{"type":"model","model":%s}}}\n' "$1"; }
+t1192_s7() { printf '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","payload":{"model_provider":"openai","base_instructions":{"text":"x","provenance":{"type":"model","model":%s}}}}\n' "$1"; }
+t1192_tx() { printf '{"timestamp":"2026-11-21T00:00:02Z","type":"turn_context","payload":{"turn_id":"t1","model":%s,"collaboration_mode":{"mode":"default","settings":{"model":%s}}}}\n' "$1" "$1"; }
+t1192_ws() { printf '{"timestamp":"2026-11-21T00:00:01Z","type":"world_state","payload":{"full":{"model":"%s","instructions":"quoted \\"model\\":\\"%s\\" text"}}}\n' "$1" "$1"; }
+t1192_ev() { printf '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"session_configured","thread_settings":{"model":%s,"collaboration_mode":{"mode":"default","settings":{"model":%s}}}}}\n' "$1" "$1"; }
+t1192_tl() { printf '%s\n%s\n' "$T1192_CE" "$T1192_TC"; }
+
+# Rollout corpus. Name -> content.
+t1192_corpus() {
+  local d="$1"
+  { t1192_sm '"zq-model-1"'; t1192_tl; } > "$d/r-160"
+  { t1192_sm '"zq-model-1"'; t1192_ws zq-decoy; t1192_tx '"zq-model-1"'; t1192_tl; } > "$d/r-prompt"
+  { t1192_s7 '"zq-model-1"'; t1192_ev '"zq-model-1"'; t1192_tl; } > "$d/r-171"
+  { t1192_sm '{"id":"zq-other"}'; t1192_tx '"zq-model-1"'; t1192_tl; } > "$d/r-objval"
+  { t1192_sm '"zq-model-1"'; t1192_ev '"zq-model-2"'; t1192_tl; } > "$d/r-evdiff"
+  t1192_tl > "$d/r-none"
+  { t1192_ws zq-model-1; t1192_tl; } > "$d/r-wsonly"
+  { t1192_ev '"zq-model-1"'; t1192_tl; } > "$d/r-evonly"
+  printf '%s\n%s\n' "$T1192_CE_TEXT" "$T1192_TC" > "$d/r-texty"
+  { t1192_sm '"zq-model-2"'; t1192_tx '"zq-model-1"'; t1192_tl; } > "$d/r-disagree"
+  { t1192_sm null; t1192_tl; } > "$d/r-null"
+  { t1192_sm '123'; t1192_tl; } > "$d/r-number"
+  { t1192_sm 'true'; t1192_tl; } > "$d/r-bool"
+  { t1192_tx '"zq bad;x"'; t1192_tl; } > "$d/r-badchars"
+  { t1192_tx "\"zq-model-${T1192_BS}u0031\""; t1192_tl; } > "$d/r-uesc"
+  { t1192_sm '"zq-model-1x"'; t1192_tl; } > "$d/r-prefix"
+  { t1192_sm '""'; t1192_tl; } > "$d/r-emptystr"
+  { t1192_sm '"zq-model-1"'; t1192_sm '"zq-model-1"'; t1192_tl; } > "$d/r-twice"
+  { t1192_sm '{"id":"zq-other"}'; t1192_tl; } > "$d/r-objonly"
+  { t1192_sm '"zq-model-1"'; printf '{"timestamp":"2026-11-21T00:00:01Z","type":"turn_context","payload":{"mod%su0065l":"zq-model-2"}}\n' "$T1192_BS"; t1192_tl; } > "$d/r-keyesc"
+}
+t1192_corpus "$T1192"
+grep -qF "zq-model-${T1192_BS}u0031" "$T1192/r-uesc" || fail "T-1192: the backslash-u fixture does not carry its escape (the malformed case would be vacuous)"
+
+# t1192_pub SCRIPT ROLLOUT [flags...] — alloc, publish with one rollout in a
+# fresh CODEX_HOME. Sets T1192_RC, T1192_ERR (stderr file), T1192_RV (reviews dir).
+T1192_N=0
+t1192_pub() {
+  local script="$1" src="$2" o j id
+  shift 2
+  T1192_N=$((T1192_N + 1))
+  id="$(printf '00000000-0000-4000-8000-%012d' "$T1192_N")"
+  mkdir -p "$T1192/ch$T1192_N/sessions/2026/11/21" "$T1192/rv$T1192_N" || fail "T-1192: scratch dirs"
+  cp "$src" "$T1192/ch$T1192_N/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$id.jsonl" || fail "T-1192: copy rollout"
+  bash "$script" --alloc --stem T-000-codex-primary --reviews-dir "$T1192/rv$T1192_N" > "$T1192/al" 2>/dev/null || fail "T-1192: alloc failed"
+  o="$(sed -n 1p "$T1192/al")"; j="$(sed -n 2p "$T1192/al")"
+  printf 'review text\n' > "$o"
+  T1192_ID="$id"; T1192_RV="$T1192/rv$T1192_N"; T1192_ERR="$T1192/pe$T1192_N"
+  set +e
+  ( exec env CODEX_HOME="$T1192/ch$T1192_N" bash "$script" --publish --stem T-000-codex-primary --reviews-dir "$T1192_RV" --publish-out "$o" --publish-jsonl "$j" --thread-id "$id" "$@" ) < /dev/null > "$T1192/po$T1192_N" 2> "$T1192_ERR"
+  T1192_RC=$?
+  set -e
+}
+t1192_ok() {  # name src expect-args... -- observed
+  local name="$1" src="$2" want="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1192 $name: expected exit 0, got $T1192_RC ($(cat "$T1192_ERR"))"
+  grep -qE "^codex-capture: publish: rollout thread=$T1192_ID .* model=$want\$" "$T1192_ERR" \
+    || fail "T-1192 $name: the summary line must end in ' model=$want' ($(cat "$T1192_ERR"))"
+  cmp -s "$src" "$T1192_RV/T-000-codex-primary.jsonl" || fail "T-1192 $name: the published jsonl is not byte-equal to the rollout"
+}
+t1192_refuse() {  # name src cause flags...
+  local name="$1" src="$2" cause="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1192 $name: expected exit 3, got $T1192_RC ($(cat "$T1192_ERR"))"
+  grep -qF 'model not established' "$T1192_ERR" || fail "T-1192 $name: stderr lacks 'model not established'"
+  grep -qF "cause=$cause" "$T1192_ERR" || fail "T-1192 $name: stderr lacks cause=$cause ($(cat "$T1192_ERR"))"
+  [[ -z "$(ls -A "$T1192_RV")" ]] || fail "T-1192 $name: the reviews dir is not empty after a refusal (a canonical file or a raw survived)"
+}
+
+# --- positive control: the BASE-equivalent gate admits every fixture shape
+# (no --expect-model), so a refusal below is the model gate and not the
+# completed-run gate.
+for r in r-160 r-prompt r-171 r-none r-wsonly r-disagree r-null r-uesc; do
+  t1192_pub "$SCRIPT" "$T1192/$r"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1192 positive control: $r must pass the completed-run gate without --expect-model (rc=$T1192_RC)"
+done
+pass "T-1192 positive control: every synthesized rollout passes the completed-run gate when no model is requested"
+
+t1192_ok "0.160.0 review shape" "$T1192/r-160" zq-model-1 --expect-model zq-model-1
+t1192_ok "prompt shape (world_state decoy)" "$T1192/r-prompt" zq-model-1 --expect-model zq-model-1
+t1192_ok "0.171.0 review shape" "$T1192/r-171" zq-model-1 --expect-model zq-model-1
+t1192_ok "object-valued model ignored beside turn_context" "$T1192/r-objval" zq-model-1 --expect-model zq-model-1
+t1192_ok "event_msg thread_settings is never read" "$T1192/r-evdiff" zq-model-1 --expect-model zq-model-1
+t1192_ok "the same value twice in session_meta is established" "$T1192/r-twice" zq-model-1 --expect-model zq-model-1
+pass "T-1192 extraction: the 0.160.0, prompt and 0.171.0 shapes establish the model; an object value and event_msg are never read"
+
+t1192_refuse "mismatch" "$T1192/r-160" mismatch --expect-model zq-model-2
+t1192_refuse "prefix near-miss, observed longer" "$T1192/r-prefix" mismatch --expect-model zq-model-1
+t1192_refuse "prefix near-miss, expected longer" "$T1192/r-160" mismatch --expect-model zq-model-1x
+t1192_refuse "absent: no model record" "$T1192/r-none" absent --expect-model zq-model-1
+t1192_refuse "absent: world_state only" "$T1192/r-wsonly" absent --expect-model zq-model-1
+t1192_refuse "absent: event_msg only" "$T1192/r-evonly" absent --expect-model zq-model-1
+t1192_refuse "absent: text inside a CommandExecution string" "$T1192/r-texty" absent --expect-model zq-model-1
+t1192_refuse "absent: only an object-valued model" "$T1192/r-objonly" absent --expect-model zq-model-1
+t1192_refuse "inconsistent: session_meta and turn_context disagree" "$T1192/r-disagree" inconsistent --expect-model zq-model-1
+t1192_refuse "malformed: null" "$T1192/r-null" malformed --expect-model zq-model-1
+t1192_refuse "malformed: number" "$T1192/r-number" malformed --expect-model zq-model-1
+t1192_refuse "malformed: boolean" "$T1192/r-bool" malformed --expect-model zq-model-1
+t1192_refuse "malformed: empty string" "$T1192/r-emptystr" malformed --expect-model zq-model-1
+t1192_refuse "malformed: a backslash-u escape in the value" "$T1192/r-uesc" malformed --expect-model zq-model-1
+t1192_refuse "malformed: spaces and a semicolon" "$T1192/r-badchars" malformed --expect-model zq-model-1
+if grep -qF 'zq bad' "$T1192_ERR"; then fail "T-1192 malformed: the offending value was echoed on stderr"; fi
+pass "T-1192 refusals: exit 3, one cause from the closed set, no canonical file, no surviving raw, a malformed value never echoed"
+
+t1192_ok "provider-configured with no model is report-only" "$T1192/r-none" unavailable --expect-model provider-configured
+t1192_ok "provider-configured never refuses on a disagreeing rollout" "$T1192/r-disagree" unavailable --expect-model provider-configured
+t1192_ok "no --expect-model on a disagreeing rollout" "$T1192/r-disagree" unavailable
+t1192_ok "no --expect-model on a malformed rollout" "$T1192/r-null" unavailable
+t1192_ok "no --expect-model on a session_meta-only rollout" "$T1192/r-160" zq-model-1
+pass "T-1192 report-only: under provider-configured or no expectation the publish never refuses on the model and the summary ends in model=<observed|unavailable>"
+
+# --- usage errors (exit 2)
+for bad in 'zq model' '' 'zq;x' '-zq' "zq${T1192_BS}u0031"; do
+  t1192_pub "$SCRIPT" "$T1192/r-160" --expect-model "$bad"
+  [[ "$T1192_RC" -eq 2 ]] || fail "T-1192 usage: --expect-model with a non-token value must exit 2, got $T1192_RC"
+done
+mkdir -p "$T1192/u1" "$T1192/u2"
+set +e
+bash "$SCRIPT" --alloc --stem T-000-codex-primary --reviews-dir "$T1192/u1" --expect-model zq-model-1 < /dev/null > /dev/null 2>&1
+u_rc=$?
+set -e
+[[ "$u_rc" -eq 2 ]] || fail "T-1192 usage: --alloc with --expect-model must exit 2, got $u_rc"
+bash "$SCRIPT" --alloc --stem T-000-codex-primary --reviews-dir "$T1192/u2" > "$T1192/al" 2>/dev/null
+u_out="$(sed -n 1p "$T1192/al")"; u_jsonl="$(sed -n 2p "$T1192/al")"
+printf 'review text\n' > "$u_out"; printf '{"type":"x"}\n' > "$u_jsonl"
+set +e
+bash "$SCRIPT" --publish --stem T-000-codex-primary --reviews-dir "$T1192/u2" --publish-out "$u_out" --publish-jsonl "$u_jsonl" --expect-model zq-model-1 < /dev/null > /dev/null 2>&1
+u_rc=$?
+set -e
+[[ "$u_rc" -eq 2 ]] || fail "T-1192 usage: --publish --expect-model without --thread-id must exit 2, got $u_rc"
+pass "T-1192 usage: --expect-model with an empty or non-token value, with --alloc, or without --thread-id exits 2"
+
+# --- --observe: read-only, same extraction and causes
+OBS_HOME="$T1192/obs-ch"
+mkdir -p "$OBS_HOME/sessions/2026/11/21" "$T1192/obs-cwd"
+i1=00000000-0000-4000-8000-0000000000a1
+i2=00000000-0000-4000-8000-0000000000a2
+i3=00000000-0000-4000-8000-0000000000a3
+i4=00000000-0000-4000-8000-0000000000a4
+i5=00000000-0000-4000-8000-0000000000a5
+cp "$T1192/r-160" "$OBS_HOME/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$i1.jsonl"
+cp "$T1192/r-none" "$OBS_HOME/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$i2.jsonl"
+cp "$T1192/r-171" "$OBS_HOME/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$i3.jsonl"
+cp "$T1192/r-null" "$OBS_HOME/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$i4.jsonl"
+cp "$T1192/r-keyesc" "$OBS_HOME/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$i5.jsonl"
+t1192_snap() { (cd "$T1192" && find obs-ch obs-cwd -print | sort && find obs-ch -type f -exec cksum {} +); }
+t1192_snap > "$T1192/snap0"
+t1192_obs() {  # args...; sets T1192_RC, stdout file, stderr file
+  set +e
+  ( cd "$T1192/obs-cwd" && exec env CODEX_HOME="$OBS_HOME" bash "$SCRIPT" "$@" ) < /dev/null > "$T1192/obs.out" 2> "$T1192/obs.err"
+  T1192_RC=$?
+  set -e
+}
+t1192_obs_refused() {  # TOKEN... MESSAGE — the last observe call must have exited 3 with every TOKEN on stderr
+  local msg="${*: -1}" tok
+  [[ "$T1192_RC" -eq 3 ]] || fail "$msg (exit $T1192_RC, expected 3)"
+  for tok in "${@:1:$#-1}"; do
+    grep -qF -- "$tok" "$T1192/obs.err" || fail "$msg (stderr lacks '$tok')"
+  done
+}
+t1192_obs --observe --thread-id "$i1" --expect-model zq-model-1
+[[ "$T1192_RC" -eq 0 && "$(cat "$T1192/obs.out")" = "model=zq-model-1" ]] || fail "T-1192 observe: 0.160.0 shape must print exactly model=zq-model-1 (rc=$T1192_RC)"
+t1192_obs --observe --thread-id "$i1" --expect-model zq-model-2
+t1192_obs_refused 'model not established' 'cause=mismatch' "T-1192 observe: a mismatch must exit 3 with model not established and cause=mismatch"
+[[ ! -s "$T1192/obs.out" ]] || fail "T-1192 observe: a refusal must print nothing on stdout"
+t1192_obs --observe --thread-id "$i2"
+[[ "$T1192_RC" -eq 0 && "$(cat "$T1192/obs.out")" = "model=unavailable" ]] || fail "T-1192 observe: no model and no expectation must print exactly model=unavailable"
+t1192_obs --observe --thread-id "$i2" --expect-model zq-model-1
+t1192_obs_refused 'cause=absent' "T-1192 observe: an absent model under an expectation must refuse cause=absent"
+t1192_obs --observe --thread-id "$i3" --expect-model zq-model-1
+[[ "$T1192_RC" -eq 0 && "$(cat "$T1192/obs.out")" = "model=zq-model-1" ]] || fail "T-1192 observe: the 0.171.0 shape must print model=zq-model-1"
+t1192_obs --observe --thread-id "$i4" --expect-model zq-model-1
+t1192_obs_refused 'cause=malformed' "T-1192 observe: a null model must refuse cause=malformed"
+t1192_obs --observe --thread-id "$i5" --expect-model zq-model-1
+t1192_obs_refused 'cause=malformed' "T-1192 observe: a backslash-u escape in a key must refuse cause=malformed"
+t1192_obs --observe --thread-id 00000000-0000-4000-8000-0000000000ff
+t1192_obs_refused 'rollout import failed' "T-1192 observe: no rollout must exit 3 (rollout import failed)"
+for combo in "--observe" "--observe --alloc --stem T-000-codex-primary --thread-id $i1" "--publish --observe --stem T-000-codex-primary --thread-id $i1" "--observe --stem T-000-codex-primary --thread-id $i1" "--observe --thread-id not-an-id"; do
+  # shellcheck disable=SC2086  # intentional splitting of the fixed flag list
+  t1192_obs $combo
+  [[ "$T1192_RC" -eq 2 ]] || fail "T-1192 observe: '$combo' must exit 2, got $T1192_RC"
+done
+t1192_snap > "$T1192/snap1"
+cmp -s "$T1192/snap0" "$T1192/snap1" || fail "T-1192 observe: the CODEX_HOME tree or the working directory changed"
+[[ -z "$(ls -A "$T1192/obs-cwd")" ]] || fail "T-1192 observe: the working directory is not empty"
+pass "T-1192 observe: read-only model observation with the same extraction and causes, exit 2 on every misuse, nothing written to CODEX_HOME or the working directory"
+
+# --- T-1193 (issue #759): extraction fails closed on an unterminated string and
+# on a duplicated depth-1 type key. Same synthesized shapes as above.
+printf -- '\n--- T-1193 extraction fail-closed ---\n'
+T1193="$TMP/t1193"
+mkdir -p "$T1193" || fail "T-1193: cannot create the scratch root"
+T1193_CR="$(printf '\015')"
+[[ "${#T1193_CR}" -eq 1 ]] || fail "T-1193: the carriage-return builder is broken"
+T1193_P0='{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","payload":{"model_provider":"openai","provenance":{"type":"model","model":"zq-model-1'
+T1193_SMOK="$T1193_P0\"}}}"
+t1193_mk() {  # file line... : the lines, then the completed-run records
+  local f="$1" l
+  shift
+  { for l in "$@"; do printf '%s\n' "$l"; done; t1192_tl; } > "$T1193/$f"
+}
+t1193_mk u1 "${T1193_P0}X"
+t1193_mk u2 "$T1193_P0"
+t1193_mk u3 "$T1193_P0$T1192_BS"
+t1193_mk u4 "$T1193_SMOK\""
+t1193_mk u5 "$T1193_P0$T1193_CR"
+t1193_mk u6 "$T1193_P0\",\"zq"
+t1193_mk u7 '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"session_configured","thread_settings":{"model":"zq-model-1X' "$T1193_SMOK"
+t1193_mk u8 '{"timestamp":"2026-11-21T00:00:00Z,"type":"session_meta","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1193_SMOK"
+t1193_mk u9 "$T1193_P0\"},\"note\":\"abc$T1192_BS\""
+t1193_mk d1 '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d2 '{"timestamp":"2026-11-21T00:00:00Z","type":"event_msg","type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d3 '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","type":"event_msg","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1193_SMOK"
+t1193_mk d5 '{"timestamp":"2026-11-21T00:00:00Z","type":1,"type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d7 '{"timestamp":"2026-11-21T00:00:00Z","type":{"a":1},"type":"session_meta","payload":{"provenance":{"model":"zq-model-1"}}}'
+t1193_mk d6 '{"timestamp":"2026-11-21T00:00:00Z","type":"session_meta","payload":{"type":"x","type":"y","provenance":{"model":"zq-model-1"}}}'
+t1193_mk w6 "$T1193_P0\"},\"note\":\"abc$T1192_BS$T1192_BS\"}}"
+grep -qF "zq-model-1$T1192_BS" "$T1193/u3" || fail "T-1193: u3 does not end in a backslash (vacuous fixture)"
+grep -qF "abc$T1192_BS\"" "$T1193/u9" || fail "T-1193: u9 lacks its escaped quote (vacuous fixture)"
+[[ "$(grep -c "$T1193_CR" "$T1193/u5")" -eq 1 ]] || fail "T-1193: u5 lacks its carriage return (vacuous fixture)"
+
+# t1193_obs SCRIPT ROLLOUT [flags...]: --observe in a fresh CODEX_HOME. Sets T1193_RC, T1193_OUT, T1193_OERR.
+t1193_obs() {
+  local script="$1" src="$2" id
+  shift 2
+  T1192_N=$((T1192_N + 1))
+  id="$(printf '00000000-0000-4000-8000-%012d' "$T1192_N")"
+  mkdir -p "$T1192/ch$T1192_N/sessions/2026/11/21" "$T1192/oc$T1192_N" || fail "T-1193: scratch dirs"
+  cp "$src" "$T1192/ch$T1192_N/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$id.jsonl" || fail "T-1193: copy rollout"
+  T1193_OUT="$T1192/oo$T1192_N"; T1193_OERR="$T1192/oe$T1192_N"
+  set +e
+  ( cd "$T1192/oc$T1192_N" && exec env CODEX_HOME="$T1192/ch$T1192_N" bash "$script" --observe --thread-id "$id" "$@" ) < /dev/null > "$T1193_OUT" 2> "$T1193_OERR"
+  T1193_RC=$?
+  set -e
+}
+# T-1193-labelled copies of t1192_refuse / t1192_ok: a failure here must read FAIL: T-1193.
+t1193_refuse() {  # name src cause flags...
+  local name="$1" src="$2" cause="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1193 $name: expected exit 3, got $T1192_RC"
+  grep -qF 'model not established' "$T1192_ERR" || fail "T-1193 $name: stderr lacks 'model not established'"
+  grep -qF "cause=$cause" "$T1192_ERR" || fail "T-1193 $name: stderr lacks cause=$cause"
+  [[ -z "$(ls -A "$T1192_RV")" ]] || fail "T-1193 $name: the reviews dir is not empty after a refusal"
+}
+t1193_ok() {  # name src observed flags...
+  local name="$1" src="$2" want="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1193 $name: expected exit 0, got $T1192_RC"
+  grep -qE "^codex-capture: publish: rollout thread=$T1192_ID .* model=$want\$" "$T1192_ERR" || fail "T-1193 $name: the summary must end in ' model=$want'"
+}
+t1193_nozq() { if grep -qF zq-model "$1"; then fail "T-1193 $2: a model value was echoed on stderr"; fi; }
+# t1193_four NAME: the three paths, report-only checked twice.
+t1193_four() {
+  local name="$1" f="$T1193/$1"
+  t1193_refuse "$name publish-named" "$f" malformed --expect-model zq-model-1
+  t1193_nozq "$T1192_ERR" "$name publish-named"
+  t1193_obs "$SCRIPT" "$f" --expect-model zq-model-1
+  if [[ "$T1193_RC" -ne 3 ]] || ! grep -qF 'model not established' "$T1193_OERR" || ! grep -qF cause=malformed "$T1193_OERR" || [[ -s "$T1193_OUT" ]]; then
+    fail "T-1193 $name observe-named: expected exit 3, model not established, cause=malformed, empty stdout (rc=$T1193_RC)"
+  fi
+  t1193_nozq "$T1193_OERR" "$name observe-named"
+  t1192_pub "$SCRIPT" "$f"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1193 $name report-only publish: expected exit 0, got $T1192_RC"
+  grep -qE "^codex-capture: publish: rollout thread=$T1192_ID .* model=unavailable\$" "$T1192_ERR" || fail "T-1193 $name report-only publish: the summary must end in ' model=unavailable'"
+  cmp -s "$f" "$T1192_RV/T-000-codex-primary.jsonl" || fail "T-1193 $name report-only publish: the published jsonl is not byte-equal to the rollout"
+  t1193_nozq "$T1192_ERR" "$name report-only publish"
+  t1193_obs "$SCRIPT" "$f"
+  [[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=unavailable" ]] || fail "T-1193 $name report-only observe: expected exactly model=unavailable (rc=$T1193_RC)"
+}
+for n in u1 u2 u3 u4 u5 u6 u7 u8 u9; do t1193_four "$n"; done
+pass "T-1193 unterminated string: nine shapes (extra byte, none, trailing backslash, lone quote, CRLF, key, unread type, swallowed type, escaped-quote value) are malformed on publish-named, observe-named and both report-only paths"
+for n in d1 d2 d3 d5 d7; do t1193_four "$n"; done
+pass "T-1193 duplicated type: equal, either-order, non-string and object-valued duplicates are malformed on all four paths"
+t1193_ok "d6 nested duplicate type is not counted" "$T1193/d6" zq-model-1 --expect-model zq-model-1
+t1193_obs "$SCRIPT" "$T1193/d6" --expect-model zq-model-1
+[[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=zq-model-1" ]] || fail "T-1193 d6 observe: a nested duplicate type must still print model=zq-model-1"
+t1193_ok "w6 escaped backslash before the closing quote stays well-formed" "$T1193/w6" zq-model-1 --expect-model zq-model-1
+pass "T-1193 boundary: a nested duplicate type and an escaped backslash before a closing quote keep their T-1192 outcome"
+
+# --- T-1193 mutation probes: break each new guard once in a scratch copy; the
+# unmutated script refuses the fixture, so a mutant that still refuses it (or
+# fails to refuse where it must) is a vacuous probe or an uncaught mutation.
+t1193_mutant() {  # label sed-expr
+  local m="$T1193/mut-$1.sh"
+  sed "$2" "$SCRIPT" > "$m" || fail "T-1193 mutation $1: sed failed"
+  cmp -s "$SCRIPT" "$m" && fail "T-1193 mutation $1: the sed expression changed nothing (the probe is vacuous)"
+  printf '%s\n' "$m"
+}
+t1193_notrefused() {  # label mutant fixture
+  t1192_pub "$2" "$3" --expect-model zq-model-1
+  if [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=malformed "$T1192_ERR"; then
+    fail "T-1193 mutation $1: the mutant still refused $3 as malformed (the fixture does not pin the guard)"
+  fi
+}
+M_UNOFF="$(t1193_mutant no-unterm 's/if (unterm) { nmal++; next }/if (unterm) { next }/')"
+t1193_notrefused no-unterm "$M_UNOFF" "$T1193/u1"
+M_UNTYPE="$(t1193_mutant unterm-typed-only 's/if (unterm) { nmal++; next }/if (unterm \&\& 0) { nmal++; next }/')"
+t1193_notrefused unterm-disabled "$M_UNTYPE" "$T1193/u7"
+M_LASTB="$(t1193_mutant last-byte 's/if (!closed) unterm = 1/if (substr(tok2, length(tok2), 1) != "\\"") unterm = 1/')"
+t1193_notrefused last-byte "$M_LASTB" "$T1193/u9"
+M_DUPOFF="$(t1193_mutant no-dup 's/if (ntype > 1) { nmal++; next }/if (ntype > 1) { next }/')"
+t1193_notrefused no-dup "$M_DUPOFF" "$T1193/d1"
+M_DUPSTR="$(t1193_mutant dup-disabled 's/if (depth == 1 \&\& last_key == "type") ntype++/if (depth == 1 \&\& last_key == "type" \&\& 0) ntype++/')"
+t1193_notrefused dup-disabled "$M_DUPSTR" "$T1193/d5"
+M_DUPDEPTH="$(t1193_mutant dup-any-depth 's/if (depth == 1 \&\& last_key == "type") ntype++/if (last_key == "type") ntype++/')"
+t1192_pub "$M_DUPDEPTH" "$T1193/d6" --expect-model zq-model-1
+[[ "$T1192_RC" -eq 3 ]] || fail "T-1193 mutation dup-any-depth: counting a nested type must refuse d6, proving the fixture pins depth"
+pass "T-1193 mutation self-check: dropping the unterminated verdict, disabling it, a last-byte test, dropping the duplicate verdict, and counting nested type keys are each caught by a fixture"
+
+# --- mutation self-check: break each guard in a scratch copy of the script and
+# require the suite's own fixtures to notice (the detector is not vacuous).
+t1192_mutant() {  # label sed-expr
+  local m="$T1192/mut-$1.sh"
+  sed "$2" "$SCRIPT" > "$m" || fail "T-1192 mutation $1: sed failed"
+  cmp -s "$SCRIPT" "$m" && fail "T-1192 mutation $1: the sed expression changed nothing (the probe is vacuous)"
+  printf '%s\n' "$m"
+}
+M_ANY="$(t1192_mutant any-record-type 's/line_type == "session_meta" || line_type == "turn_context"/line_type != ""/')"
+t1192_pub "$M_ANY" "$T1192/r-wsonly" --expect-model zq-model-1
+if [[ "$T1192_RC" -eq 3 ]] && grep -qF 'cause=absent' "$T1192_ERR"; then fail "T-1192 mutation any-record-type: reading world_state was NOT caught"; fi
+# shellcheck disable=SC2016  # the sed program is deliberately literal
+M_PREFIX="$(t1192_mutant prefix-compare 's|\[ "\$observed_model" != "\$expect_model" \]|[[ "$observed_model" != "$expect_model"* ]]|')"
+bash -n "$M_PREFIX" || fail "T-1192 mutation prefix-compare: the mutant does not parse (the probe would be vacuous)"
+t1192_pub "$M_PREFIX" "$T1192/r-prefix" --expect-model zq-model-1
+[[ "$T1192_RC" -ne 3 ]] || fail "T-1192 mutation prefix-compare: comparing by prefix was NOT caught"
+M_DEPTH="$(t1192_mutant any-depth-type 's/else if (last_key == "type" && depth == 1)/else if (last_key == "type")/')"
+t1192_pub "$M_DEPTH" "$T1192/r-160" --expect-model zq-model-1
+[[ "$T1192_RC" -ne 0 ]] || fail "T-1192 mutation any-depth-type: letting a nested type key retype the record was NOT caught"
+M_NOGATE="$(t1192_mutant no-gate 's/^  apply_model_gate publish$/  :/')"
+t1192_pub "$M_NOGATE" "$T1192/r-160" --expect-model zq-model-2
+[[ "$T1192_RC" -ne 3 ]] || fail "T-1192 mutation no-gate: removing the publish gate was NOT caught"
+M_SUFFIX="$(t1192_mutant no-suffix 's/ model=%s\\n/\\n/')"
+t1192_pub "$M_SUFFIX" "$T1192/r-160"
+grep -qE ' model=zq-model-1$' "$T1192_ERR" && fail "T-1192 mutation no-suffix: dropping the model= suffix was NOT caught"
+pass "T-1192 mutation self-check: reading any record type, comparing by prefix, retyping from a nested key, removing the publish gate and dropping the summary suffix are each caught by this suite's fixtures"
+
+# --- the agent definitions state the mechanism, and no skeleton line carries -m
+for f in "$CODEX_REVIEWER_MD" "$DRIFT_EVALUATOR_MD"; do
+  grep -qF -- '-m <MODEL>' "$f" || fail "T-1192: $f does not state the -m <MODEL> insertion"
+  grep -qF -- '--print-resolved' "$f" || fail "T-1192: $f does not read the requested model through --print-resolved"
+  grep -qF 'model not established' "$f" || fail "T-1192: $f does not state the model not established handling"
+  if grep -E '^[[:space:]]*codex exec ' "$f" | grep -qE '(^|[[:space:]])(-m|--model)([[:space:]]|=|$)'; then
+    fail "T-1192: a codex exec skeleton line in $f carries -m/--model (the insertion must stay prose)"
+  fi
+done
+for stem in T-XXX-codex-primary T-XXX-codex-adversarial T-XXX-codex-specreview; do
+  grep -Fq -- "--publish --stem $stem --publish-out \"<RAW_OUT>\" --publish-jsonl \"<RAW_JSONL>\" --thread-id \"<THREAD_ID>\" --expect-model \"<MODEL>\"" "$CODEX_REVIEWER_MD" \
+    || fail "T-1192: the $stem publish line in agents/code-reviewer.md does not end with --expect-model \"<MODEL>\""
+done
+grep -Fq -- "--publish --stem T-XXX-drift-codex --publish-out \"<RAW_OUT>\" --publish-jsonl \"<RAW_JSONL>\" --thread-id \"<THREAD_ID>\" --expect-model \"<MODEL>\"" "$DRIFT_EVALUATOR_MD" \
+  || fail "T-1192: the drift publish line in agents/drift-evaluator.md does not end with --expect-model \"<MODEL>\""
+pass "T-1192 agent prose: both agent files state the -m <MODEL> insertion, read the model through --print-resolved, name model not established, end every publish line with --expect-model, and no codex exec skeleton line carries -m"
+
+# =============================================================================
 # Summary
 # =============================================================================
 printf '\nOK\n'

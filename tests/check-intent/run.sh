@@ -749,7 +749,11 @@ AC8_RC=$?
 set -e
 [ "$AC8_RC" -eq 2 ] || fail "AC8: a failing 'dirname' during self-resolution should fail closed as usage(2), got $AC8_RC: $AC8_OUT"
 grep -q 'usage' <<< "$AC8_OUT" || fail "AC8: stderr must carry the 'usage' token, got: $AC8_OUT"
-pass "AC8: a failing 'dirname' in the resolver bootstrap fails closed as a classified usage error (exit 2, token present), never a fail-open \$PWD substitution"
+# T-1194: exit status alone no longer discriminates — on bash 5.3 the OLD
+# unsplit form also exits 2 (its `cd`/`pwd` refusal, since `cd ""` fails
+# there). The split guard is identified by its own dirname-specific refusal.
+grep -qF 'dirname failed to resolve' <<< "$AC8_OUT" || fail "AC8: stderr must carry the dirname-specific refusal 'dirname failed to resolve', got: $AC8_OUT"
+pass "AC8: a failing 'dirname' in the resolver bootstrap fails closed as a classified usage error (exit 2, token present, dirname-specific refusal text), never a fail-open \$PWD substitution"
 
 # Non-vacuous counterfactual: the OLD (unsplit, single `cd`+`dirname`+`pwd`
 # substitution) bootstrap fails OPEN for this exact scenario — dirname's
@@ -802,8 +806,18 @@ set +e
 AC8_OLD_OUT="$(PATH="$C/fakebin:$PATH" bash "$OLD_CHECKER" "$C/spec.md" "$C/board.md" 2>&1 >/dev/null)"
 AC8_OLD_RC=$?
 set -e
-[ "$AC8_OLD_RC" -eq 0 ] || fail "AC8 counterfactual: expected the OLD (unsplit) bootstrap to fail OPEN (proceed to a normal exit 0) under a failing 'dirname', got $AC8_OLD_RC: $AC8_OLD_OUT"
-pass "AC8 non-vacuous counterfactual — the OLD (unsplit) bootstrap silently proceeds (exit 0) under a failing 'dirname' instead of failing closed, the exact fail-open the NEW split-guard closes; self-contained inline fixture, no git-history/branch-name dependency"
+# T-1194: the OLD form never produces the dirname-specific refusal. Where
+# `cd ""` succeeds (bash 5.2 and earlier) it fails OPEN (exit 0); where
+# `cd ""` fails (bash 5.3) it exits 2 through its own `cd`/`pwd` refusal.
+# Any other status, or the dirname-specific text, fails the fixture.
+case "$AC8_OLD_RC" in
+  0|2) : ;;
+  *) fail "AC8 counterfactual: expected the OLD (unsplit) bootstrap to exit 0 (fail OPEN, cd \"\" succeeds) or 2 (its cd/pwd refusal, cd \"\" fails) under a failing 'dirname', got $AC8_OLD_RC: $AC8_OLD_OUT" ;;
+esac
+if grep -qF 'dirname failed to resolve' <<< "$AC8_OLD_OUT"; then
+  fail "AC8 counterfactual: the OLD (unsplit) bootstrap must never produce the dirname-specific refusal, got: $AC8_OLD_OUT"
+fi
+pass "AC8 non-vacuous counterfactual — the OLD (unsplit) bootstrap never yields the dirname-specific refusal: it silently proceeds (exit 0) where cd \"\" succeeds, or exits 2 through its cd/pwd refusal where cd \"\" fails (bash 5.3), the fail-open/indirect path the NEW split-guard closes; self-contained inline fixture, no git-history/branch-name dependency"
 
 # ============================================================================
 # AC6 (#233 item 3, non-vacuous lock): a fixed-name temp root computes the

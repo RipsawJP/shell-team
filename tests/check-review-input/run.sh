@@ -474,4 +474,100 @@ t1165_rmdir_case() {  # $1 = tool (no .sh); $2.. = command; optional T1165_CWD
 }
 t1165_rmdir_case check-review-input bash "$SCRIPT" --record "$T/hostile.md" --task T-000
 
+# =============================================================================
+# T-1192 (issues #755/#756): the OPTIONAL sixth per-pass field codex-model.
+#   codex-model (<pass>): requested=<token> — observed=<token>
+# Validated if present, forward-only (a record without it is unchanged).
+# Refusal order: duplicate, vocabulary, mismatch, contradiction. Nothing a
+# refusal prints carries a field's bytes.
+# =============================================================================
+cm_hdr() { printf '## Codex review\n\n### Codex Review verdict: APPROVE\n- Task: T-000\n'; }
+# cm_rec FILE INVOCATION [EXTRA LINE...] — one pass p1 whose four fields use
+# INVOCATION as the executor-invocation value, then the extra lines verbatim.
+cm_rec() {
+  local f="$1" e="$2" l
+  shift 2
+  {
+    cm_hdr
+    printf '  - executor-invocation (p1): %s\n  - pass-role (p1): generation\n  - briefing-fidelity (p1): carried - scope stated in the argv\n  - raw-capture (p1): T-000-codex-primary\n' "$e"
+    for l in "$@"; do printf '%s\n' "$l"; done
+  } > "$f"
+}
+cm_line() { printf '  - codex-model (p1): requested=%s — observed=%s' "$1" "$2"; }
+CM_BARE='codex exec --sandbox read-only review --base develop'
+CM_PIN='codex exec -m zq-model-1 --sandbox read-only review --base develop'
+CM_BT='`'
+
+cm_rec "$T/cm-0.md" "$CM_BARE"
+assert_case "codex-model: no line at all stays conformant (forward-only)" 0 "" -- bash "$SCRIPT" --record "$T/cm-0.md" --task T-000
+cm_rec "$T/cm-1.md" "$CM_BARE" "$(cm_line provider-configured zq-model-1)"
+assert_case "codex-model: provider-configured with an observed model is report-only" 0 "" -- bash "$SCRIPT" --record "$T/cm-1.md" --task T-000
+cm_rec "$T/cm-2.md" "$CM_BARE" "$(cm_line provider-configured unavailable)"
+assert_case "codex-model: provider-configured with observed unavailable" 0 "" -- bash "$SCRIPT" --record "$T/cm-2.md" --task T-000
+cm_rec "$T/cm-3.md" "$CM_PIN" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: named model observed equal, invocation carries -m" 0 "" -- bash "$SCRIPT" --record "$T/cm-3.md" --task T-000
+cm_rec "$T/cm-3b.md" "  $CM_PIN" '  - codex-model (p1):    requested=zq-model-1 — observed=zq-model-1'
+assert_case "codex-model: leading whitespace on both values is tolerated" 0 "" -- bash "$SCRIPT" --record "$T/cm-3b.md" --task T-000
+cm_rec "$T/cm-3c.md" "$CM_BT$CM_PIN$CM_BT" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: a backtick-wrapped invocation with matching -m is conformant" 0 "" -- bash "$SCRIPT" --record "$T/cm-3c.md" --task T-000
+cm_rec "$T/cm-3d.md" "${CM_BT}codex exec -m zq-model-1${CM_BT}" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: -m <requested> as the last token inside the backticks is conformant" 0 "" -- bash "$SCRIPT" --record "$T/cm-3d.md" --task T-000
+cm_rec "$T/cm-3e.md" "claude -p --prompt-file p.txt" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: a claude -p invocation is never refused by the contradiction rule" 0 "" -- bash "$SCRIPT" --record "$T/cm-3e.md" --task T-000
+cm_rec "$T/cm-3f.md" "claude -p codex exec --prompt-file p.txt" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: a prompt that merely mentions codex exec is not a codex exec invocation" 0 "" -- bash "$SCRIPT" --record "$T/cm-3f.md" --task T-000
+
+for v in zq-model-2 unavailable zq-model-1x; do
+  cm_rec "$T/cm-m-$v.md" "$CM_PIN" "$(cm_line zq-model-1 "$v")"
+  assert_case "codex-model: requested zq-model-1 observed $v refuses codex-model-mismatch" 1 codex-model-mismatch -- bash "$SCRIPT" --record "$T/cm-m-$v.md" --task T-000
+  out="$(bash "$SCRIPT" --record "$T/cm-m-$v.md" --task T-000 2>&1 || true)"
+  [ -n "$out" ] || fail "codex-model: the mismatch refusal printed nothing (the no-echo probe would be vacuous)"
+  if printf '%s' "$out" | grep -qF -- "$v"; then fail "codex-model: the mismatch refusal echoed the observed value ($v)"; fi
+  pass "codex-model: the mismatch refusal never echoes the observed value ($v)"
+done
+cm_rec "$T/cm-m-prefix.md" "codex exec -m zq-model-1x --sandbox read-only review" "$(cm_line zq-model-1x zq-model-1)"
+assert_case "codex-model: a prefix near-miss in the other direction also refuses codex-model-mismatch" 1 codex-model-mismatch -- bash "$SCRIPT" --record "$T/cm-m-prefix.md" --task T-000
+
+cm_rec "$T/cm-v1.md" "$CM_PIN" '  - codex-model (p1): requested=zq-model-1 observed=zq-model-1'
+assert_case "codex-model: no separator refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v1.md" --task T-000
+cm_rec "$T/cm-v2.md" "$CM_PIN" "$(cm_line 'zq model' zq-model-1)"
+assert_case "codex-model: a requested token with a space refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v2.md" --task T-000
+cm_rec "$T/cm-v3.md" "$CM_PIN" "$(cm_line zq-model-1 '')"
+assert_case "codex-model: an empty observed value refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v3.md" --task T-000
+cm_rec "$T/cm-v4.md" "$CM_PIN" "$(cm_line zq-model-1 'zq-model-1;x')"
+assert_case "codex-model: an observed token outside the token shape refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v4.md" --task T-000
+cm_rec "$T/cm-v5.md" "$CM_PIN" '  - codex-model (p1): zq-model-1 — zq-model-1'
+assert_case "codex-model: missing requested=/observed= labels refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v5.md" --task T-000
+cm_rec "$T/cm-v6.md" "$CM_PIN" "$(cm_line zq-model-1 zq-model-1) "
+assert_case "codex-model: trailing whitespace after observed refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v6.md" --task T-000
+cm_rec "$T/cm-v7.md" "$CM_PIN" "$(cm_line zq-model-1 zq-model-1) — observed=zq-model-1"
+assert_case "codex-model: a second separator inside the observed value refuses codex-model-vocabulary" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v7.md" --task T-000
+cm_rec "$T/cm-v8.md" "$CM_PIN" "$(cm_line provider-configured-x zq-model-1)"
+assert_case "codex-model: a token that merely begins with provider-configured is a named model" 1 codex-model-mismatch -- bash "$SCRIPT" --record "$T/cm-v8.md" --task T-000
+cm_rec "$T/cm-v10.md" "$CM_PIN" '  - codex-model (p1): requested=zq-model-1 observed=zq-model-2'
+assert_case "codex-model: a malformed line whose tokens would mismatch refuses vocabulary, not mismatch" 1 codex-model-vocabulary -- bash "$SCRIPT" --record "$T/cm-v10.md" --task T-000
+
+cm_rec "$T/cm-d1.md" "$CM_PIN" "$(cm_line zq-model-1 zq-model-1)" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: two lines for one pass refuse codex-model-duplicate" 1 codex-model-duplicate -- bash "$SCRIPT" --record "$T/cm-d1.md" --task T-000
+cm_rec "$T/cm-d2.md" "$CM_BARE" "$(cm_line zq-model-1 zq-model-2)" '  - codex-model (p1): requested=zq-model-1 observed=zq-model-1'
+assert_case "codex-model: duplicate wins over mismatch, vocabulary and contradiction" 1 codex-model-duplicate -- bash "$SCRIPT" --record "$T/cm-d2.md" --task T-000
+
+cm_rec "$T/cm-c1.md" "$CM_BARE" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: a named model beside an invocation with no -m refuses codex-model-contradiction" 1 codex-model-contradiction -- bash "$SCRIPT" --record "$T/cm-c1.md" --task T-000
+cm_rec "$T/cm-c2.md" "$CM_PIN" "$(cm_line provider-configured zq-model-1)"
+assert_case "codex-model: provider-configured beside an invocation carrying -m refuses codex-model-contradiction" 1 codex-model-contradiction -- bash "$SCRIPT" --record "$T/cm-c2.md" --task T-000
+cm_rec "$T/cm-c3.md" "${CM_BT}codex exec -m zq-model-2 --sandbox read-only review --base develop${CM_BT}" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: a backtick-wrapped -m naming another model refuses codex-model-contradiction" 1 codex-model-contradiction -- bash "$SCRIPT" --record "$T/cm-c3.md" --task T-000
+cm_rec "$T/cm-c4.md" "codex exec --sandbox read-only -m zq-model-1 review --base develop" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: -m not immediately after codex exec refuses codex-model-contradiction" 1 codex-model-contradiction -- bash "$SCRIPT" --record "$T/cm-c4.md" --task T-000
+cm_rec "$T/cm-c5.md" "codex exec -m zq-model-1x --sandbox read-only review" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: -m naming a prefix near-miss of the requested model refuses codex-model-contradiction" 1 codex-model-contradiction -- bash "$SCRIPT" --record "$T/cm-c5.md" --task T-000
+cm_rec "$T/cm-c6.md" "codex exec" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-model: a bare codex exec invocation beside a named model refuses codex-model-contradiction" 1 codex-model-contradiction -- bash "$SCRIPT" --record "$T/cm-c6.md" --task T-000
+
+# A pass declared ONLY by a codex-model line is still field-missing (the field
+# joins FIELD_RE like self-detected-host did; the four-field test is unchanged).
+{ cm_hdr; cm_line zq-model-1 zq-model-1; printf '\n'; } > "$T/cm-only.md"
+assert_case "codex-model: a pass declared only by codex-model refuses field-missing" 1 field-missing -- bash "$SCRIPT" --record "$T/cm-only.md" --task T-000
+
 printf '\nAll check-review-input assertions passed.\n'

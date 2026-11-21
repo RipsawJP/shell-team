@@ -128,9 +128,10 @@
 #
 # Usage:
 #   codex-capture.sh --alloc   --stem <stem> [--reviews-dir <dir>]
-#   codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id>] [--reviews-dir <dir>]
+#   codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id> [--expect-model <token>]] [--reviews-dir <dir>]
+#   codex-capture.sh --observe --thread-id <id> [--expect-model <token>]
 #
-# `--alloc` and `--publish` are mutually exclusive; exactly one is required.
+# `--alloc`, `--publish` and `--observe` are mutually exclusive; exactly one is required.
 # The caller runs its own `codex exec …` between the two calls (a single bare
 # command, first token `codex`, no other part after its arguments — see
 # agents/code-reviewer.md / agents/drift-evaluator.md for the full skeleton),
@@ -154,6 +155,7 @@
 # Exit codes:
 #   0  success — `--alloc`: both raws allocated, their paths printed.
 #              — `--publish`: both canonical files published, non-empty.
+#              — `--observe`: `model=<observed>` printed on stdout.
 #   2  usage error (bad/missing/conflicting flags, unresolvable reviews dir,
 #      `--thread-id` combined with `--alloc`, a `--thread-id` value that does
 #      not match the id shape, a non-empty jsonl raw given with `--thread-id`,
@@ -161,7 +163,10 @@
 #      `--publish` only — a raw failing the fail-closed placement
 #      precondition: wrong parent directory, wrong basename prefix, or not an
 #      existing regular file; `mv` is never attempted in this case)
-#   3  (`--publish` only) captured output failed validation (empty -o
+#   3  `--observe` exits 3 only for a failed rollout import and for `model not
+#      established`; the remaining causes in this item (an empty capture, no
+#      valid event line, `review did not run`, `unicode-escape`) are
+#      `--publish` only. Captured output failed validation (empty -o
 #      capture, or the JSONL stream has no valid event line — no complete
 #      `{…}` object line carrying the `"type"` key; T-098 DP-A) — or, with
 #      `--thread-id`: the search under `${CODEX_HOME:-$HOME/.codex}/sessions`
@@ -181,6 +186,39 @@
 #      a non-regular file was refused before any `mv`, an `mv` onto the
 #      canonical name itself reported failure, or the post-move
 #      existence/non-empty check failed)
+#
+# T-1192 (issues #755/#756): the model a pass actually ran on is read from
+# that pass's own rollout. The observed model is every string value of a key
+# named `model`, at any nesting depth, inside a record whose TOP-LEVEL `type`
+# is `session_meta` or `turn_context` (codex-cli 0.160.0 writes
+# `payload.provenance.model`; 0.171.0 `review` writes
+# `payload.base_instructions.provenance.model`, so no fixed path is used). Any
+# other record type (`event_msg`, `world_state`, `response_item`, ...) is never
+# aggregated (but see the two malformed rules below), text inside a string value is never read as a key, a `model` key whose
+# value is an object or an array is ignored, and a non-string scalar value is
+# malformed. The model is ESTABLISHED when at least one string value exists
+# and all of them are one identical token of `[A-Za-z0-9][A-Za-z0-9._-]*`.
+# T-1193: the observation is malformed when any line the extraction reads (any
+# line carrying the bytes `model` or a backslash-u) has an unterminated string
+# (no closing unescaped quote before the end of the line, a trailing carriage
+# return included), whatever that line's type, and when such a line carries the
+# depth-1 `type` key more than once (equal or differing values, any value
+# kind; a nested `type` is not counted).
+#   --publish --thread-id <id> --expect-model <m>   with <m> a named model
+#      (anything but `provider-configured`): refuse (exit 3, no canonical
+#      file, both raws removed) unless the observed model is established and
+#      byte-equal to <m>. The stderr line contains `model not established`
+#      and exactly one `cause=` of absent | inconsistent | malformed |
+#      mismatch; a malformed value is never echoed.
+#   --expect-model provider-configured, or no --expect-model: report-only. The
+#      publish never refuses on the model and the success summary line ends
+#      with ` model=<observed>` (`unavailable` when not established).
+#   --expect-model usage errors (exit 2): without --thread-id, with --alloc,
+#      with an empty value, or with a value outside the token shape.
+#   --observe --thread-id <id> [--expect-model <m>]: the same extraction and
+#      causes, read-only. It resolves no reviews dir, writes nothing, and
+#      prints `model=<observed>` on stdout on success. It serves the
+#      finding-evaluation mode, which publishes no capture.
 
 set -euo pipefail
 
@@ -194,6 +232,204 @@ die() {  # $1 = exit code, $2 = message
   exit "$1"
 }
 
+# --- T-1192 helpers: model token shape, rollout search, model extraction ------
+# model_token_ok <value>: the binding validator's MODEL_RE
+# (`^[A-Za-z0-9][A-Za-z0-9._-]*$`), evaluated byte-wise (`local LC_ALL=C`) so
+# a locale's collation can never widen the character ranges.
+model_token_ok() {
+  local LC_ALL=C
+  case "$1" in
+    ''|*[!A-Za-z0-9._-]*|[!A-Za-z0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+# locate_rollout <label>: resolve --thread-id to exactly one non-empty
+# `rollout-*-<id>.jsonl` under ${CODEX_HOME:-$HOME/.codex}/sessions through
+# the fail-closed search (T-1152 round 2, R14), setting $rollout_match. It runs
+# in the caller's own shell (never a command substitution) so $find_out stays
+# visible to the caller's EXIT trap. <label> is the leading word of every
+# refusal line (`publish` or `observe`).
+locate_rollout() {
+  local label="$1" sessions_dir resolved_sessions_dir find_rc rollout_match_count rollout_entry
+  sessions_dir="${CODEX_HOME:-$HOME/.codex}/sessions"
+  find_out="$(mktemp "${TMPDIR:-/tmp}/codex-capture.find.XXXXXX")" \
+    || die 3 "$label: rollout import failed (dir=$sessions_dir thread=$thread_id matches=0)"
+  resolved_sessions_dir=""
+  if resolved_sessions_dir="$(cd -P -- "$sessions_dir" 2>/dev/null && pwd -P)" \
+     && [ -n "$resolved_sessions_dir" ]; then
+    if find "$resolved_sessions_dir" -type f -name "rollout-*-$thread_id.jsonl" -print0 \
+         > "$find_out" 2>/dev/null; then
+      find_rc=0
+    else
+      find_rc=$?
+    fi
+  else
+    : > "$find_out"
+    find_rc=0
+  fi
+  rollout_match_count=0
+  rollout_match=""
+  if [ -s "$find_out" ]; then
+    while IFS= read -r -d '' rollout_entry; do
+      rollout_match_count=$((rollout_match_count + 1))
+      [ "$rollout_match_count" -eq 1 ] && rollout_match="$rollout_entry"
+    done < "$find_out"
+  fi
+  rm -f "$find_out"
+  if [ "$find_rc" -ne 0 ]; then
+    die 3 "$label: rollout import failed (dir=$sessions_dir thread=$thread_id incomplete search)"
+  fi
+  if [ "$rollout_match_count" -ne 1 ] || [ ! -s "$rollout_match" ]; then
+    die 3 "$label: rollout import failed (dir=$sessions_dir thread=$thread_id matches=$rollout_match_count)"
+  fi
+}
+
+# extract_model <rollout file>: print one of `OK <token>`, `ABSENT`,
+# `INCONSISTENT`, `MALFORMED`. Same tokenizer discipline as the completed-run
+# gate (string literals are opaque; a string followed by `:` is a key). Only
+# records whose TOP-LEVEL `type` is session_meta or turn_context are read,
+# at any depth. A value that is not a clean token is never printed.
+extract_model() {
+  LC_ALL=C awk '
+    BEGIN {
+      ALNUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+      MCH = ALNUM "._-"
+    }
+    function strip_quotes(s) { return substr(s, 2, length(s) - 2) }
+    function has_u_escape(s,    n2, j) {
+      n2 = length(s)
+      for (j = 1; j < n2; j++) {
+        if (substr(s, j, 1) == "\\" && substr(s, j + 1, 1) == "u") return 1
+      }
+      return 0
+    }
+    function tok_ok(s,    n2, j) {
+      n2 = length(s)
+      if (n2 < 1) return 0
+      if (index(ALNUM, substr(s, 1, 1)) == 0) return 0
+      for (j = 2; j <= n2; j++) {
+        if (index(MCH, substr(s, j, 1)) == 0) return 0
+      }
+      return 1
+    }
+    function tokenize(line,    n, i, c, tok2, esc, closed) {
+      ntok = 0
+      unterm = 0
+      n = length(line)
+      i = 1
+      while (i <= n) {
+        c = substr(line, i, 1)
+        if (c == "\"") {
+          tok2 = c
+          i++
+          esc = 0
+          closed = 0
+          while (i <= n) {
+            c = substr(line, i, 1)
+            tok2 = tok2 c
+            if (esc) { esc = 0 }
+            else if (c == "\\") { esc = 1 }
+            else if (c == "\"") { closed = 1; i++; break }
+            i++
+          }
+          if (!closed) unterm = 1
+          ntok++; tok[ntok] = tok2
+        } else if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == ",") {
+          ntok++; tok[ntok] = c
+          i++
+        } else if (c == " " || c == "\t" || c == "\r" || c == "\n") {
+          i++
+        } else {
+          tok2 = ""
+          while (i <= n) {
+            c = substr(line, i, 1)
+            if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == "," || c == "\"" || c == " " || c == "\t" || c == "\r" || c == "\n") break
+            tok2 = tok2 c
+            i++
+          }
+          ntok++; tok[ntok] = tok2
+        }
+      }
+    }
+    {
+      # A line with neither the bytes `model` nor a backslash-u escape cannot
+      # carry a model key (a key spelled through an escape is the second case).
+      if (index($0, "model") == 0 && index($0, "\\u") == 0) next
+      tokenize($0)
+      # T-1193: a string with no closing quote on this line makes the whole
+      # observation malformed, whatever the line is typed (it can swallow the
+      # type key); the line is then not read any further.
+      if (unterm) { nmal++; next }
+      depth = 0; last_key = ""; line_type = ""; nl = 0; key_u = 0; ntype = 0
+      for (i = 1; i <= ntok; i++) {
+        t = tok[i]
+        if (substr(t, 1, 1) == "\"") {
+          if (i < ntok && tok[i + 1] == ":") {
+            if (has_u_escape(t)) key_u = 1
+            last_key = strip_quotes(t)
+            if (depth == 1 && last_key == "type") ntype++
+          } else {
+            if (last_key == "model") { nl++; lk[nl] = "S"; lv[nl] = strip_quotes(t) }
+            else if (last_key == "type" && depth == 1) line_type = strip_quotes(t)
+            last_key = ""
+          }
+        } else if (t == "{" || t == "[") {
+          depth++; last_key = ""
+        } else if (t == "}" || t == "]") {
+          depth--; last_key = ""
+        } else if (t == ":" || t == ",") {
+          # structural separators only
+        } else {
+          if (last_key == "model") { nl++; lk[nl] = "M"; lv[nl] = "" }
+          last_key = ""
+        }
+      }
+      # T-1193: more than one depth-1 type key (any value kind) is malformed.
+      if (ntype > 1) { nmal++; next }
+      if (line_type == "session_meta" || line_type == "turn_context") {
+        if (key_u) nmal++
+        for (j = 1; j <= nl; j++) {
+          if (lk[j] == "M") { nmal++; continue }
+          v = lv[j]
+          if (has_u_escape(v) || !tok_ok(v)) { nmal++; continue }
+          nstr++
+          if (!(v in seen)) { seen[v] = 1; ndist++; first = v }
+        }
+      }
+    }
+    END {
+      if (nmal > 0) print "MALFORMED"
+      else if (nstr == 0) print "ABSENT"
+      else if (ndist > 1) print "INCONSISTENT"
+      else print "OK " first
+    }
+  ' "$1"
+}
+
+# apply_model_gate <label>: consume $model_state (extract_model output) and
+# $expect_model. Sets $observed_model. With a named expectation (anything but
+# `provider-configured`) it refuses (exit 3) unless the observed model is
+# established and byte-equal; otherwise it is report-only.
+apply_model_gate() {
+  local label="$1" cause=""
+  case "$model_state" in
+    "OK "*) observed_model="${model_state#OK }"; cause="" ;;
+    ABSENT) observed_model="unavailable"; cause="absent" ;;
+    INCONSISTENT) observed_model="unavailable"; cause="inconsistent" ;;
+    MALFORMED) observed_model="unavailable"; cause="malformed" ;;
+    *) die 3 "$label: model not established (thread=$thread_id cause=malformed)" ;;
+  esac
+  if [ -n "$expect_model" ] && [ "$expect_model" != "provider-configured" ]; then
+    if [ -z "$cause" ] && [ "$observed_model" != "$expect_model" ]; then
+      cause="mismatch"
+    fi
+    if [ -n "$cause" ]; then
+      die 3 "$label: model not established (thread=$thread_id cause=$cause)"
+    fi
+  fi
+}
+
 # --- argument parsing --------------------------------------------------------
 mode=""
 stem=""
@@ -202,17 +438,36 @@ publish_out=""
 publish_jsonl=""
 thread_id=""
 thread_id_given=0
+expect_model=""
+expect_model_given=0
+rollout_match=""
+find_out=""
+observed_model="unavailable"
+model_state=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --alloc)
+      [ "$mode" != "observe" ] || die 2 "--observe is mutually exclusive with --alloc and --publish"
       [ -z "$mode" ] || die 2 "--alloc and --publish are mutually exclusive"
       mode="alloc"
       shift
       ;;
     --publish)
+      [ "$mode" != "observe" ] || die 2 "--observe is mutually exclusive with --alloc and --publish"
       [ -z "$mode" ] || die 2 "--alloc and --publish are mutually exclusive"
       mode="publish"
       shift
+      ;;
+    --observe)
+      [ -z "$mode" ] || die 2 "--observe is mutually exclusive with --alloc and --publish"
+      mode="observe"
+      shift
+      ;;
+    --expect-model)
+      [ "$#" -ge 2 ] || die 2 "--expect-model requires a value"
+      expect_model="$2"
+      expect_model_given=1
+      shift 2
       ;;
     --stem)
       [ "$#" -ge 2 ] || die 2 "--stem requires a value"
@@ -244,11 +499,42 @@ while [ "$#" -gt 0 ]; do
       die 2 "'--' / trailing argv is no longer accepted -- the codex-argv-substitution mode was removed in T-107 (#353); the caller now runs codex itself"
       ;;
     -*) die 2 "unknown flag: $1" ;;
-    *) die 2 "unexpected positional argument: $1 (usage: codex-capture.sh --alloc --stem <stem> [--reviews-dir <dir>] | codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id>] [--reviews-dir <dir>])" ;;
+    *) die 2 "unexpected positional argument: $1 (usage: codex-capture.sh --alloc --stem <stem> [--reviews-dir <dir>] | codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id>] [--reviews-dir <dir>] | codex-capture.sh --observe --thread-id <id> [--expect-model <m>])" ;;
   esac
 done
 
-[ -n "$mode" ] || die 2 "exactly one of --alloc / --publish is required"
+[ -n "$mode" ] || die 2 "exactly one of --alloc / --publish / --observe is required"
+
+# --- T-1192: --expect-model usage errors (exit 2) ----------------------------
+if [ "$expect_model_given" -eq 1 ]; then
+  [ "$mode" != "alloc" ] || die 2 "--expect-model is only valid with --publish --thread-id or --observe --thread-id"
+  [ -n "$expect_model" ] || die 2 "--expect-model requires a non-empty value"
+  model_token_ok "$expect_model" || die 2 "--expect-model value is not a model token ([A-Za-z0-9][A-Za-z0-9._-]*)"
+  [ "$thread_id_given" -eq 1 ] || die 2 "--expect-model requires --thread-id"
+fi
+
+# =============================================================================
+# --observe (T-1192): read-only model observation by thread id. Resolves no
+# reviews dir and writes nothing but the search's own $TMPDIR scratch list
+# (removed before any outcome). Serves the finding-evaluation mode, which
+# publishes no capture.
+# =============================================================================
+if [ "$mode" = "observe" ]; then
+  [ -z "$stem" ] || die 2 "--stem is not valid with --observe"
+  [ -z "$reviews_dir" ] || die 2 "--reviews-dir is not valid with --observe"
+  [ -z "$publish_out" ] || die 2 "--publish-out is only valid with --publish"
+  [ -z "$publish_jsonl" ] || die 2 "--publish-jsonl is only valid with --publish"
+  [ "$thread_id_given" -eq 1 ] || die 2 "--observe requires --thread-id <id>"
+  [[ "$thread_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] \
+    || die 2 "observe refused: --thread-id value does not match the expected 8-4-4-4-12 lower-case hex id shape: $thread_id"
+  trap 'rm -f ${find_out:+"$find_out"}' EXIT
+  locate_rollout observe
+  model_state="$(extract_model "$rollout_match")" || die 3 "observe: model not established (thread=$thread_id cause=malformed)"
+  apply_model_gate observe
+  printf 'model=%s\n' "$observed_model"
+  exit 0
+fi
+
 [ -n "$stem" ] || die 2 "missing required --stem <stem>"
 if [ "$mode" = "alloc" ]; then
   [ -z "$publish_out" ] || die 2 "--publish-out is only valid with --publish"
@@ -414,37 +700,7 @@ fi
 # whitespace (a rollout filename with an embedded newline is out of scope,
 # per the spec's Non-goals).
 if [ "$thread_id_given" -eq 1 ]; then
-  sessions_dir="${CODEX_HOME:-$HOME/.codex}/sessions"
-  find_out="$(mktemp "${TMPDIR:-/tmp}/codex-capture.find.XXXXXX")" \
-    || die 3 "publish: rollout import failed (dir=$sessions_dir thread=$thread_id matches=0)"
-  resolved_sessions_dir=""
-  if resolved_sessions_dir="$(cd -P -- "$sessions_dir" 2>/dev/null && pwd -P)" \
-     && [ -n "$resolved_sessions_dir" ]; then
-    if find "$resolved_sessions_dir" -type f -name "rollout-*-$thread_id.jsonl" -print0 \
-         > "$find_out" 2>/dev/null; then
-      find_rc=0
-    else
-      find_rc=$?
-    fi
-  else
-    : > "$find_out"
-    find_rc=0
-  fi
-  rollout_match_count=0
-  rollout_match=""
-  if [ -s "$find_out" ]; then
-    while IFS= read -r -d '' rollout_entry; do
-      rollout_match_count=$((rollout_match_count + 1))
-      [ "$rollout_match_count" -eq 1 ] && rollout_match="$rollout_entry"
-    done < "$find_out"
-  fi
-  rm -f "$find_out"
-  if [ "$find_rc" -ne 0 ]; then
-    die 3 "publish: rollout import failed (dir=$sessions_dir thread=$thread_id incomplete search)"
-  fi
-  if [ "$rollout_match_count" -ne 1 ] || [ ! -s "$rollout_match" ]; then
-    die 3 "publish: rollout import failed (dir=$sessions_dir thread=$thread_id matches=$rollout_match_count)"
-  fi
+  locate_rollout publish
   cp -- "$rollout_match" "$raw_jsonl" || die 3 "publish: rollout import failed to copy $rollout_match into the jsonl raw"
 fi
 
@@ -605,6 +861,16 @@ if [ "$thread_id_given" -eq 1 ]; then
   fi
 fi
 
+# --- T-1192: with --thread-id, read the model this pass ran on from its own
+# rollout and, when a model was requested (--expect-model other than
+# `provider-configured`), refuse -- exit 3, nothing published, both raws
+# removed by the EXIT trap above -- unless it is established and equal. After
+# the completed-run gate, so every base refusal above keeps its own message.
+if [ "$thread_id_given" -eq 1 ]; then
+  model_state="$(extract_model "$raw_jsonl")" || die 3 "publish: model not established (thread=$thread_id cause=malformed)"
+  apply_model_gate publish
+fi
+
 # --- publish: refuse a non-regular-file canonical target, then atomic mv
 # with rc check (DP-4) --------------------------------------------------------
 for canon in "$reviews_dir/$stem.txt" "$reviews_dir/$stem.jsonl"; do
@@ -622,8 +888,8 @@ if ! mv "$raw_jsonl" "$reviews_dir/$stem.jsonl"; then exit 4; fi
 if [ -f "$reviews_dir/$stem.txt" ] && [ -s "$reviews_dir/$stem.txt" ] \
    && [ -f "$reviews_dir/$stem.jsonl" ] && [ -s "$reviews_dir/$stem.jsonl" ]; then
   if [ "$thread_id_given" -eq 1 ]; then
-    printf 'codex-capture: publish: rollout thread=%s commands_executed=%s commands_succeeded=%s failure_markers=%s last_agent_message=%s\n' \
-      "$thread_id" "$commands_executed" "$commands_succeeded" "$failure_markers" "$lam_state" >&2 || true
+    printf 'codex-capture: publish: rollout thread=%s commands_executed=%s commands_succeeded=%s failure_markers=%s last_agent_message=%s model=%s\n' \
+      "$thread_id" "$commands_executed" "$commands_succeeded" "$failure_markers" "$lam_state" "$observed_model" >&2 || true
   fi
   exit 0
 fi

@@ -258,15 +258,22 @@ inner-loop 役割（`tech-lead`・`pm-spec`・`engineer`・`qa-verifier`・
    `team-init` がまだ走っていない場合は、プラグイン自身の
    `templates/binding-template.conf` を手動で `<base>/binding.conf` へ
    コピーする（このパスはプラグインのインストール先ディレクトリから
-   解決される。自リポジトリ配下のパスではない）。**この 6 行が持つのは
-   プレースホルダーのモデルトークン**です。`claude` 系の 5 行に
-   `model-1`、`code-reviewer` に `model-2` と書かれていますが、いずれも
-   実在するモデルを指しません。これに依拠する前に**全ての行**を置き換えて
+   解決される。自リポジトリ配下のパスではない）。**`claude` 系の 5 行が
+   持つのはプレースホルダーのモデルトークン `model-1`** で、実在する
+   モデルを指しません。これに依拠する前に、その**全ての行**を置き換えて
    ください。変更しない役割の行には `templates/binding-default.conf` の
    実際の行を転記します（**下記の grammar example からは転記しないで
    ください**。あれは異なる値を持つ custom-binding の例示です）。1 行
-   だけ編集して止めると、残り 5 役割のプレースホルダー紐付けが
-   resolution と telemetry にそのまま入ってしまいます。
+   だけ編集して止めると、残り 4 役割のプレースホルダー紐付けが
+   resolution と telemetry にそのまま入ってしまいます。`code-reviewer`
+   の行は別です。スキャフォールドされる specimen は、この行に
+   `provider-configured` を持ちます（以前の新規スキャフォールドはこの行に
+   プレースホルダーのモデルを持っていました。スキャフォールド済みの
+   `binding.conf.example` は、再スキャフォールドか編集をするまで古い
+   プレースホルダーを持ったままです）。したがって、無編集でコピーしても
+   今日の挙動は変わりません。古いコピーがこの行にプレースホルダーを
+   持っているなら、ファイル名を変える前に置き換えてください。モデルは
+   今は実際に効きます（下記参照）。
 2. `bind <role> <provider> <model> <effort|-> <adapter>` 行（役割ごとに
    1 行）を編集する。`effort` は位置的に必須で、「値なし」はフィールド
    を省略せず常にリテラル `-` で綴る。この「未設定」の綴り方は effort
@@ -307,9 +314,29 @@ host の `<base>/binding.conf` が全く無い場合（設定していない通�
 ケース）、`resolve-executor.sh` はプラグイン出荷時の既定
 `templates/binding-default.conf` にフォールバックする。その `model` 列
 のうち `code-reviewer` の行だけは `provider-configured` を持つ。これは
-出荷時の Codex 呼び出しが model フラグを一切渡さないという境界を表す。
-それ以外の各役割の列は、その役割自身の `agents/<role>.md`（プラグイン
-自身の agent 定義）の pin をそのまま持つ。
+そのトークンの下では Codex 呼び出しが model フラグを一切渡さないという
+境界を表す。それ以外の各役割の列は、その役割自身の `agents/<role>.md`
+（プラグイン自身の agent 定義）の pin をそのまま持つ。
+
+**`code-reviewer` に名指しされたモデルは、今は実際に効きます。**
+`code-reviewer` 行の model 列は、記録されるだけでなく適用されます。その値が
+厳密な文字列 `provider-configured` 以外のとき（上の例の行は `gpt-5` を名指し
+しています）、`code-reviewer`（fresh review・spec review・finding 評価）と
+`drift-evaluator` が走らせる `codex exec` はすべて、`codex exec` の直後に
+`-m <model>` を持ち、各 pass 自身の rollout がちょうどそのモデルを示して
+いなければなりません。review record には Codex pass ごとに
+`- codex-model (<pass>): requested=<model> — observed=<model>` の行が入り、
+`observed` はその pass の rollout から読んだ値です。ラウンド単位の
+`- Codex model:` 行はそれらの行から埋めます。rollout がモデルを示さない、
+別のモデルを示す、値が食い違う、値が不正な pass は、verdict を出さず
+`model not established` で round を `BLOCKED` にします（その行の `cause=` は
+`absent`・`inconsistent`・`malformed`・`mismatch` のいずれか）。bind するのは
+rollout が報告するモデル id にしてください。provider が別の id に正規化する
+別名を bind すると、rollout は別の id を報告し、round は `mismatch` として
+明示的に止まります。`provider-configured` では何も変わりません。フラグは
+付かず、pass は Codex のインストール設定のモデルで走り、rollout が示した
+モデルは参考情報として記録されるだけです。provider が拒否する id を
+bind すると Codex の実行自体が終わり、round は同じく `BLOCKED` になります。
 
 `resolve-executor.sh` の refusal 集合は閉じており、トークンは **5 つ**。
 うち `usage` は不正な呼び出し（CLI 引数エラー）であって config の状態

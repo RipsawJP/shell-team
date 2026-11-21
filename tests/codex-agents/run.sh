@@ -287,7 +287,13 @@ fi
 # =============================================================================
 printf '\n--- fixture 6 (T-1135): code-reviewer developer_instructions body ---\n'
 OUT6="$T/out6"
-if bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT6" >"$T/gen6.out" 2>"$T/gen6.err"; then
+# T-1192 (D9): this repository now carries its own <base>/binding.conf (the
+# code-reviewer model is pinned), which a generator run from the checkout root
+# would emit as `model = ...`. The "no model/effort key" half of this fixture
+# is about the SHIPPED default binding, so run from a scratch directory whose
+# base dir (TEAM_RUN_BASE=.ops) holds no binding.conf.
+mkdir -p "$T/def6/.ops"
+if (cd "$T/def6" && TEAM_RUN_BASE=.ops bash "$GEN" --root "$REPO_ROOT" --out-dir "$OUT6" >"$T/gen6.out" 2>"$T/gen6.err"); then
   F6="$OUT6/shell-team-code-reviewer.toml"
   ok=1
   if [ -s "$F6" ]; then
