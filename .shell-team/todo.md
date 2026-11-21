@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1195** code-reviewer effort pin: an effort named by the binding reaches every codex exec as -c model_reasoning_effort, and the review record states the effort each pass actually ran at (issue #757) — `READY_FOR_QA` — spec: .shell-team/specs/T-1195-codex-review-effort-pin.md
+- [ ] **T-1195** code-reviewer effort pin: an effort named by the binding reaches every codex exec as -c model_reasoning_effort, and the review record states the effort each pass actually ran at (issue #757) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1195-codex-review-effort-pin.md
   - entry-mode: pm-authored
   - spec-review: cross-provider
   - source: issue #757, relayed by the coordinating session together with its settled decisions (2026-11-21); this role cannot read the issue, so its facts are labelled relayed in the spec's Assumptions. No separate issue filed. Branch `feature/757-codex-review-effort-pin` cut from develop at 621945d4 with no open predecessor; sprint effort-pin, release PATCH v2.9.6 (relayed); T-1196 (#760) stacks after this task and is out of scope. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -71,6 +71,17 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 - Not exercised: a real Codex CLI rollout and provider-side truth about the executed effort (spec Non-goal; above ceiling).
 - Risk notes for reviewer: QA made no test edits. The full suite list was started twice by mistake (second result unused), no effect on the tree. No `out-of-input-space` item recorded. The contradiction rule token counting in `check-review-input.sh` for backtick-wrapped invocations is hand-written awk/regex territory (covered by AC7/AC8).
 - shape-scan: rc=1 — 1 record path(s) written this round — 0 finding(s) on them, 0 classified accepted noise — command: `PII_CHECK_TRACKER_KEY=1 bash "<plugin root>/bin/check-pii-shapes.sh" --paths .shell-team/todo.md` (rc=1 is pre-existing findings elsewhere in the board, lines 337 and later; none inside this verdict block, lines 51-70, checked with `grep -E 'line=(4[0-9]|[5-7][0-9])$'` on the output)
+
+### QA verdict — T-1195 (qa-verifier, round 2)
+
+### QA verdict: PASS
+- Task: T-1195 → READY_FOR_REVIEW (branch tip aa9e3f60; working tree clean before this board append)
+- Tests: the full suite list through the WSL runner with no argument ended `ALL-PASS`; `grep -c '^PASS'` over the captured output → 69, `grep -c 'FAIL'` → 0.
+- Acceptance criteria: the runner spec mode on `.shell-team/specs/T-1195-codex-review-effort-pin.md` → `check-acs: 16 passed, 0 failed, 3 skipped, 0 unrecognized`; AC1–AC16 PASS, AC17–AC19 SKIP (runtime, no check:).
+- Verification ceiling: unit-and-static — verifies every criterion at or below that level; above-ceiling and owned by the coordinating session after this gate: AC17, AC18, AC19, each `environmentally-unverified` here (the board already carries the coordinating session's ac18-live line; not re-verified by QA).
+- Records: `check-intent.sh` aligned (v2, e047c09f…) exit 0; `check-provenance.sh` conformant (6 decision entries, 0 sentinel) exit 0; `check-handoff.sh .shell-team/todo.md` exit 0; shellcheck 0.11.0 on `bin/check-review-input.sh tests/check-review-input/run.sh` exit 0.
+- Probes (hand-made records, `check-review-input.sh --record … --task T-000`, requested=`-` unless noted): clause at token 3, mid, last, backtick-wrapped at end, `-c` and the assignment separated by extra spaces, clause only (no other args) → all rc 1 `codex-effort-contradiction`. Clause inside a single-quoted prompt argument (`'say -c model_reasoning_effort=high now'`) → rc 1 contradiction under `-`, and rc 1 `codex-effort-missing` with no effort line: the two rules are consistent (both token-scan, quote-blind, fail-closed direction). Not caught under `-` by either rule: double-quote-wrapped `"-c model_reasoning_effort=…"` (tokens `"-c`), glued `-cmodel_reasoning_effort=…`, `--config model_reasoning_effort=…`, quoted assignment `-c 'model_reasoning_effort=…'` → rc 0 (all outside the spec's token-pair definition; the missing-line rule shares the same blind spots — reported, not fixed). `claude -p … -c model_reasoning_effort=…` under `-` → rc 0 (non-codex, unchanged). Clause-free codex under `-` → rc 0. Named effort unchanged: clause at token 3 rc 0, clause after `-m <model>` rc 0, clause mid-invocation rc 1 contradiction, clause absent rc 1 contradiction.
+- Risk notes for reviewer: the quote-blind scan means a prompt argument that merely quotes the two-token clause is refused under `-` (and demands a codex-effort line otherwise); judged conservative and consistent. No test edits by QA; no `out-of-input-space` item.
 
 ### QA verdict — T-1186 (qa-verifier, round 1)
 
