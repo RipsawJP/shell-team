@@ -89,6 +89,17 @@ rc=$?
 set -e
 # DIAGNOSTIC (throwaway branch for issue #762; never merged)
 echo "DIAG-762: AC4a rc=$rc bash=$BASH_VERSION nogh-bash=$(readlink "$NOGH/bash") ImageVersion=${ImageVersion:-}"
+# DIAGNOSTIC (issue #762): which mkdir, and is it exclusive under contention?
+echo "DIAG-762: mkdir=$(command -v mkdir) -> $(readlink -f "$(command -v mkdir)") ver=$(mkdir --version 2>&1 | head -1)"
+MKR="$TMP/mkrace"; mkdir -p "$MKR"; multi=0; total=0
+for r in $(seq 1 300); do
+  d="$MKR/l$r"
+  for k in 1 2 3 4 5 6 7 8; do ( mkdir "$d" 2>/dev/null && echo ok > "$MKR/r$r.$k" ) & done
+  wait
+  n=$(find "$MKR" -maxdepth 1 -name "r$r.*" | wc -l)
+  total=$((total + 1)); [ "$n" -gt 1 ] && { multi=$((multi + 1)); echo "DIAG-762: mkdir-race round $r winners=$n"; }
+done
+echo "DIAG-762: mkdir-race rounds=$total rounds_with_multiple_winners=$multi"
 # DIAGNOSTIC (issue #762): does an EXIT trap fire inside a command substitution?
 # shellcheck disable=SC2016
 echo "DIAG-762: trap-in-cmdsubst: $(bash -c 'trap "echo TRAP-FIRED pid=\$BASHPID" EXIT; x="$(echo inner)"; echo "x=$x parent=$BASHPID"' 2>&1 | tr '\n' ' ')"
