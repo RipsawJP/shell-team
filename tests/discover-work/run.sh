@@ -89,6 +89,13 @@ rc=$?
 set -e
 # DIAGNOSTIC (throwaway branch for issue #762; never merged)
 echo "DIAG-762: AC4a rc=$rc bash=$BASH_VERSION nogh-bash=$(readlink "$NOGH/bash") ImageVersion=${ImageVersion:-}"
+# DIAGNOSTIC (issue #762): does an EXIT trap fire inside a command substitution?
+# shellcheck disable=SC2016
+echo "DIAG-762: trap-in-cmdsubst: $(bash -c 'trap "echo TRAP-FIRED pid=\$BASHPID" EXIT; x="$(echo inner)"; echo "x=$x parent=$BASHPID"' 2>&1 | tr '\n' ' ')"
+# shellcheck disable=SC2016
+echo "DIAG-762: trap-in-cmdsubst-func: $(bash -c 'f(){ echo v; }; trap "echo TRAP-FIRED pid=\$BASHPID" EXIT; x="$(f)"; echo "x=$x parent=$BASHPID"' 2>&1 | tr '\n' ' ')"
+# shellcheck disable=SC2016
+echo "DIAG-762: trap-in-cmdsubst-flag: $(bash -c 'L=1; rel(){ [ "$L" = 1 ] && echo "RELEASE pid=$BASHPID"; }; trap rel EXIT; x="$(echo inner)"; L=0; echo "done parent=$BASHPID"' 2>&1 | tr '\n' ' ')"
 echo "DIAG-762: cd-empty: $(PATH="$NOGH" bash -c 'cd ""; echo rc=$?' 2>&1)"
 echo "DIAG-762: cd-empty-subst: $(PATH="$NOGH" bash -c 'set -e; x="$(cd "" && pwd)"; echo rc=$? x=$x' 2>&1)"
 sed 's/^/DIAG-762: ac4a-out: /' "$out" | head -20
