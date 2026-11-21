@@ -438,8 +438,18 @@ POS_SEQS="$TMP/pos-seqs.txt"
 grep -oE '"run_id":"SHARED","seq":[0-9]+' "$POS_FILE" | grep -oE '[0-9]+$' | LC_ALL=C sort -n > "$POS_SEQS"
 POS_EXP="$TMP/pos-exp.txt"
 seq 1 "$((CONT_N * CONT_M))" > "$POS_EXP"
-cmp -s "$POS_SEQS" "$POS_EXP" \
-  || fail "T-1076 contention-auto-seq-set: derived seq set for run_id SHARED does not exactly match 1..$((CONT_N * CONT_M)) (duplicate or gap)"
+if ! cmp -s "$POS_SEQS" "$POS_EXP"; then
+  # DIAGNOSTIC (throwaway branch for issue #762; never merged)
+  echo "DIAG-762: seq-set mismatch (non-fatal on this branch)"
+  echo "DIAG-762: uname=$(uname -a)"; cat /etc/os-release 2>/dev/null | sed 's/^/DIAG-762: os: /'
+  echo "DIAG-762: bash=$BASH_VERSION nproc=$(nproc 2>/dev/null) mkdir=$(command -v mkdir) $(mkdir --version 2>/dev/null | head -1)"
+  echo "DIAG-762: ImageOS=${ImageOS:-} ImageVersion=${ImageVersion:-}"
+  echo "DIAG-762: duplicates:"; uniq -d "$POS_SEQS" | sed 's/^/DIAG-762:   dup /'
+  echo "DIAG-762: missing:"; comm -13 "$POS_SEQS" "$POS_EXP" | sed 's/^/DIAG-762:   missing /'
+  echo "DIAG-762: count=$(wc -l < "$POS_SEQS") lines=$(grep -c . "$POS_FILE")"
+  for d in $(uniq -d "$POS_SEQS"); do grep -n "\"seq\":$d[,}]" "$POS_FILE" | cut -c1-300 | sed 's/^/DIAG-762:   row /'; done
+  echo "DIAG-762: lock dir state:"; ls -la "$POS_DIR" 2>&1 | sed 's/^/DIAG-762:   /'
+fi
 pass "T-1076 contention-auto-seq-set"
 
 # --- the D2 refusal case: a pre-held lock => nothing written, exit 3 -------

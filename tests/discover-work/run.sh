@@ -87,6 +87,11 @@ set +e
 PATH="$NOGH" bash "$DISCOVER" --todo /nonexistent >"$out" 2>&1
 rc=$?
 set -e
+# DIAGNOSTIC (throwaway branch for issue #762; never merged)
+echo "DIAG-762: AC4a rc=$rc bash=$BASH_VERSION nogh-bash=$(readlink "$NOGH/bash") ImageVersion=${ImageVersion:-}"
+echo "DIAG-762: cd-empty: $(PATH="$NOGH" bash -c 'cd ""; echo rc=$?' 2>&1)"
+echo "DIAG-762: cd-empty-subst: $(PATH="$NOGH" bash -c 'set -e; x="$(cd "" && pwd)"; echo rc=$? x=$x' 2>&1)"
+sed 's/^/DIAG-762: ac4a-out: /' "$out" | head -20
 [ "$rc" -eq 0 ] || fail "AC4a: gh-absent should exit 0, got $rc (out: $(cat "$out"))"
 grep -qi 'not found' "$out" || fail "AC4a: gh-absent note missing (out: $(cat "$out"))"
 [ "$(grep -c '^- \[ \]' "$out" || true)" -eq 0 ] || fail "AC4a: gh-absent should emit no candidates"
