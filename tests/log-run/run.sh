@@ -447,8 +447,8 @@ if ! cmp -s "$POS_SEQS" "$POS_EXP"; then
   echo "DIAG-762: duplicates:"; uniq -d "$POS_SEQS" | sed 's/^/DIAG-762:   dup /'
   echo "DIAG-762: missing:"; comm -13 "$POS_SEQS" "$POS_EXP" | sed 's/^/DIAG-762:   missing /'
   echo "DIAG-762: count=$(wc -l < "$POS_SEQS") lines=$(grep -c . "$POS_FILE")"
-  for d in $(uniq -d "$POS_SEQS"); do grep -n "\"seq\":$d[,}]" "$POS_FILE" | cut -c1-300 | sed 's/^/DIAG-762:   row /'; done
-  echo "DIAG-762: lock dir state:"; ls -la "$POS_DIR" 2>&1 | sed 's/^/DIAG-762:   /'
+  for d in $(uniq -d "$POS_SEQS"); do grep -n "\"seq\":${d}[,}]" "$POS_FILE" | cut -c1-300 | sed 's/^/DIAG-762:   row /'; done
+  echo "DIAG-762: lock dir state:"; find "$POS_DIR" -maxdepth 1 -print 2>&1 | sed 's/^/DIAG-762:   /'
 fi
 pass "T-1076 contention-auto-seq-set"
 
