@@ -113,7 +113,7 @@ Append every finding's gate decision to a run record so a mis-classification is 
 ```
 $(team-paths.sh --get runs)/review-response-<ts>.md
 ```
-(resolve the runs dir in the same Bash call; `<ts>` is a UTC timestamp.) For each finding record: the source (review/comment ref), the classification (`auto` / `escalate` / `reject`), **which rule fired** (the deterministic floor rule name, or your grey-zone rationale), and Codex's evaluation summary.
+(resolve the runs dir in the same Bash call; `<ts>` is a UTC timestamp.) For each finding record: the source (review/comment ref), the classification (`auto` / `escalate` / `reject`), **which rule fired** (the deterministic floor rule name, or your grey-zone rationale), and Codex's evaluation summary. Also write, once per run, the line `code-reviewer`'s finding-evaluation mode returned beside its per-finding output: `- codex-model (review-response): requested=<token> — observed=<token>` (the model the reviewer binding requested and the model the evaluation pass's own rollout showed; `observed` is `unavailable` only when no model was requested). When that mode returned `BLOCKED` with `model not established`, no evaluation exists to record: write that refusal line verbatim instead and stop.
 
 **Collision rule: never-overwrite.** If that file already exists, append a numeric suffix (`-2`, `-3`, …) and use the first free slot.
 

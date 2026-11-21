@@ -258,14 +258,20 @@ you want to assign specific executors to all six:
    `team-init` has not run yet, copy the plugin's own
    `templates/binding-template.conf` (resolved from the plugin's
    installed directory, not a path under your own repository) to
-   `<base>/binding.conf` by hand. **Its six rows carry placeholder model
-   tokens** — `model-1` on the five `claude` rows, `model-2` on
-   `code-reviewer` — that name no real model: replace **every** row
-   before relying on it, or transcribe the actual rows from
-   `templates/binding-default.conf` (**not** the grammar example below,
-   which is a custom-binding illustration with different values) for any
-   role you are not changing. Editing one row and stopping there ships
-   five placeholder bindings into resolution and telemetry.
+   `<base>/binding.conf` by hand. **Its five `claude` rows carry the
+   placeholder model token `model-1`**, which names no real model: replace
+   **every** one of them before relying on it, or transcribe the actual
+   rows from `templates/binding-default.conf` (**not** the grammar example
+   below, which is a custom-binding illustration with different values)
+   for any role you are not changing. Editing one row and stopping there
+   ships five placeholder bindings into resolution and telemetry. The
+   `code-reviewer` row is different: the scaffolded specimen carries
+   `provider-configured` there (a fresh scaffold's `code-reviewer` row
+   used to carry a placeholder model; an already-scaffolded
+   `binding.conf.example` keeps its old placeholder until you re-scaffold
+   or edit it), so copying it unedited keeps today's behaviour. If an
+   older copy still carries a placeholder on that row, replace it before
+   you rename the file: the model now takes effect (see below).
 2. Edit its `bind <role> <provider> <model> <effort|-> <adapter>` rows —
    one per role. `effort` is positionally required; spell "no value" as
    a literal `-`, never by omitting the field (only the effort column
@@ -306,9 +312,30 @@ With no host `<base>/binding.conf` at all — the ordinary, unconfigured
 case — `resolve-executor.sh` falls back to the plugin-shipped default,
 `templates/binding-default.conf`; its `model` column carries
 `provider-configured` only for `code-reviewer`, naming the boundary that
-the shipped Codex invocation passes no model flag at all, while every
-other role's column carries that role's own `agents/<role>.md` pin, from
-the plugin's own agent definitions.
+under that token the Codex invocation passes no model flag at all, while
+every other role's column carries that role's own `agents/<role>.md` pin,
+from the plugin's own agent definitions.
+
+**A named `code-reviewer` model now takes effect.** The `code-reviewer`
+row's model column is applied, not just recorded. When it is anything other
+than the exact string `provider-configured` — the example row above names
+`gpt-5` — every `codex exec` that `code-reviewer` (the fresh review, the
+spec review and the finding evaluation) and `drift-evaluator` run carries
+`-m <model>` immediately after `codex exec`, and each pass's own rollout
+must show exactly that model. The review record then carries, per Codex
+pass, a line `- codex-model (<pass>): requested=<model> — observed=<model>`
+whose `observed` value was read from that pass's rollout, and the round-level
+`- Codex model:` line is filled from those lines. A pass whose rollout shows
+no model, a different one, disagreeing values or a malformed value stops the
+round `BLOCKED` with `model not established` instead of producing a verdict
+(the `cause=` on that line is one of `absent`, `inconsistent`, `malformed` or
+`mismatch`). Bind the model id the rollout reports: an alias the provider
+canonicalizes to another id reports the other id and stops the round loudly
+as `mismatch`. Under `provider-configured` nothing changes: no flag is
+added, the pass runs on whatever the Codex installation is configured for,
+and the model its rollout showed is recorded for information only. An id
+the provider rejects ends the Codex run itself and the round is `BLOCKED`
+the same way.
 
 `resolve-executor.sh`'s refusal set is closed and has **five** tokens;
 `usage` is a bad invocation (a CLI-argument error), not a config state,

@@ -64,6 +64,39 @@
 #     carries host ground truth (see agents/code-reviewer.md's own
 #     disclosure of this limit).
 #
+#   - a SIXTH, OPTIONAL per-pass field (T-1192, issues #755/#756):
+#     codex-model — validate-if-present, never required, joining FIELD_RE
+#     exactly as self-detected-host did (so a pass declared only by this
+#     field still refuses field-missing, and the per-section machinery
+#     applies unchanged). Grammar:
+#       codex-model (<pass>): requested=<token> — observed=<token>
+#     <token> is a binding model token (`[A-Za-z0-9][A-Za-z0-9._-]*`);
+#     `requested` is the code-reviewer binding's model (`provider-configured`
+#     when none is named) and `observed` is the model the pass's rollout
+#     showed (`unavailable` is legal only when nothing is requested).
+#     Refusals, in this order, none of which echoes a byte of any field:
+#       codex-model-duplicate      more than one line for the pass id
+#       codex-model-vocabulary     a malformed line: a missing ' — '
+#                                  separator, a missing requested=/observed=
+#                                  label, an empty or non-token value
+#       codex-model-mismatch       requested names a model (anything but
+#                                  provider-configured) and observed differs,
+#                                  `unavailable` included
+#       codex-model-contradiction  the pass's executor-invocation, after
+#                                  leading whitespace and one optional
+#                                  backtick are stripped, begins `codex exec`
+#                                  and its third and fourth tokens are not
+#                                  `-m <requested>` when a model is named, or
+#                                  its third token is `-m` under
+#                                  provider-configured. A non-`codex exec`
+#                                  invocation (a `claude -p` recipe) is never
+#                                  refused by this rule.
+#     The two grammar refusals run before mismatch and contradiction, so a
+#     malformed line never reports as a mismatch. This checker never reads a
+#     raw capture: the observed value is whatever the record SAYS; the
+#     deterministic comparison against the rollout is bin/codex-capture.sh's
+#     --expect-model gate.
+#
 # It never judges the content of the verbatim executor-invocation field
 # beyond non-emptiness and single-line-ness (DP-6/DP-7; two records
 # differing only in that field's free text both pass), it never verifies a
@@ -266,7 +299,7 @@ section_of() {
 # (AC8's continuation-line case). A real scan failure is distinguished
 # from a clean "no fields found" the same way the heading scan above
 # is. ------------------------------------------------------------------
-FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture|self-detected-host)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
+FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture|self-detected-host|codex-model)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
 grep -nE -- "$FIELD_RE" "$RECORD" > "$WORK/matches" 2>"$WORK/matches.err" && fgx=0 || fgx=$?
 [ "$fgx" -le 1 ] || die "record-unreadable: scanning $RECORD for input-fidelity fields failed"
 
@@ -467,6 +500,76 @@ while IFS= read -r id; do
       ei_tok2="${ei_rest%% *}"
       if [ "$ei_tok1" = "codex" ] && [ "$ei_tok2" = "exec" ]; then
         fail "self-detected-host-contradiction: pass id '$id' declares self-detected-host codex-cli while its executor-invocation begins with the two tokens codex exec"
+      fi
+    fi
+  fi
+
+  # --- codex-model (T-1192, issues #755/#756): a SIXTH, OPTIONAL per-pass
+  # field, validate-if-present. Evaluation order is fixed: duplicate, then
+  # vocabulary (the two grammar refusals), then mismatch, then contradiction,
+  # so a malformed line never reports as a mismatch. No refusal below echoes
+  # a byte of either field's value. -------------------------------------
+  cm_n=$(awk -F'	' -v id="$id" '$2=="codex-model" && $3==id' "$WORK/fields" | grep -c . || true)
+
+  if [ "$cm_n" -gt 1 ]; then
+    fail "codex-model-duplicate: pass id '$id' carries more than one codex-model line"
+  fi
+
+  if [ "$cm_n" -eq 1 ]; then
+    cm_val=$(awk -F'	' -v id="$id" '$2=="codex-model" && $3==id {print $4; exit}' "$WORK/fields")
+    while :; do
+      case "$cm_val" in
+        ' '*|$'	'*) cm_val="${cm_val#?}" ;;
+        *) break ;;
+      esac
+    done
+    CM_TOKEN_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+    cm_req="" cm_obs=""
+    case "$cm_val" in
+      requested=*' — observed='*)
+        cm_req="${cm_val%% — observed=*}"
+        cm_req="${cm_req#requested=}"
+        cm_obs="${cm_val#*' — observed='}"
+        ;;
+      *) fail "codex-model-vocabulary: pass id '$id' has a codex-model value that is not 'requested=<token> — observed=<token>'" ;;
+    esac
+    if [[ ! "$cm_req" =~ $CM_TOKEN_RE ]] || [[ ! "$cm_obs" =~ $CM_TOKEN_RE ]]; then
+      fail "codex-model-vocabulary: pass id '$id' has a codex-model requested or observed value that is not a model token"
+    fi
+
+    if [ "$cm_req" != "provider-configured" ] && [ "$cm_obs" != "$cm_req" ]; then
+      fail "codex-model-mismatch: pass id '$id' requested a model that its observed value does not equal"
+    fi
+
+    # Contradiction: only against a `codex exec` invocation, read by tokens
+    # (never a substring), after leading whitespace and ONE optional
+    # backtick are stripped.
+    cm_ei="$ei_val"
+    while :; do
+      case "$cm_ei" in
+        ' '*|$'	'*) cm_ei="${cm_ei#?}" ;;
+        *) break ;;
+      esac
+    done
+    cm_wrapped=0
+    case "$cm_ei" in
+      '`'*) cm_ei="${cm_ei#?}"; cm_wrapped=1 ;;
+    esac
+    read -r cm_t1 cm_t2 cm_t3 cm_t4 _ <<< "$cm_ei" || true
+    if [ "$cm_wrapped" -eq 1 ]; then
+      case "$cm_t4" in
+        *'`') cm_t4="${cm_t4%?}" ;;
+      esac
+    fi
+    if [ "$cm_t1" = "codex" ] && [ "$cm_t2" = "exec" ]; then
+      if [ "$cm_req" = "provider-configured" ]; then
+        if [ "$cm_t3" = "-m" ]; then
+          fail "codex-model-contradiction: pass id '$id' requests no model while its executor-invocation carries -m"
+        fi
+      else
+        if [ "$cm_t3" != "-m" ] || [ "$cm_t4" != "$cm_req" ]; then
+          fail "codex-model-contradiction: pass id '$id' requests a model while its executor-invocation does not carry -m <requested> right after codex exec"
+        fi
       fi
     fi
   fi

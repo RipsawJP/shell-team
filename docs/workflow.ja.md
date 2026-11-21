@@ -160,6 +160,10 @@ codex --version
 # トップレベル `codex review` に --json は無いため `codex exec` 配下の `review` サブコマンドを使う）
 codex exec --sandbox read-only --cd <repo> review --base <base> --json -o <out-file>
 
+# 実効の `code-reviewer` binding がモデルを名指ししているとき（`provider-configured` 以外）の同じレビュー:
+# `-m <model>` を `codex exec` の直後に置き、その pass 自身の rollout がそのモデルを示さなければならない
+codex exec -m <model> --sandbox read-only --cd <repo> review --base <base> --json -o <out-file>
+
 # `codex review` が使えないときのフォールバック
 codex exec --ephemeral --json "<prompt>"
 

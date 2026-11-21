@@ -29,6 +29,14 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/check-invocation-path-test.XXXXXX")" || { echo "FAIL: could not create scratch root" >&2; exit 1; }
 
+# T-1192 (D9): this repository carries its own tracked <base>/binding.conf, and
+# the gate (through resolve-executor.sh) resolves its base dir from the CALLER's
+# cwd. Every case below mutates a scratch copy of templates/binding-default.conf
+# and expects the copied scripts to honour it, so the suite runs from the
+# scratch root, whose base dir holds no binding.conf, never from the checkout
+# root where the host binding would override the scratch default.
+cd "$TMP" || { echo "FAIL: could not enter the scratch root" >&2; exit 1; }
+
 # build_installed_tree <dest> — a scratch copy of bin/ + templates/ +
 # agents/, the ONLY sanctioned way to exercise a mutated recipe/conf/
 # sibling/agent-definition: this gate has no override flag of its own, and

@@ -163,6 +163,10 @@ codex --version
 # top-level `codex review` has --base but no --json, so use the `review` subcommand under `codex exec`)
 codex exec --sandbox read-only --cd <repo> review --base <base> --json -o <out-file>
 
+# The same review when the effective `code-reviewer` binding names a model (any value but `provider-configured`):
+# `-m <model>` goes immediately after `codex exec`, and the pass's own rollout must show that model
+codex exec -m <model> --sandbox read-only --cd <repo> review --base <base> --json -o <out-file>
+
 # Fallback when `codex review` is unavailable
 codex exec --ephemeral --json "<prompt>"
 
