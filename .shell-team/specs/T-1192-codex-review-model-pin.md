@@ -340,13 +340,14 @@ These rules apply to every `check:` line below:
     - `bin/codex-capture.sh` and `bin/check-review-input.sh`.
     - Comment-level prose in `bin/codex-await.sh`, `bin/gen-codex-agents.sh` and `bin/team-setup.sh` (engineer's judgement).
     - `tests/codex-skeleton-hygiene/run.sh`, new fixtures `tests/codex-skeleton-hygiene/fixtures/t1192-*.{jsonl,txt}`, `tests/check-review-input/run.sh` and `tests/codex-agents/run.sh`.
+    - `tests/check-invocation-path/run.sh`. D9's tracked host binding makes that suite's checkout-root working directory resolve the host binding instead of the scratch default the suite mutates.
     - `skills/review-response/SKILL.md`.
     - `templates/binding-default.conf` (comment only, per **AC3**), `templates/binding-template.conf` and `templates/adapters/codex-cli.txt`.
     - `docs/adopting.md`, `docs/adopting.ja.md`, `docs/workflow.md`, `docs/workflow.ja.md` and `docs/loop-engineering/task-envelope.md`.
     - This task's records: `.shell-team/specs/T-1192-<slug>.md`, `.shell-team/provenance/T-1192.md`, `.shell-team/interventions/T-1192.md`, `.shell-team/interventions/no-task.md`, `.shell-team/reviews/T-1192.md`, `.shell-team/reviews/T-1192-drift.md`, and raw captures `.shell-team/reviews/T-1192-<stem>.{txt,jsonl,json}`.
     - `.shell-team/todo.md` and `.shell-team/test-recipe.md`.
     - `.shell-team/binding.conf` (D9).
-  - check: rc=0; export LC_ALL=C; T=$(mktemp -d "${TMPDIR:-/tmp}/t1192-ac13.XXXXXX") || exit 1; if git show-ref --verify --quiet refs/heads/develop; then B=$(git merge-base develop HEAD) || exit 1; elif git show-ref --verify --quiet refs/remotes/origin/develop; then B=$(git merge-base refs/remotes/origin/develop HEAD) || exit 1; else exit 1; fi; git cat-file -e "$B^{commit}" || exit 1; { git diff --no-renames --name-only "$B"...HEAD || exit 1; git diff --no-renames --cached --name-only || exit 1; git diff --no-renames --name-only || exit 1; git ls-files --others --exclude-standard || exit 1; } > "$T/set"; sort -u "$T/set" > "$T/s" || exit 1; grep -qxF bin/codex-capture.sh "$T/s" || rc=1; grep -vxE 'agents/(code-reviewer|drift-evaluator)\.md|bin/(codex-capture|check-review-input|codex-await|gen-codex-agents|team-setup)\.sh|tests/codex-skeleton-hygiene/run\.sh|tests/codex-skeleton-hygiene/fixtures/t1192-[a-z0-9-]+\.(jsonl|txt)|tests/(check-review-input|codex-agents)/run\.sh|skills/review-response/SKILL\.md|templates/binding-(default|template)\.conf|templates/adapters/codex-cli\.txt|docs/(adopting|workflow)(\.ja)?\.md|docs/loop-engineering/task-envelope\.md|\.shell-team/(specs/T-1192-[a-z0-9-]+\.md|provenance/T-1192\.md|interventions/(T-1192|no-task)\.md|reviews/T-1192(-drift)?\.md|reviews/T-1192-[a-z0-9-]+\.(txt|jsonl|json)|todo\.md|test-recipe\.md|binding\.conf)' "$T/s" > "$T/bad"; test "$?" = 1 || rc=1; test "$rc" -eq 0
+  - check: rc=0; export LC_ALL=C; T=$(mktemp -d "${TMPDIR:-/tmp}/t1192-ac13.XXXXXX") || exit 1; if git show-ref --verify --quiet refs/heads/develop; then B=$(git merge-base develop HEAD) || exit 1; elif git show-ref --verify --quiet refs/remotes/origin/develop; then B=$(git merge-base refs/remotes/origin/develop HEAD) || exit 1; else exit 1; fi; git cat-file -e "$B^{commit}" || exit 1; { git diff --no-renames --name-only "$B"...HEAD || exit 1; git diff --no-renames --cached --name-only || exit 1; git diff --no-renames --name-only || exit 1; git ls-files --others --exclude-standard || exit 1; } > "$T/set"; sort -u "$T/set" > "$T/s" || exit 1; grep -qxF bin/codex-capture.sh "$T/s" || rc=1; grep -vxE 'agents/(code-reviewer|drift-evaluator)\.md|bin/(codex-capture|check-review-input|codex-await|gen-codex-agents|team-setup)\.sh|tests/codex-skeleton-hygiene/run\.sh|tests/codex-skeleton-hygiene/fixtures/t1192-[a-z0-9-]+\.(jsonl|txt)|tests/(check-review-input|codex-agents|check-invocation-path)/run\.sh|skills/review-response/SKILL\.md|templates/binding-(default|template)\.conf|templates/adapters/codex-cli\.txt|docs/(adopting|workflow)(\.ja)?\.md|docs/loop-engineering/task-envelope\.md|\.shell-team/(specs/T-1192-[a-z0-9-]+\.md|provenance/T-1192\.md|interventions/(T-1192|no-task)\.md|reviews/T-1192(-drift)?\.md|reviews/T-1192-[a-z0-9-]+\.(txt|jsonl|json)|todo\.md|test-recipe\.md|binding\.conf)' "$T/s" > "$T/bad"; test "$?" = 1 || rc=1; test "$rc" -eq 0
 
 - [ ] **AC14** Records conformant.
   - `bash bin/check-adopter-docs.sh` on this spec exits `0` with zero bytes on both streams.
@@ -594,6 +595,13 @@ The derived tier is PATCH, the maximum of the column. **Host ruling (2026-11-21,
   - **AC19** red: the row still reads `model-2`.
   - **AC20** red: there is no binding file.
   - **AC15**–**AC17** `SKIP`.
+
+## Re-freeze record
+
+- **v1→v2 (2026-11-21), class-B.** **Trigger:** the engineer's implementation of D9 (the tracked `.shell-team/binding.conf`) made `tests/check-invocation-path/run.sh` fail. That suite ran from the checkout root, where the new host binding overrides the scratch default it mutates. The engineer's fix is one hunk that changes into the suite's scratch dir at the top. As frozen in v1, **AC13** (scope lock) and **AC18** (that suite exits `0`) could not both pass.
+- **Host ruling** (2026-11-21, relayed by the coordinating session): Option A. Keep the test fix, add the path to **AC13**'s allow-list, and re-freeze as v2.
+- **Delta.** **AC13** only: one allow-list bullet naming `tests/check-invocation-path/run.sh` with its reason, and that path added to the `- check:` line's allow-list regex. Nothing else in the intent block changed.
+- The v2 hash and attestation are recorded by the coordinating session after its live sweep.
 
 ## Open questions
 
