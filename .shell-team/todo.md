@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1195** code-reviewer effort pin: an effort named by the binding reaches every codex exec as -c model_reasoning_effort, and the review record states the effort each pass actually ran at (issue #757) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1195-codex-review-effort-pin.md
+- [ ] **T-1195** code-reviewer effort pin: an effort named by the binding reaches every codex exec as -c model_reasoning_effort, and the review record states the effort each pass actually ran at (issue #757) — `READY_FOR_QA` — spec: .shell-team/specs/T-1195-codex-review-effort-pin.md
   - entry-mode: pm-authored
   - spec-review: cross-provider
   - source: issue #757, relayed by the coordinating session together with its settled decisions (2026-11-21); this role cannot read the issue, so its facts are labelled relayed in the spec's Assumptions. No separate issue filed. Branch `feature/757-codex-review-effort-pin` cut from develop at 621945d4 with no open predecessor; sprint effort-pin, release PATCH v2.9.6 (relayed); T-1196 (#760) stacks after this task and is out of scope. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -28,6 +28,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count — correctness rests on Codex CLI behaviour this repository cannot measure (whether -c placed before the review subcommand governs the turn, whether the recorded effort is the executed tier), and the task extends a verification mechanism
   - freeze-attestation (v1, 2026-11-21): lines=16/16 sweep=mutual-satisfiability verdict=4P/12F owner=coordinating session (live check-acs on the pre-implementation tree at f60d439e; every FAIL classified expected-unimplemented, every PASS non-vacuous, no cross-AC contradiction; spec-review r1 REQUEST_CHANGES then r2 APPROVE)
   - intent-hash (v1): dc282e67984df5018332adc0a32dfdd9e24a8b65
+  - T-1195 engineer: codex-capture.sh gains --expect-effort (extract_effort reads effort and reasoning_effort from turn_context and from event_msg thread_settings_applied only; gate after the model gate; ` effort=<v>` summary suffix and a second --observe line only when the option is given); check-review-input.sh validates a seventh per-pass field codex-effort (missing, vocabulary, duplicate, mismatch, contradiction); both agent files, the alternate-executor block (and its copy in skills/run), review-response, the four adopter docs and the task-envelope section state the applied clause; this repository's binding names effort max for code-reviewer; hygiene and check-review-input suites gain T-1195 fixtures and mutation probes. AC1-AC16 pass under check-acs; AC17-AC19 above the ceiling, left to the coordinating session.
 
 
 
