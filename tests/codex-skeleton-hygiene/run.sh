@@ -2132,6 +2132,171 @@ cmp -s "$T1192/snap0" "$T1192/snap1" || fail "T-1192 observe: the CODEX_HOME tre
 [[ -z "$(ls -A "$T1192/obs-cwd")" ]] || fail "T-1192 observe: the working directory is not empty"
 pass "T-1192 observe: read-only model observation with the same extraction and causes, exit 2 on every misuse, nothing written to CODEX_HOME or the working directory"
 
+# --- T-1196 (issue #760): the completed-run gate refuses an unterminated
+# string, and a backslash-u-escaped depth-1 key counts toward the duplicated
+# type rule of both extractors. Placed before the T-1193 block so that a revert
+# of the script fails here first. Same synthesized shapes as above; the
+# canary `zqcanary` sits inside every unterminated string.
+printf -- '\n--- T-1196 completed-run gate and escaped depth-1 keys ---\n'
+T1196="$TMP/t1196"
+mkdir -p "$T1196" || fail "T-1196: cannot create the scratch root"
+T1196_CR="$(printf '\015')"
+[[ "${#T1196_CR}" -eq 1 ]] || fail "T-1196: the carriage-return builder is broken"
+T1196_SM="$(t1192_sm '"zq-model-1"')"
+T1196_NP='{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"agent_reasoning","text":"zqcanary'
+t1196_mk() {  # file line... : session_meta, the lines, then the completed-run records
+  local f="$1" l
+  shift
+  { printf '%s\n' "$T1196_SM"; for l in "$@"; do printf '%s\n' "$l"; done; t1192_tl; } > "$T1196/$f"
+}
+t1196_mr() {  # file line... : the lines only
+  local f="$1" l
+  shift
+  for l in "$@"; do printf '%s\n' "$l"; done > "$T1196/$f"
+}
+t1196_mk g1 "$T1196_NP"
+t1196_mk g2 "$T1196_NP$T1192_BS"
+t1196_mk g3 "$T1196_NP$T1192_BS\""
+t1196_mk g4 '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"agent_reasoning","text":"ok"},"zqcanary'
+t1196_mk g5 "$T1196_NP$T1196_CR"
+t1196_mk g6 '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"agent_reasoning","text":"zqcanary"}}"'
+t1196_mr g7 "$T1196_SM" '{"timestamp":"2026-11-21T00:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","exit_code":0,"aggregated_output":"zqcanary' "$T1192_TC"
+t1196_mr g8 "$T1196_SM" "$T1192_CE" '{"timestamp":"2026-11-21T00:00:09Z","type":"event_msg","payload":{"type":"task_complete","last_agent_message":"zqcanary'
+grep -qF "zqcanary$T1192_BS" "$T1196/g2" || fail "T-1196: g2 does not end in a backslash (vacuous fixture)"
+grep -qF "zqcanary$T1192_BS\"" "$T1196/g3" || fail "T-1196: g3 lacks its escaped quote (vacuous fixture)"
+[[ "$(grep -c "$T1196_CR" "$T1196/g5")" -eq 1 ]] || fail "T-1196: g5 lacks its carriage return (vacuous fixture)"
+for f in g1 g2 g3 g4 g5 g6 g7 g8; do
+  grep -F zqcanary "$T1196/$f" > "$T1196/dl" || fail "T-1196: $f lacks the canary (vacuous fixture)"
+  if grep -qE 'model|effort' "$T1196/dl"; then fail "T-1196: $f's damaged line carries model or effort bytes (an extractor would refuse it, not the gate)"; fi
+done
+t1196_gate_refuse() {  # name src flags... : publish must refuse at the completed-run gate
+  local name="$1" src="$2"
+  shift 2
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1196 $name: expected exit 3, got $T1192_RC"
+  grep -qF 'rollout not parseable' "$T1192_ERR" || fail "T-1196 $name: stderr lacks 'rollout not parseable'"
+  grep -qF cause=unterminated-string "$T1192_ERR" || fail "T-1196 $name: stderr lacks cause=unterminated-string"
+  if grep -qF zqcanary "$T1192_ERR"; then fail "T-1196 $name: the offending line was echoed on stderr"; fi
+  [[ -z "$(ls -A "$T1192_RV")" ]] || fail "T-1196 $name: the reviews dir is not empty after a refusal"
+}
+for f in g1 g2 g3 g4 g5 g6 g7 g8; do
+  t1196_gate_refuse "$f report-only" "$T1196/$f"
+  t1196_gate_refuse "$f named model" "$T1196/$f" --expect-model zq-model-1 --expect-effort -
+done
+pass "T-1196 gate: eight unterminated shapes (value, trailing backslash, escaped quote, key, CRLF, lone quote, truncated CommandExecution, truncated task_complete) refuse with cause=unterminated-string, publish nothing and echo nothing"
+
+# order: the unterminated cause wins over the escape cause and over `review did not run`
+T1196_UE="$(printf '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"agent_reasoning","t%su0065xt":"ok"}}' "$T1192_BS")"
+grep -qF "t${T1192_BS}u0065xt" <<< "$T1196_UE" || fail "T-1196: the escaped-key fixture lacks its escape (vacuous)"
+t1196_mr o1 "$T1196_SM" "$T1192_CE" "$T1196_NP"
+t1196_mr o2 "$T1196_SM" "$T1196_UE" "$T1196_NP" "$T1192_CE" "$T1192_TC"
+for f in o1 o2; do
+  t1196_gate_refuse "order $f" "$T1196/$f"
+  if grep -qE 'review did not run|unicode-escape' "$T1192_ERR"; then fail "T-1196 order $f: a lower-precedence cause is on stderr"; fi
+done
+pass "T-1196 order: an unterminated string takes precedence over unicode-escape and over review did not run"
+
+# identity: rollouts with neither shape keep their outcome
+t1196_mk w1
+t1196_mk w2 '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"agent_reasoning","text":"abc'"$T1192_BS$T1192_BS"'"}}'
+t1196_mk w3 '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"agent_reasoning","text":"a'"$T1192_BS"'"b"}}'
+t1196_mr w4 "$T1196_SM$T1196_CR" "$T1192_CE" "$T1192_TC"
+t1196_mk w5 "$T1196_UE"
+t1196_mr w6 "$T1196_SM" "$T1192_CE"
+grep -qF "abc$T1192_BS$T1192_BS\"" "$T1196/w2" || fail "T-1196: w2 lacks its escaped backslash (vacuous fixture)"
+grep -qF "a$T1192_BS\"b" "$T1196/w3" || fail "T-1196: w3 lacks its escaped quote (vacuous fixture)"
+for f in w1 w2 w3 w4; do
+  t1192_pub "$SCRIPT" "$T1196/$f" --expect-model zq-model-1 --expect-effort -
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1196 identity: $f must still publish (rc=$T1192_RC; $(cat "$T1192_ERR"))"
+done
+t1192_pub "$SCRIPT" "$T1196/w5"
+{ [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=unicode-escape "$T1192_ERR"; } || fail "T-1196 identity: w5 must still refuse as unicode-escape"
+t1192_pub "$SCRIPT" "$T1196/w6"
+{ [[ "$T1192_RC" -eq 3 ]] && grep -qF 'review did not run' "$T1192_ERR"; } || fail "T-1196 identity: w6 must still refuse as review did not run"
+pass "T-1196 identity: an escaped backslash or escaped quote before a closing quote, a CRLF line, an escape-only rollout and a rollout with no task_complete keep their outcome"
+
+# escaped depth-1 keys count toward the duplicated-type rule (observe: the gate already refuses any escaped key on publish)
+t1196_obs() {  # script src flags... ; sets T1196_RC, T1196_OUT, T1196_OERR
+  local script="$1" src="$2" id
+  shift 2
+  T1192_N=$((T1192_N + 1))
+  id="$(printf '00000000-0000-4000-8000-%012d' "$T1192_N")"
+  mkdir -p "$T1192/ch$T1192_N/sessions/2026/11/21" "$T1192/oc$T1192_N" || fail "T-1196: scratch dirs"
+  cp "$src" "$T1192/ch$T1192_N/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$id.jsonl" || fail "T-1196: copy rollout"
+  T1196_OUT="$T1192/oo$T1192_N"; T1196_OERR="$T1192/oe$T1192_N"
+  set +e
+  ( cd "$T1192/oc$T1192_N" && exec env CODEX_HOME="$T1192/ch$T1192_N" bash "$script" --observe --thread-id "$id" "$@" ) < /dev/null > "$T1196_OUT" 2> "$T1196_OERR"
+  T1196_RC=$?
+  set -e
+}
+t1196_mm() {  # file line : session_meta (zq-model-1), the line, the completed-run records
+  { printf '%s\n%s\n' "$T1196_SM" "$2"; t1192_tl; } > "$T1196/$1"
+}
+t1196_mm e1 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","%su0074ype":"session_meta","type":"other","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1192_BS")"
+t1196_mm e2 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","type":"other","typ%su0065":"session_meta","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1192_BS")"
+t1196_mm e3 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","t%su0079pe":"session_meta","type":"other","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1192_BS")"
+t1196_mm e4 "$(printf '{"ti%su006Destamp":"2026-11-21T00:00:01Z","type":"other","payload":{"provenance":{"model":"zq-model-2"}}}' "$T1192_BS")"
+t1196_mm e5 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","type":"session_meta","%su0074ype":"other","payload":{"provenance":{"model":"zq-model-1"}}}' "$T1192_BS")"
+T1196_TX='{"timestamp":"2026-11-21T00:00:02Z","type":"turn_context","payload":{"turn_id":"t1","effort":"zq-eff-a"}}'
+t1196_mx() {  # file line : session_meta, the line, a well-formed turn_context, the completed-run records
+  { printf '%s\n%s\n%s\n' "$T1196_SM" "$2" "$T1196_TX"; t1192_tl; } > "$T1196/$1"
+}
+t1196_mx x1 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","%su0074ype":"turn_context","type":"other","payload":{"effort":"zq-eff-b"}}' "$T1192_BS")"
+t1196_mx x2 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","type":"other","typ%su0065":"turn_context","payload":{"effort":"zq-eff-b"}}' "$T1192_BS")"
+t1196_mx x3 "$(printf '{"type":"other","%su0074ype":"turn_context","effort":"zq-eff-b"}' "$T1192_BS")"
+t1196_mx x4 "$(printf '{"timestamp":"2026-11-21T00:00:01Z","type":"other","%su0074ype":"event_msg","payload":{"type":"thread_settings_applied","thread_settings":{"reasoning_effort":"zq-eff-b"}}}' "$T1192_BS")"
+t1196_mx x5 "$(printf '{"ti%su006Destamp":"2026-11-21T00:00:01Z","type":"other","payload":{"effort":"zq-eff-b"}}' "$T1192_BS")"
+for f in e1 e2 e3 e4 e5 x1 x2 x3 x4 x5; do
+  grep -qF "${T1192_BS}u00" "$T1196/$f" || fail "T-1196: $f carries no backslash-u escape (vacuous fixture)"
+done
+t1196_model_refused() {  # script fixture : --observe --expect-model must exit 3 malformed
+  t1196_obs "$1" "$2" --expect-model zq-model-1
+  [[ "$T1196_RC" -eq 3 ]] && grep -qF 'model not established' "$T1196_OERR" && grep -qF cause=malformed "$T1196_OERR" && [[ ! -s "$T1196_OUT" ]]
+}
+t1196_effort_refused() {  # script fixture : --observe --expect-effort must exit 3 malformed
+  t1196_obs "$1" "$2" --expect-effort zq-eff-a
+  [[ "$T1196_RC" -eq 3 ]] && grep -qF 'effort not established' "$T1196_OERR" && grep -qF cause=malformed "$T1196_OERR" && [[ ! -s "$T1196_OUT" ]]
+}
+for f in e1 e2 e3 e4 e5; do
+  t1196_model_refused "$SCRIPT" "$T1196/$f" || fail "T-1196 escaped key $f: --observe --expect-model must exit 3 with model not established and cause=malformed, empty stdout (rc=$T1196_RC)"
+  if grep -qF zq-model-2 "$T1196_OERR"; then fail "T-1196 escaped key $f: a model value was echoed on stderr"; fi
+  t1196_obs "$SCRIPT" "$T1196/$f"
+  [[ "$T1196_RC" -eq 0 && "$(cat "$T1196_OUT")" = "model=unavailable" ]] || fail "T-1196 escaped key $f: report-only observe must print exactly model=unavailable (rc=$T1196_RC)"
+done
+for f in x1 x2 x3 x4 x5; do
+  t1196_effort_refused "$SCRIPT" "$T1196/$f" || fail "T-1196 escaped key $f: --observe --expect-effort must exit 3 with effort not established and cause=malformed, empty stdout (rc=$T1196_RC)"
+  if grep -qF zq-eff-b "$T1196_OERR"; then fail "T-1196 escaped key $f: an effort value was echoed on stderr"; fi
+  t1196_obs "$SCRIPT" "$T1196/$f" --expect-effort -
+  [[ "$T1196_RC" -eq 0 && "$(cat "$T1196_OUT")" = "$(printf 'model=unavailable\neffort=unavailable')" ]] || fail "T-1196 escaped key $f: report-only observe must print model=unavailable and effort=unavailable (rc=$T1196_RC)"
+done
+pass "T-1196 escaped keys: an escaped depth-1 key beside a plain type makes the model observation (e1-e5) and the effort observation (x1-x5) malformed, and the report-only outputs read unavailable"
+
+# --- T-1196 mutation probes: each new guard is broken once in a scratch copy
+# and a fixture must notice. The two extractors carry textually identical
+# lines, so their probes are range-scoped to their own function.
+t1196_mutant() {  # label range-start range-end sed-expr
+  local m="$T1196/mut-$1.sh"
+  sed "/$2/,/$3/ $4" "$SCRIPT" > "$m" || fail "T-1196 mutation $1: sed failed"
+  if cmp -s "$SCRIPT" "$m"; then fail "T-1196 mutation $1: the sed expression changed nothing (the probe is vacuous)"; fi
+  bash -n "$m" || fail "T-1196 mutation $1: the mutant does not parse"
+  printf '%s\n' "$m"
+}
+M="$(t1196_mutant no-gate-unterm 'tokenize(line' 'ntok++; tok\[ntok\] = tok2' 's/if (!closed) line_unterm = 1/if (0) line_unterm = 1/')"
+t1192_pub "$M" "$T1196/g1"
+[[ "$T1192_RC" -eq 0 ]] || fail "T-1196 mutation no-gate-unterm: the mutant still refused g1 (the guard is NOT pinned)"
+M="$(t1196_mutant gate-last-byte 'tokenize(line' 'ntok++; tok\[ntok\] = tok2' 's/if (!closed) line_unterm = 1/if (substr(tok2, length(tok2), 1) != "\\"") line_unterm = 1/')"
+t1192_pub "$M" "$T1196/g3"
+[[ "$T1192_RC" -eq 0 ]] || fail "T-1196 mutation gate-last-byte: a last-byte test still refused g3 (NOT caught)"
+t1192_pub "$M" "$T1196/g6"
+[[ "$T1192_RC" -eq 0 ]] || fail "T-1196 mutation gate-last-byte: a last-byte test still refused g6 (NOT caught)"
+M_MODEL="$(t1196_mutant no-escaped-count-model 'extract_model()' '^}$' 's/if (depth == 1 \&\& has_u_escape(t)) ntype++/if (0) ntype++/')"
+if t1196_model_refused "$M_MODEL" "$T1196/e1"; then fail "T-1196 mutation no-escaped-count-model: the mutant still refused e1 as malformed (NOT caught)"; fi
+t1196_effort_refused "$M_MODEL" "$T1196/x1" || fail "T-1196 mutation no-escaped-count-model: the mutant must still refuse x1 (the probe is not scoped to extract_model)"
+M_EFFORT="$(t1196_mutant no-escaped-count-effort 'extract_effort()' '^}$' 's/if (depth == 1 \&\& has_u_escape(t)) ntype++/if (0) ntype++/')"
+if t1196_effort_refused "$M_EFFORT" "$T1196/x1"; then fail "T-1196 mutation no-escaped-count-effort: the mutant still refused x1 as malformed (NOT caught)"; fi
+t1196_model_refused "$M_EFFORT" "$T1196/e1" || fail "T-1196 mutation no-escaped-count-effort: the mutant must still refuse e1 (the probe is not scoped to extract_effort)"
+pass "T-1196 mutation self-check: dropping the gate's unterminated refusal, a last-byte test in the gate, and dropping the escaped-key count from extract_model only or extract_effort only are each caught"
+
 # --- T-1193 (issue #759): extraction fails closed on an unterminated string and
 # on a duplicated depth-1 type key. Same synthesized shapes as above.
 printf -- '\n--- T-1193 extraction fail-closed ---\n'
@@ -2216,8 +2381,27 @@ t1193_four() {
   t1193_obs "$SCRIPT" "$f"
   [[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=unavailable" ]] || fail "T-1193 $name report-only observe: expected exactly model=unavailable (rc=$T1193_RC)"
 }
-for n in u1 u2 u3 u4 u5 u6 u7 u8 u9; do t1193_four "$n"; done
-pass "T-1193 unterminated string: nine shapes (extra byte, none, trailing backslash, lone quote, CRLF, key, unread type, swallowed type, escaped-quote value) are malformed on publish-named, observe-named and both report-only paths"
+# t1193_four_u NAME: the T-1196 gate now refuses these fixtures on publish
+# (--observe runs no gate), so the publish paths assert the gate refusal and
+# the two observe paths keep their T-1193 assertions.
+t1193_four_u() {
+  local name="$1" f="$T1193/$1"
+  t1192_pub "$SCRIPT" "$f" --expect-model zq-model-1
+  [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=unterminated-string "$T1192_ERR" && [[ -z "$(ls -A "$T1192_RV")" ]]     || fail "T-1193 $name publish-named: expected the completed-run gate refusal (exit 3, cause=unterminated-string, empty reviews dir; rc=$T1192_RC)"
+  t1193_nozq "$T1192_ERR" "$name publish-named"
+  t1193_obs "$SCRIPT" "$f" --expect-model zq-model-1
+  if [[ "$T1193_RC" -ne 3 ]] || ! grep -qF 'model not established' "$T1193_OERR" || ! grep -qF cause=malformed "$T1193_OERR" || [[ -s "$T1193_OUT" ]]; then
+    fail "T-1193 $name observe-named: expected exit 3, model not established, cause=malformed, empty stdout (rc=$T1193_RC)"
+  fi
+  t1193_nozq "$T1193_OERR" "$name observe-named"
+  t1192_pub "$SCRIPT" "$f"
+  [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=unterminated-string "$T1192_ERR" && [[ -z "$(ls -A "$T1192_RV")" ]]     || fail "T-1193 $name report-only publish: expected the completed-run gate refusal (rc=$T1192_RC)"
+  t1193_nozq "$T1192_ERR" "$name report-only publish"
+  t1193_obs "$SCRIPT" "$f"
+  [[ "$T1193_RC" -eq 0 && "$(cat "$T1193_OUT")" = "model=unavailable" ]] || fail "T-1193 $name report-only observe: expected exactly model=unavailable (rc=$T1193_RC)"
+}
+for n in u1 u2 u3 u4 u5 u6 u7 u8 u9; do t1193_four_u "$n"; done
+pass "T-1193 unterminated string: nine shapes (extra byte, none, trailing backslash, lone quote, CRLF, key, unread type, swallowed type, escaped-quote value) are refused by the completed-run gate on both publish paths and malformed on both observe paths"
 for n in d1 d2 d3 d5 d7; do t1193_four "$n"; done
 pass "T-1193 duplicated type: equal, either-order, non-string and object-valued duplicates are malformed on all four paths"
 t1193_ok "d6 nested duplicate type is not counted" "$T1193/d6" zq-model-1 --expect-model zq-model-1
@@ -2235,7 +2419,17 @@ t1193_mutant() {  # label sed-expr
   cmp -s "$SCRIPT" "$m" && fail "T-1193 mutation $1: the sed expression changed nothing (the probe is vacuous)"
   printf '%s\n' "$m"
 }
-t1193_notrefused() {  # label mutant fixture
+t1193_notrefused() {  # label mutant fixture : on --observe, where extract_model is the only refuser
+  t1193_obs "$SCRIPT" "$3" --expect-model zq-model-1
+  if [[ "$T1193_RC" -ne 3 ]] || ! grep -qF cause=malformed "$T1193_OERR"; then
+    fail "T-1193 mutation $1: the unmutated script must refuse $3 on --observe with cause=malformed (the probe is vacuous)"
+  fi
+  t1193_obs "$2" "$3" --expect-model zq-model-1
+  if [[ "$T1193_RC" -eq 3 ]] && grep -qF cause=malformed "$T1193_OERR"; then
+    fail "T-1193 mutation $1: the mutant still refused $3 as malformed (the fixture does not pin the guard)"
+  fi
+}
+t1193_notrefused_pub() {  # label mutant fixture : the duplicated-type fixtures carry no unterminated string, so the publish path stays the refuser
   t1192_pub "$2" "$3" --expect-model zq-model-1
   if [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=malformed "$T1192_ERR"; then
     fail "T-1193 mutation $1: the mutant still refused $3 as malformed (the fixture does not pin the guard)"
@@ -2248,9 +2442,9 @@ t1193_notrefused unterm-disabled "$M_UNTYPE" "$T1193/u7"
 M_LASTB="$(t1193_mutant last-byte 's/if (!closed) unterm = 1/if (substr(tok2, length(tok2), 1) != "\\"") unterm = 1/')"
 t1193_notrefused last-byte "$M_LASTB" "$T1193/u9"
 M_DUPOFF="$(t1193_mutant no-dup 's/if (ntype > 1) { nmal++; next }/if (ntype > 1) { next }/')"
-t1193_notrefused no-dup "$M_DUPOFF" "$T1193/d1"
+t1193_notrefused_pub no-dup "$M_DUPOFF" "$T1193/d1"
 M_DUPSTR="$(t1193_mutant dup-disabled 's/if (depth == 1 \&\& last_key == "type") ntype++/if (depth == 1 \&\& last_key == "type" \&\& 0) ntype++/')"
-t1193_notrefused dup-disabled "$M_DUPSTR" "$T1193/d5"
+t1193_notrefused_pub dup-disabled "$M_DUPSTR" "$T1193/d5"
 M_DUPDEPTH="$(t1193_mutant dup-any-depth 's/if (depth == 1 \&\& last_key == "type") ntype++/if (last_key == "type") ntype++/')"
 t1192_pub "$M_DUPDEPTH" "$T1193/d6" --expect-model zq-model-1
 [[ "$T1192_RC" -eq 3 ]] || fail "T-1193 mutation dup-any-depth: counting a nested type must refuse d6, proving the fixture pins depth"
@@ -2363,11 +2557,13 @@ t1195_refuse() {  # name src cause flags...
 
 # positive control: every fixture passes the completed-run and model gates when
 # no effort is requested (so a refusal below is the effort gate).
-for r in fv fp f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14; do
+for r in fv fp f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f11 f12 f13 f14; do
   t1192_pub "$SCRIPT" "$T1195/$r"
   [[ "$T1192_RC" -eq 0 ]] || fail "T-1195 positive control: $r must publish without --expect-effort (rc=$T1192_RC)"
   if grep -qF 'effort=' "$T1192_ERR"; then fail "T-1195 positive control: $r printed effort= without --expect-effort"; fi
 done
+t1192_pub "$SCRIPT" "$T1195/f10"
+{ [[ "$T1192_RC" -eq 3 ]] && grep -qF cause=unterminated-string "$T1192_ERR"; } || fail "T-1195 positive control: f10 (an unterminated string) must be refused by the completed-run gate (rc=$T1192_RC)"
 pass "T-1195 positive control: every synthesized rollout publishes without --expect-effort, and no summary line carries effort="
 
 t1195_ok "review shape" "$T1195/fv" zq-eff-a --expect-effort zq-eff-a
@@ -2381,7 +2577,7 @@ t1195_refuse "prefix near-miss, expected longer" "$T1195/fv" mismatch --expect-e
 for r in f0 f1 f2 f3; do t1195_refuse "absent $r" "$T1195/$r" absent --expect-effort zq-eff-a; done
 t1195_refuse "nested type spoofing thread_settings_applied" "$T1195/f13" absent --expect-effort zq-eff-b
 for r in f4 f5; do t1195_refuse "inconsistent $r" "$T1195/$r" inconsistent --expect-effort zq-eff-a; done
-for r in f6 f7 f8 f10 f11 f12 f14; do t1195_refuse "malformed $r" "$T1195/$r" malformed --expect-effort zq-eff-a; done
+for r in f6 f7 f8 f11 f12 f14; do t1195_refuse "malformed $r" "$T1195/$r" malformed --expect-effort zq-eff-a; done
 t1195_refuse "malformed value never echoed" "$T1195/f7" malformed --expect-effort zq-eff-a
 if grep -qF 'zq bad' "$T1192_ERR"; then fail "T-1195: a malformed value was echoed on stderr"; fi
 pass "T-1195 refusals: mismatch, prefix near-misses, absent, inconsistent and malformed each exit 3 with the cause, publish nothing and echo nothing"
@@ -2451,6 +2647,12 @@ t1195_obs f "$T1195/fv" --expect-effort
 [[ -z "$(ls -A "$T1195_OW")" ]] || fail "T-1195 observe: the working directory was written"
 pass "T-1195 observe: two stdout lines on success, nothing on stdout on refusal, exactly the model line without --expect-effort"
 
+# f10 (an unterminated string) is refused by the completed-run gate on publish;
+# the effort extractor's own malformed verdict is asserted on --observe.
+t1195_obs g "$T1195/f10" --expect-effort zq-eff-a
+{ [[ "$T1195_ORC" -eq 3 ]] && grep -qF 'effort not established' "$T1195_OE" && grep -qF cause=malformed "$T1195_OE" && [[ ! -s "$T1195_OO" ]]; } || fail "T-1195 observe: f10 must be refused as effort not established / cause=malformed (rc=$T1195_ORC)"
+pass "T-1195 observe: an unterminated string in a line the effort extractor reads is malformed"
+
 # --- mutation self-check (each mutation is scoped to extract_effort / the effort
 # gate; the model extractor shares several lines and must not be what gets mutated)
 t1195_mutant() {  # label range-start range-end sed-expr
@@ -2479,7 +2681,13 @@ t1195_probe_absent any-event-subtype "$M" "$T1195/f2"
 M="$(t1195_mutant payload-type-any-depth 'extract_effort()' '^}$' 's/last_key == "type" \&\& depth == 2 \&\& pstack\[2\] == "payload"/last_key == "type" \&\& depth >= 2/')"
 t1195_probe_absent payload-type-any-depth "$M" "$T1195/f13"
 M="$(t1195_mutant no-unterm 'extract_effort()' '^}$' 's/if (unterm) { nmal++; next }/if (unterm) { next }/')"
-t1195_probe_malformed no-unterm "$M" "$T1195/f10"
+t1195_obs h "$T1195/f10" --expect-effort zq-eff-a
+{ [[ "$T1195_ORC" -eq 3 ]] && grep -qF cause=malformed "$T1195_OE"; } || fail "T-1195 mutation no-unterm: the unmutated script must refuse f10 on --observe as malformed (the probe is vacuous)"
+set +e
+( cd "$T1195_OW" && exec env CODEX_HOME="$T1195/oc$T1192_N" bash "$M" --observe --thread-id "$(printf '00000000-0000-4000-8000-%012d' "$T1192_N")" --expect-effort zq-eff-a ) < /dev/null > "$T1195_OO" 2> "$T1195_OE"
+T1195_ORC=$?
+set -e
+if [[ "$T1195_ORC" -eq 3 ]] && grep -qF cause=malformed "$T1195_OE"; then fail "T-1195 mutation no-unterm: the mutant still refused f10 as malformed (NOT caught)"; fi
 M="$(t1195_mutant no-dup 'extract_effort()' '^}$' 's/if (ntype > 1) { nmal++; next }/if (ntype > 1) { next }/')"
 t1195_probe_malformed no-dup "$M" "$T1195/f12"
 M="$(t1195_mutant null-ok 'extract_effort()' '^}$' 's/if (lk\[j\] == "M") { nmal++; continue }/if (lk[j] == "M") { continue }/')"

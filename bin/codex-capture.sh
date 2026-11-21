@@ -165,7 +165,8 @@
 #      existing regular file; `mv` is never attempted in this case)
 #   3  `--observe` exits 3 only for a failed rollout import and for `model not
 #      established`; the remaining causes in this item (an empty capture, no
-#      valid event line, `review did not run`, `unicode-escape`) are
+#      valid event line, `review did not run`, `unicode-escape`,
+#      `unterminated-string`) are
 #      `--publish` only. Captured output failed validation (empty -o
 #      capture, or the JSONL stream has no valid event line — no complete
 #      `{…}` object line carrying the `"type"` key; T-098 DP-A) — or, with
@@ -181,7 +182,12 @@
 #      never a refusal condition); or a `\u` escape inside a key string or
 #      inside the value of a key named `type` ("rollout not parseable",
 #      cause=unicode-escape) — T-1152, structural field reading and the
-#      fail-closed search added in round 2 (cross-provider review round 1)
+#      fail-closed search added in round 2 (cross-provider review round 1); or
+#      (T-1196) a string with no closing unescaped quote before the end of any
+#      line of the rollout, a trailing carriage return included ("rollout not
+#      parseable", cause=unterminated-string). That cause is decided while
+#      tokenizing, takes precedence over cause=unicode-escape and over "review
+#      did not run", and echoes no byte of the line
 #   4  (`--publish` only) publish failed (a canonical target pre-existing as
 #      a non-regular file was refused before any `mv`, an `mv` onto the
 #      canonical name itself reported failure, or the post-move
@@ -203,7 +209,9 @@
 # (no closing unescaped quote before the end of the line, a trailing carriage
 # return included), whatever that line's type, and when such a line carries the
 # depth-1 `type` key more than once (equal or differing values, any value
-# kind; a nested `type` is not counted).
+# kind; a nested `type` is not counted). T-1196: every depth-1 key whose text
+# contains a backslash-u counts toward that `type`-key count as well (no escape
+# is decoded), so an escaped depth-1 key beside a plain `type` is malformed.
 #   --publish --thread-id <id> --expect-model <m>   with <m> a named model
 #      (anything but `provider-configured`): refuse (exit 3, no canonical
 #      file, both raws removed) unless the observed model is established and
@@ -231,7 +239,8 @@
 # effort is ESTABLISHED when at least one string value exists and all are one
 # identical token of `[a-z][a-z0-9-]*`. A line carrying the bytes `effort` or a
 # backslash-u that has an unterminated string, or the depth-1 `type` key more
-# than once, makes the observation malformed.
+# than once, makes the observation malformed; as for the model, a depth-1 key
+# containing a backslash-u counts toward that `type`-key count (T-1196).
 #   --expect-effort <e> with <e> a named effort (anything but `-`): refuse
 #      (exit 3, no canonical file, both raws removed; on --observe nothing on
 #      stdout) unless the observed effort is established and byte-equal to <e>.
@@ -396,6 +405,7 @@ extract_model() {
             if (has_u_escape(t)) key_u = 1
             last_key = strip_quotes(t)
             if (depth == 1 && last_key == "type") ntype++
+            if (depth == 1 && has_u_escape(t)) ntype++  # T-1196: an escaped depth-1 key counts too
           } else {
             if (last_key == "model") { nl++; lk[nl] = "S"; lv[nl] = strip_quotes(t) }
             else if (last_key == "type" && depth == 1) line_type = strip_quotes(t)
@@ -544,6 +554,7 @@ extract_effort() {
             if (has_u_escape(t)) key_u = 1
             last_key = strip_quotes(t)
             if (depth == 1 && last_key == "type") ntype++
+            if (depth == 1 && has_u_escape(t)) ntype++  # T-1196: an escaped depth-1 key counts too
           } else {
             if (last_key == "effort" || last_key == "reasoning_effort") { nl++; lk[nl] = "S"; lv[nl] = strip_quotes(t) }
             else if (last_key == "type" && depth == 1) line_type = strip_quotes(t)
@@ -960,8 +971,9 @@ if [ "$thread_id_given" -eq 1 ]; then
         fp = (depth == 0) ? last_key : (pathstr() "." last_key)
         return fp
       }
-      function tokenize(line,    n, i, c, tok2, esc) {
+      function tokenize(line,    n, i, c, tok2, esc, closed) {
         ntok = 0
+        line_unterm = 0
         n = length(line)
         i = 1
         while (i <= n) {
@@ -970,14 +982,16 @@ if [ "$thread_id_given" -eq 1 ]; then
             tok2 = c
             i++
             esc = 0
+            closed = 0
             while (i <= n) {
               c = substr(line, i, 1)
               tok2 = tok2 c
               if (esc) { esc = 0 }
               else if (c == "\\") { esc = 1 }
-              else if (c == "\"") { i++; break }
+              else if (c == "\"") { closed = 1; i++; break }
               i++
             }
+            if (!closed) line_unterm = 1
             ntok++; tok[ntok] = tok2
           } else if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == ",") {
             ntok++; tok[ntok] = c
@@ -998,6 +1012,7 @@ if [ "$thread_id_given" -eq 1 ]; then
       }
       {
         tokenize($0)
+        if (line_unterm) g_unterm = 1
         depth = 0
         last_key = ""
         line_type = ""
@@ -1050,10 +1065,14 @@ if [ "$thread_id_given" -eq 1 ]; then
         }
       }
       END {
+        if (g_unterm) { print "UNTERMINATED_STRING"; exit 0 }
         if (g_unicode_bad) { print "UNICODE_ESCAPE"; exit 0 }
         printf "%d %d %d %d %d\n", g_commands_executed + 0, g_commands_succeeded + 0, g_tc_present + 0, g_tc_error_present + 0, g_tc_lam_null + 0
       }
     ' "$raw_jsonl")"
+  if [ "$gate_fields" = "UNTERMINATED_STRING" ]; then
+    die 3 "publish: rollout not parseable (thread=$thread_id cause=unterminated-string)"
+  fi
   if [ "$gate_fields" = "UNICODE_ESCAPE" ]; then
     die 3 "publish: rollout not parseable (thread=$thread_id cause=unicode-escape)"
   fi
