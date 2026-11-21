@@ -128,8 +128,8 @@
 #
 # Usage:
 #   codex-capture.sh --alloc   --stem <stem> [--reviews-dir <dir>]
-#   codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id> [--expect-model <token>]] [--reviews-dir <dir>]
-#   codex-capture.sh --observe --thread-id <id> [--expect-model <token>]
+#   codex-capture.sh --publish --stem <stem> --publish-out <raw-out> --publish-jsonl <raw-jsonl> [--thread-id <id> [--expect-model <token>] [--expect-effort <token>]] [--reviews-dir <dir>]
+#   codex-capture.sh --observe --thread-id <id> [--expect-model <token>] [--expect-effort <token>]
 #
 # `--alloc`, `--publish` and `--observe` are mutually exclusive; exactly one is required.
 # The caller runs its own `codex exec …` between the two calls (a single bare
@@ -219,6 +219,33 @@
 #      causes, read-only. It resolves no reviews dir, writes nothing, and
 #      prints `model=<observed>` on stdout on success. It serves the
 #      finding-evaluation mode, which publishes no capture.
+#
+# T-1195 (issue #757): the effort a pass actually ran at is read from its own
+# rollout, independently of the model. The observed effort is every string
+# value of a key named `effort` or `reasoning_effort`, at any depth, inside a
+# record whose TOP-LEVEL `type` is `turn_context`, or whose top-level `type` is
+# `event_msg` and whose `payload` object's own `type` is
+# `thread_settings_applied` (the `review` subcommand writes no `turn_context`).
+# Every other record, `response_item` included, is never read; a key whose
+# value is an object or array is ignored; a non-string scalar is malformed. The
+# effort is ESTABLISHED when at least one string value exists and all are one
+# identical token of `[a-z][a-z0-9-]*`. A line carrying the bytes `effort` or a
+# backslash-u that has an unterminated string, or the depth-1 `type` key more
+# than once, makes the observation malformed.
+#   --expect-effort <e> with <e> a named effort (anything but `-`): refuse
+#      (exit 3, no canonical file, both raws removed; on --observe nothing on
+#      stdout) unless the observed effort is established and byte-equal to <e>.
+#      The stderr line contains `effort not established` and exactly one
+#      `cause=` of absent | inconsistent | malformed | mismatch; a malformed
+#      value is never echoed. The effort gate runs after the model gate.
+#   --expect-effort -: report-only, never refuses on the effort.
+#   Only when --expect-effort is given (any value) the publish summary line
+#      gains ` effort=<observed>` after ` model=<observed>` and --observe
+#      prints a second line `effort=<observed>` (`unavailable` when not
+#      established). Without it, output is exactly as before T-1195.
+#   --expect-effort usage errors (exit 2): without --thread-id, with --alloc,
+#      with an empty value, or with a value that is neither `-` nor an effort
+#      token.
 
 set -euo pipefail
 
@@ -430,6 +457,164 @@ apply_model_gate() {
   fi
 }
 
+# extract_effort <rollout file>: print one of `OK <token>`, `ABSENT`,
+# `INCONSISTENT`, `MALFORMED` (T-1195). Same tokenizer discipline as
+# extract_model. The observed effort is every string value of a key named
+# `effort` or `reasoning_effort`, at any depth, inside a record whose TOP-LEVEL
+# `type` is `turn_context`, or whose top-level `type` is `event_msg` and whose
+# `payload` object's own `type` is `thread_settings_applied` (decided
+# structurally, never by substring). Every other record is never read. A key
+# whose value is an object or array is ignored; a non-string scalar value is
+# malformed. Established = at least one string and all one identical token of
+# `[a-z][a-z0-9-]*`. A line carrying the bytes `effort` or a backslash-u that
+# has an unterminated string, or that carries the depth-1 `type` key more than
+# once, makes the observation malformed. A value is never printed unless clean.
+extract_effort() {
+  LC_ALL=C awk '
+    BEGIN {
+      LOW = "abcdefghijklmnopqrstuvwxyz"
+      DIG = "0123456789"
+      MCH = LOW DIG "-"
+    }
+    function strip_quotes(s) { return substr(s, 2, length(s) - 2) }
+    function has_u_escape(s,    n2, j) {
+      n2 = length(s)
+      for (j = 1; j < n2; j++) {
+        if (substr(s, j, 1) == "\\" && substr(s, j + 1, 1) == "u") return 1
+      }
+      return 0
+    }
+    function tok_ok(s,    n2, j) {
+      n2 = length(s)
+      if (n2 < 1) return 0
+      if (index(LOW, substr(s, 1, 1)) == 0) return 0
+      for (j = 2; j <= n2; j++) {
+        if (index(MCH, substr(s, j, 1)) == 0) return 0
+      }
+      return 1
+    }
+    function tokenize(line,    n, i, c, tok2, esc, closed) {
+      ntok = 0
+      unterm = 0
+      n = length(line)
+      i = 1
+      while (i <= n) {
+        c = substr(line, i, 1)
+        if (c == "\"") {
+          tok2 = c
+          i++
+          esc = 0
+          closed = 0
+          while (i <= n) {
+            c = substr(line, i, 1)
+            tok2 = tok2 c
+            if (esc) { esc = 0 }
+            else if (c == "\\") { esc = 1 }
+            else if (c == "\"") { closed = 1; i++; break }
+            i++
+          }
+          if (!closed) unterm = 1
+          ntok++; tok[ntok] = tok2
+        } else if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == ",") {
+          ntok++; tok[ntok] = c
+          i++
+        } else if (c == " " || c == "\t" || c == "\r" || c == "\n") {
+          i++
+        } else {
+          tok2 = ""
+          while (i <= n) {
+            c = substr(line, i, 1)
+            if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == "," || c == "\"" || c == " " || c == "\t" || c == "\r" || c == "\n") break
+            tok2 = tok2 c
+            i++
+          }
+          ntok++; tok[ntok] = tok2
+        }
+      }
+    }
+    {
+      if (index($0, "effort") == 0 && index($0, "\\u") == 0) next
+      tokenize($0)
+      if (unterm) { nmal++; next }
+      depth = 0; last_key = ""; line_type = ""; payload_type = ""; nl = 0; key_u = 0; ntype = 0
+      for (i = 1; i <= ntok; i++) {
+        t = tok[i]
+        if (substr(t, 1, 1) == "\"") {
+          if (i < ntok && tok[i + 1] == ":") {
+            if (has_u_escape(t)) key_u = 1
+            last_key = strip_quotes(t)
+            if (depth == 1 && last_key == "type") ntype++
+          } else {
+            if (last_key == "effort" || last_key == "reasoning_effort") { nl++; lk[nl] = "S"; lv[nl] = strip_quotes(t) }
+            else if (last_key == "type" && depth == 1) line_type = strip_quotes(t)
+            else if (last_key == "type" && depth == 2 && pstack[2] == "payload") payload_type = strip_quotes(t)
+            last_key = ""
+          }
+        } else if (t == "{" || t == "[") {
+          depth++; pstack[depth] = last_key; last_key = ""
+        } else if (t == "}" || t == "]") {
+          depth--; last_key = ""
+        } else if (t == ":" || t == ",") {
+          # structural separators only
+        } else {
+          if (last_key == "effort" || last_key == "reasoning_effort") { nl++; lk[nl] = "M"; lv[nl] = "" }
+          last_key = ""
+        }
+      }
+      if (ntype > 1) { nmal++; next }
+      if (line_type == "turn_context" || (line_type == "event_msg" && payload_type == "thread_settings_applied")) {
+        if (key_u) nmal++
+        for (j = 1; j <= nl; j++) {
+          if (lk[j] == "M") { nmal++; continue }
+          v = lv[j]
+          if (has_u_escape(v) || !tok_ok(v)) { nmal++; continue }
+          nstr++
+          if (!(v in seen)) { seen[v] = 1; ndist++; first = v }
+        }
+      }
+    }
+    END {
+      if (nmal > 0) print "MALFORMED"
+      else if (nstr == 0) print "ABSENT"
+      else if (ndist > 1) print "INCONSISTENT"
+      else print "OK " first
+    }
+  ' "$1"
+}
+
+# effort_token_ok <value>: the binding validator's effort token shape
+# (`^[a-z][a-z0-9-]*$`), evaluated byte-wise.
+effort_token_ok() {
+  local LC_ALL=C
+  case "$1" in
+    ''|*[!a-z0-9-]*|[!a-z]*) return 1 ;;
+  esac
+  return 0
+}
+
+# apply_effort_gate <label>: consume $effort_state and $expect_effort. Sets
+# $observed_effort. With a named expectation (anything but `-`) it refuses
+# (exit 3) unless the observed effort is established and byte-equal;
+# `-` is report-only.
+apply_effort_gate() {
+  local label="$1" cause=""
+  case "$effort_state" in
+    "OK "*) observed_effort="${effort_state#OK }"; cause="" ;;
+    ABSENT) observed_effort="unavailable"; cause="absent" ;;
+    INCONSISTENT) observed_effort="unavailable"; cause="inconsistent" ;;
+    MALFORMED) observed_effort="unavailable"; cause="malformed" ;;
+    *) die 3 "$label: effort not established (thread=$thread_id cause=malformed)" ;;
+  esac
+  if [ -n "$expect_effort" ] && [ "$expect_effort" != "-" ]; then
+    if [ -z "$cause" ] && [ "$observed_effort" != "$expect_effort" ]; then
+      cause="mismatch"
+    fi
+    if [ -n "$cause" ]; then
+      die 3 "$label: effort not established (thread=$thread_id cause=$cause)"
+    fi
+  fi
+}
+
 # --- argument parsing --------------------------------------------------------
 mode=""
 stem=""
@@ -444,6 +629,10 @@ rollout_match=""
 find_out=""
 observed_model="unavailable"
 model_state=""
+expect_effort=""
+expect_effort_given=0
+observed_effort="unavailable"
+effort_state=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --alloc)
@@ -467,6 +656,12 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || die 2 "--expect-model requires a value"
       expect_model="$2"
       expect_model_given=1
+      shift 2
+      ;;
+    --expect-effort)
+      [ "$#" -ge 2 ] || die 2 "--expect-effort requires a value"
+      expect_effort="$2"
+      expect_effort_given=1
       shift 2
       ;;
     --stem)
@@ -513,6 +708,14 @@ if [ "$expect_model_given" -eq 1 ]; then
   [ "$thread_id_given" -eq 1 ] || die 2 "--expect-model requires --thread-id"
 fi
 
+# --- T-1195: --expect-effort usage errors (exit 2) ---------------------------
+if [ "$expect_effort_given" -eq 1 ]; then
+  [ "$mode" != "alloc" ] || die 2 "--expect-effort is only valid with --publish --thread-id or --observe --thread-id"
+  [ -n "$expect_effort" ] || die 2 "--expect-effort requires a non-empty value"
+  [ "$expect_effort" = "-" ] || effort_token_ok "$expect_effort" || die 2 "--expect-effort value is neither - nor an effort token ([a-z][a-z0-9-]*)"
+  [ "$thread_id_given" -eq 1 ] || die 2 "--expect-effort requires --thread-id"
+fi
+
 # =============================================================================
 # --observe (T-1192): read-only model observation by thread id. Resolves no
 # reviews dir and writes nothing but the search's own $TMPDIR scratch list
@@ -531,6 +734,12 @@ if [ "$mode" = "observe" ]; then
   locate_rollout observe
   model_state="$(extract_model "$rollout_match")" || die 3 "observe: model not established (thread=$thread_id cause=malformed)"
   apply_model_gate observe
+  if [ "$expect_effort_given" -eq 1 ]; then
+    effort_state="$(extract_effort "$rollout_match")" || die 3 "observe: effort not established (thread=$thread_id cause=malformed)"
+    apply_effort_gate observe
+    printf 'model=%s\neffort=%s\n' "$observed_model" "$observed_effort"
+    exit 0
+  fi
   printf 'model=%s\n' "$observed_model"
   exit 0
 fi
@@ -869,6 +1078,10 @@ fi
 if [ "$thread_id_given" -eq 1 ]; then
   model_state="$(extract_model "$raw_jsonl")" || die 3 "publish: model not established (thread=$thread_id cause=malformed)"
   apply_model_gate publish
+  if [ "$expect_effort_given" -eq 1 ]; then
+    effort_state="$(extract_effort "$raw_jsonl")" || die 3 "publish: effort not established (thread=$thread_id cause=malformed)"
+    apply_effort_gate publish
+  fi
 fi
 
 # --- publish: refuse a non-regular-file canonical target, then atomic mv
@@ -888,8 +1101,10 @@ if ! mv "$raw_jsonl" "$reviews_dir/$stem.jsonl"; then exit 4; fi
 if [ -f "$reviews_dir/$stem.txt" ] && [ -s "$reviews_dir/$stem.txt" ] \
    && [ -f "$reviews_dir/$stem.jsonl" ] && [ -s "$reviews_dir/$stem.jsonl" ]; then
   if [ "$thread_id_given" -eq 1 ]; then
-    printf 'codex-capture: publish: rollout thread=%s commands_executed=%s commands_succeeded=%s failure_markers=%s last_agent_message=%s model=%s\n' \
-      "$thread_id" "$commands_executed" "$commands_succeeded" "$failure_markers" "$lam_state" "$observed_model" >&2 || true
+    effort_suffix=""
+    [ "$expect_effort_given" -eq 0 ] || effort_suffix=" effort=$observed_effort"
+    printf 'codex-capture: publish: rollout thread=%s commands_executed=%s commands_succeeded=%s failure_markers=%s last_agent_message=%s model=%s%s\n' \
+      "$thread_id" "$commands_executed" "$commands_succeeded" "$failure_markers" "$lam_state" "$observed_model" "$effort_suffix" >&2 || true
   fi
   exit 0
 fi

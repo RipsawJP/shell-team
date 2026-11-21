@@ -296,15 +296,23 @@ model は今なお役割自身の `agents/<role>.md` の pin から来る（issu
 される：`tech-lead` の別経路——`codex-cli` の recipe を通じて
 `sandbox-read-only` で dispatch される——では値が実際の呼び出しに
 **適用**される（`-c model_reasoning_effort=<value>` として、その adapter
-自身の `cli-config-override` 宣言に紐付く）#420。それ以外の
-`codex-cli` の行——出荷時既定の `code-reviewer` 自身の行を含め、これは
-自身の `agents/code-reviewer.md` を通じて `wrapper-hosted` で dispatch
-され、その recipe の行を一切受け取らない——と、すべての `claude-cli` の
-行は、**記録**されるだけで何にも適用されない。executor レベルの経路は
+自身の `cli-config-override` 宣言に紐付く）#420。出荷時既定の
+`code-reviewer` 自身の行は、自身の `agents/code-reviewer.md` を通じて
+`wrapper-hosted` で dispatch され（その recipe の行は受け取らない）、
+指定された `code-reviewer` の effort は同様に**適用**される:
+`-c model_reasoning_effort=<effort>` が `code-reviewer` と
+`drift-evaluator` の実行するすべての `codex exec` に付き、model を指定
+していれば `-m <model>` の直後、`-` のときは何も足されない。各 pass 自身の
+rollout がちょうどその effort を示さなければならず、レビュー記録は
+rollout から読んだ `codex-effort (<pass>)` 行を pass ごとに持ち、effort が
+無い・異なる場合は round が停止する（`effort not established`）。
+それ以外の `codex-cli` の行と、すべての `claude-cli` の行は、**記録**される
+だけで何にも適用されない。executor レベルの経路は
 resolution が制御していない（`tech-lead` を除くいずれの役割についても）。紐付けられた
 値はすべて宣言された値であって、実行されたものの観測ではない——ただし
-`tech-lead` の別経路だけは例外で、そこでは resolved row の model 列が
-そのまま実際に走ったものになる。reviewer 行自身の出荷時の既定とその
+`tech-lead` の別経路は例外で、そこでは resolved row の model 列が
+そのまま実際に走ったものになり、`code-reviewer` の行は model も effort も
+適用され、各 pass 自身の rollout と突き合わせて検査される。reviewer 行自身の出荷時の既定とその
 理由は
 [設計上の選択](#設計上の選択) を参照。 第 1 軸の境界事例として、Claude Code host で `code-reviewer` を Codex 以外の provider に紐付けると、すべてのレビューモードが Codex を呼ぶ前に `BLOCKED`（`reviewer-binding-not-codex`）で停止する。Codex CLI host は変わらず、同一ファミリーによる実際のレビューは #689 で追う後続作業である。
 
