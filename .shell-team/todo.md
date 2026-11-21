@@ -26,6 +26,9 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, a handful of existing fixture suites and a base-vs-head argv byte-identity run, below the fan-out threshold; no mechanism-class full-population half
   - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the host's five decisions, the measured site inventory and the rollout findings hand over as text
   - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count — correctness rests on Codex CLI and provider behaviour (does `-m` before `review` govern the turn, is the rollout model executed or echoed, unknown-model behaviour) that this repository cannot measure, and the task extends a verification mechanism
+  - freeze-attestation (v1, 2026-11-21): lines=17/17 sweep=mutual-satisfiability verdict=4P/13F owner=coordinating session
+  - version-derivation (v1, 2026-11-21): verdict=match — derived=PATCH — headline=met — default-reach=not-met — premise=PATCH, host ruling 2026-11-21 (the model pin takes effect only through a host-authored binding.conf, so the shipped default path is unchanged) — grounds: spec ## Version table; the headline item (a named code-reviewer model applied as -m) fails default-reachability, every other item fails at least one test, so the two tests never jointly hold
+  - intent-hash (v1): a7a6af5dabcb158addee071dae70bd3ce1db9265
 
 
 
