@@ -595,6 +595,10 @@ cm_rec "$T/ce-3b.md" "$CE_CLAUSE_M" "$(cm_line zq-model-1 zq-model-1)" "$(ce_lin
 assert_case "codex-effort: the clause right after -m <model> is conformant beside a conformant codex-model line" 0 "" -- bash "$SCRIPT" --record "$T/ce-3b.md" --task T-000
 cm_rec "$T/ce-3c.md" "${CM_BT}${CE_CLAUSE_M}${CM_BT}" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line zq-eff-a zq-eff-a)"
 assert_case "codex-effort: a backtick-wrapped invocation with the clause is conformant" 0 "" -- bash "$SCRIPT" --record "$T/ce-3c.md" --task T-000
+cm_rec "$T/ce-3e.md" "${CM_BT}codex exec --sandbox read-only review --base develop -c model_reasoning_effort=zq-eff-a${CM_BT}" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a backtick-wrapped invocation carrying the clause at the end (not right after codex exec) refuses by the position rule" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-3e.md" --task T-000
+cm_rec "$T/ce-3f.md" "${CM_BT}codex exec -c model_reasoning_effort=zq-eff-a${CM_BT}" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a backtick-wrapped invocation ending exactly at the clause value is conformant (the trailing backtick is stripped from the last token)" 0 "" -- bash "$SCRIPT" --record "$T/ce-3f.md" --task T-000
 cm_rec "$T/ce-3d.md" "claude -p --prompt-file p.txt" "$(ce_line zq-eff-a zq-eff-a)"
 assert_case "codex-effort: a claude -p invocation beside a named effort is never refused by the contradiction rule" 0 "" -- bash "$SCRIPT" --record "$T/ce-3d.md" --task T-000
 
@@ -611,6 +615,12 @@ cm_rec "$T/ce-v1.md" "$CE_CLAUSE" '  - codex-effort (p1): requested=zq-eff-a obs
 assert_case "codex-effort: no separator refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v1.md" --task T-000
 cm_rec "$T/ce-v2.md" "$CE_CLAUSE" "$(ce_line Zq-Eff zq-eff-a)"
 assert_case "codex-effort: an uppercase requested token refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2.md" --task T-000
+cm_rec "$T/ce-v2b.md" "$CE_CLAUSE" "$(ce_line zq-Eff zq-eff-a)"
+assert_case "codex-effort: an uppercase byte after a lowercase first byte in requested refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2b.md" --task T-000
+cm_rec "$T/ce-v2c.md" "$CE_CLAUSE" "$(ce_line zq-eff-a zq-Eff)"
+assert_case "codex-effort: an uppercase byte after a lowercase first byte in observed refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2c.md" --task T-000
+cm_rec "$T/ce-v2d.md" "$CE_CLAUSE" "$(ce_line zq-eff-a 'zq;eff')"
+assert_case "codex-effort: a punctuation byte inside observed refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2d.md" --task T-000
 cm_rec "$T/ce-v3.md" "$CE_CLAUSE" "$(ce_line zq-eff-a '')"
 assert_case "codex-effort: an empty observed value refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v3.md" --task T-000
 cm_rec "$T/ce-v4.md" "$CM_BARE" "$(ce_line - -)"
