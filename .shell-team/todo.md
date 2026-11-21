@@ -11,6 +11,21 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1192** code-reviewer model pin: a model named by the binding reaches every codex exec as -m, and the review record states the model each pass actually ran on (issues #755, #756) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1192-codex-review-model-pin.md
+  - entry-mode: pm-authored
+  - spec-review: cross-provider
+  - source: issue #755 (design decision) and issue #756 (implementation), one task, filed by the host; the five fixed decisions were relayed by the coordinating session from the issue body and the host's answers on 2026-11-21 and are labelled relayed in the spec's Assumptions. Branch `feature/755-codex-review-model-pin` cut from develop at 75866424 with no open predecessor. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - deviations from the recommended resolutions (pm-spec, 2026-11-21): the requested model is read from `resolve-executor.sh --print-resolved` rather than by extending `check-review-provider.sh`, because T-1177's frozen AC1 asserts its exact admit stdout and a model sentinel on no stream; the finding-evaluation observation is a read-only `codex-capture.sh --observe` mode rather than alloc/publish, because review-response has no task id or review record; the per-pass field carries no `source=`; CHANGELOG is release-prep and `executor-resolution.md` / `tier2-firing.md` are not edited; the derived version tier is PATCH, not the Plan-time MINOR (accepted by the host, see below).
+  - host rulings (2026-11-21, relayed by the coordinating session; resolves the four former open questions): (1) version tier PATCH, v2.9.5 at release; (2) review-response record = the mode's return value plus the skill's run record (D7/AC9 stand); (3) `templates/binding-template.conf` code-reviewer model `model-2` → `provider-configured`, in scope (D8, AC19; `model-2` occurs elsewhere only in the two adopting docs, which AC10 now requires to drop it); (4) this repository's reviewer pin moves into tracked `.shell-team/binding.conf`, code-reviewer = gpt-6-luna, all other rows equal to the shipped default (D9, AC20); AC17 is value-independent and AC8 refuses any out-of-binding `-m`.
+  - dispatch-reflection: implement — T-1191 — repeat — T-1191's recorded value is `serial`; agent prose, codex-capture.sh, the fixture suites and the EN/JA docs land in lockstep, no balanced disjoint partition
+  - dispatch-reflection: verify — T-1191 — repeat — T-1191's recorded value is `serial`; one spec's check-acs plus the linked suites and a base-vs-head argv byte-identity run, no mechanism-class full-population half
+  - dispatch-reflection: specify — T-1191 — repeat — T-1191's recorded value is `pm-authored`; the host's five decisions, the measured invocation-site inventory and the rollout findings hand over as text
+  - dispatch-reflection: spec-review — T-1191 — differs — T-1191's recorded value is `none`; this spec's correctness rests on Codex CLI and provider behaviour this repository cannot measure, and the task extends a verification mechanism
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — agent prose, codex-capture.sh, fixture suites and EN/JA docs land in lockstep; no balanced disjoint partition, and the tier2 trigger does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, a handful of existing fixture suites and a base-vs-head argv byte-identity run, below the fan-out threshold; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the host's five decisions, the measured site inventory and the rollout findings hand over as text
+  - dispatch: spec-review — cross-provider — conditional — cost-input: t1092-domain-premise-count — correctness rests on Codex CLI and provider behaviour (does `-m` before `review` govern the turn, is the rollout model executed or echoed, unknown-model behaviour) that this repository cannot measure, and the task extends a verification mechanism
+
 
 
 
