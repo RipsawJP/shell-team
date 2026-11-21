@@ -288,7 +288,56 @@ The inventory of record is frozen in **AC8**, and **AC8**'s check re-derives the
 
 - reproduce: bash bin/derive-populations.sh --label t1194-dirname-sites --set base-dirname-users='git grep -l -e dirname 2c4d05bb6b8074e58d88fe634a4920200f06f730 -- bin/ | sed "s|^2c4d05bb6b8074e58d88fe634a4920200f06f730:||"' --set ac8-inventory='awk "/^- \\[.\\] [*][*]AC8[*][*]/ { f = 1 } /^- \\[.\\] [*][*]AC9[*][*]/ { f = 0 } f" .shell-team/specs/T-1194-ci-runner-image-red.md | grep -oE "bin/[A-Za-z0-9._-]+" | sort -u'
 
-`(derivation block to be embedded by the freeze run)`
+<!-- BEGIN derivation: t1194-dirname-sites -->
+- derived-by: bin/derive-populations.sh
+- locale: LC_ALL=C
+- set: base-dirname-users — status: 0 — lines: 42 — items: 42 — command: git grep -l -e dirname 2c4d05bb6b8074e58d88fe634a4920200f06f730 -- bin/ | sed "s|^2c4d05bb6b8074e58d88fe634a4920200f06f730:||"
+- set: ac8-inventory — status: 0 — lines: 42 — items: 42 — command: awk "/^- \\[.\\] [*][*]AC8[*][*]/ { f = 1 } /^- \\[.\\] [*][*]AC9[*][*]/ { f = 0 } f" .shell-team/specs/T-1194-ci-runner-image-red.md | grep -oE "bin/[A-Za-z0-9._-]+" | sort -u
+- union: items: 42
+- bucket: base-dirname-users+ac8-inventory — items: 42
+  - bin/check-adapter.sh
+  - bin/check-adopter-docs.sh
+  - bin/check-binding.sh
+  - bin/check-board-headings.sh
+  - bin/check-codex-agents.sh
+  - bin/check-commit-identity.sh
+  - bin/check-count-claims.sh
+  - bin/check-durability.sh
+  - bin/check-intent.sh
+  - bin/check-interventions.sh
+  - bin/check-invocation-path.sh
+  - bin/check-liveness.sh
+  - bin/check-model-pins.sh
+  - bin/check-oversight.sh
+  - bin/check-pii-shapes.sh
+  - bin/check-provenance.sh
+  - bin/check-readme-version.sh
+  - bin/check-refreeze-class.sh
+  - bin/check-refreeze-grant.sh
+  - bin/check-review-input.sh
+  - bin/check-review-provider.sh
+  - bin/check-setup.sh
+  - bin/check-spec-review.sh
+  - bin/close-out.sh
+  - bin/codex-await.sh
+  - bin/codex-capture.sh
+  - bin/consolidate-proposals.sh
+  - bin/discover-work.sh
+  - bin/gen-codex-agents.sh
+  - bin/gen-loop-replay.sh
+  - bin/gen-playbook-blocks.sh
+  - bin/gen-project-status.sh
+  - bin/install
+  - bin/log-run.sh
+  - bin/playbook-promote.sh
+  - bin/resolve-executor.sh
+  - bin/retro-inputs.sh
+  - bin/rework-digest.sh
+  - bin/rollup-track.sh
+  - bin/team-commit.sh
+  - bin/team-init.sh
+  - bin/team-setup.sh
+<!-- END derivation: t1194-dirname-sites -->
 
 Expected reading: every member falls in the `base-dirname-users+ac8-inventory` bucket, and no `base-dirname-users`-only bucket exists. A member only in the inventory bucket is harmless.
 

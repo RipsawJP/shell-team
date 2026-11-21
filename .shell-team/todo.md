@@ -17,6 +17,17 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - source: issue #762 (CI red on develop's tip with the current runner image), filed by the coordinating session; its title only was relayed, and the CI measurements from diagnostic draft PR #764 were relayed as text and are labelled relayed in the spec's Assumptions. No separate issue filed. Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live, embeds the `## Class sweep` derivation block, and freezes once.
   - stacked-on: T-1193 (feature/759-capture-extraction-fail-closed @ 2c4d05bb); PR #763 base develop, open; T-1193 stacks on T-1192 (PR #758); sprint codex-model-pin (prerequisite for the batch merge, not the sprint goal), release PATCH v2.9.5 (relayed)
   - follow-up candidate (coordinating session decides whether to file): the combined `$(cd "$(dirname …)" && pwd)` self-resolution in the other class-B scripts of the spec's AC8 falls back to the working directory on bash 5.2 and exits non-zero on bash 5.3 when dirname is missing; out of scope here because dirname is on PATH in every invocation those scripts' contracts and suites make
+  - dispatch-reflection: implement — T-1193 — repeat — T-1193's recorded value is `serial`; two scripts and their suites land toward one diagnosis, no balanced disjoint partition
+  - dispatch-reflection: verify — T-1193 — repeat — T-1193's recorded value is `serial`; two existing fixture suites, shellcheck, one spec's check-acs and one CI run, no mechanism-class full-population half
+  - dispatch-reflection: specify — T-1193 — repeat — T-1193's recorded value is `pm-authored`; the issue, the measured CI failure lines and the diagnostic runs' logs hand over as text
+  - dispatch-reflection: spec-review — T-1193 — repeat — T-1193's recorded value is `none`; the runner premise was measured on diagnostic CI runs before the spec was written
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — two scripts, their suites and the class-sweep record land together toward one diagnosis; no balanced disjoint partition, and the tier2 trigger does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — two existing fixture suites, shellcheck, one spec's check-acs and one CI run, below the fan-out threshold; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue, the measured CI failure lines and the diagnostic runs' logs hand over as text
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the runner-image premise (Ubuntu 26.04.1, bash 5.3.9, `cd ""` failing, a duplicated --seq auto value) was measured on diagnostic CI runs before the spec was written
+  - freeze-attestation (v1, 2026-11-21): lines=10/10 sweep=mutual-satisfiability verdict=4P/6F owner=coordinating session
+  - version-derivation (v1, 2026-11-21): verdict=match — derived=PATCH — headline=not-met — default-reach=not-met — premise=PATCH, sprint codex-model-pin planning approved by the host 2026-11-21 (release v2.9.5; this task is a declared prerequisite) — grounds: spec ## Version; two bug fixes (an undeclared dirname dependency, a non-exclusive --seq auto lock), no new capability
+  - intent-hash (v1): 4801fb4067fa08de28da26f74aa8f1cbe635e34d
 
 
 
