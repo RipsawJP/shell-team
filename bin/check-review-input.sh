@@ -116,8 +116,8 @@
 #                                   from token 3 (token 5 when token 3 is -m),
 #                                   the next two tokens are not
 #                                   `-c model_reasoning_effort=<requested>`
-#                                   when an effort is named, or are the clause
-#                                   under `-`.
+#                                   when an effort is named; under `-`, the clause
+#                                   at any position of the invocation.
 #     Evaluation order: duplicate, vocabulary, mismatch, contradiction. This
 #     checker never reads a raw capture; the rollout comparison is
 #     bin/codex-capture.sh's --expect-effort gate.
@@ -688,13 +688,11 @@ while IFS= read -r id; do
       ce_c1="${ce_tok[ce_pos]:-}"
       ce_c2="${ce_tok[ce_pos+1]:-}"
       if [ "$ce_req" = "-" ]; then
-        case "$ce_c2" in
-          model_reasoning_effort=*)
-            if [ "$ce_c1" = "-c" ]; then
-              fail "codex-effort-contradiction: pass id '$id' requests no effort while its executor-invocation carries the effort clause"
-            fi
-            ;;
-        esac
+        # Under `-` the clause at ANY position is the contradiction; ce_has is
+        # the same scan the missing-line requirement above uses.
+        if [ "$ce_has" -eq 1 ]; then
+          fail "codex-effort-contradiction: pass id '$id' requests no effort while its executor-invocation carries the effort clause"
+        fi
       else
         if [ "$ce_c1" != "-c" ] || [ "$ce_c2" != "model_reasoning_effort=$ce_req" ]; then
           fail "codex-effort-contradiction: pass id '$id' requests an effort while its executor-invocation does not carry -c model_reasoning_effort=<requested> at the required position"

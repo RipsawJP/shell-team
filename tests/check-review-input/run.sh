@@ -661,6 +661,24 @@ assert_case "codex-effort: a clause naming a prefix near-miss of the requested e
 cm_rec "$T/ce-c8.md" "codex exec -m zq-model-1 -c model_reasoning_effort=zq-eff-a --sandbox read-only review --base develop" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line - unavailable)"
 assert_case "codex-effort: under - a clause after -m refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c8.md" --task T-000
 
+# Under requested=- the clause at ANY position is the contradiction (class:
+# token 3, after -m, mid, last, backtick-wrapped, with and without codex-model).
+CE_DASH="$(ce_line - unavailable)"
+cm_rec "$T/ce-x1.md" "codex exec --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - the clause mid-invocation (no -m) refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x1.md" --task T-000
+cm_rec "$T/ce-x2.md" "codex exec -m zq-model-1 --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$(cm_line zq-model-1 zq-model-1)" "$CE_DASH"
+assert_case "codex-effort: under - the clause mid-invocation after -m, with codex-model, refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x2.md" --task T-000
+cm_rec "$T/ce-x3.md" "codex exec -m zq-model-1 --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - the clause mid-invocation after -m, without codex-model, refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x3.md" --task T-000
+cm_rec "$T/ce-x4.md" "codex exec --sandbox read-only review --base develop -c model_reasoning_effort=zq-eff-a" "$CE_DASH"
+assert_case "codex-effort: under - the clause as the last two tokens refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x4.md" --task T-000
+cm_rec "$T/ce-x5.md" "${CM_BT}codex exec --sandbox read-only review --base develop -c model_reasoning_effort=zq-eff-a${CM_BT}" "$CE_DASH"
+assert_case "codex-effort: under - a backtick-wrapped clause at the end refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x5.md" --task T-000
+cm_rec "$T/ce-x6.md" "codex exec -c model_reasoning_effort=zq-eff-a --sandbox read-only review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - the clause at token 3 refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x6.md" --task T-000
+cm_rec "$T/ce-x7.md" "codex exec --sandbox read-only review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - a clause-free invocation stays conformant" 0 "" -- bash "$SCRIPT" --record "$T/ce-x7.md" --task T-000
+
 # A pass declared ONLY by a codex-effort line is still field-missing.
 { cm_hdr; ce_line zq-eff-a zq-eff-a; printf '\n'; } > "$T/ce-only.md"
 assert_case "codex-effort: a pass declared only by codex-effort refuses field-missing" 1 field-missing -- bash "$SCRIPT" --record "$T/ce-only.md" --task T-000
