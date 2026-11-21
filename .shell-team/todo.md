@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
+- [ ] **T-1193** codex-capture model extraction fails closed on an unterminated string and a duplicated top-level type, and its diagnostics name --observe (issue #759) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1193-capture-extraction-fail-closed.md
   - T-1193 engineer: extract_model now marks a line with an unterminated string (decided in the tokenizer, any line type) and a line with more than one depth-1 type key as MALFORMED; diagnostics and --help name --observe; hygiene suite gains T-1193 fixtures and mutation probes.
   - entry-mode: pm-authored
   - spec-review: none
@@ -33,6 +33,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - qa never-dropped: D1 (unterminated string, AC1 u1-u9 on publish-named, observe-named and report-only paths; base accepts u1 and u3-u9 as the positive control) held; D2 (duplicated depth-1 type, AC2 d1, d2, d3, d5 malformed; d6 depth-2 not counted) held. AC3 well-formed rollouts (0.160.0, 0.171.0, prompt shapes) byte-identical to base 7fccd1e0.
   - qa edge cases beyond the fixtures (13 shapes, base 7fccd1e0 vs HEAD with `--observe --expect-model`): triple type, duplicated type on an event_msg line, an unterminated event line carrying `\u`, a lone `"model` line, an unterminated string inside an array, a duplicated type with whitespace — HEAD exit 3, base exit 0; a "type" string value, a depth-1 type after nesting, a type inside an array object, `\"` inside an array — exit 0 on both (no over-refusal); an unterminated line outside the prefilter — exit 0 on both (outside the input space); a `type` duplicate key — exit 3 on both (existing behaviour, out of scope 2, issue #760).
   - qa reading items: the header documents both new rules; the "never read" sentence now reads "never aggregated (but see the two malformed rules below)"; `--help` exit 0 and 3 items name `--observe`; the no-mode and positional usage errors name `--observe`; the completed-run gate tokenizer is unchanged (`git diff 7fccd1e0 HEAD -- bin/codex-capture.sh` shows no hunk there; issue #760).
+  - review (round 1, 2026-11-21): APPROVE → READY_FOR_MERGE — record .shell-team/reviews/T-1193.md; Codex gpt-6-luna on both passes, read by the role from the binding and confirmed by `--expect-model` publish (`model=gpt-6-luna`); no blocker or major. Synthesis audit ledger row 1 rejects the adversarial pass's major (that `--observe`'s exit-3 text omits completed-gate refusals): the ground is substantive — `--observe` returns before the completed-run gate (`bin/codex-capture.sh:522-535`), confirmed by a probe that returned exit 0 with `model=zq-1` on a rollout with no command records — and does not rest on frozen status, so the downgrade-ground check leaves it rejected
+  - fast-follow disposition (2026-11-21): minor (a `\u`-spelled second `type` key is not counted by D2) — filed as issue #760 (already covers this shape, the spec's declared out-of-scope 2); nit (no fixture for several objects on one line or a very long line) — waived: behaviour is correct (several objects on one line are refused as malformed) and no new guard is added
 
 
 
