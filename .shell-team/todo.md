@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
+- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #782, relayed in its essentials by the coordinating session with tech-lead's settled map (deliverable path, fixed headings, criteria, non-goals, pre-commitment, version). This role cannot read the tracker, so its facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself, and no removal issue is filed by it. Branch `feature/782-playbook-measurement-design`; sprint context-trim, last backlog item, release PATCH v2.9.7 (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -29,6 +29,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the note's premises are in-repo records, and any figure about model behaviour or cost must be derived or labelled estimate by AC3
   - freeze-attestation (v1, 2026-11-22): lines=9/9 sweep=mutual-satisfiability verdict=2P/7F owner=coordinating session (pre-implementation run at 558093be: AC1-AC3, AC5, AC8, AC10 red on the missing document, AC7 red on its positive control, AC4 and AC6 green; the discriminator resolves to 59e16830 in this checkout and is spelled identically at its three sites; specimen sweep in a scratch clone: AC1-AC8 and AC10 green on a throwaway document in the spec's grammar, and duplicate-heading, stripped cost tail, dropped tokens line, dropped age marker, moved Scope: maintainer and dropped reuse candidate each turned its criterion red)
   - intent-hash (v1): 6122747ee427ea92b37257decb48aa5ab3abf497
+  - review (round 1, 2026-11-22): REQUEST_CHANGES → READY_FOR_ENG — record .shell-team/reviews/T-1199.md; Codex gpt-6-luna at effort max on both passes (confirmed in each rollout by the coordinating session); five majors in the design's content (overlapping verdicts, run counts omitting the full arm and an unstated price basis, three binary repetitions cannot resolve a small effect, removal allowed with strata unmeasured, the whole-block self-contradiction) and four minors; no never-dropped component defeated (the sections and the cost grammar hold), so the task is reworked in place
 
 
 
