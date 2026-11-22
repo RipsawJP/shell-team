@@ -11,6 +11,21 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1197** Machinery inventory: one document recording, for every agent, prompt block, skill, bin entry, CI step and review shape, what it does, what it prevents, whether that failure still reproduces, a verdict and the host cost (issue #754) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1197-machinery-inventory.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #754, relayed in its essentials by the coordinating session with settled decisions on item units, row grammar, criteria, verdict scope, pre-commitment and version (2026-11-22). This role cannot read the tracker, so its facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself; follow-up issues come only after the inventory is reviewed. Branch `feature/754-machinery-inventory` cut from develop a35e040b; sprint machinery-inventory, no release (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - spec choices (pm-spec, 2026-11-22): rows are `### item: <id>` headings with five one-line fields (`does`, `prevents … — provenance:`, `reproducible: measured:|unmeasured:`, `verdict: … — evidence:`, `host-cost`); CI steps are covered exactly once, as a `- ci-step:` line in a bin row or as a `ci:` row, and shellcheck steps and suites with no bin subject get their own `ci:` rows (tie-break in the spec's Assumptions); the closed shape list carries at least primary, adversarial, evidence, review-response, spec-review and drift-semantic (drift-evaluator's Codex semantic pass); registry.txt is read by check-prompt-sync.sh and gen-playbook-blocks.sh, so "the generator's config" is refined in the document's sentence, and it stays a non-item.
+  - spec-choices-confirmed (coordinating session, 2026-11-22): the CI tie-break, the two readers of registry.txt and `shape:drift-semantic` accepted; tracked counts measured with git ls-files — agents 9, skills 7, bin 62, prompt blocks 29 .md plus registry.txt, CI `- name:` steps 110, no duplicated step name; the platform fact has an external primary source (the Claude Code subagents documentation page), to be cited by the writer
+  - dispatch-reflection: implement — T-1196 — repeat — T-1196's recorded value is `serial`; one document is the single landed artifact, the parallel read-only readers are a gather step feeding one writer
+  - dispatch-reflection: verify — T-1196 — repeat — T-1196's recorded value is `serial`; one spec's check-acs, one derivation re-run and a judgment sample of provenance cells
+  - dispatch-reflection: specify — T-1196 — repeat — T-1196's recorded value is `pm-authored`; the issue body and the coordinator's settled decisions hand over as text
+  - dispatch-reflection: spec-review — T-1196 — repeat — T-1196's recorded value is `none`; the one external premise has a cite-or-label criterion and the reproducibility cells are marked unmeasured
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — one document is the single landed artifact, so there is no disjoint file set that all lands; parallel read-only readers are a gather step feeding one writer, not an implement election; tier2 does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, one derivation re-run and a judgment sample of provenance cells; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue body and the coordinator's settled intent hand over as text
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the one external premise carries a cite-or-label criterion and has a primary source; reproducibility cells are marked unmeasured rather than resting on model behaviour
+
 
 
 
