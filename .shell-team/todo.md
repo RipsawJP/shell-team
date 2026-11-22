@@ -32,6 +32,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 
 
+
 ### QA verdict — T-1195 (qa-verifier, round 1)
 
 ### QA verdict: PASS
@@ -7072,6 +7073,17 @@ Supersedes nothing above (rounds 1-3's own numbers stand as measured then); this
 
 ## Done
 
+- [x] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
+  - closed: 2026-11-22, PR #783 → develop, closes #781 — merge pending the sprint batch GO (stacked train, sprint context-trim)
+  - entry-mode: pm-authored
+  - spec-review: none
+  - trivial-path: prose-only removal of a duplicate in a shipped orchestration prompt, no behaviour, checker or registry change; precedents the trivial-path entries T-1187 and T-1188 on this board; both gates still run.
+  - source: issue #781, relayed by the coordinating session with tech-lead's measured inventory at develop b5927c58 and the settled in-place shape; branch `feature/781-skills-run-dedupe`; sprint context-trim, release PATCH v2.9.7 (relayed); T-1199 (#782) stacks after.
+  - engineer hand-off: skills/run/SKILL.md line 131 replaced in place as one line (step-6 pointer + unchanged authorship sentence; line count unchanged); docs/loop-engineering/means-ends-reflection.md:5 now names step 5 only.
+  - checks: spec-mode check-acs run 7 passed 0 failed (AC1-AC7); suites (WSL bash 5.2) check-prompt-sync, codex-skeleton-hygiene, check-refreeze-grant, check-oversight ALL-PASS.
+  - review (round 1, 2026-11-22): APPROVE → READY_FOR_MERGE — record .shell-team/reviews/T-1198.md; Codex gpt-6-luna at effort max on both passes (confirmed in each rollout by the coordinating session); one minor — the inventory's skills/run row (docs/loop-engineering/machinery-inventory.md, a dated snapshot at its base) still describes the repeat — folded into the next inventory refresh, no separate issue
+  - pr: #783 (base develop, open; merges with the sprint batch GO)
+
 - [x] **T-1197** Machinery inventory: one document recording, for every agent, prompt block, skill, bin entry, CI step and review shape, what it does, what it prevents, whether that failure still reproduces, a verdict and the host cost (issue #754) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1197-machinery-inventory.md
   - closed: 2026-11-22, PR #779 → develop, closes #754 — merge pending the sprint batch GO (sprint machinery-inventory)
   - entry-mode: pm-authored
@@ -13847,3 +13859,12 @@ _(none)_
 - Eight generated copies: the exception sentence with the Codex-only qualifier, `grep -cF 'The one exception applies on the Codex CLI host only (the Claude Code host is unchanged) and to exactly two command shapes'` → 1 in each of `.shell-team/lessons.md`, `agents/{engineer,pm-spec,qa-verifier,tech-lead}.md` and `templates/prompt-blocks/playbook-{engineer,pm-spec,qa-verifier,tech-lead}.md`; the eight agent and block copies reduce to one unique string (`sort -u | wc -l` → 1); `check-prompt-sync.sh` rc=0.
 - Edge cases tried: AC8/AC10 widened scope via check-acs; recursive-delete re-grep above; merge-base cmp of the Claude Code text; test-edit: none. Prose and generated-block deliverable, so the fixture-synthesis checklist does not apply beyond the check lines.
 - Risk notes for reviewer: `environmentally-unverified: issue #662` (tracker unreadable here); AC7/AC8 merge-point-scoped.
+
+### T-1198 QA verdict: PASS
+- Task: T-1198 → READY_FOR_REVIEW
+- Tests: the suites (WSL bash 5.2) check-prompt-sync, codex-skeleton-hygiene, check-refreeze-grant, check-oversight all PASS, ALL-PASS; check-handoff on the board rc=0.
+- Acceptance criteria: 7/7 passed — command: `bash bin/check-acs.sh .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md` → `7 passed, 0 failed, 0 skipped`. No runtime (check-less) criterion.
+- Judgment: step 6 line 131 pointer resolves to step 5's same-named bullet (line 108); authorship sentence is byte-identical to base (AC3 exact-string match, count 1); base line 131 duties (four questions at three firing points, disposition rule, authorship naming) all kept via pointer + sentence; Worked example pointer stays on line 108 only (pinned); lines 102/114/116/128/130 still name rules present in file; line count unchanged (AC4).
+- Mutation probe: scratch copy with base SKILL.md restored → AC1 command gives n=2, rc=1 (red).
+- Edge cases tried: AC5 across committed/staged/unstaged; working tree clean after run.
+- Risk notes for reviewer: prose-only deliverable, fixture checklist not applicable; machinery-inventory/telemetry line citations stay valid by line-count preservation (AC4).
