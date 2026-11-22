@@ -11,13 +11,6 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
-  - entry-mode: pm-authored
-  - spec-review: none
-  - trivial-path: prose-only removal of a duplicate in a shipped orchestration prompt, no behaviour, checker or registry change; precedents the trivial-path entries T-1187 and T-1188 on this board; both gates still run.
-  - source: issue #781, relayed by the coordinating session with tech-lead's measured inventory at develop b5927c58 and the settled in-place shape; branch `feature/781-skills-run-dedupe`; sprint context-trim, release PATCH v2.9.7 (relayed); T-1199 (#782) stacks after.
-  - engineer hand-off: skills/run/SKILL.md line 131 replaced in place as one line (step-6 pointer + unchanged authorship sentence; line count unchanged); docs/loop-engineering/means-ends-reflection.md:5 now names step 5 only.
-  - checks: spec-mode check-acs run 7 passed 0 failed (AC1-AC7); suites (WSL bash 5.2) check-prompt-sync, codex-skeleton-hygiene, check-refreeze-grant, check-oversight ALL-PASS.
 
 
 
@@ -7079,6 +7072,17 @@ Supersedes nothing above (rounds 1-3's own numbers stand as measured then); this
 `bash bin/check-acs.sh .shell-team/specs/T-1060-adopter-binding-docs.md`: 11 passed, 0 failed, 1 skipped (AC12, by design), 0 unrecognized. `bash bin/check-intent.sh .shell-team/specs/T-1060-adopter-binding-docs.md .shell-team/todo.md`: aligned, hash unchanged. `bash bin/check-pii-shapes.sh --base d01ab30`: clean.
 
 ## Done
+
+- [x] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
+  - closed: 2026-11-22, PR #783 → develop, closes #781 — merge pending the sprint batch GO (stacked train, sprint context-trim)
+  - entry-mode: pm-authored
+  - spec-review: none
+  - trivial-path: prose-only removal of a duplicate in a shipped orchestration prompt, no behaviour, checker or registry change; precedents the trivial-path entries T-1187 and T-1188 on this board; both gates still run.
+  - source: issue #781, relayed by the coordinating session with tech-lead's measured inventory at develop b5927c58 and the settled in-place shape; branch `feature/781-skills-run-dedupe`; sprint context-trim, release PATCH v2.9.7 (relayed); T-1199 (#782) stacks after.
+  - engineer hand-off: skills/run/SKILL.md line 131 replaced in place as one line (step-6 pointer + unchanged authorship sentence; line count unchanged); docs/loop-engineering/means-ends-reflection.md:5 now names step 5 only.
+  - checks: spec-mode check-acs run 7 passed 0 failed (AC1-AC7); suites (WSL bash 5.2) check-prompt-sync, codex-skeleton-hygiene, check-refreeze-grant, check-oversight ALL-PASS.
+  - review (round 1, 2026-11-22): APPROVE → READY_FOR_MERGE — record .shell-team/reviews/T-1198.md; Codex gpt-6-luna at effort max on both passes (confirmed in each rollout by the coordinating session); one minor — the inventory's skills/run row (docs/loop-engineering/machinery-inventory.md, a dated snapshot at its base) still describes the repeat — folded into the next inventory refresh, no separate issue
+  - pr: #783 (base develop, open; merges with the sprint batch GO)
 
 - [x] **T-1197** Machinery inventory: one document recording, for every agent, prompt block, skill, bin entry, CI step and review shape, what it does, what it prevents, whether that failure still reproduces, a verdict and the host cost (issue #754) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1197-machinery-inventory.md
   - closed: 2026-11-22, PR #779 → develop, closes #754 — merge pending the sprint batch GO (sprint machinery-inventory)
