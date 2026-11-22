@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1197** Machinery inventory: one document recording, for every agent, prompt block, skill, bin entry, CI step and review shape, what it does, what it prevents, whether that failure still reproduces, a verdict and the host cost (issue #754) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1197-machinery-inventory.md
+- [ ] **T-1197** Machinery inventory: one document recording, for every agent, prompt block, skill, bin entry, CI step and review shape, what it does, what it prevents, whether that failure still reproduces, a verdict and the host cost (issue #754) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1197-machinery-inventory.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #754, relayed in its essentials by the coordinating session with settled decisions on item units, row grammar, criteria, verdict scope, pre-commitment and version (2026-11-22). This role cannot read the tracker, so its facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself; follow-up issues come only after the inventory is reviewed. Branch `feature/754-machinery-inventory` cut from develop a35e040b; sprint machinery-inventory, no release (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -25,6 +25,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, one derivation re-run and a judgment sample of provenance cells; no mechanism-class full-population half
   - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue body and the coordinator's settled intent hand over as text
   - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the one external premise carries a cite-or-label criterion and has a primary source; reproducibility cells are marked unmeasured rather than resting on model behaviour
+  - freeze-attestation (v1, 2026-11-22): lines=9/9 sweep=mutual-satisfiability verdict=1P/8F owner=coordinating session (pre-implementation run at 52d9764c: every line except AC9 fails on the missing document, by its leading `test -s`; specimen sweep in a scratch clone with a mechanically generated document in the row grammar: AC1–AC9 all green, and each of the mutations drop-a-row, duplicate ci-step, duplicate ci row, blank a field, simplify without evidence, drop a generated-block line, drop a closed-list shape, drop the platform URL turned its criterion red)
+  - intent-hash (v1): d3abbc9295fb1eb8288a238e4c7d22a37d96b1db
 
 
 
