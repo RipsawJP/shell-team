@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_QA` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
+- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #782, relayed in its essentials by the coordinating session with tech-lead's settled map (deliverable path, fixed headings, criteria, non-goals, pre-commitment, version). This role cannot read the tracker, so its facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself, and no removal issue is filed by it. Branch `feature/782-playbook-measurement-design`; sprint context-trim, last backlog item, release PATCH v2.9.7 (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -13887,3 +13887,14 @@ _(none)_
 - Mutation probe: scratch copy with base SKILL.md restored → AC1 command gives n=2, rc=1 (red).
 - Edge cases tried: AC5 across committed/staged/unstaged; working tree clean after run.
 - Risk notes for reviewer: prose-only deliverable, fixture checklist not applicable; machinery-inventory/telemetry line citations stay valid by line-count preservation (AC4).
+
+### T-1199 QA verdict: PASS
+- Task: T-1199 → READY_FOR_REVIEW
+- Tests: no fixture suite reached (no `bin/`, `tests/`, `templates/`, `.github/` path in the diff); check-handoff on the board rc=0.
+- Acceptance criteria: 9/9 runnable passed — command: spec-mode check-acs run (WSL bash 5.2) → `9 passed, 0 failed, 1 skipped, 0 unrecognized`. AC9 (CI) SKIP, above ceiling.
+- Verification ceiling: unit-and-static — verifies every criterion at or below that level; AC9 (CI on the pull request) stays with the coordinating session, `environmentally-unverified: AC9`.
+- Records: check-intent aligned (rc=0); check-provenance conformant, 4 entries (rc=0); check-interventions --task T-1199 conformant, 1 entry (rc=0); check-pii-shapes on the document clean (rc=0).
+- Cost lines re-run: the six derivation commands reproduce (136 numeric / 64 null tokens of the latest 200 span rows; 130 numeric duration; engineer mean 34 rows, 162482 tokens, 791844 ms; 87 engineer bullets). Estimates follow: 33 runs x 13.2 min = 7.3 h (stated "about 7.5"), 33 x 162482 = 5.36M, 87 x 3 = 261, 261 x 13.2 min = 57.4 h (stated "about 58"), 261 x 162482 = 42.4M. Rounding runs slightly high, same direction, not material.
+- Reading: five issue points all present (unit, observation plus still-prevents/no-longer-needed, cost, removal path, cannot-measure); no removal and no age criterion. Deferral claims 1-5 and signal-1 match the record's own text; inventory line 23 approve-before-filing matches; Superseded-by gap matches `bin/check-playbook.sh` (missing/empty refused; also self-reference, dangling, non-active target) and the lessons header. Host cost (one approval per pilot, one per removal proposal) follows from the design as written.
+- Edge cases tried: re-ran the 200-row window derivations (window moves as telemetry grows, so counts are as of this HEAD); git status clean before the board edit.
+- Risk notes for reviewer: the cost figures use a rolling tail window, so a later re-run gives different numbers; null tokens are 32 percent of the sample. Prose-only deliverable with derivation commands re-run, fixture checklist otherwise not applicable.
