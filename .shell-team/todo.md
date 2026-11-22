@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_QA` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
+- [ ] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: prose-only removal of a duplicate in a shipped orchestration prompt, no behaviour, checker or registry change; precedents the trivial-path entries T-1187 and T-1188 on this board; both gates still run.
@@ -13855,3 +13855,12 @@ _(none)_
 - Eight generated copies: the exception sentence with the Codex-only qualifier, `grep -cF 'The one exception applies on the Codex CLI host only (the Claude Code host is unchanged) and to exactly two command shapes'` → 1 in each of `.shell-team/lessons.md`, `agents/{engineer,pm-spec,qa-verifier,tech-lead}.md` and `templates/prompt-blocks/playbook-{engineer,pm-spec,qa-verifier,tech-lead}.md`; the eight agent and block copies reduce to one unique string (`sort -u | wc -l` → 1); `check-prompt-sync.sh` rc=0.
 - Edge cases tried: AC8/AC10 widened scope via check-acs; recursive-delete re-grep above; merge-base cmp of the Claude Code text; test-edit: none. Prose and generated-block deliverable, so the fixture-synthesis checklist does not apply beyond the check lines.
 - Risk notes for reviewer: `environmentally-unverified: issue #662` (tracker unreadable here); AC7/AC8 merge-point-scoped.
+
+### T-1198 QA verdict: PASS
+- Task: T-1198 → READY_FOR_REVIEW
+- Tests: the suites (WSL bash 5.2) check-prompt-sync, codex-skeleton-hygiene, check-refreeze-grant, check-oversight all PASS, ALL-PASS; check-handoff on the board rc=0.
+- Acceptance criteria: 7/7 passed — command: `bash bin/check-acs.sh .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md` → `7 passed, 0 failed, 0 skipped`. No runtime (check-less) criterion.
+- Judgment: step 6 line 131 pointer resolves to step 5's same-named bullet (line 108); authorship sentence is byte-identical to base (AC3 exact-string match, count 1); base line 131 duties (four questions at three firing points, disposition rule, authorship naming) all kept via pointer + sentence; Worked example pointer stays on line 108 only (pinned); lines 102/114/116/128/130 still name rules present in file; line count unchanged (AC4).
+- Mutation probe: scratch copy with base SKILL.md restored → AC1 command gives n=2, rc=1 (red).
+- Edge cases tried: AC5 across committed/staged/unstaged; working tree clean after run.
+- Risk notes for reviewer: prose-only deliverable, fixture checklist not applicable; machinery-inventory/telemetry line citations stay valid by line-count preservation (AC4).
