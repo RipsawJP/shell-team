@@ -2278,7 +2278,7 @@ t1192_pub "$M_DEPTH" "$T1192/r-160" --expect-model zq-model-1
 M_NOGATE="$(t1192_mutant no-gate 's/^  apply_model_gate publish$/  :/')"
 t1192_pub "$M_NOGATE" "$T1192/r-160" --expect-model zq-model-2
 [[ "$T1192_RC" -ne 3 ]] || fail "T-1192 mutation no-gate: removing the publish gate was NOT caught"
-M_SUFFIX="$(t1192_mutant no-suffix 's/ model=%s\\n/\\n/')"
+M_SUFFIX="$(t1192_mutant no-suffix 's/ model=%s%s\\n/\\n/')"
 t1192_pub "$M_SUFFIX" "$T1192/r-160"
 grep -qE ' model=zq-model-1$' "$T1192_ERR" && fail "T-1192 mutation no-suffix: dropping the model= suffix was NOT caught"
 pass "T-1192 mutation self-check: reading any record type, comparing by prefix, retyping from a nested key, removing the publish gate and dropping the summary suffix are each caught by this suite's fixtures"
@@ -2299,6 +2299,223 @@ done
 grep -Fq -- "--publish --stem T-XXX-drift-codex --publish-out \"<RAW_OUT>\" --publish-jsonl \"<RAW_JSONL>\" --thread-id \"<THREAD_ID>\" --expect-model \"<MODEL>\"" "$DRIFT_EVALUATOR_MD" \
   || fail "T-1192: the drift publish line in agents/drift-evaluator.md does not end with --expect-model \"<MODEL>\""
 pass "T-1192 agent prose: both agent files state the -m <MODEL> insertion, read the model through --print-resolved, name model not established, end every publish line with --expect-model, and no codex exec skeleton line carries -m"
+
+# =============================================================================
+# T-1195 (issue #757): the effort a pass ran at, read from its own rollout.
+#   --publish --thread-id <id> --expect-effort <e>  and  --observe ... --expect-effort <e>
+# Rollouts are SYNTHESIZED in the measured record shapes: the `review` shape
+# carries the effort only in an event_msg `thread_settings_applied`; the prompt
+# shape also carries it in `turn_context` and an object-valued decoy in a
+# response_item. `zq-eff-a` / `zq-eff-b` name no real effort.
+# =============================================================================
+printf -- '\n--- T-1195 effort gate ---\n'
+T1195="$TMP/t1195"
+mkdir -p "$T1195" || fail "T-1195: cannot create the scratch root"
+t1195_ts() { printf '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"thread_settings_applied","thread_settings":{"model":"zq-model-1","reasoning_effort":%s,"collaboration_mode":{"mode":"default","settings":{"model":"zq-model-1","reasoning_effort":%s}}}}}\n' "$1" "$1"; }
+t1195_tx() { printf '{"timestamp":"2026-11-21T00:00:02Z","type":"turn_context","payload":{"turn_id":"t1","model":"zq-model-1","effort":%s,"collaboration_mode":{"mode":"default","settings":{"model":"zq-model-1","reasoning_effort":%s}}}}\n' "$1" "$2"; }
+t1195_eo() { printf '{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"session_configured","reasoning_effort":%s}}\n' "$1"; }
+t1195_ris() { printf '{"timestamp":"2026-11-21T00:00:01Z","type":"response_item","payload":{"type":"message","reasoning_effort":%s}}\n' "$1"; }
+T1195_RI='{"timestamp":"2026-11-21T00:00:01Z","type":"response_item","payload":{"type":"function_call","tools":[{"name":"x","parameters":{"properties":{"reasoning_effort":{"type":"string"}}}}]}}'
+T1195_UT='{"timestamp":"2026-11-21T00:00:02Z","type":"turn_context","payload":{"effort":"zq-eff-a}'
+T1195_DT='{"timestamp":"2026-11-21T00:00:02Z","type":"turn_context","type":"turn_context","payload":{"effort":"zq-eff-a"}}'
+# a nested `type` whose value is thread_settings_applied, under an event_msg whose own payload type is another subtype
+T1195_NEST='{"timestamp":"2026-11-21T00:00:01Z","type":"event_msg","payload":{"type":"session_configured","reasoning_effort":"zq-eff-b","inner":{"type":"thread_settings_applied"}}}'
+T1195_CE2='{"timestamp":"2026-11-21T00:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","exit_code":0,"aggregated_output":"\"reasoning_effort\":\"zq-eff-a\""}}}'
+if grep -qF 'model' <<< "$T1195_UT"; then fail "T-1195: the unterminated fixture carries model bytes (it would be read by the model extractor, not only the effort one)"; fi
+if grep -qF 'model' <<< "$T1195_DT"; then fail "T-1195: the duplicated-type fixture carries model bytes"; fi
+{ t1192_sm '"zq-model-1"'; t1195_ts '"zq-eff-a"'; t1192_tl; } > "$T1195/fv"
+{ t1192_sm '"zq-model-1"'; printf '%s\n' "$T1195_RI"; t1195_tx '"zq-eff-a"' '"zq-eff-a"'; t1195_ts '"zq-eff-a"'; t1195_eo '"zq-eff-b"'; t1192_tl; } > "$T1195/fp"
+{ t1192_sm '"zq-model-1"'; t1192_tl; } > "$T1195/f0"
+{ t1192_sm '"zq-model-1"'; t1195_ris '"zq-eff-a"'; t1192_tl; } > "$T1195/f1"
+{ t1192_sm '"zq-model-1"'; t1195_eo '"zq-eff-a"'; t1192_tl; } > "$T1195/f2"
+{ t1192_sm '"zq-model-1"'; printf '%s\n%s\n' "$T1195_CE2" "$T1192_TC"; } > "$T1195/f3"
+{ t1192_sm '"zq-model-1"'; t1195_tx '"zq-eff-a"' '"zq-eff-b"'; t1192_tl; } > "$T1195/f4"
+{ t1192_sm '"zq-model-1"'; t1195_tx '"zq-eff-a"' '"zq-eff-a"'; t1195_ts '"zq-eff-b"'; t1192_tl; } > "$T1195/f5"
+{ t1192_sm '"zq-model-1"'; t1195_tx null null; t1192_tl; } > "$T1195/f6"
+{ t1192_sm '"zq-model-1"'; t1195_ts '"zq bad;x"'; t1192_tl; } > "$T1195/f7"
+{ t1192_sm '"zq-model-1"'; t1195_ts "\"zq-eff-${T1192_BS}u0061\""; t1192_tl; } > "$T1195/f8"
+grep -qF "zq-eff-${T1192_BS}u0061" "$T1195/f8" || fail "T-1195: the backslash-u fixture does not carry its escape"
+{ t1192_sm '"zq-model-1"'; t1195_ts '"zq-eff-ax"'; t1192_tl; } > "$T1195/f9"
+{ t1192_sm '"zq-model-1"'; printf '%s\n' "$T1195_UT"; t1192_tl; } > "$T1195/f10"
+{ t1192_sm '"zq-model-1"'; t1195_ts '"Zq-Eff"'; t1192_tl; } > "$T1195/f11"
+{ t1192_sm '"zq-model-1"'; printf '%s\n' "$T1195_DT"; t1192_tl; } > "$T1195/f12"
+{ t1192_sm '"zq-model-1"'; printf '%s\n' "$T1195_NEST"; t1192_tl; } > "$T1195/f13"
+{ t1192_sm '"zq-model-1"'; t1195_ts 7; t1192_tl; } > "$T1195/f14"
+
+t1195_ok() {  # name src want flags...
+  local name="$1" src="$2" want="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1195 $name: expected exit 0, got $T1192_RC ($(cat "$T1192_ERR"))"
+  grep -qE "^codex-capture: publish: rollout thread=$T1192_ID .* model=zq-model-1 effort=$want\$" "$T1192_ERR" \
+    || fail "T-1195 $name: the summary line must end in ' model=zq-model-1 effort=$want' ($(cat "$T1192_ERR"))"
+  cmp -s "$src" "$T1192_RV/T-000-codex-primary.jsonl" || fail "T-1195 $name: the published jsonl is not byte-equal to the rollout"
+}
+t1195_refuse() {  # name src cause flags...
+  local name="$1" src="$2" cause="$3"
+  shift 3
+  t1192_pub "$SCRIPT" "$src" "$@"
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1195 $name: expected exit 3, got $T1192_RC ($(cat "$T1192_ERR"))"
+  grep -qF 'effort not established' "$T1192_ERR" || fail "T-1195 $name: stderr lacks 'effort not established' ($(cat "$T1192_ERR"))"
+  grep -qF "cause=$cause" "$T1192_ERR" || fail "T-1195 $name: stderr lacks cause=$cause ($(cat "$T1192_ERR"))"
+  [[ -z "$(ls -A "$T1192_RV")" ]] || fail "T-1195 $name: the reviews dir is not empty after a refusal"
+}
+
+# positive control: every fixture passes the completed-run and model gates when
+# no effort is requested (so a refusal below is the effort gate).
+for r in fv fp f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14; do
+  t1192_pub "$SCRIPT" "$T1195/$r"
+  [[ "$T1192_RC" -eq 0 ]] || fail "T-1195 positive control: $r must publish without --expect-effort (rc=$T1192_RC)"
+  if grep -qF 'effort=' "$T1192_ERR"; then fail "T-1195 positive control: $r printed effort= without --expect-effort"; fi
+done
+pass "T-1195 positive control: every synthesized rollout publishes without --expect-effort, and no summary line carries effort="
+
+t1195_ok "review shape" "$T1195/fv" zq-eff-a --expect-effort zq-eff-a
+t1195_ok "prompt shape (turn_context, response_item decoy, other event_msg subtype)" "$T1195/fp" zq-eff-a --expect-effort zq-eff-a
+t1195_ok "review shape with --expect-model too" "$T1195/fv" zq-eff-a --expect-model zq-model-1 --expect-effort zq-eff-a
+pass "T-1195 extraction: the review and prompt shapes establish the effort; an object value, a response_item and another event_msg subtype are never read"
+
+t1195_refuse "mismatch" "$T1195/fv" mismatch --expect-effort zq-eff-b
+t1195_refuse "prefix near-miss, observed longer" "$T1195/f9" mismatch --expect-effort zq-eff-a
+t1195_refuse "prefix near-miss, expected longer" "$T1195/fv" mismatch --expect-effort zq-eff-ax
+for r in f0 f1 f2 f3; do t1195_refuse "absent $r" "$T1195/$r" absent --expect-effort zq-eff-a; done
+t1195_refuse "nested type spoofing thread_settings_applied" "$T1195/f13" absent --expect-effort zq-eff-b
+for r in f4 f5; do t1195_refuse "inconsistent $r" "$T1195/$r" inconsistent --expect-effort zq-eff-a; done
+for r in f6 f7 f8 f10 f11 f12 f14; do t1195_refuse "malformed $r" "$T1195/$r" malformed --expect-effort zq-eff-a; done
+t1195_refuse "malformed value never echoed" "$T1195/f7" malformed --expect-effort zq-eff-a
+if grep -qF 'zq bad' "$T1192_ERR"; then fail "T-1195: a malformed value was echoed on stderr"; fi
+pass "T-1195 refusals: mismatch, prefix near-misses, absent, inconsistent and malformed each exit 3 with the cause, publish nothing and echo nothing"
+
+t1195_ok "report-only, no effort" "$T1195/f0" unavailable --expect-effort -
+t1195_ok "report-only, inconsistent" "$T1195/f5" unavailable --expect-effort -
+t1195_ok "report-only, malformed" "$T1195/f6" unavailable --expect-effort -
+t1195_ok "report-only, established" "$T1195/fv" zq-eff-a --expect-effort -
+pass "T-1195 report-only: --expect-effort - never refuses and prints the observed effort or unavailable"
+
+t1192_pub "$SCRIPT" "$T1195/fv" --expect-model zq-model-2 --expect-effort zq-eff-a
+[[ "$T1192_RC" -eq 3 ]] || fail "T-1195 model first: expected exit 3"
+grep -qF 'model not established' "$T1192_ERR" || fail "T-1195 model first: stderr lacks 'model not established'"
+if grep -qF 'effort not established' "$T1192_ERR"; then fail "T-1195 model first: a pass failing both must report only the model"; fi
+pass "T-1195 order: a pass failing both gates reports model not established, not effort not established"
+
+for bad in Zq '' 'a b'; do
+  t1192_pub "$SCRIPT" "$T1195/fv" --expect-effort "$bad"
+  [[ "$T1192_RC" -eq 2 ]] || fail "T-1195 usage: --expect-effort '$bad' must exit 2 (rc=$T1192_RC)"
+done
+set +e
+bash "$SCRIPT" --alloc --stem T-000-codex-primary --reviews-dir "$T1195" --expect-effort zq-eff-a < /dev/null > /dev/null 2>&1
+T1195_ARC=$?
+set -e
+[[ "$T1195_ARC" -eq 2 ]] || fail "T-1195 usage: --alloc --expect-effort must exit 2 (rc=$T1195_ARC)"
+mkdir -p "$T1195/uv" || fail "T-1195: scratch"
+bash "$SCRIPT" --alloc --stem T-000-codex-primary --reviews-dir "$T1195/uv" > "$T1195/ual" 2> /dev/null || fail "T-1195: alloc failed"
+T1195_UO="$(sed -n 1p "$T1195/ual")"
+T1195_UJ="$(sed -n 2p "$T1195/ual")"
+printf 'review text\n' > "$T1195_UO"
+printf '{"type":"x"}\n' > "$T1195_UJ"
+set +e
+bash "$SCRIPT" --publish --stem T-000-codex-primary --reviews-dir "$T1195/uv" --publish-out "$T1195_UO" --publish-jsonl "$T1195_UJ" --expect-effort zq-eff-a < /dev/null > /dev/null 2>&1
+T1195_URC=$?
+set -e
+[[ "$T1195_URC" -eq 2 ]] || fail "T-1195 usage: --publish --expect-effort without --thread-id must exit 2 (rc=$T1195_URC)"
+pass "T-1195 usage: an out-of-shape value, an empty value, --alloc and a missing --thread-id each exit 2"
+
+# --observe: the same extraction, read-only
+t1195_obs() {  # label fixture flags... -> sets T1195_ORC, T1195_OO, T1195_OE
+  local f="$2" id
+  shift 2
+  T1192_N=$((T1192_N + 1))
+  id="$(printf '00000000-0000-4000-8000-%012d' "$T1192_N")"
+  mkdir -p "$T1195/oc$T1192_N/sessions/2026/11/21" "$T1195/ocwd$T1192_N" || fail "T-1195: scratch"
+  cp "$f" "$T1195/oc$T1192_N/sessions/2026/11/21/rollout-2026-11-21T00-00-00-$id.jsonl" || fail "T-1195: copy rollout"
+  T1195_OO="$T1195/oo$T1192_N"; T1195_OE="$T1195/oe$T1192_N"; T1195_OW="$T1195/ocwd$T1192_N"
+  set +e
+  ( cd "$T1195_OW" && exec env CODEX_HOME="$T1195/oc$T1192_N" bash "$SCRIPT" --observe --thread-id "$id" "$@" ) < /dev/null > "$T1195_OO" 2> "$T1195_OE"
+  T1195_ORC=$?
+  set -e
+}
+t1195_obs a "$T1195/fv" --expect-effort zq-eff-a
+[[ "$T1195_ORC" -eq 0 ]] || fail "T-1195 observe: expected exit 0"
+[[ "$(cat "$T1195_OO")" == "$(printf 'model=zq-model-1\neffort=zq-eff-a')" ]] || fail "T-1195 observe: stdout must be the two lines"
+t1195_obs b "$T1195/fv" --expect-effort zq-eff-b
+[[ "$T1195_ORC" -eq 3 && ! -s "$T1195_OO" ]] || fail "T-1195 observe: a mismatch must exit 3 with nothing on stdout"
+grep -qF 'cause=mismatch' "$T1195_OE" || fail "T-1195 observe: stderr lacks cause=mismatch"
+t1195_obs c "$T1195/f0" --expect-effort -
+[[ "$T1195_ORC" -eq 0 && "$(cat "$T1195_OO")" == "$(printf 'model=zq-model-1\neffort=unavailable')" ]] || fail "T-1195 observe: report-only with no effort"
+t1195_obs d "$T1195/fp" --expect-model zq-model-1 --expect-effort zq-eff-a
+[[ "$T1195_ORC" -eq 0 && "$(cat "$T1195_OO")" == "$(printf 'model=zq-model-1\neffort=zq-eff-a')" ]] || fail "T-1195 observe: prompt shape"
+t1195_obs e "$T1195/fv"
+[[ "$T1195_ORC" -eq 0 && "$(cat "$T1195_OO")" == 'model=zq-model-1' ]] || fail "T-1195 observe: without --expect-effort stdout must be exactly the model line"
+t1195_obs f "$T1195/fv" --expect-effort
+[[ "$T1195_ORC" -eq 2 ]] || fail "T-1195 observe: --expect-effort without a value must exit 2"
+[[ -z "$(ls -A "$T1195_OW")" ]] || fail "T-1195 observe: the working directory was written"
+pass "T-1195 observe: two stdout lines on success, nothing on stdout on refusal, exactly the model line without --expect-effort"
+
+# --- mutation self-check (each mutation is scoped to extract_effort / the effort
+# gate; the model extractor shares several lines and must not be what gets mutated)
+t1195_mutant() {  # label range-start range-end sed-expr
+  local m="$T1195/mut-$1.sh"
+  sed "/$2/,/$3/ $4" "$SCRIPT" > "$m" || fail "T-1195 mutation $1: sed failed"
+  if cmp -s "$SCRIPT" "$m"; then fail "T-1195 mutation $1: the sed expression changed nothing (the probe is vacuous)"; fi
+  bash -n "$m" || fail "T-1195 mutation $1: the mutant does not parse"
+  printf '%s\n' "$m"
+}
+t1195_probe_absent() {  # label mutant fixture : the unmutated script refuses it as absent; the mutant must not
+  t1192_pub "$SCRIPT" "$3" --expect-effort zq-eff-a
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1195 mutation $1: the unmutated script must refuse $3 (the probe is vacuous)"
+  t1192_pub "$2" "$3" --expect-effort zq-eff-a
+  if [[ "$T1192_RC" -eq 3 ]] && grep -qF 'cause=absent' "$T1192_ERR"; then fail "T-1195 mutation $1: the mutant still refused $3 as absent (NOT caught)"; fi
+}
+t1195_probe_malformed() {  # label mutant fixture : the unmutated script refuses it as malformed; the mutant must not
+  t1192_pub "$SCRIPT" "$3" --expect-effort zq-eff-a
+  [[ "$T1192_RC" -eq 3 ]] || fail "T-1195 mutation $1: the unmutated script must refuse $3 (the probe is vacuous)"
+  t1192_pub "$2" "$3" --expect-effort zq-eff-a
+  if [[ "$T1192_RC" -eq 3 ]] && grep -qF 'cause=malformed' "$T1192_ERR"; then fail "T-1195 mutation $1: the mutant still refused $3 as malformed (NOT caught)"; fi
+}
+M="$(t1195_mutant any-record 'extract_effort()' '^}$' 's/line_type == "turn_context" || (line_type == "event_msg" \&\& payload_type == "thread_settings_applied")/line_type != ""/')"
+t1195_probe_absent any-record "$M" "$T1195/f1"
+M="$(t1195_mutant any-event-subtype 'extract_effort()' '^}$' 's/payload_type == "thread_settings_applied"/payload_type != ""/')"
+t1195_probe_absent any-event-subtype "$M" "$T1195/f2"
+M="$(t1195_mutant payload-type-any-depth 'extract_effort()' '^}$' 's/last_key == "type" \&\& depth == 2 \&\& pstack\[2\] == "payload"/last_key == "type" \&\& depth >= 2/')"
+t1195_probe_absent payload-type-any-depth "$M" "$T1195/f13"
+M="$(t1195_mutant no-unterm 'extract_effort()' '^}$' 's/if (unterm) { nmal++; next }/if (unterm) { next }/')"
+t1195_probe_malformed no-unterm "$M" "$T1195/f10"
+M="$(t1195_mutant no-dup 'extract_effort()' '^}$' 's/if (ntype > 1) { nmal++; next }/if (ntype > 1) { next }/')"
+t1195_probe_malformed no-dup "$M" "$T1195/f12"
+M="$(t1195_mutant null-ok 'extract_effort()' '^}$' 's/if (lk\[j\] == "M") { nmal++; continue }/if (lk[j] == "M") { continue }/')"
+t1195_probe_malformed null-ok "$M" "$T1195/f6"
+M="$(t1195_mutant no-shape-check 'extract_effort()' '^}$' 's/if (has_u_escape(v) || !tok_ok(v)) { nmal++; continue }/if (has_u_escape(v)) { nmal++; continue }/')"
+t1195_probe_malformed no-shape-check "$M" "$T1195/f11"
+# shellcheck disable=SC2016  # the sed program / grep pattern is deliberately literal
+M="$(t1195_mutant prefix-compare 'apply_effort_gate()' '^}$' 's|\[ "\$observed_effort" != "\$expect_effort" \]|[[ "$observed_effort" != "$expect_effort"* ]]|')"
+t1192_pub "$M" "$T1195/f9" --expect-effort zq-eff-a
+[[ "$T1192_RC" -ne 3 ]] || fail "T-1195 mutation prefix-compare: the observed-longer near-miss was still refused (NOT caught)"
+# shellcheck disable=SC2016  # the sed program / grep pattern is deliberately literal
+M="$(t1195_mutant no-gate '^  if \[ "\$expect_effort_given" -eq 1 \]; then$' 'apply_effort_gate publish' 's/^    apply_effort_gate publish$/    :/')"
+t1192_pub "$M" "$T1195/fv" --expect-effort zq-eff-b
+[[ "$T1192_RC" -ne 3 ]] || fail "T-1195 mutation no-gate: removing the publish effort gate was NOT caught"
+# shellcheck disable=SC2016  # the sed program / grep pattern is deliberately literal
+M="$(t1195_mutant suffix-unconditional '^    effort_suffix=""$' '^    printf' 's/^    \[ "\$expect_effort_given" -eq 0 \] || effort_suffix=/    effort_suffix=/')"
+t1192_pub "$M" "$T1195/fv"
+grep -qF 'effort=' "$T1192_ERR" || fail "T-1195 mutation suffix-unconditional: printing effort= without the option was NOT caught"
+pass "T-1195 mutation self-check: reading any record type or event subtype, a nested payload type, dropping the unterminated or duplicated-type verdicts, accepting null or an out-of-shape value, comparing by prefix, removing the gate and printing effort= unconditionally are each caught"
+
+# --- the agent definitions state the mechanism, and no skeleton line carries -c
+for f in "$CODEX_REVIEWER_MD" "$DRIFT_EVALUATOR_MD"; do
+  grep -qF -- '-c model_reasoning_effort=<EFFORT>' "$f" || fail "T-1195: $f does not state the effort clause"
+  grep -qF -- 'field 5' "$f" || fail "T-1195: $f does not read the effort as field 5 of the resolved row"
+  grep -qF 'effort not established' "$f" || fail "T-1195: $f does not state the effort not established handling"
+# shellcheck disable=SC2016  # the sed program / grep pattern is deliberately literal
+  grep -F -- '-c model_reasoning_effort=<EFFORT>' "$f" | grep -vF -- '`<EFFORT>` is `-`' > "$T1195/uncond" || true
+  [[ ! -s "$T1195/uncond" ]] || fail "T-1195: a line of $f states the effort clause without its condition for the unset case"
+  if grep -E '^[[:space:]]*codex exec ' "$f" | grep -qE '(^|[[:space:]])(-c|--config)([[:space:]]|=|$)|model_reasoning_effort'; then
+    fail "T-1195: a codex exec skeleton line in $f carries -c (the insertion must stay prose)"
+  fi
+  grep -E '^[[:space:]]*codex-capture\.sh --publish ' "$f" | grep -vF -- '--expect-model "<MODEL>" --expect-effort "<EFFORT>"' > "$T1195/badpub" || true
+  [[ ! -s "$T1195/badpub" ]] || fail "T-1195: a publish line of $f does not end with --expect-model --expect-effort"
+done
+if grep -qF 'declared and unapplied' "$CODEX_REVIEWER_MD"; then fail "T-1195: agents/code-reviewer.md still says the effort column is declared and unapplied"; fi
+pass "T-1195 agent prose: both agent files state the effort clause only under its condition, read field 5, name effort not established, end every publish line with --expect-effort, and no codex exec skeleton line carries -c"
 
 # =============================================================================
 # Summary

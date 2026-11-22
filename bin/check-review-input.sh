@@ -97,6 +97,31 @@
 #     deterministic comparison against the rollout is bin/codex-capture.sh's
 #     --expect-model gate.
 #
+#   - a SEVENTH per-pass field (T-1195, issue #757): codex-effort. Grammar:
+#       codex-effort (<pass>): requested=<token> — observed=<token>
+#     `requested` is `-` or an effort token (`[a-z][a-z0-9-]*`); `observed` is
+#     an effort token or `unavailable`. It is optional for a pass whose
+#     executor-invocation carries no effort clause, and REQUIRED for a pass
+#     whose executor-invocation (after leading whitespace and one optional
+#     backtick) begins `codex exec` and carries the token pair
+#     `-c model_reasoning_effort=<e>` anywhere. Refusals, none of which echoes
+#     a byte of any field:
+#       codex-effort-missing        the clause is carried and no line exists
+#       codex-effort-duplicate      more than one line for the pass id
+#       codex-effort-vocabulary     a malformed line (missing ' — ', a value
+#                                   outside the vocabulary above)
+#       codex-effort-mismatch       requested names an effort and observed
+#                                   differs, `unavailable` included
+#       codex-effort-contradiction  against a `codex exec` invocation: counting
+#                                   from token 3 (token 5 when token 3 is -m),
+#                                   the next two tokens are not
+#                                   `-c model_reasoning_effort=<requested>`
+#                                   when an effort is named; under `-`, the clause
+#                                   at any position of the invocation.
+#     Evaluation order: duplicate, vocabulary, mismatch, contradiction. This
+#     checker never reads a raw capture; the rollout comparison is
+#     bin/codex-capture.sh's --expect-effort gate.
+#
 # It never judges the content of the verbatim executor-invocation field
 # beyond non-emptiness and single-line-ness (DP-6/DP-7; two records
 # differing only in that field's free text both pass), it never verifies a
@@ -299,7 +324,7 @@ section_of() {
 # (AC8's continuation-line case). A real scan failure is distinguished
 # from a clean "no fields found" the same way the heading scan above
 # is. ------------------------------------------------------------------
-FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture|self-detected-host|codex-model)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
+FIELD_RE='^[[:space:]]*-[[:space:]](executor-invocation|pass-role|briefing-fidelity|raw-capture|self-detected-host|codex-model|codex-effort)[[:space:]]\(([^)]*)\):[[:space:]]?(.*)$'
 grep -nE -- "$FIELD_RE" "$RECORD" > "$WORK/matches" 2>"$WORK/matches.err" && fgx=0 || fgx=$?
 [ "$fgx" -le 1 ] || die "record-unreadable: scanning $RECORD for input-fidelity fields failed"
 
@@ -569,6 +594,108 @@ while IFS= read -r id; do
       else
         if [ "$cm_t3" != "-m" ] || [ "$cm_t4" != "$cm_req" ]; then
           fail "codex-model-contradiction: pass id '$id' requests a model while its executor-invocation does not carry -m <requested> right after codex exec"
+        fi
+      fi
+    fi
+  fi
+
+  # --- codex-effort (T-1195, issue #757): a SEVENTH per-pass field. Optional
+  # for a pass whose executor-invocation carries no effort clause; REQUIRED
+  # for a `codex exec` invocation that carries the token pair
+  # `-c model_reasoning_effort=<e>` anywhere. Order: duplicate, vocabulary,
+  # mismatch, contradiction. No refusal echoes a byte of any field's value,
+  # and no raw capture is ever read. ------------------------------------
+  ce_n=$(awk -F'	' -v id="$id" '$2=="codex-effort" && $3==id' "$WORK/fields" | grep -c . || true)
+
+  if [ "$ce_n" -gt 1 ]; then
+    fail "codex-effort-duplicate: pass id '$id' carries more than one codex-effort line"
+  fi
+
+  # Tokens of the executor-invocation after leading whitespace and ONE
+  # optional backtick are stripped (a trailing backtick on the last token too).
+  ce_ei="$ei_val"
+  while :; do
+    case "$ce_ei" in
+      ' '*|$'	'*) ce_ei="${ce_ei#?}" ;;
+      *) break ;;
+    esac
+  done
+  ce_wrapped=0
+  case "$ce_ei" in
+    '`'*) ce_ei="${ce_ei#?}"; ce_wrapped=1 ;;
+  esac
+  ce_tok=()
+  read -r -a ce_tok <<< "$ce_ei" || true
+  ce_ntok="${#ce_tok[@]}"
+  if [ "$ce_wrapped" -eq 1 ] && [ "$ce_ntok" -gt 0 ]; then
+    case "${ce_tok[ce_ntok-1]}" in
+      *'`') ce_tok[ce_ntok-1]="${ce_tok[ce_ntok-1]%?}" ;;
+    esac
+  fi
+  ce_codex=0
+  if [ "${ce_tok[0]:-}" = "codex" ] && [ "${ce_tok[1]:-}" = "exec" ]; then ce_codex=1; fi
+  ce_has=0
+  if [ "$ce_codex" -eq 1 ]; then
+    for ((ce_k = 2; ce_k + 1 < ce_ntok; ce_k++)); do
+      case "${ce_tok[ce_k+1]}" in
+        model_reasoning_effort=*)
+          if [ "${ce_tok[ce_k]}" = "-c" ]; then ce_has=1; break; fi
+          ;;
+      esac
+    done
+  fi
+
+  if [ "$ce_n" -eq 0 ] && [ "$ce_has" -eq 1 ]; then
+    fail "codex-effort-missing: pass id '$id' has a codex exec executor-invocation carrying the effort clause but no codex-effort line"
+  fi
+
+  if [ "$ce_n" -eq 1 ]; then
+    ce_val=$(awk -F'	' -v id="$id" '$2=="codex-effort" && $3==id {print $4; exit}' "$WORK/fields")
+    while :; do
+      case "$ce_val" in
+        ' '*|$'	'*) ce_val="${ce_val#?}" ;;
+        *) break ;;
+      esac
+    done
+    ce_req="" ce_obs=""
+    case "$ce_val" in
+      requested=*' — observed='*)
+        ce_req="${ce_val%% — observed=*}"
+        ce_req="${ce_req#requested=}"
+        ce_obs="${ce_val#*' — observed='}"
+        ;;
+      *) fail "codex-effort-vocabulary: pass id '$id' has a codex-effort value that is not 'requested=<token> — observed=<token>'" ;;
+    esac
+    ce_token_ok() {
+      local LC_ALL=C
+      case "$1" in
+        ''|*[!a-z0-9-]*|[!a-z]*) return 1 ;;
+      esac
+      return 0
+    }
+    if { [ "$ce_req" != "-" ] && ! ce_token_ok "$ce_req"; } \
+       || { [ "$ce_obs" != "unavailable" ] && ! ce_token_ok "$ce_obs"; }; then
+      fail "codex-effort-vocabulary: pass id '$id' has a codex-effort requested or observed value outside the closed vocabulary"
+    fi
+
+    if [ "$ce_req" != "-" ] && [ "$ce_obs" != "$ce_req" ]; then
+      fail "codex-effort-mismatch: pass id '$id' requested an effort that its observed value does not equal"
+    fi
+
+    if [ "$ce_codex" -eq 1 ]; then
+      ce_pos=2
+      if [ "${ce_tok[2]:-}" = "-m" ]; then ce_pos=4; fi
+      ce_c1="${ce_tok[ce_pos]:-}"
+      ce_c2="${ce_tok[ce_pos+1]:-}"
+      if [ "$ce_req" = "-" ]; then
+        # Under `-` the clause at ANY position is the contradiction; ce_has is
+        # the same scan the missing-line requirement above uses.
+        if [ "$ce_has" -eq 1 ]; then
+          fail "codex-effort-contradiction: pass id '$id' requests no effort while its executor-invocation carries the effort clause"
+        fi
+      else
+        if [ "$ce_c1" != "-c" ] || [ "$ce_c2" != "model_reasoning_effort=$ce_req" ]; then
+          fail "codex-effort-contradiction: pass id '$id' requests an effort while its executor-invocation does not carry -c model_reasoning_effort=<requested> at the required position"
         fi
       fi
     fi

@@ -570,4 +570,117 @@ assert_case "codex-model: a bare codex exec invocation beside a named model refu
 { cm_hdr; cm_line zq-model-1 zq-model-1; printf '\n'; } > "$T/cm-only.md"
 assert_case "codex-model: a pass declared only by codex-model refuses field-missing" 1 field-missing -- bash "$SCRIPT" --record "$T/cm-only.md" --task T-000
 
+# =============================================================================
+# T-1195 (issue #757): the SEVENTH per-pass field codex-effort.
+#   codex-effort (<pass>): requested=<token> — observed=<token>
+# Optional for an invocation without the effort clause; REQUIRED when a
+# `codex exec` invocation carries `-c model_reasoning_effort=<e>`. Refusal order:
+# duplicate, vocabulary, mismatch, contradiction. Nothing a refusal prints
+# carries a field's bytes.
+# =============================================================================
+ce_line() { printf '  - codex-effort (p1): requested=%s — observed=%s' "$1" "$2"; }
+CE_CLAUSE='codex exec -c model_reasoning_effort=zq-eff-a --sandbox read-only review --base develop'
+CE_CLAUSE_B='codex exec -c model_reasoning_effort=zq-eff-b --sandbox read-only review --base develop'
+CE_CLAUSE_M='codex exec -m zq-model-1 -c model_reasoning_effort=zq-eff-a --sandbox read-only review --base develop'
+
+cm_rec "$T/ce-0.md" "$CM_BARE"
+assert_case "codex-effort: no line beside a clause-free invocation stays conformant (forward-only)" 0 "" -- bash "$SCRIPT" --record "$T/ce-0.md" --task T-000
+cm_rec "$T/ce-1.md" "$CM_BARE" "$(ce_line - zq-eff-a)"
+assert_case "codex-effort: requested - with an observed effort is report-only" 0 "" -- bash "$SCRIPT" --record "$T/ce-1.md" --task T-000
+cm_rec "$T/ce-2.md" "$CM_BARE" "$(ce_line - unavailable)"
+assert_case "codex-effort: requested - with observed unavailable" 0 "" -- bash "$SCRIPT" --record "$T/ce-2.md" --task T-000
+cm_rec "$T/ce-3.md" "$CE_CLAUSE" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a named effort observed equal, invocation carries the clause after codex exec" 0 "" -- bash "$SCRIPT" --record "$T/ce-3.md" --task T-000
+cm_rec "$T/ce-3b.md" "$CE_CLAUSE_M" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: the clause right after -m <model> is conformant beside a conformant codex-model line" 0 "" -- bash "$SCRIPT" --record "$T/ce-3b.md" --task T-000
+cm_rec "$T/ce-3c.md" "${CM_BT}${CE_CLAUSE_M}${CM_BT}" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a backtick-wrapped invocation with the clause is conformant" 0 "" -- bash "$SCRIPT" --record "$T/ce-3c.md" --task T-000
+cm_rec "$T/ce-3e.md" "${CM_BT}codex exec --sandbox read-only review --base develop -c model_reasoning_effort=zq-eff-a${CM_BT}" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a backtick-wrapped invocation carrying the clause at the end (not right after codex exec) refuses by the position rule" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-3e.md" --task T-000
+cm_rec "$T/ce-3f.md" "${CM_BT}codex exec -c model_reasoning_effort=zq-eff-a${CM_BT}" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a backtick-wrapped invocation ending exactly at the clause value is conformant (the trailing backtick is stripped from the last token)" 0 "" -- bash "$SCRIPT" --record "$T/ce-3f.md" --task T-000
+cm_rec "$T/ce-3d.md" "claude -p --prompt-file p.txt" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a claude -p invocation beside a named effort is never refused by the contradiction rule" 0 "" -- bash "$SCRIPT" --record "$T/ce-3d.md" --task T-000
+
+for v in zq-eff-b unavailable zq-eff-ax; do
+  cm_rec "$T/ce-m-$v.md" "$CE_CLAUSE" "$(ce_line zq-eff-a "$v")"
+  assert_case "codex-effort: requested zq-eff-a observed $v refuses codex-effort-mismatch" 1 codex-effort-mismatch -- bash "$SCRIPT" --record "$T/ce-m-$v.md" --task T-000
+  out="$(bash "$SCRIPT" --record "$T/ce-m-$v.md" --task T-000 2>&1 || true)"
+  [ -n "$out" ] || fail "codex-effort: the mismatch refusal printed nothing (the no-echo probe would be vacuous)"
+  if printf '%s' "$out" | grep -qF -- "$v"; then fail "codex-effort: the mismatch refusal echoed the observed value ($v)"; fi
+  pass "codex-effort: the mismatch refusal never echoes the observed value ($v)"
+done
+
+cm_rec "$T/ce-v1.md" "$CE_CLAUSE" '  - codex-effort (p1): requested=zq-eff-a observed=zq-eff-a'
+assert_case "codex-effort: no separator refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v1.md" --task T-000
+cm_rec "$T/ce-v2.md" "$CE_CLAUSE" "$(ce_line Zq-Eff zq-eff-a)"
+assert_case "codex-effort: an uppercase requested token refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2.md" --task T-000
+cm_rec "$T/ce-v2b.md" "$CE_CLAUSE" "$(ce_line zq-Eff zq-eff-a)"
+assert_case "codex-effort: an uppercase byte after a lowercase first byte in requested refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2b.md" --task T-000
+cm_rec "$T/ce-v2c.md" "$CE_CLAUSE" "$(ce_line zq-eff-a zq-Eff)"
+assert_case "codex-effort: an uppercase byte after a lowercase first byte in observed refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2c.md" --task T-000
+cm_rec "$T/ce-v2d.md" "$CE_CLAUSE" "$(ce_line zq-eff-a 'zq;eff')"
+assert_case "codex-effort: a punctuation byte inside observed refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v2d.md" --task T-000
+cm_rec "$T/ce-v3.md" "$CE_CLAUSE" "$(ce_line zq-eff-a '')"
+assert_case "codex-effort: an empty observed value refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v3.md" --task T-000
+cm_rec "$T/ce-v4.md" "$CM_BARE" "$(ce_line - -)"
+assert_case "codex-effort: observed - refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v4.md" --task T-000
+cm_rec "$T/ce-v5.md" "$CM_BARE" "$(ce_line 1zq zq-eff-a)"
+assert_case "codex-effort: a requested token starting with a digit refuses codex-effort-vocabulary" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v5.md" --task T-000
+cm_rec "$T/ce-v6.md" "$CE_CLAUSE" '  - codex-effort (p1): requested=zq-eff-a observed=zq-eff-b'
+assert_case "codex-effort: a malformed line whose tokens would mismatch refuses vocabulary, not mismatch" 1 codex-effort-vocabulary -- bash "$SCRIPT" --record "$T/ce-v6.md" --task T-000
+
+cm_rec "$T/ce-d1.md" "$CE_CLAUSE" "$(ce_line zq-eff-a zq-eff-a)" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: two lines for one pass refuse codex-effort-duplicate" 1 codex-effort-duplicate -- bash "$SCRIPT" --record "$T/ce-d1.md" --task T-000
+
+cm_rec "$T/ce-s1.md" "$CE_CLAUSE"
+assert_case "codex-effort: the clause with no codex-effort line refuses codex-effort-missing" 1 codex-effort-missing -- bash "$SCRIPT" --record "$T/ce-s1.md" --task T-000
+cm_rec "$T/ce-s2.md" "$CE_CLAUSE_M" "$(cm_line zq-model-1 zq-model-1)"
+assert_case "codex-effort: the clause after -m with no codex-effort line refuses codex-effort-missing" 1 codex-effort-missing -- bash "$SCRIPT" --record "$T/ce-s2.md" --task T-000
+cm_rec "$T/ce-s3.md" "${CM_BT}${CE_CLAUSE}${CM_BT}"
+assert_case "codex-effort: a backtick-wrapped invocation with the clause and no line refuses codex-effort-missing" 1 codex-effort-missing -- bash "$SCRIPT" --record "$T/ce-s3.md" --task T-000
+cm_rec "$T/ce-s4.md" "codex exec --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop"
+assert_case "codex-effort: the clause anywhere in the invocation (not only at the required position) with no line refuses codex-effort-missing" 1 codex-effort-missing -- bash "$SCRIPT" --record "$T/ce-s4.md" --task T-000
+cm_rec "$T/ce-s5.md" "claude -p --prompt-file p.txt -c model_reasoning_effort=zq-eff-a"
+assert_case "codex-effort: a non-codex-exec invocation that merely mentions the clause is not required to carry a line" 0 "" -- bash "$SCRIPT" --record "$T/ce-s5.md" --task T-000
+
+cm_rec "$T/ce-c1.md" "$CM_BARE" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a named effort beside an invocation without -c refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c1.md" --task T-000
+cm_rec "$T/ce-c2.md" "$CE_CLAUSE" "$(ce_line - zq-eff-a)"
+assert_case "codex-effort: requested - beside an invocation carrying the clause refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c2.md" --task T-000
+cm_rec "$T/ce-c3.md" "$CE_CLAUSE_B" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: the clause naming another effort refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c3.md" --task T-000
+cm_rec "$T/ce-c4.md" "${CM_BT}codex exec -m zq-model-1 -c model_reasoning_effort=zq-eff-b --sandbox read-only review --base develop${CM_BT}" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a backtick-wrapped invocation naming another effort after -m refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c4.md" --task T-000
+cm_rec "$T/ce-c5.md" "codex exec -m zq-model-1 --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: another option between -m <model> and the clause refuses codex-effort-contradiction (position rule alone)" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c5.md" --task T-000
+cm_rec "$T/ce-c6.md" "codex exec -m zq-model-1 --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: the position rule alone, with no codex-model line" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c6.md" --task T-000
+cm_rec "$T/ce-c7.md" "codex exec -c model_reasoning_effort=zq-eff-ax --sandbox read-only review --base develop" "$(ce_line zq-eff-a zq-eff-a)"
+assert_case "codex-effort: a clause naming a prefix near-miss of the requested effort refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c7.md" --task T-000
+cm_rec "$T/ce-c8.md" "codex exec -m zq-model-1 -c model_reasoning_effort=zq-eff-a --sandbox read-only review --base develop" "$(cm_line zq-model-1 zq-model-1)" "$(ce_line - unavailable)"
+assert_case "codex-effort: under - a clause after -m refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-c8.md" --task T-000
+
+# Under requested=- the clause at ANY position is the contradiction (class:
+# token 3, after -m, mid, last, backtick-wrapped, with and without codex-model).
+CE_DASH="$(ce_line - unavailable)"
+cm_rec "$T/ce-x1.md" "codex exec --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - the clause mid-invocation (no -m) refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x1.md" --task T-000
+cm_rec "$T/ce-x2.md" "codex exec -m zq-model-1 --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$(cm_line zq-model-1 zq-model-1)" "$CE_DASH"
+assert_case "codex-effort: under - the clause mid-invocation after -m, with codex-model, refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x2.md" --task T-000
+cm_rec "$T/ce-x3.md" "codex exec -m zq-model-1 --sandbox read-only -c model_reasoning_effort=zq-eff-a review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - the clause mid-invocation after -m, without codex-model, refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x3.md" --task T-000
+cm_rec "$T/ce-x4.md" "codex exec --sandbox read-only review --base develop -c model_reasoning_effort=zq-eff-a" "$CE_DASH"
+assert_case "codex-effort: under - the clause as the last two tokens refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x4.md" --task T-000
+cm_rec "$T/ce-x5.md" "${CM_BT}codex exec --sandbox read-only review --base develop -c model_reasoning_effort=zq-eff-a${CM_BT}" "$CE_DASH"
+assert_case "codex-effort: under - a backtick-wrapped clause at the end refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x5.md" --task T-000
+cm_rec "$T/ce-x6.md" "codex exec -c model_reasoning_effort=zq-eff-a --sandbox read-only review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - the clause at token 3 refuses codex-effort-contradiction" 1 codex-effort-contradiction -- bash "$SCRIPT" --record "$T/ce-x6.md" --task T-000
+cm_rec "$T/ce-x7.md" "codex exec --sandbox read-only review --base develop" "$CE_DASH"
+assert_case "codex-effort: under - a clause-free invocation stays conformant" 0 "" -- bash "$SCRIPT" --record "$T/ce-x7.md" --task T-000
+
+# A pass declared ONLY by a codex-effort line is still field-missing.
+{ cm_hdr; ce_line zq-eff-a zq-eff-a; printf '\n'; } > "$T/ce-only.md"
+assert_case "codex-effort: a pass declared only by codex-effort refuses field-missing" 1 field-missing -- bash "$SCRIPT" --record "$T/ce-only.md" --task T-000
+
 printf '\nAll check-review-input assertions passed.\n'
