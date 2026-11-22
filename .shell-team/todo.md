@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1200** The full-population downstream-impact diff is owed by default and skipped only where the loop contract declares that CI runs the test suites (issue #216) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1200-downstream-diff-default.md
+- [ ] **T-1200** The full-population downstream-impact diff is owed by default and skipped only where the loop contract declares that CI runs the test suites (issue #216) — `READY_FOR_QA` — spec: .shell-team/specs/T-1200-downstream-diff-default.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #216, relayed in its essentials by the coordinating session together with the operator's settled condition (quoted verbatim in the spec's Problem) and tech-lead's design (a)-(e). This role cannot read the tracker, so those facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself; the setup follow-up's title and body are in the spec's Open questions for the coordinating session to file. Branch `feature/216-downstream-diff-default` from develop (relayed `d8ca827e`); sprint verify-cost, release MINOR v2.10.0, T-1201 (#639) stacks after (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -28,6 +28,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
   - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the adopter-CI premise is handled as an operator declaration, and this repository's own evidence is in-repo board rows
   - freeze-attestation (v1, 2026-11-22): lines=10/10 sweep=mutual-satisfiability verdict=4P/6F owner=coordinating session (pre-implementation run at d16033b3: AC1, AC2, AC4, AC5, AC6, AC10 red only on the missing implementation, AC3, AC7, AC8, AC9 green non-vacuous, matching the spec's predictions; base resolves to d8ca827e; coined tokens absent at base by git grep on the base commit; specimen sweep in a scratch clone: all ten check lines green, and removing the fail-closed anchor, adding an unconditioned skip paragraph, dropping the evidence field and adding a line outside the method item each turned its criterion red; bin/loop-guard.sh and bin/check-contract.sh accept the contract with the new section; derivations run (read set 144 of 198 specs; release-sweep rows 18, 10 mentioning full-population — the relayed 16 is not restated as derived))
   - intent-hash (v1): 28b7cd2490a3ae211a00babb6e60477944ca73d6
+  - engineer hand-off (T-1200): AC1-AC10 PASS via the spec-mode check-acs run (AC11 CI); check-prompt-sync, check-contract, loop-guard CONTINUE, check-adopter-docs exit 0; suites check-contract, check-spec-review, check-prompt-sync, check-adopter-docs PASS (WSL bash 5.2). Changed: agents/pm-spec.md (method line only), skills/run/SKILL.md (2 added lines), docs/adopting.md and .ja.md, this repo's contract (verification section appended).
 
 
 
