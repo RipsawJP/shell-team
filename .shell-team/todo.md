@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1202** A task whose requirements only emerge by trying can start with one throwaway prototype run whose findings feed the spec before the first freeze (issue #795) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1202-prototype-first-entry.md
+- [ ] **T-1202** A task whose requirements only emerge by trying can start with one throwaway prototype run whose findings feed the spec before the first freeze (issue #795) — `REWORK` — spec: .shell-team/specs/T-1202-prototype-first-entry.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #795, whose body was relayed verbatim by the coordinating session together with the operator-approved planning (sprint prototype-entry; item (1) never-dropped MINOR, item (2) droppable PATCH, release premise v2.11.0) and tech-lead's Routing Map. This role cannot read the tracker, so those facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself. Branch `feature/795-prototype-entry` from develop (relayed `f501a8b6`). T-1201 is skipped on purpose (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live, attests and freezes once this hand-off returns.
@@ -39,6 +39,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Edge cases tried: regenerated Codex agents (AC9 does it into a scratch dir, passed); no `prototype-findings-*` file in the diff; working tree clean before the board edit.
     - Risk notes for reviewer: prose deliverable; AC13 (CI) and AC14 are above ceiling. Expected stale reds T-1108 AC3 and T-1200 AC3 were not run (past specs not run locally).
 
+  - review (round 1, 2026-11-23): REQUEST_CHANGES → REWORK — record .shell-team/reviews/T-1202.md (commit c0c40204); Codex gpt-6-luna at effort max on both passes (confirmed in each rollout by the coordinating session: primary thread 01a2041b, adversarial thread 01a20421). Blocker 0, Major 4: (M1) agents/engineer.md prototype mode does not override the standard inputs, loop and READY_FOR_QA hand-off, which presuppose a spec and a board entry that do not exist before Specify — item (1), never-dropped; (M2) agents/pm-spec.md's new interventions write sits under the base dir while the adjacent rule says stay in docs/ and tasks/; (M3) the `Interventions dir:` line is prepended only at step 2, so pm-spec's trivial-mode call in step 1 never receives it; (M4) copying another task's record leaves that task's id in the markers, which check-interventions refuses, and a new adopter repo has no record to copy — M2–M4 against item (2), droppable. Four downgrades re-read under the step-6 downgrade-ground check: each ground is substantive and none rests on frozen or ratified status, so they stand as minor. Pre-commitment trigger (two consecutive rounds of the same class against the same component) has not fired: this is round 1. loop-guard iteration 1: CONTINUE.
 
 
 
