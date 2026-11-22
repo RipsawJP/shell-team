@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1202** A task whose requirements only emerge by trying can start with one throwaway prototype run whose findings feed the spec before the first freeze (issue #795) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1202-prototype-first-entry.md
+- [ ] **T-1202** A task whose requirements only emerge by trying can start with one throwaway prototype run whose findings feed the spec before the first freeze (issue #795) — `READY_FOR_MERGE` — spec: .shell-team/specs/T-1202-prototype-first-entry.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #795, whose body was relayed verbatim by the coordinating session together with the operator-approved planning (sprint prototype-entry; item (1) never-dropped MINOR, item (2) droppable PATCH, release premise v2.11.0) and tech-lead's Routing Map. This role cannot read the tracker, so those facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself. Branch `feature/795-prototype-entry` from develop (relayed `f501a8b6`). T-1201 is skipped on purpose (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live, attests and freezes once this hand-off returns.
@@ -56,6 +56,8 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
     - Minors (low, not blocking): (1) engineer.md prototype hand-off does not say whether the generated record-shape-scan `- shape-scan:` line rides in it; (2) the prototype's write boundary (one record only) and the test-recipe append-back duty are not reconciled; (3) pm-spec's BLOCKED-on-missing-`Interventions dir:` sentence sits in the entry-creation bullet, so read literally it could be taken to cover non-creating pm-spec calls, which the run skill gives no such line.
     - Edge cases tried: foreign-id copy of the template; fake-id instantiation; stale-record rule checked against pm-spec tools (Read/Grep/Glob/Write/Edit suffice, no Bash needed).
     - Risk notes for reviewer: prose deliverable; AC13 and AC14 above ceiling; past specs' check lines not run locally.
+  - review (round 2, 2026-11-23): APPROVE → READY_FOR_MERGE — record .shell-team/reviews/T-1202.md (commit f57d0dc1); Codex gpt-6-luna at effort max on both passes (confirmed in each rollout by the coordinating session); evidence ledger present for round 2; check-review-input exit 0. Round-1 Majors M1–M4 judged closed as a class by both passes. Three downgrades (unquoted `--paths` placeholder; the stop clause scoped by "Whenever you create a board entry"; the one-record boundary versus the test-recipe append) re-read under the step-6 downgrade-ground check: each ground is substantive and none rests on frozen or ratified status, so they stand as minor.
+  - fast-follow disposition (2026-11-23): five minors — the unquoted `--paths` argument (agents/engineer.md), the stop clause's scope (agents/pm-spec.md), the append duty versus the one-record boundary (agents/engineer.md), the stale record by slug (agents/pm-spec.md), and the hand-off `- shape-scan:` wording (agents/engineer.md) — deferred: the reviewer intended one wording-fix issue; whether to file it or waive it is left to the operator at the sprint batch GO, since none blocks the delivered behaviour on a plain reading.
 
 
 
