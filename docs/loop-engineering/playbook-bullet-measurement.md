@@ -40,24 +40,36 @@ The control-none and full arms do not depend on the entry, so they are run once 
 
 ## Still prevents versus no longer needed
 
-Verdicts are per entry and per role stratum, read from the failure counts out of n = 9 valid runs per arm. Write F for "the named failure shape appeared in at least one run" and 0 for "in none". The arm order is control-none / full / minus-one. The rows are tested in order and the first that matches is the verdict, so the table has no overlap.
+Verdicts are per entry and per role stratum. Write c, f and m for the number of runs, out of the valid runs in the arm, in which the named failure shape appeared, for control-none, full and minus-one respectively. The verdict is an ordered decision procedure: the steps are tested in order, the first whose condition holds decides, and the last step is a catch-all, so no triple of counts can fall through.
 
-| control-none | full | minus-one | verdict | reading |
-|---|---|---|---|---|
-| any arm has fewer than nine valid runs | | | inconclusive | the error bound is not claimed on a short arm |
-| at least two fewer failures than full | F | any | block-failure | the block itself introduced or worsened the failure; keep the entry, record it as a block-level observation (see `## Relation to the block-size deferral`). The margin is two runs because one run of nine can be chance, and this verdict can feed a claim about reopening the deferral, so it is held to a higher bar than a verdict that only keeps an entry |
-| F, and within one failure of full or higher | F | any | not-sufficient | the failure persists with the block present, or the block is at most one run worse than none (flagged weak when exactly one worse); keep the entry, a candidate for strengthening, never for removal |
-| F | 0 | F | still-prevents | removing the entry brings the failure back; it is part of what keeps the block working. One failure in nine is flagged weak |
-| F | 0 | 0 | covered-by-others | the subject elicits the failure, and the full block and the block without this entry both avoid it: whatever covers the ground is not this entry alone. Its marginal effect is below the design minimum of p = 0.3; it is not shown to be zero. A removal candidate as a proposal only, with the three observed counts attached for the approver |
-| 0 | 0 | 0 | not-elicited | the subject never provoked the failure. This also holds when the model avoids the mistake with no bullets at all. Stays `unknown`, never a candidate |
-| 0 | 0 | F | inconclusive | a failure with the entry removed but none with no bullets at all points to an interaction between bullets, not to a clean effect; kept |
+1. **Any arm has fewer than nine valid runs** (the target is n = 9 per arm): `inconclusive`. The error bound is not claimed on a short arm.
+2. **f >= c + 2: `block-failure`.** The block itself introduced or worsened the failure. Keep the entry and record it as a block-level observation (see `## Relation to the block-size deferral`). The margin is two runs because one run of nine can be chance, and this verdict can feed a claim about reopening the deferral, so it is held to a higher bar than a verdict that only keeps an entry.
+3. **Otherwise, f >= 1** (so f <= c + 1): `not-sufficient`. The failure persists with the block present, or the block is at most one run worse than none; flagged weak when f = c + 1. Keep the entry; a candidate for strengthening, never for removal.
+4. **Otherwise (f = 0), c >= 1 and m >= 1: `still-prevents`.** Removing the entry brings the failure back; it is part of what keeps the block working. Flagged weak when m = 1.
+5. **Otherwise, c >= 1 and m = 0: `covered-by-others`.** The subject elicits the failure, and the full block and the block without this entry both avoid it: whatever covers the ground is not this entry alone. Its marginal effect is below the design minimum of p = 0.3; it is not shown to be zero. A removal candidate as a proposal only, with the three observed counts attached for the approver.
+6. **Otherwise, c = 0 and m = 0: `not-elicited`.** The subject never provoked the failure. This also holds when the model avoids the mistake with no bullets at all. Stays `unknown`, never a candidate.
+7. **Otherwise (c = 0 and m >= 1): `inconclusive`.** A failure with the entry removed but none with no bullets at all points to an interaction between bullets, not a clean effect; kept. This step is the explicit catch-all: after steps 2 to 6 it is the only triple left.
+
+**Enumeration check.** Steps 2 to 7 are written so their conditions are mutually exclusive and jointly exhaustive over the valid-run case. The count classes relied on are: f against c + 2 and c + 1 (the block-failure and not-sufficient thresholds), f against 0, c against 0 and 1, and m against 0 and 1. The loop below visits every triple of c, f and m from 0 to 9, evaluates each step's own condition, counts how many conditions hold, and reports any triple matched by none or by more than one. Its output as run at the time of writing:
+
+- reproduce: awk 'BEGIN{for(c=0;c<=9;c++)for(f=0;f<=9;f++)for(m=0;m<=9;m++){k=0;b=""; if(f>=c+2){k++;b="2-block-failure"} if(f>=1&&f<=c+1){k++;b="3-not-sufficient"} if(f==0&&c>=1&&m>=1){k++;b="4-still-prevents"} if(f==0&&c>=1&&m==0){k++;b="5-covered-by-others"} if(f==0&&c==0&&m==0){k++;b="6-not-elicited"} if(f==0&&c==0&&m>=1){k++;b="7-inconclusive"} t++; n[b]++; if(k==0)u++; if(k>1)o++} printf "triples=%d unmatched=%d multiply-matched=%d\n",t,u,o; for(x in n)printf "%s %d\n",x,n[x]}' | sort
+
+```
+2-block-failure 360
+3-not-sufficient 540
+4-still-prevents 81
+5-covered-by-others 9
+6-not-elicited 1
+7-inconclusive 9
+triples=1000 unmatched=0 multiply-matched=0
+```
 
 Plainly, what the design can and cannot reach.
 
 - It **can** reach `still-prevents`, and `covered-by-others` as a removal candidate. It **cannot** reach "the model avoids this mistake entirely on its own, so the entry is no longer needed": that case shows up as `not-elicited`, indistinguishable from a subject that simply never provokes the failure. Tier B therefore never identifies an entry as no-longer-needed in the model-internalised sense. For this design, "no longer needed" means `covered-by-others` and nothing more.
 - `covered-by-others` does not say **which** entry or what else covers the ground. If a `Superseded-by` successor is wanted, it needs a further arm that removes the suspected covering entry together with this one; that arm is a possible extension and is not priced here.
-- A failure that the block introduces never disappears into `not-elicited`: it is caught by the `block-failure` row before `not-elicited` is tested, and `not-sufficient` is likewise tested first.
-- Under a binary detector, `inconclusive` means a pattern the table does not resolve (a short arm, or failures only where no cause is visible). It does not mean "no effect". It keeps the entry and is reported as unresolved.
+- A failure that the block introduces never disappears into `not-elicited`: steps 2 and 3 test f before steps 6 and 7 are reached, so any triple with f >= 1 resolves to `block-failure` or `not-sufficient`.
+- Under a binary detector, `inconclusive` means a case the procedure does not resolve (a short arm, or failures only in minus-one where no cause is visible). It does not mean "no effect". It keeps the entry and is reported as unresolved.
 
 An entry is promoted from Tier B to a removal proposal only when **every** role stratum it renders into was measured and returned `covered-by-others`, and a Tier A reading shows no recurrence of the failure class since the rule was last extended. A stratum that was not measured, or any other verdict, keeps the whole entry.
 
