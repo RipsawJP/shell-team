@@ -11,7 +11,7 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_QA` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
+- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_REVIEW` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
   - entry-mode: pm-authored
   - spec-review: none
   - source: issue #782, relayed in its essentials by the coordinating session with tech-lead's settled map (deliverable path, fixed headings, criteria, non-goals, pre-commitment, version). This role cannot read the tracker, so its facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself, and no removal issue is filed by it. Branch `feature/782-playbook-measurement-design`; sprint context-trim, last backlog item, release PATCH v2.9.7 (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
@@ -13921,3 +13921,13 @@ _(none)_
 - Suggested next step: widen the not-sufficient control-none cell to cover control-none 0 with full exactly 1 (for example "within one failure of full or higher, including none when full is exactly one"), then re-enumerate.
 - Everything else checked and holding: spec-mode check-acs run (WSL bash 5.2) 9 passed, 0 failed, 1 skipped (AC9 CI, above ceiling), 0 unrecognized; check-intent aligned (rc=0); check-provenance conformant, 8 entries (rc=0); check-handoff rc=0; check-pii-shapes --paths on the document clean (rc=0, tracker-key mode on). Repetition-rule paragraph, covered-by-others row and small-effects bullet agree (0.9^9 about 0.387, operator approval and counts conditions stated). Sweep 87*9 + 9*18 = 945; primary 117.4 h / 95.7 M tokens, secondary 203.5 h / 154.1 M tokens re-derive. Superseded-by addition matches the checker's loop-to-maintainer refusal. claim-1 quote matches the deferral note verbatim.
 - Verification ceiling: unit-and-static — verifies every criterion at or below that level; AC9 (CI on the pull request) stays with the coordinating session, `environmentally-unverified: AC9`.
+
+### T-1199 QA verdict (round 4): PASS
+- Task: T-1199 → READY_FOR_REVIEW
+- Tests: no fixture suite reached (diff touches only the design note, the provenance file and the board); check-handoff on the board rc=0.
+- Acceptance criteria: 9/9 runnable passed — command: spec-mode check-acs run (WSL bash 5.2) → `9 passed, 0 failed, 1 skipped, 0 unrecognized`. AC9 (CI) SKIP, above ceiling.
+- Verification ceiling: unit-and-static — verifies every criterion at or below that level; AC9 (CI on the pull request) stays with the coordinating session, `environmentally-unverified: AC9`.
+- Records: check-intent aligned (rc=0); check-provenance conformant, 9 entries (rc=0); check-interventions --task T-1199 conformant, 2 entries (rc=0); check-pii-shapes --paths on the document clean (rc=0, tracker-key mode on).
+- Judgment: (1) the doc's reproduce line, extracted verbatim and run: `triples=1000 unmatched=0 multiply-matched=0`, bucket counts match the doc. (2) Each loop condition read against its prose step: step 2 f>=c+2, step 3 f>=1 and f<=c+1 (prose: otherwise f>=1, so f<=c+1), step 4 f==0,c>=1,m>=1, step 5 f==0,c>=1,m==0, step 6 c=0,m=0, step 7 f==0,c==0,m>=1; they agree, so the loop checks the prose. Step 1 (short arm) is outside the loop by design (valid-run case). (3) c=0,f=1 evaluated: only step 3 fires, not-sufficient (weak, f=c+1). (4) Both reworded bullets agree with the steps: steps 2 and 3 test f before 6 and 7; inconclusive = short arm or failures only in minus-one. (5) Diff 80dc5e2d..646a4f00 touches three files only (design note, provenance, board).
+- Edge cases tried: the gap triple above; extremes c=9,f=9,m=9 resolves to step 3 only (per the exhaustive loop); working tree clean before the board edit.
+- Risk notes for reviewer: prose-only deliverable with one runnable enumeration, which was run as written.
