@@ -6,6 +6,10 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.7**
+  - **run skill が手段と目的の振り返りの規則を 1 回だけ読み込むようになる。** レビュー段階が計画段階の振り返り・処置規則の段落をそのまま繰り返していたのを、その段落への参照に置き換え、レビュー段階固有の 1 文だけを残した。実行のたびに読む文脈が約 310 語減る。規則の中身は変わらない。(#781)
+  - **playbook の各教訓がまだ効いているかを測る方法の設計。** `docs/loop-engineering/playbook-bullet-measurement.md` に、lessons のエントリごと・役割ごとに、playbook の bullet が現行モデルの振る舞いをまだ変えているかを見分ける方法をまとめた。まずモデルを動かさない telemetry の分析で候補を絞り、その少数だけを固定タスク上で 1 件ずつ外して比べる。判定手順は全組み合わせの網羅性を確かめてあり、コストは算出根拠付きか見積りと明記してある。このリリースでは何も測定・削除しない。(#782)
+  - Records maintenance.
 - **v2.9.6**
   - **`<base>/binding.conf` で `code-reviewer` に指定した effort が、Codex のすべてのレビューパスに届くようになる。** 実効 `code-reviewer` 行の effort 欄が `-` 以外のとき、`code-reviewer`（全モード）と `drift-evaluator` が実行するすべての `codex exec` に `-c model_reasoning_effort=<effort>` が付き、レビューはその時点のホストの Codex 設定に引きずられなくなる。各パスの Codex セッションログがその effort を示さなければ（`bin/codex-capture.sh --expect-effort`、publish と `--observe` の両方）ラウンドは `BLOCKED — review not established` で止まり、すべてのレビュー記録は各パスが実際に走った effort を `codex-effort (<pass>)` として残す（`bin/check-review-input.sh` が検査する）。出荷時の既定値 `-` のままなら、呼び出しも出力も変わらない。(#757)
   - **`bin/codex-capture.sh` が解釈できないセッションログをさらに拒否する。** `--publish` では、閉じていない文字列を含む rollout の行を `publish: rollout not parseable (thread=… cause=unterminated-string)` で拒否し、`unicode-escape` と `review did not run` より優先する。model と effort の読み取りでは、`\u` エスケープで書かれたトップレベルのキーも `type` の重複として数える。(#760)
