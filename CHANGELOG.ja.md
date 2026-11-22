@@ -6,6 +6,9 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+- **v2.9.6**
+  - **`<base>/binding.conf` で `code-reviewer` に指定した effort が、Codex のすべてのレビューパスに届くようになる。** 実効 `code-reviewer` 行の effort 欄が `-` 以外のとき、`code-reviewer`（全モード）と `drift-evaluator` が実行するすべての `codex exec` に `-c model_reasoning_effort=<effort>` が付き、レビューはその時点のホストの Codex 設定に引きずられなくなる。各パスの Codex セッションログがその effort を示さなければ（`bin/codex-capture.sh --expect-effort`、publish と `--observe` の両方）ラウンドは `BLOCKED — review not established` で止まり、すべてのレビュー記録は各パスが実際に走った effort を `codex-effort (<pass>)` として残す（`bin/check-review-input.sh` が検査する）。出荷時の既定値 `-` のままなら、呼び出しも出力も変わらない。(#757)
+  - **`bin/codex-capture.sh` が解釈できないセッションログをさらに拒否する。** `--publish` では、閉じていない文字列を含む rollout の行を `publish: rollout not parseable (thread=… cause=unterminated-string)` で拒否し、`unicode-escape` と `review did not run` より優先する。model と effort の読み取りでは、`\u` エスケープで書かれたトップレベルのキーも `type` の重複として数える。(#760)
 - **v2.9.5**
   - **`<base>/binding.conf` で `code-reviewer` に指定したモデルが、Codex のすべてのレビューパスに届くようになる。** 実効 binding が `provider-configured` 以外のモデルを指定していると、`code-reviewer`（全モード）と `drift-evaluator` が実行するすべての `codex exec` に `-m <model>` が付く。各パスの Codex のセッションログがそのモデルを示さなければ、そのラウンドは判定を出さずに `BLOCKED — review not established` で止まる。レビュー記録には、パスごとに実際に使われたモデルが、セッションログから読んだ値で記録される。このリリースより前に書かれ、`code-reviewer` のモデルを指定している `binding.conf` は、このリリースから効くようになる。出荷時の既定は `provider-configured`（モデル指定なし）のまま。新しく作られる `binding.conf.example` の `code-reviewer` 行は、仮の `model-2` ではなく `provider-configured` になる。
   - **モデルを照合するとき、`bin/codex-capture.sh` は解釈できないセッションログを拒否する。** `--publish --expect-model` と読み取り専用の `--observe` は、閉じていない文字列や、トップレベルの `type` キーを 2 つ以上持つレコードを malformed として扱い、そこからモデル名を読まない。診断メッセージと `--help` に `--observe` モードが載る。
