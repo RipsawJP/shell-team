@@ -11,6 +11,22 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1200** The full-population downstream-impact diff is owed by default and skipped only where the loop contract declares that CI runs the test suites (issue #216) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1200-downstream-diff-default.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #216, relayed in its essentials by the coordinating session together with the operator's settled condition (quoted verbatim in the spec's Problem) and tech-lead's design (a)-(e). This role cannot read the tracker, so those facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself; the setup follow-up's title and body are in the spec's Open questions for the coordinating session to file. Branch `feature/216-downstream-diff-default` from develop (relayed `d8ca827e`); sprint verify-cost, release MINOR v2.10.0, T-1201 (#639) stacks after (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - spec choices (pm-spec, 2026-11-22): contract section `verification:` with `ci_runs_test_suites: yes` and space-separated `ci_suite_workflows`; record lines `- full-population-diff: skipped|owed` in the spec's `## Blast radius`; the method item (`agents/pm-spec.md:87`) is rewritten in place as one line and every other line of that file, `:92` included, stays byte-identical, because the merged T-1108 AC3 is live and reddens on any other line change (T-1053 AC2/AC3 and T-1108 AC1 are already red at today's base; T-1065's criteria exit on an absent branch); `skills/run/SKILL.md` gains added lines only; the AC5 negative pairs the skip token with a fail-closed anchor the record form does not contain; an owed diff runs against the post-implementation HEAD inside verification, not at the freeze sweep (differs from the relayed design; reported in the hand-off)
+  - spec-choices-confirmed (coordinating session, 2026-11-22): both pm-spec deviations accepted (the owed diff runs against the post-implementation HEAD inside verification, the freeze sweep confirms the decision line; agents/pm-spec.md:92 stays byte-identical because a live merged criterion pins it); README EN/JA and CONTRIBUTING dispositioned unchanged with reasons; follow-up #789 filed for setup surfacing the section; interventions entry 1
+  - follow-up: #789 (setup surfaces the optional verification: contract section)
+  - dispatch-reflection: implement — T-1199 — repeat — T-1199's recorded value is `serial`; lockstep prose across pm-spec, skills/run, adopting EN/JA and the repo contract, no balanced disjoint partition
+  - dispatch-reflection: verify — T-1199 — repeat — T-1199's recorded value is `serial`; one spec's check-acs, a read-set analysis and the contract/prompt-sync/handoff checkers
+  - dispatch-reflection: specify — T-1199 — repeat — T-1199's recorded value is `pm-authored`; the issue body, the operator condition and the measured inventory hand over as text
+  - dispatch-reflection: spec-review — T-1199 — repeat — T-1199's recorded value is `none`; the adopter-CI premise is an operator declaration the spec does not measure, and this repository's evidence is in-repo
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — lockstep prose across pm-spec, skills/run, adopting EN/JA and the repo contract; no balanced disjoint partition, and the tier2 trigger does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs, a read-set analysis over the merged criteria reading the edited files, check-contract/check-prompt-sync/check-handoff; below the fan-out threshold; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue body, the operator condition and the measured inventory hand over as text
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the adopter-CI premise is handled as an operator declaration, and this repository's own evidence is in-repo board rows
+
 
 
 
