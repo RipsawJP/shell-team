@@ -409,8 +409,15 @@ was made to `templates/binding-template.conf` by this task.
   resolved row whose effort field is not `-` reaches that recipe's `codex
   exec` line as `-c model_reasoning_effort=<EFFORT>`, gated on the bound
   adapter's own `applies-effort codex-cli cli-config-override`
-  declaration; every other bound path stays `applies-effort <adapter>
-  not-applied` — declared, recorded, and applied to nothing.
+  declaration.
+- applied-at: `agents/code-reviewer.md` and `agents/drift-evaluator.md`
+  (issue #757) — the `wrapper-hosted` `code-reviewer` row hosts its own
+  `codex exec` lines, so a named effort reaches each of them as
+  `-c model_reasoning_effort=<EFFORT>` after `-m <MODEL>` (or after
+  `codex exec`), and `bin/codex-capture.sh --expect-effort` refuses a pass whose
+  rollout does not show that effort. Under `-` nothing is added. Every other
+  bound path stays `applies-effort <adapter> not-applied` — recorded, and
+  applied to nothing.
 
 The accepted-value set was re-measured before this runtime application
 shipped: `codex --version` on 2026-09-03 reports `codex-cli 0.149.1`, and

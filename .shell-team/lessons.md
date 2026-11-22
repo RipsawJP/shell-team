@@ -1702,3 +1702,44 @@ Two more field bullets exist outside the fenced example above (kept out of it de
 - **Rule**: When a probe builds a scratch install of the code under test to run a suite against it, the install copies the files rather than symlinking the checkout's directories, because a fixture that renames, rewrites or removes a file in its install then acts on the real tree through the link.
 - **Why**: A probe for a suite's missing-sibling case linked the checkout's script directory into a scratch install; the suite's existing fixture, which renames and rewrites a sibling script to simulate its absence, did so through the link to the tracked file, and the tree had to be restored from git before any result could be trusted.
 - **How to apply**: Build a scratch install with a copy of each file the probe needs, or a `git clone --shared` of the repository under `$TMPDIR`; before running a suite against it, confirm no path in the install is a symlink into the checkout, and after the run confirm the checkout's tracked files are unchanged.
+
+## 2026-11-21 — An empty findings array from a reviewer pass is unverified, not clean
+- **Category**: verification-discipline
+- **Applies-to**: tech-lead, qa-verifier
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-11-21.md
+- **Rule**: When a reviewer pass returns an empty findings array, treat the pass as unverified rather than as "no issues": record its depth (commands run, how many succeeded, failure markers seen) and have the receiving role read the target itself before it relies on the empty result.
+- **Why**: In T-1192's spec review, short low-effort passes returned `[]` while having examined little; an empty array looks like a normal, clean exit whether the pass found nothing or looked at nothing, so its shape alone cannot distinguish the two.
+- **How to apply**: The coordinating session asks every reviewer pass to report its depth alongside its findings; a `[]` with shallow or missing depth sends the target to an independent read by the receiving role (or a re-run at higher depth) before the gate counts it.
+
+## 2026-11-21 — A pinned value that equals the configured default proves nothing when observed
+- **Category**: verification-discipline
+- **Applies-to**: engineer, qa-verifier, pm-spec
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-11-21.md
+- **Rule**: When verifying that a pin (a model flag, a setting override) takes effect, an observation matching the requested value is evidence only if the requested value differs from what the unpinned configuration would produce; otherwise add a control run with a non-default value and confirm the observation follows it.
+- **Why**: While verifying the Codex review model pin, the pinned model was also the configured default, so the session log would have shown the same model even if the `-m` flag had been ignored entirely.
+- **How to apply**: pm-spec writes the pin's acceptance criterion with a control whose requested value differs from the configured default; the engineer runs that control and records both observations; QA rejects a pin verification whose only evidence is a match against the default.
+
+## 2026-11-21 — A CI failure caused by the runner environment is measured on CI before its cause is written into a spec
+- **Category**: tooling-ci
+- **Applies-to**: pm-spec, engineer
+- **Scope**: loop
+- **Status**: active
+- **Source**: .shell-team/retros/2026-11-21.md
+- **Rule**: When a CI failure may come from the runner environment (image, core utilities, shell version), assume it will not reproduce locally, measure it with a diagnostic CI run before writing its cause into a spec, and label any pre-measurement explanation as a hypothesis.
+- **Why**: T-1194's first spec fixed two failing steps and a lock-defect hypothesis as the cause; a local older-shell, older-coreutils environment could not reproduce the failures, diagnostic CI runs then found a third failure and refuted the hypothesis, and the spec had to be re-frozen.
+- **How to apply**: Before freezing a spec for an environment-dependent CI failure, open a throwaway diagnostic run (draft PR) that prints the runner's tool versions and exercises the failing step in isolation; cite that run's output as the cause's evidence, and keep anything unmeasured in a "hypotheses" list rather than in the problem statement.
+
+## 2026-11-21 — A successful mkdir is not evidence of an exclusive lock
+- **Category**: tooling-ci
+- **Applies-to**: engineer
+- **Scope**: maintainer
+- **Bound-in**: bin/log-run.sh
+- **Status**: active
+- **Source**: .shell-team/retros/2026-11-21.md
+- **Rule**: Do not treat a successful `mkdir` as having acquired an exclusive lock: after creating the lock directory, claim ownership with a separate exclusive token inside it, and reproduce the non-exclusive case deterministically with a PATH-stub `mkdir` that always succeeds.
+- **Why**: On a runner whose `mkdir` came from a different core-utilities implementation, concurrent `mkdir` of the same directory reported success to more than one caller, so two writers received the same sequence number from the lock.
+- **How to apply**: Any lock in `bin/` claims an owner token with a noclobber write (or equivalent exclusive create) after the directory exists, treats an existing directory as held, and ships a test fixture that stubs `mkdir` to always succeed so the exclusivity comes from the token, not from `mkdir`.

@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-lightgrey?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.9.5-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.9.6-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.md#using-shell-team-from-codex-cli)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#design-choices)
@@ -290,14 +290,22 @@ which story applies depends on **dispatch shape**, not on the adapter
 token alone: on `tech-lead`'s alternate path — dispatched
 `sandbox-read-only` through the `codex-cli` recipe — the value is now
 **applied** to the invocation, as `-c model_reasoning_effort=<value>`
-gated on that adapter's own `cli-config-override` declaration; every
-other `codex-cli` row, including the shipped default's own
-`code-reviewer`, which is dispatched `wrapper-hosted` through its own
-`agents/code-reviewer.md` and never receives that recipe's line at all,
-and every `claude-cli` row, stays **recorded** and applied to nothing. Every
+gated on that adapter's own `cli-config-override` declaration. The shipped
+default's own `code-reviewer` is dispatched `wrapper-hosted` through its own
+`agents/code-reviewer.md` (so it never receives that recipe's line), and a
+named `code-reviewer` effort is likewise **applied** there: `-c
+model_reasoning_effort=<effort>` reaches every `codex exec` that
+`code-reviewer` and `drift-evaluator` run, right after `-m <model>` when a
+model is named, and under `-` nothing is added. Each pass's own rollout must
+show exactly that effort, the review record carries a `codex-effort (<pass>)`
+line per pass read from it, and a missing or different effort stops the
+round (`effort not established`). Every other `codex-cli` row, and every
+`claude-cli` row, stays **recorded** and applied to nothing. Every
 bound value is declared, never an observation of what executed — except
 `tech-lead`'s alternate path, where the resolved row's model column is what
-actually ran and, on a `codex-cli` row, its effort column is applied too. See [Design choices](#design-choices) for the
+actually ran and, on a `codex-cli` row, its effort column is applied too,
+and the `code-reviewer` row's model and effort, which are applied and checked
+against each pass's own rollout. See [Design choices](#design-choices) for the
 reviewer row's own shipped default and its rationale. One boundary case of the first axis: a non-Codex `code-reviewer` binding on a Claude Code host stops every review mode with `BLOCKED` (`reviewer-binding-not-codex`) before any Codex call; the Codex CLI host is unchanged, and an actual same-family review is the follow-up tracked as #689.
 
 ## Replaying a run

@@ -426,19 +426,27 @@ CLI を呼び出す Claude 側の wrapper を設定するもので、レビュ�
 される：`tech-lead` の別経路——`codex-cli` の recipe を通じて
 `sandbox-read-only` で dispatch される——では値がその呼び出し自体に
 **適用**される（`-c model_reasoning_effort=<value>` として、その adapter
-自身の `cli-config-override` 宣言に紐付く）#420。それ以外の `codex-cli` の
-行——出荷時既定の `code-reviewer` 自身の行を含め、これは自身の
-`agents/code-reviewer.md` を通じて `wrapper-hosted` で dispatch され、
-その recipe の行を一切受け取らない——と、すべての `claude-cli` の行は、
-span に**記録**されるだけで何にも適用されず、他に及ぶ影響は上記の
-`capability-unsupported` refusal だけである。最後に、どの **executor**（provider と
+自身の `cli-config-override` 宣言に紐付く）#420。出荷時既定の
+`code-reviewer` 自身の行は、自身の `agents/code-reviewer.md` を通じて
+`wrapper-hosted` で dispatch され（その recipe の行は受け取らない）、
+指定された `code-reviewer` の effort は同様に**適用**される（issue #757）:
+`-c model_reasoning_effort=<effort>` が `code-reviewer` と `drift-evaluator` の
+実行するすべての `codex exec` に付き、model を指定していれば `-m <model>` の
+直後、指定が無ければ `codex exec` の直後に置かれ、`-` のときは何も足されない。
+各 pass 自身の rollout がちょうどその effort を示さなければならない:
+`bin/codex-capture.sh` が rollout から読み（`--expect-effort`）、レビュー記録は
+`codex-effort (<pass>)` 行を pass ごとに 1 つ持ち、effort が無い・異なる場合は
+verdict を出さず `effort not established` で round が停止する。それ以外の
+`codex-cli` の行と、すべての `claude-cli` の行は、span に**記録**されるだけで
+何にも適用されず、他に及ぶ影響は上記の `capability-unsupported` refusal だけである。最後に、どの **executor**（provider と
 adapter）経由で役割が呼び出されるかは、`tech-lead` を除くどの役割に
 ついても resolution が経路制御しておらず、これを追跡する issue も
 存在しない。持ち帰るべき規則は、第 2 軸を列挙ではなく普遍形で述べた
 ほうである。すなわち、紐付けられた値はすべて**宣言された値であって、
 実行されたものの観測ではない**——ただし `tech-lead` の別経路だけは
 例外で、そこでは resolved row の model 列がそのまま実際に走ったものに
-なる。
+なり、`code-reviewer` の行は model も effort も適用され、各 pass 自身の
+rollout と突き合わせて検査される。
 
 **`tech-lead` の別経路が立っている読み取り境界を、測定された幅のまま
 開示する。** Codex CLI 自体には読み取り範囲を制限する仕組みが無い。
