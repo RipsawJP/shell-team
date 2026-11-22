@@ -157,7 +157,8 @@ bullet `- verification-class: mechanism — <rationale>` または
 （`bin/`、`tests/`、`templates/` 配下のいずれかのパス、CI workflow、または
 checker の semantics）に届きうる場合である。このクラスでは検証プロトコル
 全体がこれまで通り適用される。すなわち、既にマージ済みの spec すべてに
-対する **full-population** な downstream-impact diff、CI と同等のステップ
+対する **full-population** な downstream-impact diff（ただし下記のとおり
+contract が CI を宣言している場合を除く）、CI と同等のステップ
 全部、そして spec 自身の criteria 全体に対する mutation-probe マトリクス
 である。
 
@@ -179,6 +180,8 @@ full-population な sweep も、CI 相当ステップ全体の再実行も、こ
 snapshot を base アームへステージングする。これを行わないと、この
 corpus を読む criterion は diff とは無関係な理由で base アーム側の
 FAIL を報告する。
+
+自リポジトリの CI がテストスイートを実行している場合、loop contract（`shell-team.contract.yaml`）にオプションのトップレベル `verification:` セクションを置いて、`mechanism` クラスのタスクの full-population diff を省略できる。キーは 2 つで、`ci_runs_test_suites: yes` と `ci_suite_workflows: <リポジトリ相対の workflow パスを 1 行にスペース区切り>` である。diff を省略するのは、contract が読めて、`verification:` セクションがちょうど 1 つあり、その中に `ci_runs_test_suites:` キーがちょうど 1 つあって値（末尾の `# comment` を除く）が厳密に `yes` であり、かつ空でない `ci_suite_workflows:` キーがちょうど 1 つある場合だけであり、それ以外では diff は owed のままである。セクションが無い・`no`・`true`・`Yes`・`"yes"`・空の値・キーの綴り違いや重複・根拠の欠落・contract が読めない場合は、いずれも owed のままになる。spec の著者は contract を読み、判断を spec の `## Blast radius` セクションに 1 行だけ記録する。`- full-population-diff: skipped — contract: <path> — ci_runs_test_suites: yes — evidence: <ci_suite_workflows の値>`、または `- full-population-diff: owed — population: <マージ済み spec を列挙するコマンド> — run by: coordinating session, against the post-implementation HEAD` である。freeze sweep はこの行を contract と照合する。owed の diff は実装が入ってから実行し、記録された skip はレビューで non-gating、結果が記録されていない owed の diff は gating のままである。対象は `mechanism` クラスの spec だけで、`no-mechanism` の read-set の義務、trivial path、release レベルの sweep は変わらない。これは宣言であって検出ではない。この宣言を検証するものはないので、`yes` と書く運用者が、名指しした workflow がスイートを実行していることを保証する。このセクションを持つ contract はインストール済みテンプレートと差分があり、`check-setup.sh` はそれを終了ステータスを変えない note として報告する。
 
 現時点の強制は**チェッカーではなく duty** である。この宣言は spec 完成時に
 著者役割が行い、両方の review gate と人間がそれを読む。**機械的なチェッカーは

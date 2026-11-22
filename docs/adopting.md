@@ -151,8 +151,9 @@ default whenever the task's diff can reach an executing surface — any path
 under `bin/`, `tests/`, `templates/`, a CI workflow, or the semantics of a
 checker — and for that class the full verification protocol applies
 exactly as before: a full-population downstream-impact diff over every
-merged spec, the whole CI-equivalent step list, and a mutation-probe matrix
-over the spec's own criteria.
+merged spec (unless the contract declares CI, as described below), the whole
+CI-equivalent step list, and a mutation-probe matrix over the spec's own
+criteria.
 
 **`no-mechanism`** is for a task that changes no executing surface —
 wording, prose, editorial or documentation deliverables — and it prices
@@ -171,6 +172,8 @@ A two-arm sweep additionally stages a single snapshot of the gitignored
 `.shell-team/runs` corpus into its base arm before either arm runs
 (once per sweep) — without that staging step, a criterion reading the
 corpus reports a base-arm FAIL that the diff never caused.
+
+A repository whose own CI runs its test suites can switch the full-population diff off for `mechanism`-class tasks by declaring that in its loop contract, `shell-team.contract.yaml`, as an optional top-level `verification:` section holding two keys: `ci_runs_test_suites: yes` and `ci_suite_workflows: <repository-relative workflow paths, space-separated on one line>`. The diff is skipped only when the contract is readable, carries exactly one `verification:` section with exactly one `ci_runs_test_suites:` key whose value (a trailing `# comment` aside) is exactly `yes`, and exactly one non-empty `ci_suite_workflows:` key; otherwise the diff stays owed — an absent section, `no`, `true`, `Yes`, `"yes"`, an empty value, a misspelled or duplicated key, missing evidence and an unreadable contract all leave it owed. The spec's author reads the contract and records the decision as exactly one line in the spec's `## Blast radius` section: `- full-population-diff: skipped — contract: <path> — ci_runs_test_suites: yes — evidence: <the ci_suite_workflows value>`, or `- full-population-diff: owed — population: <the command that enumerates the merged specs> — run by: coordinating session, against the post-implementation HEAD`. The freeze sweep confirms the line against the contract; an owed diff runs once the implementation is in place, and a recorded skip is non-gating in review while an owed diff with no recorded result stays gating. The scope is `mechanism`-class specs only; the `no-mechanism` read-set duty, the trivial path and any release-level sweep are unchanged. This is a declaration, not a detection: nothing verifies this declaration, so the operator who writes `yes` is the one attesting that the named workflows run the suites. A contract carrying the section differs from the installed template, and `check-setup.sh` reports that as a note that does not change its exit status.
 
 Enforcement today is a **duty, not a checker**: the declaration is
 performed by the authoring role at spec-completion time and read by both
