@@ -244,6 +244,8 @@ merge に向けて付け直す必要が生じ、本来自分が生み出すは�
 著作・レビュー投稿・報告に留め、run 側が求めるホスト操作（run 側からはできない
 push、fetch）は要約ではなくコマンドそのものとして中継してください。
 
+**試してみないと分からないタスクの経路（prototype-first）。** `tech-lead` が、ツール・ジェネレータ・ランタイムの制約・上限・失敗モードがリポジトリにも docs にも書かれておらず、一度実行するまで受け入れ基準をテスト可能な文として書けない、と判断した場合、`[engineer — prototype mode]` ステップ付きで prototype-first に回します。`engineer` は作業ツリーの外（`$TMPDIR`、未設定ならプラットフォームの temp 既定）で使い捨てのプロトタイプを 1 回だけ実行し、追跡される findings 記録 `prototype-findings-<slug>.md` を specs ディレクトリに 1 つ書きます。`pm-spec` は最初の凍結の前にこの記録を読み、情報源として列挙し、依拠する知見に「プロトタイプ実行で測定」と注記し、board エントリに `- prototype-first: <ground>` と `- prototype-findings: <path>` を書きます。記録が無い・空の場合、`pm-spec` は `BLOCKED` で止まります。プロトタイプの出力は実装として出荷されない。どのゲートも迂回せず（凍結・QA・別プロバイダレビューは通常どおり走り、1 つのタスクを prototype-first と trivial の両方に回すことはありません）。プロトタイプ実行は 1 タスクにつき 1 回で、2 回目は `tech-lead` の再計画に戻ります。この上限は文章であってチェッカーではない。`--span prototype --phase plan` のテレメトリ行と findings 記録で観測できるだけで、機械的には強制されません。
+
 ## 役割と executor の紐付け
 
 `team-init` は不活性な `<base>/binding.conf.example`

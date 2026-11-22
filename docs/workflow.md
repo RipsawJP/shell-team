@@ -44,6 +44,7 @@ The setup is one prompt on either host, `set up shell-team`, which does the plug
 | Situation | Allowed shortcut |
 |-----------|------------------|
 | Single-line typo or comment fix | `tech-lead` routes it to `pm-spec`'s trivial mode (a minimal board entry and spec), then `engineer` |
+| Task whose requirements can only be learned by running something once (`prototype-first`) | `tech-lead` adds an `[engineer — prototype mode]` step before `pm-spec`; `engineer` runs one throwaway prototype outside the working tree and writes `prototype-findings-<slug>.md`, which `pm-spec` reads before the first freeze. The prototype output is never shipped, and the freeze, QA and review are unchanged |
 | Non-UI task (CI/bash/backend/docs/config, or non-visual frontend edits) | `ui-designer` does not participate — no `[Design]` phase |
 | Test-only change (adding a missing test) | Skip `pm-spec`; `engineer` + `qa-verifier` + `code-reviewer` |
 | Reviewing someone else's PR | Use `/review` — only `code-reviewer` runs |

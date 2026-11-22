@@ -44,6 +44,7 @@ review pass がもう 1 つの非対称性で、これは意図的なもので�
 | 状況 | 許容されるショートカット |
 |-----------|------------------|
 | 1 行のタイポ修正やコメント修正 | `tech-lead` は `pm-spec` の trivial mode（最小の board エントリと spec）へ回し、その後 `engineer` へ進む |
+| 一度実行するまで要件が分からないタスク（`prototype-first`） | `tech-lead` が `pm-spec` の前に `[engineer — prototype mode]` ステップを加え、`engineer` が作業ツリーの外で使い捨てのプロトタイプを 1 回実行して `prototype-findings-<slug>.md` を書く。`pm-spec` は最初の凍結の前にこれを読む。プロトタイプの出力は出荷されず、凍結・QA・レビューは変わらない |
 | 非 UI タスク（CI/bash/バックエンド/docs/config、または非視覚的なフロントエンド編集） | `ui-designer` は参加しない — `[Design]` フェーズ無し |
 | テストのみの変更（不足テストの追加） | `pm-spec` をスキップ。`engineer` + `qa-verifier` + `code-reviewer` |
 | 他人の PR をレビューする | `/review` を使う — `code-reviewer` のみが走る |

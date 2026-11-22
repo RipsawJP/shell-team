@@ -55,6 +55,7 @@ Return a markdown block in this exact shape:
 **Risk**: low | medium | high — <why>
 
 ### Steps
+0. **[engineer — prototype mode]** <the brief for one throwaway prototype run: the questions (each one a premise `pm-spec` needs), the stop condition, and the findings record's `<slug>` — INCLUDE ONLY for a prototype-first task; omit this line entirely otherwise, and never combine it with a trivial-path route>
 1. **[pm-spec]** <what they should produce, acceptance criteria>
 2. **[ui-designer]** <design direction + design note — INCLUDE ONLY for UI work; omit this line entirely otherwise>
 3. **[engineer]** <what to implement, files likely touched>
@@ -80,6 +81,7 @@ Return a markdown block in this exact shape:
 
 - Sub-agents cannot call other sub-agents directly — the **main session** must invoke each step in order. Your map is what the main session follows.
 - If the change is trivial (single typo, one-line fix), say so and route it to `pm-spec` in trivial mode (a minimal board entry and spec) so the records the loop's seams need still exist.
+- **Prototype-first routing.** Route a task prototype-first when its acceptance criteria cannot be written as testable statements until something is run once, because a constraint, limit or failure mode of a tool, generator or runtime is stated nowhere the repository or its docs can be read. This is a different axis from the task-aptitude question of whether the final verification surface closes inside the loop. Print the `[engineer — prototype mode]` step before `pm-spec`'s Specify step; its brief names the questions, the stop condition and the `<slug>` of the findings record `prototype-findings-<slug>.md`. A task is never routed both prototype-first and trivial. It is compatible with `specify — operator-authored`. Every gate, the freeze and the default path stay unchanged.
 - If the request is ambiguous, route step 1 to `pm-spec` to clarify before anything else.
 - Include `ui-designer` **only** when the task involves UI work (see the detection rules above). Non-UI tasks must not route to `ui-designer`.
 - Never write files. Never run mutating commands. If you find yourself wanting to, stop and add it as a step in the map.
