@@ -15,7 +15,7 @@ Each item is a heading line of the form `### item: <id>` followed by five field 
 - A provenance cell holds one locator: a `<path>:<line>` where a marker or a stated reason sits, an issue number, or a lessons entry as `lessons: <date> — <heading>`. `not found` means no line in the repository states the reason; it is not a claim that no reason exists.
 - A `reproducible` cell starts `measured:` only where a fixture or record in this repository demonstrates the failure shape. Everything else is `unmeasured:` with the reason. No model was run for this inventory.
 - A verdict is one of keep, simplify, candidate for removal, unknown. A simplify or removal verdict must end with an evidence locator; a verdict that cannot cite evidence is keep (with the protective reason) or unknown.
-- Line counts in host-cost cells are `wc -l` of the file; word counts are whitespace-separated tokens under a Unicode-aware split and run a few percent above `wc -w` under the C locale.
+- Line counts in host-cost cells are `wc -l` of the file; word counts are whitespace-separated tokens under a Unicode-aware split, not `LC_ALL=C wc -w`; on the four playbook files the split runs about 2 percent above `wc -w`.
 - Optional lines: one generated-block line per prompt block an agent file carries (marker mode), one CI-step line per workflow step attached to a `bin/` row, and free notes.
 
 ## Verdict scope
@@ -24,13 +24,13 @@ The consumer of this document is the operator and the planning that follows it; 
 
 ## Platform fact
 
-Subagents shipped inside a plugin do not support the `hooks`, `mcpServers` or `permissionMode` frontmatter fields, so any per-role protection (a tool restriction enforced by a hook, a role-scoped server, a permission mode) has to live somewhere other than a plugin agent's frontmatter. The source is the Claude Code subagent documentation, https://code.claude.com/docs/en/sub-agents, which states that plugin subagents do not support these fields; its frontmatter table also marks `initialPrompt` as ignored for them. The same fact is stated in issue #754 (relayed from issue #754, unverified in this repository); the page was cited by the coordinating session and was not fetched while this document was written, so a reader who acts on it re-reads the page.
+Subagents shipped inside a plugin do not support the `hooks`, `mcpServers` or `permissionMode` frontmatter fields, so any per-role protection (a tool restriction enforced by a hook, a role-scoped server, a permission mode) has to live somewhere other than a plugin agent's frontmatter. The source is the Claude Code subagent documentation, https://code.claude.com/docs/en/sub-agents. The coordinating session confirmed on 2026-11-22 that the page states that plugin subagents do not support these fields; its frontmatter table also marks `initialPrompt` as ignored for them. The same fact is stated in issue #754.
 
 ## Summary of findings
 
 The verdict counts per group are derived, not typed: the six derivation blocks in the appendix at the end of this document each carry the command that regenerates them, and their set lines are the counts. The findings below are prose over those blocks and the rows.
 
-- **No row is a removal or simplify candidate.** In every one of the six blocks the simplify and candidate sets are empty. Nine CI lint steps (the `shellcheck (T-1151 additions)` family and two lint steps named for T-1177 and T-1178) were first marked simplify by the readers. Re-measured at the workflow, none of the paths they lint appears in the main `shellcheck` step (`.github/workflows/check-handoff.yml:29`), so each step is the only lint of its files and the evidence for a simplify verdict does not hold; the rows are keep. What remains is a pattern, noted in each row: lint paths are added as one extra step per task instead of a list edit, which is a structural tidy-up, not a saving of lint work.
+- **One row is a simplify candidate, and no row is a removal candidate.** The simplify row is `skills/run`: its Review step repeats a paragraph its Validate step already carries (the row names both lines and the evidence locator). The simplify and candidate sets in the appendix blocks are the derived record of this. Nine CI lint steps (the `shellcheck (T-1151 additions)` family and two lint steps named for T-1177 and T-1178) were first marked simplify by the readers. Re-measured at the workflow, none of the paths they lint appears in the main `shellcheck` step (`.github/workflows/check-handoff.yml:29`), so each step is the only lint of its files and the evidence for a simplify verdict does not hold; those rows are keep. What remains is a pattern, noted in each row: lint paths are added as one extra step per task instead of a list edit, which is a structural tidy-up, not a saving of lint work.
 - **The largest host-cost levers sit in the prompts, and their live value is unmeasured.** The four generated playbook blocks are loaded in full each time their role is dispatched. Their size, by the command beside it:
 
 ```
@@ -52,9 +52,14 @@ $ LC_ALL=C wc -l agents/pm-spec.md agents/code-reviewer.md skills/run/SKILL.md
    927 total
 ```
 
-  `skills/run` and the four playbook blocks are verdict unknown rather than keep because no per-step or per-bullet evidence was gathered that a failure class no longer occurs; the rows say the pricing has to be step by step. One bullet in the engineer playbook states its own retirement condition (`agents/engineer.md:136`).
+  The four playbook blocks are verdict unknown rather than keep because no per-bullet evidence was gathered that a failure class no longer occurs. `skills/run` is the simplify row above; its steps other than the duplicated paragraph carry no per-step evidence, and the row says they should be priced step by step. One bullet in the engineer playbook states its own retirement condition (`agents/engineer.md:136`).
 - **The adversarial and evidence shapes are one Codex invocation.** Both rows describe the perspectives-file pass: its raw capture is the adversarial one and its answer is the evidence ledger. Removing or simplifying one of them cannot be priced apart from the other; the extra cost is an additional Codex pass on each approving round, bounded by the await rule stated in the review-shapes section.
-- **Every unknown is an item whose frequency of use is not recorded in the files read.** They are optional, conditional or on-demand items: the drift-evaluator role and its shape, the spec-review shape, the alternate-executor invocation block, triage-only and on-demand scripts, the liveness classifier (invoked by a timer this repository does not ship), the installer and the goal skill. The ids are the unknown buckets of the appendix blocks. A telemetry count of invocations per item would settle most of them; none was taken, because this inventory stages no model run and reads no live telemetry.
+- **The unknown rows have four different reasons; none is a single shared one.** The ids are the unknown buckets of the appendix blocks.
+  - Per-bullet value unmeasured: the four playbook blocks.
+  - Use frequency of an optional or conditional pass is not recorded: the drift-evaluator role and its shape, the spec-review shape, the alternate-executor invocation block, and the adversarial shape (which also cannot be priced apart from the evidence shape).
+  - Callers limited to triage, on-demand use or documentation, so no consumer is shown: the liveness classifier (invoked by a timer this repository does not ship), the triage-only scripts (cluster-failures, consolidate-proposals, rollup-runs), rollup-track, gen-loop-replay and the installer.
+  - Duplicated text with no decision on it: the goal skill, which repeats the run skill's escalation paragraphs; whether the goal path is used in current runs was not measured.
+  A telemetry count of invocations per item would settle most of the second and third groups; none was taken, because this inventory stages no model run and reads no live telemetry.
 - **Failure reproducibility is almost entirely unmeasured.** Exactly one row carries a `measured:` cell (the errexit-safe suite), by the command beside it:
 
 ```
@@ -271,10 +276,10 @@ One row per canonical block file under `templates/prompt-blocks/`. The four play
 
 ### item: templates/prompt-blocks/means-ends-reflection.md
 - does: Four-question reflection at three firing points and the rule for executing a pre-priced disposition versus escalating.
-- prevents: Escalating to the operator for a decision already priced at freeze, or executing one without checking the never-dropped set — provenance: docs/loop-engineering/means-ends-reflection.md:4
+- prevents: Escalating to the operator for a decision already priced at freeze, or executing one without checking the never-dropped set — provenance: docs/loop-engineering/means-ends-reflection.md:52
 - reproducible: unmeasured: no fixture in the files read demonstrates the failure shape this block prevents
 - verdict: keep — read by bin/rework-digest.sh and referenced from workflow docs.
-- host-cost: 4 lines / 304 words in the block, copied into 2 consumer file(s) (contain mode); also loaded each time the goal/run skill(s) run
+- host-cost: 4 lines / 304 words in the block, copied into 2 consumer file(s) (contain mode); also loaded each time the goal/run skill(s) run; skills/run/SKILL.md carries this paragraph twice (lines 108 and 131) although the registry requires one copy, so one extra copy of about 310 words is loaded on every run
 
 ### item: templates/prompt-blocks/operating-paths-core.md
 - does: One-sentence core of the operating-paths note: scripts run as bash "<plugin root>/bin/<script>", never assumed on PATH.
@@ -348,7 +353,7 @@ One row per canonical block file under `templates/prompt-blocks/`. The four play
 
 ### item: templates/prompt-blocks/telemetry-binding.md
 - does: After each bound role call, passes the resolved row's provider, effort and adapter to log-run.sh, and records a refusal as a gate event instead of a span.
-- prevents: Spans recording a call that did not happen, and telemetry missing the executor that ran — provenance: docs/loop-engineering/default-path-firing.md:104
+- prevents: Spans recording a call that did not happen, and telemetry missing the executor that ran — provenance: templates/prompt-blocks/telemetry-binding.md:1
 - reproducible: unmeasured: no fixture in the files read demonstrates the failure shape this block prevents
 - verdict: keep — one long line held in three skills.
 - host-cost: 1 lines / 136 words in the block, copied into 3 consumer file(s) (contain mode); also loaded each time the goal/review-response/run skill(s) run
@@ -368,7 +373,7 @@ Seven skill directories, each holding one `SKILL.md`. A free note in a skill row
 - does: Orchestrates the full loop (Plan, Specify, Design when UI, Implement, Validate, Review, Done) on either host, with Step 0 path/probe/setup-check/record-mode resolution, seam gates, loop-guard retries, telemetry rows, executor resolution and the Codex-host recipes.
 - prevents: Skipped phases and unguarded hand-offs between roles (every seam has a gate: durability barrier, provenance, interventions, frozen-intent confirmation, spec-review, evidence-ledger and downgrade-ground checks); unbounded rework (loop-guard plus same-class-2 and means-ends rules); a review or resolution step that silently substitutes another executor; unrecorded human interrupts — provenance: skills/run/SKILL.md:96
 - reproducible: unmeasured: the skill is an orchestration prompt; runtime behaviour is exercised by dogfood runs, and no repo fixture replays a model skipping a seam. The checkers it calls have their own suites under tests/, which test the scripts and not the skill's instruction-following.
-- verdict: unknown — by far the largest single prompt in the plugin and a long accretion of per-task seam gates, but no per-step evidence was gathered that a given step's failure class no longer occurs with current models; it should be priced step by step, not judged as a whole.
+- verdict: simplify — the Review step (skills/run/SKILL.md:131) repeats the 'Means-ends reflection and disposition rule (T-1095)' paragraph that the Validate step already carries at skills/run/SKILL.md:108: the first 310 words (the length of line 108 by `wc -w`) are the same text, and line 131 then adds an authorship-class sentence of about 60 words; the registry rule for that block (`templates/prompt-blocks/registry.txt:54`) is `contain` with one copy per consumer, and neither line sits inside a prompt-block marker, so the second copy is not required by the registry. Beyond that duplicate the skill is a long accretion of per-task seam gates with no per-step evidence gathered, so its other steps stay unpriced and should be priced step by step, not as a whole — evidence: skills/run/SKILL.md:131
 - host-cost: loaded on every /shell-team:run, about 349 lines and 25,000 words (175 KB, with very long lines) of orchestrator context per run; each seam gate adds a Bash call and a wait; four standing steps run before any role dispatches (path resolve, ignore probe, setup check, record-mode read).
 - steps (what each exists to prevent): Step 0 resolve/probe/setup-check/record-mode — prevents running against an unscaffolded, mis-ignored or ambiguous-mode repo (skills/run/SKILL.md:22; skills/run/SKILL.md:28). Interventions discipline — prevents the host's interrupts and corrections going unrecorded (skills/run/SKILL.md:42). 1 Plan (tech-lead Routing Map, dispatch record) — prevents ad hoc role routing (skills/run/SKILL.md:58). 2 Specify plus freeze gates (frozen-intent, adopter-docs, spec-review, oversight, version derivation) — prevents implementing against an unfrozen or unratified spec (skills/run/SKILL.md:67; skills/run/SKILL.md:70; skills/run/SKILL.md:72; skills/run/SKILL.md:73). 3 Design (UI only) — prevents the engineer inferring UI intent from a missing note. 4 Implement plus commit/durability/provenance/interventions gates — prevents QA running over uncommitted or unrecorded work (skills/run/SKILL.md:91; skills/run/SKILL.md:95; skills/run/SKILL.md:96). 5 Validate plus loop-guard, same-class-2, rework digest — prevents endless identical retries (skills/run/SKILL.md:99). 6 Review plus binding pre-dispatch, evidence-ledger gate, downgrade-ground check — prevents an unverified APPROVE reaching READY_FOR_MERGE and a defect being lowered on its own frozen status (skills/run/SKILL.md:119; skills/run/SKILL.md:120; skills/run/SKILL.md:121). 7 Done — the human gate before merge stays with the operator. Telemetry rows, human-gate declaration and executor resolution — prevent unobservable runs and a role running on an unresolved executor (skills/run/SKILL.md:194; skills/run/SKILL.md:196). Codex-host and alternate-executor recipes (skills/run/SKILL.md:198 onward) — prevent re-deriving the host dispatch each run. The fan-out and concurrent-worktree sections (skills/run/SKILL.md:284; skills/run/SKILL.md:309) are opt-in and wired to no default phase.
 
@@ -376,7 +381,7 @@ Seven skill directories, each holding one `SKILL.md`. A free note in a skill row
 - does: Drives one task through repeated implement-and-verify ticks until a layered completion gate (check-acs, check-intent, check-provenance, qa-verifier, code-reviewer) is green, bounded by loop-guard (iteration, wall-clock, no-progress), then stops at the human gate.
 - prevents: A self-verification loop that runs away or merges on its own; one verifier's PASS anchoring the next (gate layers run independently); cross-tick state lost between separate shell calls (state file via goal-state.sh) — provenance: skills/goal/SKILL.md:9
 - reproducible: unmeasured: the skill itself states its tick cadence and end-to-end behaviour are dogfood-verified, not CI-tested (skills/goal/SKILL.md:292); only goal-state.sh and the contract lint have fixtures.
-- verdict: unknown — it repeats the run skill's escalation and digest paragraphs (a second copy of the STOP, rework-digest, means-ends and ratifier text); whether the /goal path is used in current runs was not measured here.
+- verdict: unknown — it repeats the run skill's escalation and digest paragraphs (a second copy of the STOP, rework-digest, means-ends and ratifier text: skills/goal/SKILL.md:248 repeats the rework-history digest paragraph, :252 the extension ratifier and :254 the means-ends paragraph); whether the /goal path is used in current runs was not measured here.
 - host-cost: loaded only when /goal is invoked; about 309 lines and 5,300 words (39 KB); each tick adds a loop-guard call, a state-file bump and a ScheduleWakeup.
 - steps (what each exists to prevent): Step 0 path and contract resolve — prevents hardcoded layout (skills/goal/SKILL.md:12). First-tick state init and record mode — prevents lost cross-tick counters and an unread record mode (skills/goal/SKILL.md:46). 1 Implement attempt plus commit guard — prevents verifying uncommitted work (skills/goal/SKILL.md:53). 2 Layered completion gate — prevents false-positive PASS chaining (skills/goal/SKILL.md:60). 3 Bound gate (loop-guard) — prevents runaway loops (skills/goal/SKILL.md:113). 4 Decide (green stop, STOP reporting, early escalation, means-ends reflection) — prevents merging or pushing and unreflective escalations (skills/goal/SKILL.md:237; skills/goal/SKILL.md:254).
 
@@ -641,7 +646,7 @@ One row per tracked `bin/` entry. A CI step that executes a script, directly or 
 
 ### item: bin/check-readme-version.sh
 - does: Fails when a README's static version badge differs from the version in the plugin manifest.
-- prevents: The README version badge going stale on release — provenance: not found
+- prevents: The README version badge going stale on release — provenance: bin/check-readme-version.sh:3
 - reproducible: unmeasured: no recorded failure was read for this row.
 - verdict: keep — a 87-line manifest comparison that CONTRIBUTING.md:125 lists in the release preparation; trivially cheap.
 - host-cost: ~87 lines of bash, not loaded into prompts; CI and one release-preparation command; no per-task cost.
@@ -1154,7 +1159,7 @@ Every Codex pass the plugin defines is listed here, with the closed list below. 
 
 Each block below is the output of the command on the `- reproduce:` line above it, run at the repository root against this document. The sets count rows by verdict within one id prefix group.
 
-- reproduce: bash bin/derive-populations.sh --label verdicts-agents --set "keep=awk -v p=agents/ -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=agents/ -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=agents/ -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=agents/ -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
+- reproduce: bash bin/derive-populations.sh --label verdicts-agents --set "keep=awk -v p=agents/ -v v=keep '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=agents/ -v v=simplify '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=agents/ -v v=candidate '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=agents/ -v v=unknown '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
 <!-- BEGIN derivation: verdicts-agents -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
@@ -1176,7 +1181,7 @@ Each block below is the output of the command on the `- reproduce:` line above i
   - agents/drift-evaluator.md
 <!-- END derivation: verdicts-agents -->
 
-- reproduce: bash bin/derive-populations.sh --label verdicts-templates --set "keep=awk -v p=templates/ -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=templates/ -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=templates/ -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=templates/ -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
+- reproduce: bash bin/derive-populations.sh --label verdicts-templates --set "keep=awk -v p=templates/ -v v=keep '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=templates/ -v v=simplify '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=templates/ -v v=candidate '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=templates/ -v v=unknown '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
 <!-- BEGIN derivation: verdicts-templates -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
@@ -1218,14 +1223,14 @@ Each block below is the output of the command on the `- reproduce:` line above i
   - templates/prompt-blocks/playbook-tech-lead.md
 <!-- END derivation: verdicts-templates -->
 
-- reproduce: bash bin/derive-populations.sh --label verdicts-skills --set "keep=awk -v p=skills/ -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=skills/ -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=skills/ -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=skills/ -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
+- reproduce: bash bin/derive-populations.sh --label verdicts-skills --set "keep=awk -v p=skills/ -v v=keep '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=skills/ -v v=simplify '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=skills/ -v v=candidate '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=skills/ -v v=unknown '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
 <!-- BEGIN derivation: verdicts-skills -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
 - set: keep — status: 0 — lines: 5 — items: 5 — command: awk -v p=skills/ -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md
-- set: simplify — status: 0 — lines: 0 — items: 0 — command: awk -v p=skills/ -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md
+- set: simplify — status: 0 — lines: 1 — items: 1 — command: awk -v p=skills/ -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md
 - set: candidate — status: 0 — lines: 0 — items: 0 — command: awk -v p=skills/ -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md
-- set: unknown — status: 0 — lines: 2 — items: 2 — command: awk -v p=skills/ -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md
+- set: unknown — status: 0 — lines: 1 — items: 1 — command: awk -v p=skills/ -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md
 - union: items: 7
 - bucket: keep — items: 5
   - skills/loop-triage
@@ -1233,12 +1238,13 @@ Each block below is the output of the command on the `- reproduce:` line above i
   - skills/review-response
   - skills/setup
   - skills/team-init
-- bucket: unknown — items: 2
-  - skills/goal
+- bucket: simplify — items: 1
   - skills/run
+- bucket: unknown — items: 1
+  - skills/goal
 <!-- END derivation: verdicts-skills -->
 
-- reproduce: bash bin/derive-populations.sh --label verdicts-bin --set "keep=awk -v p=bin/ -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=bin/ -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=bin/ -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=bin/ -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
+- reproduce: bash bin/derive-populations.sh --label verdicts-bin --set "keep=awk -v p=bin/ -v v=keep '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=bin/ -v v=simplify '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=bin/ -v v=candidate '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=bin/ -v v=unknown '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
 <!-- BEGIN derivation: verdicts-bin -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
@@ -1313,7 +1319,7 @@ Each block below is the output of the command on the `- reproduce:` line above i
   - bin/rollup-track.sh
 <!-- END derivation: verdicts-bin -->
 
-- reproduce: bash bin/derive-populations.sh --label verdicts-ci --set "keep=awk -v p=ci: -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=ci: -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=ci: -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=ci: -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
+- reproduce: bash bin/derive-populations.sh --label verdicts-ci --set "keep=awk -v p=ci: -v v=keep '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=ci: -v v=simplify '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=ci: -v v=candidate '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=ci: -v v=unknown '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
 <!-- BEGIN derivation: verdicts-ci -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
@@ -1347,7 +1353,7 @@ Each block below is the output of the command on the `- reproduce:` line above i
   - ci:shellcheck (T-1183 additions)
 <!-- END derivation: verdicts-ci -->
 
-- reproduce: bash bin/derive-populations.sh --label verdicts-shape --set "keep=awk -v p=shape: -v v=keep '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=shape: -v v=simplify '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=shape: -v v=candidate '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=shape: -v v=unknown '/^### item: /{id=substr($0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr($0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
+- reproduce: bash bin/derive-populations.sh --label verdicts-shape --set "keep=awk -v p=shape: -v v=keep '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "simplify=awk -v p=shape: -v v=simplify '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "candidate=awk -v p=shape: -v v=candidate '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md" --set "unknown=awk -v p=shape: -v v=unknown '/^### item: /{id=substr(\$0,11)} /^- verdict: /{if(index(id,p)==1&&index(substr(\$0,12),v)==1)print id}' docs/loop-engineering/machinery-inventory.md"
 <!-- BEGIN derivation: verdicts-shape -->
 - derived-by: bin/derive-populations.sh
 - locale: LC_ALL=C
