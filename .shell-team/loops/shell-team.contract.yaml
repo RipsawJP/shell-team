@@ -53,3 +53,9 @@ evidence:
   - QA verification of the spec's acceptance criteria (check-acs PASS / test output)
   - the Codex cross-provider review verdict in the reviews dir (team-paths.sh --get reviews) (APPROVE)
   - the feature-branch diff / PR for human review
+
+# Optional declaration: this repository's own CI runs its test suites, so a mechanism-class
+# task here does not owe the full-population downstream-impact diff (see docs/adopting.md).
+verification:
+  ci_runs_test_suites: yes
+  ci_suite_workflows: .github/workflows/check-handoff.yml

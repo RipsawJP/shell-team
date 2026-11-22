@@ -6,6 +6,9 @@ A change that alters no behaviour and touches only committed records is describe
 
 日本語版: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
+- **v2.10.0**
+  - **A repository whose CI runs its test suites can skip the full-population downstream-impact diff.** A mechanism-class task no longer has to run every merged spec's criteria at base and at HEAD (one to five hours) when the loop contract declares, in an optional top-level `verification:` section, `ci_runs_test_suites: yes` with `ci_suite_workflows` naming the CI workflow(s) that run the suites. Without that exact declaration the diff stays owed, as before; nothing verifies the declaration. The spec records the decision in its Blast radius, the run skill's freeze sweep confirms it against the contract, an owed diff runs against the post-implementation HEAD, and the review treats a recorded skip as non-gating. pm-spec's self-check item becomes a property of the spec text it can meet without a shell. Adding the section makes `check-setup.sh` note that the contract differs from the template (exit status unchanged). (#216)
+  - Records maintenance.
 - **v2.9.7**
   - **The run skill loads its means-ends reflection rule once.** The review step repeated the planning step's means-ends reflection and disposition paragraph word for word; it now points to that paragraph and keeps only its own authorship-class sentence, so every run reads about 310 fewer words. The rule itself is unchanged. (#781)
   - **A design for measuring what each playbook lesson still prevents.** `docs/loop-engineering/playbook-bullet-measurement.md` sets out how to tell, per lessons entry and per role, whether a playbook bullet still changes what a current model does: a no-model telemetry pass first, then a single-entry ablation on a fixed task for the few entries it selects, with a verdict procedure checked for exhaustiveness and costs derived or labelled as estimates. Nothing is measured or removed by this release. (#782)
