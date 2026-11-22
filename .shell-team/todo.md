@@ -11,6 +11,22 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
+- [ ] **T-1199** Design how to measure what each playbook block's lessons still prevent: one design note, nine fixed sections, cost lines with derivations or labelled estimates, nothing removed (issue #782) — `READY_FOR_ARCH` — spec: .shell-team/specs/T-1199-playbook-measurement-design.md
+  - entry-mode: pm-authored
+  - spec-review: none
+  - source: issue #782, relayed in its essentials by the coordinating session with tech-lead's settled map (deliverable path, fixed headings, criteria, non-goals, pre-commitment, version). This role cannot read the tracker, so its facts are labelled relayed in the spec's Assumptions. No separate issue is filed for the task itself, and no removal issue is filed by it. Branch `feature/782-playbook-measurement-design`; sprint context-trim, last backlog item, release PATCH v2.9.7 (relayed). Intent hash not recorded: this role has no shell, so the coordinating session runs the check lines live and freezes once.
+  - stacked-on: T-1198 (feature/781-skills-run-dedupe @ 59e16830); PR #783 base develop, open; sprint context-trim, release PATCH v2.9.7 (relayed)
+  - spec choices (pm-spec, 2026-11-22): the two unnamed sections are `## Relation to the block-size deferral` and `## Bullets that state their own retirement condition`; the cost grammar is `- cost: <runs|wall-clock|tokens|host> — <value> — derivation: <cmd>` or `— estimate: <basis>`; section-scoped string checks (AC8) pin `Applies-to: all`, `Superseded-by`, `Scope: maintainer`, `bin/check-playbook.sh`, the inventory and deferral paths, claim-1, signal-1, #268 and `proposal`; the base is the stacked two-arm discriminator (feature/781 local, then remote-tracking, then develop), byte-identical in AC4 and AC7; the #268 retirement bullet is one `Applies-to: all` entry (lessons.md:1235) rendered in all four blocks and agents, not a tech-lead-only bullet
+  - spec-choices-confirmed (coordinating session, 2026-11-22): the nine fixed headings, the cost-line grammar, AC8 section-scoped strings and AC10 reuse-candidate naming accepted; the self-retiring bullet premise re-measured (git grep: eight files, one occurrence each; interventions entry 1); the retro lands on this branch only after close-out, and lesson promotion goes to a separate PR, so AC4 and AC7 are judged before either
+  - dispatch-reflection: implement — T-1198 — no-predecessor-row — T-1198 is a trivial-path entry that recorded no dispatch rows
+  - dispatch-reflection: verify — T-1198 — no-predecessor-row — T-1198 is a trivial-path entry that recorded no dispatch rows
+  - dispatch-reflection: specify — T-1198 — no-predecessor-row — T-1198 is a trivial-path entry that recorded no dispatch rows
+  - dispatch-reflection: spec-review — T-1198 — no-predecessor-row — T-1198 is a trivial-path entry that recorded no dispatch rows
+  - dispatch: implement — serial — unconditional — saving: tier3-work-splitting — one new document; no balanced disjoint partition, and the tier2 trigger does not fire (no judge role)
+  - dispatch: verify — serial — unconditional — recommendation: tier1-verification-fanout — one spec's check-acs plus the PII checker and check-handoff, below the fan-out threshold; no mechanism-class full-population half
+  - dispatch: specify — pm-authored — unconditional — recommendation: pm-authored-default — judgment-density trigger examined and not fired: the issue body names the sections and the measured inventory hands over as text
+  - dispatch: spec-review — none — unconditional — recommendation: spec-review-none-default — domain-premise trigger examined and not fired: the note's premises are in-repo records, and any figure about model behaviour or cost must be derived or labelled estimate by AC3
+
 
 
 
