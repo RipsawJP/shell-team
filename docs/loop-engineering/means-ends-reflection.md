@@ -2,7 +2,7 @@
 
 This note is the one worked example the means-ends reflection duty
 (`templates/prompt-blocks/means-ends-reflection.md`, mirrored into
-`skills/run/SKILL.md` step 5, step 6, and `skills/goal/SKILL.md`'s Decide
+`skills/run/SKILL.md` step 5 and `skills/goal/SKILL.md`'s Decide
 list) currently rests on. It is built from a single live firing, recorded on
 the board rather than invented for this note, and it carries the norm's own
 bound with it so a reader who never opens the frozen spec still sees the

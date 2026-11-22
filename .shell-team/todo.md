@@ -11,11 +11,13 @@ state — the `/shell-team:run` loop advances the flag at each phase gate.
 
 ## Active
 
-- [ ] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_ENG` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
+- [ ] **T-1198** skills/run carries the means-ends reflection paragraph once: step 6's copy becomes a pointer to step 5 (issue #781) — `READY_FOR_QA` — spec: .shell-team/specs/T-1198-skills-run-means-ends-dedupe.md
   - entry-mode: pm-authored
   - spec-review: none
   - trivial-path: prose-only removal of a duplicate in a shipped orchestration prompt, no behaviour, checker or registry change; precedents the trivial-path entries T-1187 and T-1188 on this board; both gates still run.
   - source: issue #781, relayed by the coordinating session with tech-lead's measured inventory at develop b5927c58 and the settled in-place shape; branch `feature/781-skills-run-dedupe`; sprint context-trim, release PATCH v2.9.7 (relayed); T-1199 (#782) stacks after.
+  - engineer hand-off: skills/run/SKILL.md line 131 replaced in place as one line (step-6 pointer + unchanged authorship sentence; line count unchanged); docs/loop-engineering/means-ends-reflection.md:5 now names step 5 only.
+  - checks: spec-mode check-acs run 7 passed 0 failed (AC1-AC7); suites (WSL bash 5.2) check-prompt-sync, codex-skeleton-hygiene, check-refreeze-grant, check-oversight ALL-PASS.
 
 
 
