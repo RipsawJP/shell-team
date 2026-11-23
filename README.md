@@ -226,6 +226,7 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 
 ```
 [Plan]      tech-lead       → Routing Map
+[Prototype]  engineer        → (prototype-first only) throwaway run → prototype-findings-<slug>.md   no new flag
 [Specify]   pm-spec         → docs/specs/<slug>.md   READY_FOR_ARCH
 [Design]    ui-designer     → (UI only) design note   no new flag
 [Implement] engineer        → code + tests           READY_FOR_QA
@@ -234,6 +235,8 @@ On a Claude Code host, it also works standalone, one agent or skill at a time, w
 ```
 
 `[Design]` is **conditional** (only when the task involves UI work). It carries no new status flag — the design note's existence gates the engineer. The `frontend-design` Skill is an optional dependency (degrades to in-house guidance, announced not silent, when absent).
+
+`[Prototype]` is **conditional** (only a `prototype-first` task, whose requirements can be learned only by running something once): `engineer` runs one throwaway prototype outside the working tree and `pm-spec` reads its findings record before the first freeze. It carries no new status flag and never ships.
 
 See [docs/workflow.md](docs/workflow.md) for the hand-off contract and shortcuts.
 
