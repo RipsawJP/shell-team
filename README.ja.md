@@ -4,7 +4,7 @@
 [![日本語](https://img.shields.io/badge/lang-日本語-1f6feb?style=flat-square)](README.ja.md)
 
 [![CI](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml/badge.svg)](https://github.com/RipsawJP/shell-team/actions/workflows/check-handoff.yml)
-[![version](https://img.shields.io/badge/version-2.10.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
+[![version](https://img.shields.io/badge/version-2.11.0-1f6feb?style=flat-square)](https://github.com/RipsawJP/shell-team/tags)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-d97757?style=flat-square)](docs/distribution.md)
 [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-10a37f?style=flat-square)](docs/adopting.ja.md#codex-cli-から-shell-team-を使う)
 [![reviewer: Codex](https://img.shields.io/badge/reviewer-Codex_cross--provider-10a37f?style=flat-square)](#設計上の選択)
@@ -226,6 +226,7 @@ Claude Code host では、明示的に使いたいときにエージェントや
 
 ```
 [Plan]      tech-lead       → Routing Map
+[Prototype]  engineer        → （prototype-first 時のみ）使い捨て実行 → prototype-findings-<slug>.md  新フラグなし
 [Specify]   pm-spec         → docs/specs/<slug>.md   READY_FOR_ARCH
 [Design]    ui-designer     → （UI 時のみ）design note  新フラグなし
 [Implement] engineer        → コード + テスト          READY_FOR_QA
@@ -234,6 +235,8 @@ Claude Code host では、明示的に使いたいときにエージェントや
 ```
 
 `[Design]` は**条件付き**（UI 作業時のみ `ui-designer` が参加）。新しい status flag は持たず、design note の存在で順序を担保する。`frontend-design` Skill は任意依存（未インストール時は内蔵指針に縮退モード明示で fallback）。
+
+`[Prototype]` は**条件付き**（`prototype-first` のタスク、つまり一度実行しないと要件が分からないものだけ）。`engineer` が作業ツリーの外で使い捨てのプロトタイプを 1 回実行し、`pm-spec` が最初の凍結の前にその findings 記録を読む。新しい status flag は持たず、出荷もされない。
 
 ハンドオフ契約とショートカットは [docs/workflow.md](docs/workflow.md) を参照。
 

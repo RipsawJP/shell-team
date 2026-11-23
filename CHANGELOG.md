@@ -6,6 +6,9 @@ A change that alters no behaviour and touches only committed records is describe
 
 日本語版: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
+- **v2.11.0**
+  - **A task whose requirements emerge only by trying can start with one throwaway prototype run.** When a task's acceptance criteria cannot be written as testable statements until something is run once, `tech-lead` can route it prototype-first. `engineer` then runs one prototype outside the working tree, under `$TMPDIR`, and writes a single findings record, `prototype-findings-<slug>.md`, in the specs dir. `pm-spec` reads that record as a primary input before the first freeze, and the freeze sweep re-measures each finding the spec relies on. Every gate is unchanged, and a task not routed this way follows the same path as before.
+  - **`pm-spec` creates the task's interventions file when it creates the board entry.** If the file is absent, it writes the zero-entry record, so a missing file no longer fails QA.
 - **v2.10.0**
   - **A repository whose CI runs its test suites can skip the full-population downstream-impact diff.** A mechanism-class task no longer has to run every merged spec's criteria at base and at HEAD (one to five hours) when the loop contract declares, in an optional top-level `verification:` section, `ci_runs_test_suites: yes` with `ci_suite_workflows` naming the CI workflow(s) that run the suites. Without that exact declaration the diff stays owed, as before; nothing verifies the declaration. The spec records the decision in its Blast radius, the run skill's freeze sweep confirms it against the contract, an owed diff runs against the post-implementation HEAD, and the review treats a recorded skip as non-gating. pm-spec's self-check item becomes a property of the spec text it can meet without a shell. Adding the section makes `check-setup.sh` note that the contract differs from the template (exit status unchanged). (#216)
   - Records maintenance.
